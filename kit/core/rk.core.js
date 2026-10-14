@@ -97,7 +97,9 @@
       if (t === '.') el.classList.add(v); else el.id = v;
     });
     var kids = Array.prototype.slice.call(arguments, 2);
-    if (props && (typeof props !== 'object' || props.nodeType || Array.isArray(props))) { kids.unshift(props); props = null; }
+    // second argument is a props bag only when it is a plain object; data values must be passed as children
+    // (dataset cells are normalised to scalars by RK.Dataset, so a data cell can never become props)
+    if (props && (typeof props !== 'object' || props.nodeType || Array.isArray(props) || Object.getPrototypeOf(props) !== Object.prototype)) { kids.unshift(props); props = null; }
     if (props) {
       for (var k in props) {
         var v = props[k];

@@ -282,5 +282,13 @@
     };
   };
 
+  /**
+   * Make a data string safe inside an ECharts rich-text template ('{n|' + name + '}'): braces in data would
+   * otherwise start / end style runs. Replaces them with look-alike full-width characters.
+   */
+  chart.richSafe = function (s) {
+    return s == null ? '' : String(s).replace(/\{/g, '\uFF5B').replace(/\}/g, '\uFF5D');
+  };
+
   RK.chart = chart;
 })(typeof window !== 'undefined' ? window : this);

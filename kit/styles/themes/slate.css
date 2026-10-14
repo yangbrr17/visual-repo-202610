@@ -11,10 +11,10 @@
   --rk-grid: #e8ecf0;
   --rk-axis: #8d98a4;
   --rk-accent: #1f2a44;
-  --rk-accent-2: #1b8a8f;
-  --rk-accent-2-ink: #198084;   /* text-safe (>= 4.5:1) variant of accent-2 for labels */
+  --rk-accent-2: #c98a00;
+  --rk-accent-2-ink: #8a5e00;   /* text-safe (>= 4.5:1) variant of accent-2 for labels */
   --rk-accent-3: #3d7eaa;
-  --rk-highlight: #1b8a8f;
+  --rk-highlight: #c98a00;
   --rk-pos: #2f7a4f;
   --rk-neg: #c0504d;
   --rk-neutral: #a8b2bd;

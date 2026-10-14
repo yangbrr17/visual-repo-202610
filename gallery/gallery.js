@@ -31,7 +31,7 @@
   };
   var GENERIC_OPTS = ['encode', 'tools', 'where', 'filters', 'ignoreFilters', 'crossFilterScope'];
 
-  var comps = G.components, byId = {}, cats = G.categories, catById = {};
+  var comps = G.components, byId = Object.create(null), cats = G.categories, catById = Object.create(null);
   comps.forEach(function (c) { byId[c.id] = c; });
   cats.forEach(function (c) { catById[c.id] = c; });
 

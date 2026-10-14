@@ -871,3 +871,26 @@ class PageSizeTests(unittest.TestCase):
             self.assertIn('<meta name="rk:themes"', (out / "index.html").read_text())
         with self.assertRaises(ValueError):
             Report("T", page_size="legal")
+
+
+class HardeningTests(unittest.TestCase):
+    def test_dataset_id_rejected_early(self):
+        from reportkit import Report
+        r = Report("T")
+        for bad in ("../x", "a/b", "peers\n", "__proto__"):
+            with self.assertRaises(ValueError):
+                r.dataset(bad, [{"a": 1}])
+
+    def test_clean_keeps_foreign_files(self):
+        import tempfile
+        from pathlib import Path
+        from reportkit import Report
+        root = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as tmp:
+            r = Report("T")
+            r.dataset("kpis", root / "kit/samples/datasets/kpis.json")
+            r.page("P").block("kpi-tiles", data="kpis", height="auto")
+            out = r.build(Path(tmp) / "a", kit=root)
+            (out / "data" / "analyst-notes.txt").write_text("keep me")
+            r.build(out, kit=root)
+            self.assertTrue((out / "data" / "analyst-notes.txt").exists())

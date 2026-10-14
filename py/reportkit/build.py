@@ -157,9 +157,13 @@ def _prepare_out(out: Path, clean: bool) -> None:
     if foreign:
         raise BuildError(f"refusing to clean {out}: {', '.join(foreign)} not written by ReportKit. "
                          "Choose an empty / dedicated output folder (or pass clean=False).")
-    for name, _ in checks:
-        if (out / name).exists():
-            shutil.rmtree(out / name)
+    # remove only the paths a build writes; anything else an analyst put in data/ or assets/ survives
+    for rel in ("assets/js", "assets/css", "assets/vendor", "assets/fonts", "data/datasets"):
+        if (out / rel).is_dir():
+            shutil.rmtree(out / rel)
+    for rel in ("data/manifest.json", "data/bundle.js"):
+        if (out / rel).is_file():
+            (out / rel).unlink()
     if idx.exists():
         idx.unlink()
 
@@ -232,7 +236,7 @@ def build(report: "Report", out_dir: str | os.PathLike, *, clean: bool = True, v
     if validate:
         for w in _validate(report, kit):
             _warnings.warn(w, ReportKitWarning, stacklevel=3)
-    bad = [did for did in report.datasets if not DATASET_ID_RE.match(did)]
+    bad = [did for did in report.datasets if not DATASET_ID_RE.fullmatch(did)]
     if bad:
         raise BuildError(f"invalid dataset id(s) for a file name: {', '.join(map(repr, bad))}")
     p = plan(report, kit, build_date=build_date)

@@ -67,6 +67,18 @@
         return o;
       });
     }
+    // Cells must be scalars (or arrays, e.g. sparklines). Object cells (dict / JSONB columns) are turned into JSON
+    // text so they can never be mistaken for DOM props / markup by components.
+    for (var ri = 0; ri < data.length; ri++) {
+      var rec = data[ri];
+      for (var ck in rec) {
+        if (Object.prototype.hasOwnProperty.call(rec, ck)) {
+          var cv = rec[ck];
+          if (cv !== null && typeof cv === 'object' && !Array.isArray(cv)) rec[ck] = JSON.stringify(cv);
+          else if (Array.isArray(cv)) rec[ck] = cv.map(function (x) { return x !== null && typeof x === 'object' ? JSON.stringify(x) : x; });
+        }
+      }
+    }
     this.rows = data;
     if (!fields) {
       var names = data.length ? Object.keys(data[0]) : [];
@@ -181,7 +193,9 @@
     function esc(v) {
       if (v == null) return '';
       var s = String(v);
-      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      // spreadsheet formula injection: =HYPERLINK(...), +cmd, -cmd, @SUM... are executed by Excel on open
+      if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s) && !/^-?\d/.test(s)) s = "'" + s;
+      return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     }
     var lines = [fields.map(function (f) { return esc(f.title || f.name); }).join(',')];
     rows.forEach(function (r) { lines.push(fields.map(function (f) { return esc(get(r, f.name)); }).join(',')); });

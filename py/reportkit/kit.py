@@ -120,7 +120,7 @@ class Kit:
     def component(self, cid: str) -> dict | None:
         """Manifest dict for component *cid*, or None if it does not exist."""
         if cid not in self._manifests:
-            path = self.component_dir(cid) / "manifest.json" if COMPONENT_ID_RE.match(cid or "") else None
+            path = self.component_dir(cid) / "manifest.json" if COMPONENT_ID_RE.fullmatch(cid or "") else None
             self._manifests[cid] = _read_json(path) if path and path.is_file() else None
         return self._manifests[cid]
 

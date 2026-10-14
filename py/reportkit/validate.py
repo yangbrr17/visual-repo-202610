@@ -89,7 +89,7 @@ def check(report: "Report", kit: Any = None) -> tuple[list[str], list[str]]:
 
     # -------------------------------------------------------------- datasets
     for did, ds in report.datasets.items():
-        if not DATASET_ID_RE.match(did):
+        if not DATASET_ID_RE.fullmatch(did):
             errors.append(f"dataset id '{did}' must contain only letters, digits, '_', '-', '.' "
                           "(it becomes data/datasets/<id>.json)")
         n = len(ds.get("data") or [])

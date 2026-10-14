@@ -204,6 +204,10 @@ class Report:
         """
         if not isinstance(id, str) or not id:
             raise TypeError("dataset id must be a non-empty string")
+        from .validate import DATASET_ID_RE
+        if not DATASET_ID_RE.fullmatch(id) or id in ("__proto__", "constructor", "prototype"):
+            # ids become file names (data/datasets/<id>.json, spec datasets/<id>.json) and JS object keys
+            raise ValueError(f"invalid dataset id {id!r}: use letters, digits, '_', '-', '.' (no path separators)")
         if isinstance(data, (str, os.PathLike)) and not isinstance(data, Path):
             data = Path(data)
         ds, warns = normalize_dataset(id, data, title=title, fields=fields, source=source, notes=notes,

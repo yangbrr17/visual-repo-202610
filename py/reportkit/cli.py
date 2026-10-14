@@ -162,7 +162,7 @@ _JS_DOM = """/*!
 def scaffold_component(kit: Kit, cid: str, category: str, *, name: str | None = None,
                        engine: str = "echarts", force: bool = False) -> Path:
     """Create kit/components/<cid>/ with manifest.json and <cid>.js following the contract."""
-    if not COMPONENT_ID_RE.match(cid):
+    if not COMPONENT_ID_RE.fullmatch(cid):
         raise ReportKitError(f"component id '{cid}' must be kebab-case (e.g. 'waterfall', 'football-field')")
     if category not in CATEGORIES:
         raise ReportKitError(f"category '{category}' must be one of: {', '.join(CATEGORIES)}")
