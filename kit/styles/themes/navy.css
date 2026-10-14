@@ -14,6 +14,7 @@
   --rk-axis: #8a95a6;
   --rk-accent: #0b2d5b;       /* brand primary */
   --rk-accent-2: #b08d57;     /* highlight accent (gold) */
+  --rk-accent-2-ink: #886d43;   /* text-safe (>= 4.5:1) variant of accent-2 for labels */
   --rk-accent-3: #4a78b0;
   --rk-highlight: #b08d57;
   --rk-pos: #2e7d6f;

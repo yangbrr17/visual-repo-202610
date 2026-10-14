@@ -14,6 +14,7 @@
   --rk-axis: #52637c;
   --rk-accent: #7fa7d9;
   --rk-accent-2: #d6b47a;
+  --rk-accent-2-ink: #d6b47a;   /* text-safe (>= 4.5:1) variant of accent-2 for labels */
   --rk-accent-3: #5f8fcb;
   --rk-highlight: #d6b47a;
   --rk-pos: #5fb3a2;

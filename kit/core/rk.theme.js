@@ -9,7 +9,7 @@
 
   var TOKEN_NAMES = [
     'font-sans', 'font-serif', 'font-num', 'paper', 'canvas', 'surface', 'surface-2',
-    'ink', 'ink-2', 'ink-3', 'rule', 'grid', 'axis', 'accent', 'accent-2', 'accent-3',
+    'ink', 'ink-2', 'ink-3', 'rule', 'grid', 'axis', 'accent', 'accent-2', 'accent-2-ink', 'accent-3',
     'highlight', 'pos', 'neg', 'neutral', 'tooltip-bg', 'tooltip-ink', 'map-land', 'map-border', 'map-water'
   ];
 
@@ -94,6 +94,7 @@
     t.axis = t.axis || t.ink3;
     t.accent = t.accent || t.cat[0];
     t.accent2 = t.accent2 || t.cat[3] || t.cat[1];
+    t.accent2Ink = t.accent2Ink || t.accent2;   // use for TEXT in the highlight colour (contrast >= 4.5:1)
     t.pos = t.pos || '#2f7d6d';
     t.neg = t.neg || '#a3485a';
     t.neutral = t.neutral || '#9ca3af';
