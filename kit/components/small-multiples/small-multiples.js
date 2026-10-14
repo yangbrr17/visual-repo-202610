@@ -32,8 +32,9 @@
       var state = { facets: [] };                                   // per-instance: facet order for click -> filter
       return C(function (c, chart) { return build(c, chart, state); }, {
         rebuildOnResize: true,                                      // panel geometry is in pixels
-        select: function (p, c) {
-          var m = /^f-(\d+)$/.exec(p.seriesId || ''), f = c.enc.facet;
+        select: function (p, c, chart) {
+          var sm = chart.getModel().getSeriesByIndex(p.seriesIndex);   // line-body clicks carry no seriesId
+          var m = /^f-(\d+)$/.exec(sm ? sm.id : ''), f = c.enc.facet;
           if (!m || c.options.crossFilter === false) return null;
           c.select(f, state.facets[+m[1]], GENERIC.test(f) && !c.options.crossFilterScope ? { scope: 'dataset' } : null);
           return null;
@@ -160,6 +161,7 @@
         }
       } else {
         main.showSymbol = false;
+        main.triggerLineEvent = true;     // the whole line is clickable (cross-filter), as in the line component
         main.symbol = 'circle';
         main.symbolSize = 5;
         main.lineStyle = { width: isHl ? 2.2 : 1.8, color: col };

@@ -43,8 +43,10 @@
       var state = { zoom: null, legendSel: null, labelIds: [], model: null, yAxis: null, raf: 0 };
       var api = C(function (c, inst) { return build(c, inst, state); }, {
         rebuildOnResize: true,     // date-tick density and the end-label margin depend on the plot size
-        select: function (p, c) {
-          var f = c.enc.series, s = state.model && state.model.byId[p.seriesId];
+        select: function (p, c, chart) {
+          // clicks on the line body carry seriesIndex but no seriesId
+          var sm = chart.getModel().getSeriesByIndex(p.seriesIndex);
+          var f = c.enc.series, s = state.model && sm && state.model.byId[sm.id];
           if (!f || !s || Array.isArray(c.enc.y) || p.seriesType !== 'line' || c.options.crossFilter === false) return null;
           c.select(f, s.name, GENERIC.test(f) && !c.options.crossFilterScope ? { scope: 'dataset' } : null);
           return null;

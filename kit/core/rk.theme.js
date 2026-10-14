@@ -212,6 +212,15 @@
       RK.bus.emit('theme:changed', theme.current);
     },
 
+    /** Resolve a token name ('accent2', 'cat3', 'ref', 'seq5', 'ink-2') or pass a literal colour through. */
+    resolve: function (c) {
+      if (!c || typeof c !== 'string') return c;
+      var t = theme.tokens(), k = c.replace(/^--rk-/, '').replace(/-(\w)/g, function (_, x) { return x.toUpperCase(); });
+      var m = k.match(/^(cat|seq|div|ord)(\d+)$/);
+      if (m) return t[m[1]][+m[2] - 1] || c;
+      return typeof t[k] === 'string' && t[k] ? t[k] : c;
+    },
+
     /** Readable label colour on top of a data fill, correct in light and dark themes. */
     textOn: function (fill) {
       var t = theme.tokens();

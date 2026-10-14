@@ -341,6 +341,7 @@ kit 主题里的 categorical **并不等同于上表**：cat-1 被设成品牌�
   需要经典双轴时再设 `overlay`，并且两侧都要有轴标题和单位（04 §0-12）✅。
 - **轴断裂**（ECharts 6 `breaks`）只用于有极端值的 bridge 或柱图，必须画出断裂标记并加脚注（06 §11）。
 - **"Other" 归并**：donut 和 marimekko 超出可读数量的类别归入灰色 "Other"（`--rk-neutral` / cat-8）✅。
+- **缩放不能劫持页面滚动**：普通滚轮滚动页面，Ctrl/Cmd + 滚轮或触控板捏合才缩放图表 ✅（`rk.chart.js`）。
 - **打印用 SVG renderer**：`rk.chart.js` 默认就是 SVG。PDF 里是矢量，文字可选中（09 §8.1：canvas 在 PDF 中会变成 560×360 位图）✅。
 
 ### 6.2 Don't

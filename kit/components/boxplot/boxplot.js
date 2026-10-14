@@ -238,12 +238,13 @@
           rich: { g: { color: t.ink2, fontSize: 11, lineHeight: 14 }, n: { color: t.ink3, fontSize: 10, lineHeight: 14, fontFamily: t.fontNum } }
         }
       };
-      var tickFont = '11px ' + t.fontNum;
+      var tickFont = '11px ' + t.fontNum, tick0 = ticks(fmt, ve.step);
+      var liveStep = function () { try { return inst.getModel().getComponent(vert ? 'yAxis' : 'xAxis', 0).axis.scale.getInterval(); } catch (e) { return ve.step; } };
       var valAxis = {
         type: 'value', min: ve.min, max: ve.max, splitNumber: Math.round((ve.max - ve.min) / ve.step),
         name: o.title || ctx.title(enc.value), nameLocation: 'middle',
-        nameGap: vert ? Math.round(Math.max(C.measure(ticks(fmt, ve.step)(ve.min), tickFont), C.measure(ticks(fmt, ve.step)(ve.max), tickFont)) + 14) : 26,
-        axisLabel: { formatter: ticks(fmt, function () { try { return inst.getModel().getComponent(vert ? 'yAxis' : 'xAxis', 0).axis.scale.getInterval(); } catch (e) { return ve.step; } }) },
+        nameGap: vert ? Math.round(Math.max(C.measure(tick0(ve.min), tickFont), C.measure(tick0(ve.max), tickFont)) + 14) : 26,
+        axisLabel: { formatter: ticks(fmt, liveStep) },
         splitLine: { show: true, lineStyle: { color: t.grid } }
       };
 

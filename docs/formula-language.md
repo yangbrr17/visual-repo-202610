@@ -72,6 +72,12 @@ top 5                                          ← 前 N 行 / first N rows
 Python 构建器在 `build()` 时会检查公式引用的字段与 `@参数` 是否存在，错误一次性列出。
 The Python builder validates field and `@param` references of computed formulas at build time and lists every problem at once.
 
+派生字段**不能引用自身**：`x = x * (1 + @g)` 每次拖动滑块都会在上一次结果上累乘，因此报错
+`Computed field "x" cannot reference itself — give the result a new name`；多个派生字段之间也不能循环引用
+（`Computed fields cannot reference each other in a loop (a -> b -> a) …`）。重新定义同名派生字段时保留其原有位置，
+读取它的字段随之重算。A computed field **cannot reference itself** (it would compound on every slider move) or form a
+loop with other computed fields. Redefining a computed field keeps its place, and the fields that read it are recomputed.
+
 ## 3. 字面量 / Literals
 
 | 类型 / Type | 写法 / Syntax | 说明 / Notes |
@@ -161,6 +167,13 @@ identifiers. Computed fields that use a parameter are recomputed when the slider
 > `-2^2` is **-4** here (Excel: 4); `2^3^2` is **512** (Excel: 64); concatenate with `+` or `concat()` (no `&`);
 > `%` only applies to number literals. Add parentheses when in doubt.
 
+> **比较 / Comparisons**：数字按数值比较；两个文本按字母顺序比较，**不区分大小写**（与 `==` 一致，`"a" >= "A"` 为 true）；
+> 数字形式的文本（`"10"`）与数字按数值比较；**非数字文本与数字不可比较**：`<` `>` `<=` `>=` 一律为 false
+> （`"n.a." < 6`、`"2021-03-18" < 2021` 都是 false），与 null 相同。
+> Numbers compare numerically; two texts compare alphabetically and case-insensitively (consistent with `==`); numeric
+> text compares with a number numerically; **non-numeric text is not comparable with a number**: `<` `>` `<=` `>=`
+> are all false, as with null — so placeholders such as "n.a." never pass a numeric screen.
+
 <!-- verify:expr -->
 | 公式 / Formula | 结果 / Result |
 |---|---|
@@ -176,6 +189,10 @@ identifiers. Computed fields that use a parameter are recomputed when the slider
 | `"EV" + "/" + "EBITDA"` | `"EV/EBITDA"` |
 | `"Asia" == "ASIA"` | `true` |
 | `"10" < 9` | `false` |
+| `"n.a." < 6` | `false` |
+| `"n.a." >= 6` | `false` |
+| `"2021-03-18" < 2021` | `false` |
+| `"a" >= "A"` | `true` |
 | `3 in (1, 2, 3)` | `true` |
 | `"x" not in ["a", "b"]` | `true` |
 | `1 > 2 ? "up" : "down"` | `"down"` |
@@ -189,6 +206,7 @@ identifiers. Computed fields that use a parameter are recomputed when the slider
 | 除以零 / division by zero | `NaN` | n.m. |
 | `sqrt` / `ln` / `log` 定义域外 / out of domain | `NaN` | n.m. |
 | `null` 参与比较 `<` `>` `<=` `>=` / in comparisons | `false`（两个方向都是 / both ways） | — |
+| 非数字文本与数字比较 / non-numeric text vs a number | `false`（`"n.a." < 6`、`"n.a." >= 6`） | — |
 | `x == null` | 为空（null、缺失、空文本）时为 true / true when null, missing or `""` | — |
 | 聚合函数 / aggregates | 忽略 null 与 NaN / skip null and NaN | — |
 
@@ -222,7 +240,8 @@ identifiers. Computed fields that use a parameter are recomputed when the slider
 | `coalesce(a, b, …)` | 第一个非空且非 NaN 的值 / first non-null, non-NaN | `coalesce(null, dividend_yield)` | `0.016` |
 | `isnull(x)` | 为空或 NaN / null or NaN | `isnull(ev / 0)` | `true` |
 | `abs(x)` | 绝对值 / absolute value | `abs(-5)` | `5` |
-| `round(x, d)` | 四舍五入到 d 位（d 可为负） / round to d places (d may be negative) | `round(1234.567, -2)` | `1200` |
+| `round(x, d)` | 与 Excel ROUND 相同：按 15 位有效数字的十进制值远离零舍入，d 可为负、小数部分截去 / Excel ROUND: half away from zero on the 15-significant-digit value; d may be negative | `round(1234.567, -2)` | `1200` |
+| `round(x, d)`（续 / cont.） | `round(1.005, 2)` = 1.01、`round(-2.5)` = -3（与显示的四舍五入一致 / matches display rounding, §12） | `round(-2.5)` | `-3` |
 | `floor(x)` / `ceil(x)` | 向下 / 向上取整 / round down / up | `ceil(9.15)` | `10` |
 | `sign(x)` | 符号 -1 / 0 / 1 / sign | `sign(net_debt)` | `1` |
 | `sqrt(x)` | 平方根（负数为 NaN）/ square root | `sqrt(16)` | `4` |
@@ -230,8 +249,8 @@ identifiers. Computed fields that use a parameter are recomputed when the slider
 | `exp(x)` / `ln(x)` | e 的幂 / 自然对数 / e^x, natural log | `ln(1)` | `0` |
 | `log(x)` / `log(x, base)` / `log10(x)` | 对数（默认以 10 为底）/ logarithm, base 10 by default | `log(8, 2)` | `3` |
 | `min(a, b, …)` / `max(a, b, …)` | 两个及以上参数时为标量 / scalar with 2+ arguments | `max(ev_ebitda_25e, pe_25e, 12)` | `15.1` |
-| `clamp(x, lo, hi)` | 限制在区间内 / clamp into [lo, hi] | `clamp(ev_ebitda_25e, 10, 12)` | `10` |
-| `between(x, lo, hi)` | lo ≤ x ≤ hi | `between(ev_ebitda_25e, 8, 10)` | `true` |
+| `clamp(x, lo, hi)` | 限制在区间内；lo 或 hi 为 null 时该侧不限 / clamp into [lo, hi]; a null bound is open | `clamp(ev_ebitda_25e, 10, 12)` | `10` |
+| `between(x, lo, hi)` | lo ≤ x ≤ hi；null 边界不限 / a null bound is open | `between(ev_ebitda_25e, 8, null)` | `true` |
 | `div(a, b)` | 除法，除数为 0 时返回 null（n.a. 而不是 n.m.）/ division, null when b = 0 | `div(ev, 0)` | `null` |
 | `pct_change(a, b)` | a / b − 1 | `pct_change(revenue_26e, revenue_25e)` | `≈ 0.0701` |
 | `cagr(end, start, years)` | 年复合增长率 / compound annual growth | `cagr(revenue_26e, revenue_24a, 2)` | `≈ 0.0721` |
@@ -240,9 +259,9 @@ identifiers. Computed fields that use a parameter are recomputed when the slider
 | `concat(a, b, …)` | 拼接，跳过空值 / join, skipping nulls | `concat(ticker, " (", country, ")")` | `"HLX (USA)"` |
 | `len(s)` | 长度 / length | `len(company)` | `17` |
 | `lower(s)` / `upper(s)` | 小写 / 大写 / lower / upper case | `upper("hlx")` | `"HLX"` |
-| `contains(s, sub)` | 包含（不区分大小写）/ contains, case-insensitive | `contains(company, "industrial")` | `true` |
-| `startswith(s, p)` / `endswith(s, p)` | 开头 / 结尾匹配（不区分大小写） | `startswith(company, "HEL")` | `true` |
-| `year(d)` / `month(d)` / `quarter(d)` | 日期部分（ISO 日期 `YYYY-MM-DD`）/ date parts of ISO dates | `quarter("2026-10-14")` | `4` |
+| `contains(s, sub)` | 包含（不区分大小写）；sub 为 null 时为 false / contains, case-insensitive; false for a null sub | `contains(company, "industrial")` | `true` |
+| `startswith(s, p)` / `endswith(s, p)` | 开头 / 结尾匹配（不区分大小写）；空文本 `""` 总是匹配 / an empty `""` always matches | `startswith(company, "HEL")` | `true` |
+| `year(d)` / `month(d)` / `quarter(d)` | 日期部分（ISO 日期 `YYYY-MM-DD`，或 1000–9999 的整数年份）；无效日期为 null / date parts of ISO dates or a 4-digit year; invalid dates give null | `quarter("2026-10-14")` | `4` |
 
 ### 8.2 聚合函数 / Aggregate functions（每组一个值 / one value per group）
 
@@ -252,14 +271,24 @@ identifiers. Computed fields that use a parameter are recomputed when the slider
 | `sum(x)` | 合计 / total | `sum(ev)` | `161496.1` |
 | `avg(x)` / `mean` / `average` | 算术平均（忽略空值）/ mean, nulls skipped | `avg(ev_ebitda_25e)` | `≈ 11.499` |
 | `median(x)` | 中位数 / median | `median(ev_ebitda_25e)` | `10.66` |
-| `min(x)` / `max(x)` | 最小 / 最大 / smallest / largest | `max(ev_ebitda_25e)` | `18.1` |
+| `min(x)` / `max(x)` | 最小 / 最大；没有数字的列按文本比较（ISO 日期列给出最早 / 最晚日期）/ smallest / largest; a column without numbers compares as text (earliest / latest ISO date) | `max(ev_ebitda_25e)` | `18.1` |
 | `count()` | 行数 / number of rows | `count()` | `18` |
 | `count(x)` | 非空值个数 / non-null values | `count(dividend_yield)` | `18` |
 | `countd(x)` | 不同值个数（区分大小写）/ distinct values | `countd(sector)` | `3` |
 | `stdev(x)` / `stddev` | 样本标准差（STDEV.S）/ sample standard deviation | `stdev(ev_ebitda_25e)` | `≈ 3.2876` |
-| `pctl(x, p)` / `percentile` | 分位数，线性插值（PERCENTILE.INC），p 取 0–1 或百分数 / quantile | `pctl(ev_ebitda_25e, 25%)` | `9.3325` |
-| `wavg(x, w)` | 加权平均 / weighted average | `wavg(ev_ebitda_25e, mkt_cap)` | `≈ 12.103` |
+| `pctl(x, p)` / `percentile` | 分位数，线性插值（PERCENTILE.INC），p 为 0–1 的数字、百分数或 `@参数`（不能是字段），省略为中位数 / quantile; p is a number, percent or `@param` | `pctl(ev_ebitda_25e, 25%)` | `9.3325` |
+| `wavg(x, w)` | 加权平均；值或权重为空 / NaN 的行被忽略 / weighted average; rows with a null or NaN value or weight are skipped | `wavg(ev_ebitda_25e, mkt_cap)` | `≈ 12.103` |
 | `first(x)` / `last(x)` | 组内第一个 / 最后一个非空值 / first / last non-null | `first(company)` | `"Helios Industrial"` |
+
+参数个数在编译时检查：`wavg(x)`、`sum()`、`sum(x, y)` 报错 `… expects N argument(s), got M`（`count` 接受 0–1 个，`pctl` 1–2 个，
+`wavg` 2 个，其余 1 个）。Argument counts are checked when the formula is compiled.
+
+<!-- verify:expr dataset=precedents -->
+| 公式 / Formula（precedents，21 宗交易 / 21 deals） | 结果 / Result |
+|---|---|
+| `min(date)` | `"2019-03-18"` |
+| `max(date)` | `"2026-08-24"` |
+| `count(premium_1d)` | `15` |
 
 聚合函数可以与运算符、标量函数组合 / Aggregates combine with operators and scalar functions:
 
@@ -278,8 +307,10 @@ identifiers. Computed fields that use a parameter are recomputed when the slider
   A formula that contains an aggregate is an **aggregate formula**: one value per group (the whole dataset without `by`).
 - 聚合公式中的**裸字段**读取该组的**第一行**（适合读取分组键）。`company, count() by sector` 中 company 为每组第一家公司。
   A **bare field** inside an aggregate formula reads the **first row** of the group.
-- 派生字段（computed）与 `where` 只能用**行公式**；聚合函数**不能嵌套**（`sum(sum(x))` 报错）。
-  Computed fields and `where` take **row formulas** only; aggregates **cannot be nested**.
+- 派生字段（computed）与 `where` 只能用**行公式**；聚合函数**不能嵌套**（`sum(sum(x))` 报错
+  `Aggregates cannot be nested …`：先把内层结果做成单独的列或派生字段）。
+  Computed fields and `where` take **row formulas** only; aggregates **cannot be nested** — compute the inner value in
+  its own column or computed field first.
 - 条件聚合用 `sum(if(条件, x, 0))`；占比用 `sum(if(...)) / sum(x)`；没有窗口函数（同一行内不能引用"全体平均"）。
   Conditional aggregates: `sum(if(cond, x, 0))`; shares: `sum(if(...)) / sum(x)`. There are no window functions.
 - **合计倍数 ≠ 倍数平均**：`sum(ev) / sum(ebitda_25e)` 是按规模加权的合计倍数；`avg(ev_ebitda_25e)` 是简单平均；投行惯例通常展示中位数与平均数。
@@ -289,25 +320,33 @@ identifiers. Computed fields that use a parameter are recomputed when the slider
 
 ```text
 [select | show] <列 / items> [from <数据集 / dataset>] [by | group by <字段 / fields>] [where <条件 / condition>]
-                [sort | order by <列 / column> [asc|desc], …] [top | limit <N>]
+                [sort | sort by | order by <列 / column> [asc|desc], …] [top | limit <N>]
 
 <item> := * | <公式 / formula> [as <标签 / label>] [format <格式码 / code>]
 ```
 
 | 子句 / Clause | 说明 / Description |
 |---|---|
-| items | 逗号分隔；`*` 展开全部字段；省略时等于 `*`。`as "标签"`（含空格时必须加引号，也可用 `'…'`、`` `…` ``）；`format "0.0x"`（含 `"m"` 等字面量的格式码用单引号：`format '$#,##0.0,,"bn"'`）。Comma-separated; `*` = all fields. Quote labels with blanks; put format codes containing `"` in single quotes. |
+| items | 逗号分隔；`*` 展开全部字段；省略时等于 `*`。`as "标签"`（含空格时必须加引号，也可用 `'…'`、`` `…` ``）；`format "0.0x"`（含 `"m"` 等字面量的格式码用单引号：`format '$#,##0.0,,"bn"'`）；`as` 与 `format` 顺序不限。Comma-separated; `*` = all fields. Quote labels with blanks; put format codes containing `"` in single quotes; `as` and `format` in either order. |
 | `from` | 数据集 id；含空格时可加引号：`from "my data"`。省略时使用控制台当前数据集。Dataset id (quotes optional). |
-| `by` / `group by` | 分组字段，逗号分隔；只接受字段（名称、标题或 `[…]`；反引号见 §15），不接受表达式——需要时先建派生字段（§11.17）。Group-by fields only (name, title or `[…]`; for backticks see §15); for expressions add a computed field first. |
+| `by` / `group by` | 分组字段，逗号分隔；只接受字段（名称、标题、`` `…` `` 或 `[…]`），不接受表达式——需要时先建派生字段（§11.17）。Group-by fields only (name, title, `` `…` `` or `[…]`); for expressions add a computed field first. |
 | `where` | 行条件，在分组前过滤；不能用聚合函数（没有 `having`）。Row filter applied before grouping; no aggregates. |
-| `sort` / `order by` | 按**结果列**排序：列序号（`sort 2`）、标签（不区分大小写）或字段名；**默认降序**；空值和 n.m. 总在最后；可多列：`sort 3 desc, 1 asc`。分组查询中 `by` 字段排在最前，**序号从分组列开始数**（`… by sector sort 2` 按第一个选择列排序）。Sort by result column position, label or field name; **default desc**; nulls last. In grouped queries the `by` columns come first and **count in positions**. |
-| `top` / `limit` | 排序后保留前 N 行（N ≥ 1）。Keep the first N rows after sorting. |
+| `sort` / `sort by` / `order by` | 按**结果列**排序：列序号（`sort 2`）、标签（不区分大小写）或字段名；**默认降序**；空值和 n.m. 总在最后；可多列：`sort 3 desc, 1 asc`。分组查询中 `by` 字段排在最前，**序号从分组列开始数**（`… by sector sort 2` 按第一个选择列排序）。Sort by result column position, label or field name; **default desc**; nulls last. In grouped queries the `by` columns come first and **count in positions**. |
+| `top` / `limit` | 排序后保留前 N 行；N 必须是正整数（`top 0`、`top -3`、`top ten` 报错）。Keep the first N rows after sorting; N must be a positive whole number. |
 
-- 子句关键字须前后有空格，可任意顺序、任意大小写、可换行；引号、反引号、方括号和括号内的关键字不会被识别为子句（`where name == "Sort by"` 安全）。
-  Clause keywords need blanks around them, may come in any order / case / line; keywords inside quotes, backticks, brackets or parentheses are ignored.
-- 结果列：单个字段沿用字段名、标题和格式；其他列命名为 `c1, c2, …`，标题为 `as` 标签（否则为公式文本），格式为 `format`，否则继承
-  （`sum(x)`、`median(x)` 等沿用 x 的格式，`count()` 为 `#,##0`），否则 General。
-  Output columns: a single field keeps its name, title and format; other columns are `c1, c2, …` titled by `as` (or the formula) and formatted by `format`, else inherited from the aggregated field.
+- 子句关键字须前后有空格，可任意顺序、任意大小写、可换行；引号（含 `\"` 转义）、反引号、方括号和括号内的关键字不会被识别为子句（`where name == "Sort by"` 安全）。
+  Clause keywords need blanks around them, may come in any order / case / line; keywords inside quotes (escapes included), backticks, brackets or parentheses are ignored.
+- 每个子句只能写一次（`sort` / `sort by` / `order by` 算同一子句）：多个条件用 `and` 合并，多个排序列用逗号分隔。
+  Each clause may appear once (`sort`, `sort by` and `order by` count as one): combine conditions with `and`, list sort columns with commas.
+- 结果列：单个字段沿用字段名、标题、格式和类型；其他列命名为 `c1, c2, …`，标题为 `as` 标签（否则为公式文本），格式为 `format`，
+  否则按公式推断：保持原字段单位的公式沿用其格式——`sum(x)`、`median(x)`、`min(x)`、`round(avg(x), 1)`、`-x`、`x - y`（x、y 格式相同）、
+  `if(c, x, 0)`、`sum(if(c, x, 0))`；`count()` / `countd()` 为 `#,##0`，`pct_change()` / `cagr()` 为 `0.0%`，`year()` / `month()` /
+  `quarter()` 为 `0`；比率、乘积和其他函数为 General。列类型（`number` / `string` / `date` / `boolean`）按结果值推断。
+  Output columns: a single field keeps its name, title, format and type; other columns are `c1, c2, …` titled by `as`
+  (or the formula) and formatted by `format`, else by inference: formulas that keep a field's unit keep its format
+  (`sum(x)`, `round(avg(x), 1)`, `-x`, `x - y` with equal formats, `sum(if(c, x, 0))`); `count()` is `#,##0`,
+  `pct_change()` / `cagr()` `0.0%`, `year()` `0`; ratios, products and other functions get General. Column types are
+  inferred from the values.
 - 查询结果会先应用报告的全局筛选（filter bar、交叉筛选）。The report's global filters apply first.
 - 有 `by` 或任一列为聚合公式时，结果为分组汇总；否则逐行输出。A query is grouped when it has `by` or any aggregate column.
 
@@ -557,10 +596,23 @@ count() as "Deals", sum(ev) as "Total EV", median(ev_ebitda) as "Median EV/EBITD
 | `%` | ×100 并显示 % / ×100 and show % |
 | `"文本"` `\x` | 字面量 / literal text |
 | `_)` | 留出 `)` 的宽度（对齐括号负数）/ space the width of `)` |
-| `正;负;零` | 分段 / sections: positive;negative;zero |
-| `[Red]` 等 | 忽略 / ignored |
-| `yyyy yy mmmm mmm mm m dd d q` | 日期 / date parts（ISO `YYYY-MM-DD`） |
+| `正;负;零` | 分段 / sections: positive;negative;zero；第三段为空（`#,##0;(#,##0);`）时零显示为空白 / an empty third section blanks zeros |
+| `[Red]`、`[$-409]` 等 | 忽略 / ignored |
+| `[$€-407]`、`[$USD]` | 显示其中的货币符号 / show the currency text |
+| `yyyy yy mmmm mmm mm m dddd ddd dd d q` | 日期 / date parts（ISO `YYYY-MM-DD`，或 1000–9999 的整数年份）；`ddd` = Wed，`dddd` = Wednesday |
 | 预设 / presets | `mult` `0.0x` · `pct1` `0.0%` · `usd_m` `$#,##0"m"` · `delta_pct` `+0.0%;-0.0%;0.0%` · `acct1` `#,##0.0_);(#,##0.0)` · `date` `dd mmm yyyy` · `auto` 紧凑 / compact … |
+
+- **四舍五入与 Excel 一致**：按数值的 15 位有效数字十进制表示、远离零舍入（10.35 → `10.4x`，2.675 → `$2.68`，0.0705 → `7.1%`）；
+  `%` 与千分位缩放只移动小数点，不引入二进制误差。`round()`（§8）使用同一规则，所以计算结果与显示一致。
+  **Rounding matches Excel**: half away from zero on the value's 15-significant-digit decimal digits; `%` and
+  thousands scaling move the decimal point exactly. `round()` (§8) uses the same rule, so values and display agree.
+- **四舍五入后为零的值显示为零**：不会出现 `-0.0`、`(0.0)`、`+0.0%`——有零段时用零段，零段为空时为空白，否则用不带符号的正数段。
+  这一点有意与 Excel 不同。A value that rounds to zero shows as zero (zero section, blank with an empty zero section,
+  else the unsigned positive section) — never "-0.0", "(0.0)" or "+0.0%". This deliberately differs from Excel.
+- **General**（没有格式时）：≥ 10,000 取整并加千分位；否则最多 2 位小数；小于 0.01 的值保留 3 位有效数字（低于 1e-8 用指数形式）。
+  拼错的预设名（`usd_mn`）按 General 显示。General (no format): grouped integers from 10,000, else up to 2 decimals,
+  3 significant digits below 0.01; a mistyped preset name renders as General.
+- **日期**：无效日期（`2026-13-45`、`2026-02-30`）原样显示，不会顺延到下个月。Invalid dates are shown unchanged, never rolled over.
 
 <!-- verify:format -->
 | 值 / Value | 格式码 / Code | 显示 / Output |
@@ -585,6 +637,19 @@ count() as "Deals", sum(ev) as "Total EV", median(ev_ebitda) as "Median EV/EBITD
 | `"2026-10-14"` | `yyyy"年"m"月"d"日"` | `2026年10月14日` |
 | `null` | `0.0x` | `n.a.` |
 | `NaN` | `0.0x` | `n.m.` |
+| `10.35` | `0.0x` | `10.4x` |
+| `2.675` | `$#,##0.00` | `$2.68` |
+| `0.0705` | `0.0%` | `7.1%` |
+| `16450000` | `$#,##0.0,,"m"` | `$16.5m` |
+| `-0.0004` | `+0.0%;-0.0%;0.0%` | `0.0%` |
+| `-123456` | `General` | `-123,456` |
+| `0.000123` | `General` | `0.000123` |
+| `999950` | `auto` | `1m` |
+| `1234` | `[$€-407]#,##0` | `€1,234` |
+| `4520` | `usd_mn` | `4520` |
+| `2026` | `yyyy` | `2026` |
+| `"2026-10-14"` | `ddd d mmm` | `Wed 14 Oct` |
+| `"2026-13-45"` | `dd mmm yyyy` | `2026-13-45` |
 
 ## 13. 错误信息 / Error messages
 
@@ -608,17 +673,28 @@ Syntax and reference errors are thrown as `ExprError` (`RK.expr.check()` returns
 | `if(is_target)` | `if(condition, then, else) needs at least 2 arguments` | — |
 | `sum(ev) as Total EV from peers` | `Unexpected "as"` | 含空格的标签加引号 / quote the label: `as "Total EV"` |
 | `company from peers where ev > avg(ev)` | `"where" cannot use aggregates` | `where` 只接受行条件 / row conditions only |
+| `wavg(ev)` | `wavg() expects 2 arguments, got 1` | 加上权重：`wavg(x, w)` / add the weight |
+| `sum()` | `sum() expects 1 argument, got 0` | — |
+| `sum(sum(ev))` | `Aggregates cannot be nested: sum() contains another aggregate…` | 内层结果先做成单独的列或派生字段 / compute the inner value first |
+| `pctl(ev, mkt_cap)` | `pctl() percentile must be a number or @param…` | 分位数用数字、百分数或参数：`pctl(ev, 75%)` / use a number |
+| `company from peers top -3` | `"top" expects a whole number of rows, e.g. top 10 (got "-3")` | — |
+| `company from peers where ev > 1000 where region == "Europe"` | `"where" appears more than once…` | 用 `and` 合并条件 / combine with `and` |
 | `count() by year(date) from precedents` | `"by" expects field names, got "year(date)"` | 先建派生字段（§11.17）/ add a computed field |
 | `company from peers sort mkt_cap` | `Cannot sort by "mkt_cap" — use a column label or position` | 只能按结果列排序；把 mkt_cap 加入选择列 / select the column first |
 | `count() from comps` | `Unknown dataset "comps" (available: peers…` | 数据集 id 错误 / wrong dataset id |
 | `RK.query("count()")` | `Choose a dataset (from <name>) — available: peers…` | 加 `from` / add `from <dataset>` |
 
+另外 / Also：公式嵌套过深（超过 256 层括号、函数或一元运算）或过长（超过约 1,000 项的连加）时报错
+`Formula is too deeply nested or too long — split it into several computed fields`（不会卡死或抛出 RangeError）；
+派生字段引用自身或循环引用时的错误见 §2。Formulas nested more than 256 levels deep or chained longer than about
+1,000 terms raise that ExprError (never a hang or RangeError); for computed-field self-reference and loops see §2.
+
 ## 14. 技巧与易错点 / Tips & gotchas
 
 1. **文本比较不区分大小写**：`region == "europe"` 匹配 "Europe"；`countd()` 与分组则**区分**大小写。
    String equality is case-insensitive, but `countd()` and `by` groups are case-sensitive.
-2. **日期是 ISO 文本**：用 `date >= "2023-01-01"` 比较；按年用 `year(date)`。
-   Dates are ISO text: compare with `"YYYY-MM-DD"` strings; use `year(date)` for years.
+2. **日期是 ISO 文本**：用 `date >= "2023-01-01"` 比较；按年用 `year(date) >= 2023`。日期与数字比较（`date < 2021`）总是 false。
+   Dates are ISO text: compare with `"YYYY-MM-DD"` strings, or use `year(date)`; a date compared with a number is always false.
 3. **百分数字面量**：`ebitda_margin_25e > 20%` 等同于 `> 0.2`；格式 `0.0%` 只影响显示。
    `20%` is 0.2; `0.0%` formats display only.
 4. **排序默认降序**，文本也一样；需要升序写 `asc`。只能按已选择的列排序。
@@ -637,28 +713,17 @@ Syntax and reference errors are thrown as `ExprError` (`RK.expr.check()` returns
 12. **数据集名含空格**：`from "my data"`。Dataset ids with blanks: quote them.
 13. **分组查询的列序号**：`by` 字段排在结果最前面，`sort 1` 指的是分组列；按指标排序请用标签：`sort Median desc`。
     In grouped queries the `by` columns come first, so `sort 1` is the group column — sort by label to be explicit.
-14. **条件聚合的格式**：`sum(if(...))` 不会继承字段格式，请加 `format`。Conditional aggregates do not inherit a format — add `format`.
+14. **比率需要格式**：`sum(if(c, x, 0))` 沿用 x 的格式，但比率（`sum(if(...)) / sum(x)`）与乘积显示为 General，请加 `format "0.0%"`。
+    `sum(if(c, x, 0))` keeps x's format, but ratios and products show as General — add a `format`.
+15. **派生字段不能引用自身**：`x = x * 1.1` 报错；结果请用新名称（`x_adj = x * 1.1`）。A computed field cannot read itself — use a new name.
 
 ## 15. 已知问题 / Known issues
 
-以下行为已在引擎审计（`research/engine-audit.md`）中记录并提交修复补丁；修复合入前请按"临时做法"使用。
-The following are documented in the engine audit (`research/engine-audit.md`) with proposed patches; until they are
-merged use the workaround.
-
-| 问题 / Issue | 临时做法 / Workaround |
-|---|---|
-| `sort by <列>` 被解析成 `sort` + `by` 分组 / `sort by` is mis-parsed | 用 `sort <列>` 或 `order by <列>` / use `sort` or `order by` |
-| `by` 后的反引号名称（`` by `HQ city` ``）报错 / backticked names after `by` fail | 用标题或方括号：`by [HQ city]` / use `[brackets]` |
-| `top 0`、`top -3`、`top ten` 不报错 / `top` is not validated | 只用正整数 / use a positive whole number |
-| 同一子句写两次时后者覆盖前者 / a repeated clause replaces the first | 用 `and` 合并条件 / combine with `and` |
-| 文本与数字比较时文本按 0 处理（`"n.a." < 6` 为 true）/ text compared with a number acts as 0 | 先排除：`x != "n.a." and x < 6`，或数据中用 null / use null in data |
-| `pct_change` / `cagr` / `year()` 列可能继承原字段的 `$` 或日期格式 / may inherit a `$` or date format | 显式写 `format "0.0%"` / `format "0"` |
-| 显示四舍五入用二进制浮点：10.35 显示为 "10.3x"（Excel 为 10.4x）/ display rounding at exact .x5 ties | 需要与模型逐位一致时在源数据中预先四舍五入 / pre-round in the source data |
-| `round(1.005, 2)` = 1、`round(-2.5)` = -2（Excel：1.01、-3） | 同上 / as above |
-| `min(date)` / `max(date)` 返回空 / return null | 用 `first(date)` / `last(date)` 配合排序好的数据 / use first/last on sorted data |
-| 派生字段引用自身（`x = x * (1 + @g)`）会在每次拖动滑块时累乘 / a computed field that references itself compounds on every slider move | 结果用新名称 / give the result a new name |
-| `expr` 筛选只认字段名，不认标题或大小写变体（`[Enterprise value] > 1` 不生效）/ `expr` filters match exact field names only | 在筛选中用字段名 / use field names in filters |
-| `not_in` 筛选区分大小写 / the `not_in` filter is case-sensitive | 按数据中的大小写书写 / match the data's case |
+目前没有已知问题。引擎审计（`research/engine-audit.md`，2026-10-14）发现的 36 个问题已全部修复，逐项结论见该文件末尾的
+"Resolution" 一节；修复带来的行为变化已写入本文（§2、§6–§10、§12–§14）。与 Excel 的有意差异见 §6、§7 与 §12。
+There are no known open issues. All 36 findings of the engine audit (`research/engine-audit.md`) are fixed — see its
+"Resolution" section; the resulting behaviour is documented above (§2, §6–§10, §12–§14). Deliberate differences from
+Excel are listed in §6, §7 and §12.
 
 ---
 

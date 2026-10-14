@@ -78,6 +78,13 @@ t('expr syntax error pos', () => {
   assert.strictEqual(r.ok, false);
 });
 t('expr chinese field', () => assert.strictEqual(E.evaluate('营业收入 * 2', { 营业收入: 5 }), 10));
+// fixes from research/engine-audit.md (full regression set: tests/js/engine.test.js, tests/js/engine-audit.test.js)
+t('format rounds like Excel (F1)', () => { assert.strictEqual(F(10.35, '0.0x'), '10.4x'); assert.strictEqual(F(0.0705, '0.0%'), '7.1%'); assert.strictEqual(F(2.675, '$#,##0.00'), '$2.68'); });
+t('format General negatives (F2)', () => assert.strictEqual(F(-123456), '-123,456'));
+t('expr round like Excel (E4)', () => { assert.strictEqual(E.evaluate('round(1.005, 2)', {}), 1.01); assert.strictEqual(E.evaluate('round(-2.5)', {}), -3); });
+t('expr text vs number not comparable (E1)', () => assert.strictEqual(E.evaluate('x < 6', { x: 'n.a.' }), false));
+t('expr deep nesting is an ExprError (E10)', () => assert.throws(() => E.compile('('.repeat(5000) + '1' + ')'.repeat(5000)), e => e instanceof E.ExprError));
+t('expr prototype names are plain fields (E7)', () => assert.strictEqual(E.evaluate('constructor + 1', { constructor: 1 }), 2));
 
 // data + query
 RK.data.load({ bundle: { manifest: { params: { wacc: { value: 0.09 } } }, datasets: {
@@ -121,6 +128,10 @@ setTimeout(() => {
     assert.ok(Math.abs(r.rows[0].c1 - 7300 / 610) < 1e-9);
   });
   t('query top', () => assert.strictEqual(RK.query('* top 2', { dataset: 'comps' }).rows.length, 2));
+  t('query sort by (Q1)', () => assert.strictEqual(RK.query('company, ev sort by ev desc top 1', { dataset: 'comps' }).rows[0].company, 'D'));
+  t('query column formats (Q4)', () => assert.strictEqual(JSON.stringify(RK.query('pct_change(ev, ebitda), -ev, ev / ebitda', { dataset: 'comps' }).columns.map(c => c.format)), '["0.0%","$#,##0",null]'));
+  t('query top validated (Q5)', () => assert.throws(() => RK.query('* top -3', { dataset: 'comps' }), /expects a whole number/));
+  t('computed self-reference rejected (Q9)', () => assert.throws(() => ds.addComputed({ name: 'adj', formula: 'adj * 2' }), /cannot reference itself/));
   t('filter in', () => {
     RK.store.setFilter('region', { op: 'in', values: ['Asia'] });
     assert.strictEqual(RK.data.view('comps').length, 2);

@@ -680,6 +680,9 @@
     view: view,
     affected: affected,
     applies: filterApplies,
+    /** Column names too generic to cross-filter across datasets (see ctx.select scope). */
+    GENERIC_FIELDS: /^(type|kind|source|target|step|stage|metric|category|group|name|label|id|parent|value|series|status|item|node|link|bucket|class|level)$/i,
+    isGenericField: function (field) { return !!field && RK.data.GENERIC_FIELDS.test(String(field)); },
     aggregate: aggregate,
 
     adapter: function (name, fn) { adapters[name] = fn; },

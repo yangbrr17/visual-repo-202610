@@ -52,7 +52,7 @@
       if (hooks.select) {
         inst.on('click', function (params) {
           var sel = hooks.select(params, current, inst);
-          if (sel && sel.field != null && current.options.crossFilter !== false) current.select(sel.field, sel.value);
+          if (sel && sel.field != null && current.options.crossFilter !== false) current.select(sel.field, sel.value, sel.opt);
         });
       }
       if (hooks.on) {

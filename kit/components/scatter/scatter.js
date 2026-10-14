@@ -346,9 +346,8 @@
     inst.__rk = { ctx: ctx, points: points, selField: selField };
     inst.__rkCanBrush = !!selField && o.brush !== false && o.crossFilter !== false;
 
-    var yTick = ticks(yFmt, function () { return axisStep(inst, 'yAxis', ye.step); });
-    var labFont = '11px ' + t.fontNum;
-    var yLabW = Math.max(C.measure(ticks(yFmt, ye.step)(ye.min), labFont), C.measure(ticks(yFmt, ye.step)(ye.max), labFont));
+    var yLab = ticks(yFmt, ye.step), labFont = '11px ' + t.fontNum;
+    var yLabW = Math.max(C.measure(yLab(ye.min), labFont), C.measure(yLab(ye.max), labFont));
     var legendNames = layers.map(function (L) { return L.name; });
     if (fit) legendNames.push({ name: fitName, icon: 'path://M0 4.2h18v1.6H0z', itemWidth: 16, itemHeight: 9 });
     var showLegend = legendOn && legendNames.length > 1;
@@ -384,7 +383,7 @@
       yAxis: {
         type: 'value', min: ye.min, max: ye.max, splitNumber: Math.round((ye.max - ye.min) / ye.step), name: o.yTitle || ctx.title(enc.y), nameLocation: 'middle', nameGap: Math.round(yLabW + 14),
         axisLine: { show: false, onZero: false },
-        axisLabel: { formatter: yTick, showMinLabel: !zoomed, showMaxLabel: !zoomed },
+        axisLabel: { formatter: ticks(yFmt, function () { return axisStep(inst, 'yAxis', ye.step); }), showMinLabel: !zoomed, showMaxLabel: !zoomed },
         splitLine: { show: true, lineStyle: { color: t.grid } }
       },
       toolbox: { show: false },  // the brush is driven from the HTML toolbar

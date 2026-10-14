@@ -145,9 +145,11 @@
     var self = this;
     var opts = this.options();
     var ds = this.datasetId ? RK.data.get(this.datasetId) : null;
-    function selExtra(opt) {
+    function selExtra(opt, field) {
       opt = opt || {};
-      var scope = opt.scope || opts.crossFilterScope || 'global';
+      // generic column names (type, source, step...) mean different things in different datasets:
+      // their selections stay within this block's dataset unless a scope is given explicitly
+      var scope = opt.scope || opts.crossFilterScope || (RK.data.isGenericField(field) ? 'dataset' : 'global');
       var extra = { either: opt.either, allowEmpty: opt.allowEmpty };
       if (opt.datasets) extra.datasets = opt.datasets;
       else if (scope === 'dataset' && ds) extra.datasets = [ds.id];
@@ -185,11 +187,11 @@
        * Block option crossFilterScope sets the default scope.
        */
       select: function (field, value, opt) {
-        RK.store.toggleValue(self.id + ':' + field, field, value, self.id, selExtra(opt));
+        RK.store.toggleValue(self.id + ':' + field, field, value, self.id, selExtra(opt, field));
       },
       /** Replace the whole selection on `field` (brush / lasso). Empty array clears it unless opt.allowEmpty. */
       setSelection: function (field, values, opt) {
-        RK.store.setValues(self.id + ':' + field, field, values, self.id, selExtra(opt));
+        RK.store.setValues(self.id + ':' + field, field, values, self.id, selExtra(opt, field));
       },
       selected: function (field) { var f = RK.store.filter(self.id + ':' + field); return f && f.values ? f.values : []; },
       clearSelection: function () { RK.store.clearFilters(self.id); },

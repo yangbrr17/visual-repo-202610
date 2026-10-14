@@ -268,7 +268,6 @@
     el.classList.add('rk-geo');
     if (cls) el.classList.add(cls);
     if (ctx.motion) el.classList.add('is-motion');
-    map.createPane('rk-labels').style.zIndex = 640;
     map.on('dragstart', function () { st.moved = true; });
     map.on('zoomstart', function () { if (!st.fitting) st.moved = true; });
     if (wheel === 'click') {   // plain-wheel zoom armed by a click on the map, disarmed when the pointer leaves it
@@ -357,7 +356,7 @@
   }
 
   /**
-   * Collision-aware HTML labels in the 'rk-labels' pane (created by RK.geo.view): per group, the top `max`
+   * Collision-aware HTML labels in an 'rk-labels' pane above all marks: per group, the top `max`
    * items by priority that fit next to their mark without overlapping controls or each other.
    *   var lab = RK.geo.labels(map);
    *   lab.set([{latlng, html, r, prio, pos: ['r','l','t','b','c'], cls, group}], maxOrPerGroup, soft);   // soft: [{ll, r}] marks to avoid covering
