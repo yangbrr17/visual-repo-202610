@@ -153,15 +153,15 @@
 | Magnitude（12） | `comparison` | `bar`、`lollipop`、`radar`、`bullet`、`parallel`、`marimekko` | 10 / 0 / 2 |
 | Spatial（8） | `geo` 地理空间 | `choropleth`、`bubble-map`、`flow-map`、`geo-heat`、`cluster-map`、`china-tilemap` | 5 / 1 / 2 |
 | Flow（4） | `flow` 流向与关系 | `sankey`、`chord`、`network`、`waterfall` | 4 / 0 / 0 |
-| （FT 没有） | `valuation` · `table` · `timeline` · `layout` · `controls` | `football-field`；5 个表格；`gantt`、`timeline`；`kpi-tiles`、`text-block`；4 个控件 | 19 个投行或骨架组件，占 37% |
-| **合计** | | | **49 ✓ / 5 ◐ / 18 ✗**（72 种） |
+| （FT 没有） | `valuation` · `table` · `timeline` · `layout` · `controls` | `football-field`；5 个表格；`gantt`、`timeline`；`kpi-tiles`、`text-block`；4 个控件 | 这 5 类共 14 个组件（占 53 个的 26%）。其中 `gantt`、`timeline` 同时承接 FT 的 priestley / circles-timeline。完全不在 FT 词表里的组件共 16 个（30%），除这 12 个外还有 `multiple-history`、`small-multiples`、`tree`、`funnel`（landscape §3.3） |
+| **合计** | | | **50 ✓ / 5 ◐ / 17 ✗**（72 种） |
 
 **合集能直接补上的 FT 缺口**（按投行价值排序；优先级与 landscape §3.4 一致）：
 
 | FT 图型 | 优先级 | 参考实现来自哪个合集 | 建议做法 |
 |---|---|---|---|
 | fan（预测区间） | **P1** | `@echarts-x/custom-line-range`（1.4 节）；Plotly 的 Financial 节 | 新组件 `fan-chart`，或给 `line` 加 `band` 选项 |
-| equalised-cartogram | **P1** | FT 模板；方格布局取自 geofacet 的 `china_prov_grid1` 网格（MIT；出处见 `china-tilemap.js` 文件头注释） | `china-tilemap` 开发中，需补 manifest。之后可推广到世界区域和美国州 |
+| equalised-cartogram（中国版已完成） | **P1**（世界区域 / 美国州） | FT 模板；`china-tilemap` 的方格布局是自研的（按省份质心经纬度排布，压缩到 7 × 8），并与 geofacet 的 `china_prov_grid1` 网格（MIT）交叉核对过，见 `china-tilemap.js` 文件头注释 | `china-tilemap` 已完成（manifest 和 `china_provinces` 样例已进 catalog，还没有 `refs` 字段）。下一步推广到世界区域和美国州 |
 | violin | P1 | `@echarts-x/custom-violin` | 给 `boxplot` 或 `beeswarm` 加 `violin` 变体 |
 | line-surplus-deficit-filled | P2 | ECharts area 配方：两条线之间按正负着色填充 | 给 `line` 加 `fillBetween` 选项（实际对预算） |
 | population-pyramid（butterfly / tornado） | P2 | think-cell 的 butterfly；ECharts 双向 bar | 给 `bar` 加 `diverging: 'mirror'` 选项 |
