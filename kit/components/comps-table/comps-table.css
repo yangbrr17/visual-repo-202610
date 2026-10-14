@@ -1,7 +1,7 @@
 /* comps-table — extends the shared .rk-table pitchbook styles */
 .rk-comps { position: relative; height: 100%; }
 .rk-comps.is-auto { height: auto; }
-.rk-comps__scroll { height: 100%; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--rk-rule) transparent; }
+.rk-comps__scroll { height: 100%; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--rk-rule) transparent; }
 .rk-comps.is-auto .rk-comps__scroll { height: auto; overflow-x: auto; overflow-y: visible; }
 
 /* separate borders so sticky cells keep their rules while scrolling */

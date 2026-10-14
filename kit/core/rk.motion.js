@@ -79,6 +79,38 @@
       try { return document.startViewTransition(update).updateCallbackDone; } catch (e) { update(); return Promise.resolve(); }
     },
 
+    /**
+     * FLIP re-order for keyed DOM rows (table sort / filter): measure, rebuild, glide.
+     *   RK.motion.flip([tbody, tfoot], function () { ...replace the rows... });
+     * Children carrying the same data-key before and after glide from their old position (the
+     * component CSS gives them a `transition: transform`); new children get `.is-enter` for an
+     * entry animation. Without motion it just runs the rebuild.
+     */
+    flip: function (containers, rebuild) {
+      function rows() {
+        var out = [];
+        [].concat(containers).forEach(function (c) { if (c) out.push.apply(out, c.children); });
+        return out;
+      }
+      if (!motion.enabled) { rebuild(); return; }
+      var before = new Map();
+      rows().forEach(function (el) { before.set(el.dataset.key, el.getBoundingClientRect().top); });
+      rebuild();
+      var moved = [];
+      rows().forEach(function (el) {
+        var y0 = before.get(el.dataset.key);
+        if (y0 == null) { el.classList.add('is-enter'); return; }
+        var dy = y0 - el.getBoundingClientRect().top;
+        if (Math.abs(dy) < 0.5) return;
+        el.style.transition = 'none';
+        el.style.transform = 'translateY(' + dy + 'px)';
+        moved.push(el);
+      });
+      if (!moved.length) return;
+      void moved[0].offsetHeight;   // commit the inverted positions before releasing them
+      moved.forEach(function (el) { el.style.transition = ''; el.style.transform = ''; });
+    },
+
     /** Generic tween: tween(600, t => ..., 'outCubic') */
     tween: function (duration, onFrame, ease) {
       var e = easing[ease || 'outCubic'], start = null;

@@ -24,15 +24,6 @@
     return best;
   }
 
-  /** Fixed tooltip centred above the cell (below when there is no room), kept inside the viewport. */
-  function placeTip(tip, cell) {
-    var r = cell.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
-    var x = util.clamp(r.left + r.width / 2 - tw / 2, 6, Math.max(6, window.innerWidth - tw - 6));
-    var y = r.top - th - 8;
-    if (y < 6) y = r.bottom + 8;
-    tip.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
-  }
-
   function cmp(a, b) { return typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b)); }
 
   /** Long rows -> {rows:[...], cols:[...], cell(i, j) -> value}. */
@@ -82,13 +73,12 @@
       var caption = h('div.rk-sens__caption');
       var seg = h('div.rk-seg.rk-sens__seg.rk-noprint', { role: 'group', 'aria-label': 'Display mode' });
       var table = h('table.rk-table.rk-sens__table');
-      var tip = h('div.rk-sens__tip', { 'aria-hidden': 'true' });
+      var tip = RK.ui.tip();
       bar.appendChild(caption);
       bar.appendChild(seg);
       root.appendChild(bar);
       root.appendChild(h('div.rk-sens__wrap', table));
       ctx.el.appendChild(root);
-      document.body.appendChild(tip); // fixed-position tooltip: never clipped by the page
 
       MODES.forEach(function (m) {
         seg.appendChild(h('button', { type: 'button', dataset: { mode: m[0] }, 'aria-pressed': 'false' }, m[1]));
@@ -141,7 +131,6 @@
         if (o.reverse) stops.reverse();
         var mid = o.mid != null ? o.mid : (util.isNum(bv) ? bv : RK.expr.agg.median(nums));
         var scale = !o.heat ? null : o.heat === 'seq' ? RK.theme.sequential(ext, stops) : RK.theme.diverging(ext, mid, stops);
-        var dark = t.dark ? t.paper : t.ink, light = t.dark ? t.ink : t.paper;
         var sameShape = cells.length === g.rows.length && cells[0] && cells[0].length === g.cols.length && how !== 'rebuild';
 
         root.classList.toggle('has-heat', !!scale);
@@ -158,7 +147,7 @@
             var td = cells[i][j], v = g.cell(i, j), isBase = i === b.i && j === b.j;
             var fill = scale && util.isNum(v) ? RK.theme.mix(t.paper, scale(v), o.heatIntensity) : null;
             td.style.backgroundColor = fill || '';
-            td.style.color = fill ? RK.theme.onColor(fill, dark, light) : '';
+            td.style.color = fill ? RK.theme.textOn(fill) : '';
             td.classList.toggle('is-base', isBase);
             td.classList.toggle('is-na', !util.isNum(v));
             td._rk = { i: i, j: j, v: v, row: g.rows[i], col: g.cols[j] };
@@ -261,8 +250,8 @@
         root.querySelectorAll('.is-xrow, .is-xcol, .is-hot').forEach(function (el) { el.classList.remove('is-xrow', 'is-xcol', 'is-hot'); });
         hot = null;
       }
-      function showTip(td, e) {
-        if (cur.options.tooltip === false || !td || !td._rk) { tip.classList.remove('is-on'); return; }
+      function showTip(td) {
+        if (cur.options.tooltip === false || !td || !td._rk) { tip.hide(); return; }
         var o = cur.options, enc = cur.enc, p = td._rk, F = state.F, bv = state.bv;
         var isBase = p.i === state.b.i && p.j === state.b.j;
         var rows = [{ label: cur.title(enc.value), value: RK.format(p.v, F.value), bold: true }];
@@ -270,18 +259,16 @@
           rows.push({ label: 'vs base', value: RK.format(p.v - bv, F.delta) });
           rows.push({ label: '% vs base', value: RK.format(bv ? p.v / bv - 1 : NaN, F.pct) });
         }
-        tip.innerHTML = RK.chart.tip((o.rowTitle || cur.title(enc.row)) + ' ' + RK.format(p.row, F.row) + '  ·  ' +
+        tip.show(RK.chart.tip((o.rowTitle || cur.title(enc.row)) + ' ' + RK.format(p.row, F.row) + '  ·  ' +
           (o.colTitle || cur.title(enc.col)) + ' ' + RK.format(p.col, F.col), rows,
-          isBase ? 'Base case' : (o.rebase !== false ? 'Click to set as base case' : null));
-        tip.classList.add('is-on');
-        placeTip(tip, td);
+          isBase ? 'Base case' : (o.rebase !== false ? 'Click to set as base case' : null)), td);
       }
       function onOver(e) {
         var td = e.target.closest('td.rk-sens__cell');
         cross(td);
-        showTip(td, e);
+        showTip(td);
       }
-      function onLeave() { clear(); tip.classList.remove('is-on'); }
+      function onLeave() { clear(); tip.hide(); }
       function onClick(e) {
         var td = e.target.closest('td.rk-sens__cell');
         if (!td || !td._rk || cur.options.rebase === false) return;
@@ -296,7 +283,7 @@
           override = { row: p.row, col: p.col };
         }
         draw('tween');
-        showTip(td, e);
+        showTip(td);
       }
       function onSeg(e) {
         var btn = e.target.closest('button[data-mode]');
@@ -306,7 +293,6 @@
       }
       table.addEventListener('mouseover', onOver);
       table.addEventListener('mouseleave', onLeave);
-      window.addEventListener('scroll', onLeave, { passive: true, capture: true });
       table.addEventListener('click', onClick);
       seg.addEventListener('click', onSeg);
 
@@ -326,11 +312,10 @@
           unsub();
           table.removeEventListener('mouseover', onOver);
           table.removeEventListener('mouseleave', onLeave);
-          window.removeEventListener('scroll', onLeave, { capture: true });
           table.removeEventListener('click', onClick);
           seg.removeEventListener('click', onSeg);
           root.remove();
-          tip.remove();
+          tip.destroy();
           cur.el.classList.remove('is-auto');
         }
       };

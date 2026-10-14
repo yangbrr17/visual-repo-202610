@@ -26,7 +26,7 @@
     "zeroLabels": {"type": "boolean", "default": false, "desc": "Horizontal only: category names at the zero line, on the side opposite each bar"},
     "labels": {"type": "boolean", "default": true, "desc": "Signed value labels outside the bar ends"},
     "valueAxis": {"type": "boolean", "default": false, "desc": "Show the value axis and gridlines"},
-    "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] reference lines in value units"},
+    "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] reference lines in value units, dashed in --rk-ref unless a colour is given"},
     "highlight": {"type": "string|string[]", "default": null, "desc": "Label value(s) to emphasise in addition to the highlight channel"},
     "highlightBand": {"type": "boolean", "default": true, "desc": "Tinted row / column behind highlighted categories"},
     "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field's format (signed automatically)"}

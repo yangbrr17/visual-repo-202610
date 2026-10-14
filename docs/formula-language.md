@@ -43,9 +43,15 @@ sum(ev) / sum(ebitda_25e)                         聚合比率（合计倍数）
 ```
 
 ```text
-median(ev_ebitda_25e) as "Median", count() by sector from peers where not is_target sort 2 desc top 5
-└─ 选择列 / columns ───────────────────────────┘ └─ 分组 ─┘ └─ 数据集 ┘ └─ 条件 / filter ┘ └ 排序 ┘ └ 前 N ┘
+median(ev_ebitda_25e) as "Median", count()     ← 选择列 / columns
+by sector                                      ← 分组 / group by
+from peers                                     ← 数据集 / dataset
+where not is_target                            ← 条件 / filter
+sort 2 desc                                    ← 排序：第 2 列 = Median（第 1 列是分组列 sector）/ sort by column 2
+top 5                                          ← 前 N 行 / first N rows
 ```
+
+查询可以写在一行，也可以像上面这样分行。A query may be written on one line or across several lines as above.
 
 - 公式语言是**安全的**：不会执行任意代码（没有 `eval`，没有对象属性访问语法），只能读取当前行的字段、报告参数和内置函数。
   The language is **sandboxed**: no `eval`, no property access syntax — a formula can only read fields of the current
@@ -292,7 +298,7 @@ identifiers. Computed fields that use a parameter are recomputed when the slider
 |---|---|
 | items | 逗号分隔；`*` 展开全部字段；省略时等于 `*`。`as "标签"`（含空格时必须加引号，也可用 `'…'`、`` `…` ``）；`format "0.0x"`（含 `"m"` 等字面量的格式码用单引号：`format '$#,##0.0,,"bn"'`）。Comma-separated; `*` = all fields. Quote labels with blanks; put format codes containing `"` in single quotes. |
 | `from` | 数据集 id；含空格时可加引号：`from "my data"`。省略时使用控制台当前数据集。Dataset id (quotes optional). |
-| `by` / `group by` | 分组字段，逗号分隔；只接受字段（名称、标题、`` `…` `` 或 `[…]`），不接受表达式——需要时先建派生字段。Group-by fields only; for expressions add a computed field first. |
+| `by` / `group by` | 分组字段，逗号分隔；只接受字段（名称、标题或 `[…]`；反引号见 §15），不接受表达式——需要时先建派生字段（§11.17）。Group-by fields only (name, title or `[…]`; for backticks see §15); for expressions add a computed field first. |
 | `where` | 行条件，在分组前过滤；不能用聚合函数（没有 `having`）。Row filter applied before grouping; no aggregates. |
 | `sort` / `order by` | 按**结果列**排序：列序号（`sort 2`）、标签（不区分大小写）或字段名；**默认降序**；空值和 n.m. 总在最后；可多列：`sort 3 desc, 1 asc`。分组查询中 `by` 字段排在最前，**序号从分组列开始数**（`… by sector sort 2` 按第一个选择列排序）。Sort by result column position, label or field name; **default desc**; nulls last. In grouped queries the `by` columns come first and **count in positions**. |
 | `top` / `limit` | 排序后保留前 N 行（N ≥ 1）。Keep the first N rows after sorting. |
@@ -313,14 +319,14 @@ The tables below are generated from the live query results and checked by the sa
 ### 11.1 分行业估值倍数 / Median multiples by sector（peers）
 
 ```rkq
-median(ev_ebitda_25e) as "Median EV/EBITDA 25E", median(pe_25e) as "Median P/E 25E", count() as "Peers" by sector from peers sort 2 desc
+median(ev_ebitda_25e) as "Median EV/EBITDA 25E", median(ev_ebitda_26e) as "Median EV/EBITDA 26E", count() as "Peers" by sector from peers sort 2 desc
 ```
 
-| Sector | Median EV/EBITDA 25E | Median P/E 25E | Peers |
+| Sector | Median EV/EBITDA 25E | Median EV/EBITDA 26E | Peers |
 |---|---:|---:|---:|
-| Industrial Software & Sensors | 15.5x | 24.4x | 6 |
-| Industrial Automation | 10.7x | 16.6x | 6 |
-| Motion & Power Control | 9.4x | 15.4x | 6 |
+| Industrial Software & Sensors | 15.5x | 13.1x | 6 |
+| Industrial Automation | 10.7x | 9.5x | 6 |
+| Motion & Power Control | 9.4x | 8.8x | 6 |
 
 ### 11.2 目标公司与高估值同业 / Target vs richly valued peers（peers）
 
@@ -650,7 +656,9 @@ merged use the workaround.
 | 显示四舍五入用二进制浮点：10.35 显示为 "10.3x"（Excel 为 10.4x）/ display rounding at exact .x5 ties | 需要与模型逐位一致时在源数据中预先四舍五入 / pre-round in the source data |
 | `round(1.005, 2)` = 1、`round(-2.5)` = -2（Excel：1.01、-3） | 同上 / as above |
 | `min(date)` / `max(date)` 返回空 / return null | 用 `first(date)` / `last(date)` 配合排序好的数据 / use first/last on sorted data |
-| 派生字段依赖另一个含 `@参数` 的派生字段时，拖动滑块后不更新 / chained computed fields go stale on slider moves | 在公式里直接引用参数 / reference the `@param` directly in each formula |
+| 派生字段引用自身（`x = x * (1 + @g)`）会在每次拖动滑块时累乘 / a computed field that references itself compounds on every slider move | 结果用新名称 / give the result a new name |
+| `expr` 筛选只认字段名，不认标题或大小写变体（`[Enterprise value] > 1` 不生效）/ `expr` filters match exact field names only | 在筛选中用字段名 / use field names in filters |
+| `not_in` 筛选区分大小写 / the `not_in` filter is case-sensitive | 按数据中的大小写书写 / match the data's case |
 
 ---
 
@@ -668,8 +676,35 @@ node tests/js/formula-doc.test.js --write    # 文档修改后重新生成结果
 RK_CORE_DIR=/path/to/patched/kit/core node tests/js/formula-doc.test.js   # 对补丁后的引擎核对 / verify a patched engine
 ```
 
-验证输出 / Verification output（2026-10-14）:
+验证输出 / Verification output（2026-10-14，`kit/core` @ `88a4097`；同一文档也在应用审计补丁后的引擎上通过 /
+the same document also verifies on the engine with the audit patches applied）。覆盖范围 / coverage：§11 的 17 个查询实例，
+§3–§9 的 83 个公式，§12 的 20 个格式码，§13 的 18 条错误信息；并检查引擎的 50 个函数名（含别名）都在 §8 中有说明 /
+the 17 worked queries of §11, 83 formulas in §3–§9, 20 format codes (§12) and 18 error messages (§13); it also checks
+that all 50 engine function names (incl. aliases) are documented in §8:
 
 ```text
-VERIFY_OUTPUT_PLACEHOLDER
+$ node tests/js/formula-doc.test.js --verbose
+  query 11.1   3 rows x 4 cols  median(ev_ebitda_25e) as "Median EV/EBITDA 25E", median(ev_ebitda_2...
+  query 11.2   4 rows x 4 cols  company, ev_ebitda_25e, pe_25e, ebitda_margin_25e from peers where ...
+  query 11.3   5 rows x 3 cols  company, mkt_cap, ev / ebitda_26e as "EV/EBITDA 26E" format "0.0x" ...
+  query 11.4   4 rows x 4 cols  company, region, ebitda_margin_25e, ev_ebitda_25e from peers where ...
+  query 11.5   1 rows x 4 cols  sum(ev) / sum(ebitda_25e) as "Aggregate" format "0.0x", avg(ev_ebit...
+  query 11.6   4 rows x 4 cols  wavg(ev_ebitda_25e, mkt_cap) as "Mkt-cap weighted", median(ev_ebitd...
+  query 11.7   3 rows x 5 cols  pctl(ev_ebitda, 25%) as "25th pct", median(ev_ebitda) as "Median", ...
+  query 11.8   5 rows x 5 cols  date, target, acquirer, ev, premium_1d from precedents where date >...
+  query 11.9   3 rows x 5 cols  count() as "Deals", count(premium_1d) as "Public targets", avg(prem...
+  query 11.10  7 rows x 5 cols  year, revenue, ebitda / revenue as "EBITDA margin" format "0.0%", f...
+  query 11.11  2 rows x 5 cols  first(year) as "From", last(year) as "To", cagr(last(revenue), firs...
+  query 11.12  1 rows x 4 cols  year, fcf, fcf * (1 + @g) / (@wacc - @g) as "Terminal value (Gordon...
+  query 11.13  1 rows x 5 cols  company, ebitda_26e, net_debt, ebitda_26e * @multiple - net_debt as...
+  query 11.14  4 rows x 4 cols  sum(revenue) as "Revenue 2025A", sum(if(region == "Asia Pacific", r...
+  query 11.15  4 rows x 4 cols  sum(if(year == "2024A", revenue, 0)) as "2024A" format "$#,##0.0", ...
+  query 11.16 12 rows x 3 cols  company, if(net_debt < 0, "Net cash", if(net_debt_ebitda > 2, "Leve...
+  query 11.17  5 rows x 4 cols  count() as "Deals", sum(ev) as "Total EV", median(ev_ebitda) as "Me...
+formula-doc: 17 queries, 83 formulas, 20 format codes, 18 error messages, 1 setup blocks — 138/138 verified; 50 engine functions documented
+core: kit/core, node v22.22.0
+
+$ RK_CORE_DIR=/tmp/patched/kit/core node tests/js/formula-doc.test.js     # kit/core + research/engine-audit.md patches
+formula-doc: 17 queries, 83 formulas, 20 format codes, 18 error messages, 1 setup blocks — 138/138 verified; 50 engine functions documented
+core: /tmp/patched/kit/core, node v22.22.0
 ```

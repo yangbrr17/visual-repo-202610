@@ -25,12 +25,13 @@
     "refLine": {"type": "string|number", "default": "median", "desc": "'median' | 'mean' | a number | null"},
     "refExcludeHighlight": {"type": "boolean", "default": true, "desc": "Compute the median / mean without the highlighted (target) rows"},
     "refLabel": {"type": "string", "default": null, "desc": "Reference line label; default 'Median' / 'Mean'"},
-    "refLines": {"type": "array", "default": [], "desc": "Extra [{value, label, color}] reference lines"},
+    "refLines": {"type": "array", "default": [], "desc": "Extra [{value, label, color}] reference lines (e.g. offer multiple), dashed in --rk-ref unless a colour is given"},
     "labels": {"type": "boolean", "default": true, "desc": "Value labels beyond the outer dot (both values when value2 is set)"},
     "dotSize": {"type": "number", "default": 9, "desc": "Dot diameter in px"},
     "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field's format"},
     "legend": {"type": "boolean", "default": true, "desc": "Legend (shown for value2 / group)"},
-    "zoom": {"type": "boolean", "default": false, "desc": "Scroll / zoom along the category axis for long lists"}
+    "zoom": {"type": "boolean", "default": false, "desc": "Scroll / zoom along the category axis for long lists (slider; Ctrl/Cmd + wheel or pinch zooms)"},
+    "wheelZoom": {"type": "boolean", "default": null, "desc": "With zoom: true = zoom on the plain mouse wheel; null = plain wheel scrolls the report, Ctrl/Cmd + wheel zooms"}
   },
   "interactions": ["Hover tooltip with premium / (discount) to the median and period change", "Click a dot to cross-filter", "Legend toggles groups", "Optional category zoom for long lists", "PNG / CSV export"],
   "samples": [

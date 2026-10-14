@@ -217,8 +217,15 @@ def _concat_css(kit: Kit, p: BuildPlan) -> str:
 
 
 def build(report: "Report", out_dir: str | os.PathLike, *, clean: bool = True, validate: bool = True,
-          kit: Any = None, build_date: Any = None) -> Path:
-    """Validate (optional) and write *report* to *out_dir*. Returns the folder path."""
+          kit: Any = None, build_date: Any = None, data_source: str = "bundle", api: str | None = None) -> Path:
+    """Validate (optional) and write *report* to *out_dir*. Returns the folder path.
+
+    data_source: 'bundle' (default, opens from file://), 'http' (data/*.json fetched over a web server)
+    or 'api' (the page fetches {api}manifest and {api}datasets/<id> — same JSON shapes as data/)."""
+    if data_source not in ("bundle", "http", "api"):
+        raise BuildError(f"data_source must be 'bundle', 'http' or 'api', got {data_source!r}")
+    if data_source == "api" and not api:
+        raise BuildError("data_source='api' needs api='https://host/api/reports/<id>/'")
     from .render import render_index
 
     kit = get_kit(kit)
@@ -262,5 +269,5 @@ def build(report: "Report", out_dir: str | os.PathLike, *, clean: bool = True, v
         _write(out / "data/datasets" / f"{did}.json", dataset_json_text(ds) + "\n")
     _write(out / "data/bundle.js", bundle_js_text(manifest, report.datasets))
 
-    _write(out / "index.html", render_index(report, p))
+    _write(out / "index.html", render_index(report, p, data_source=data_source, api=api))
     return out

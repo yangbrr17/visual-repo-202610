@@ -1,0 +1,153 @@
+{
+  "reportkit": "0.1",
+  "report": {
+    "title": "Project Atlas",
+    "subtitle": "Discussion materials for the Board of Directors of Helios Industrial",
+    "client": "Board of Directors, Helios Industrial",
+    "date": "2026-10-14",
+    "confidentiality": "Strictly private & confidential",
+    "locale": "en-US",
+    "firm": "Northbridge Capital · Investment Banking",
+    "theme": "navy"
+  },
+  "datasets": {
+    "kpis": {
+      "path": "datasets/kpis.json",
+      "title": "Key performance indicators",
+      "rows": 6
+    },
+    "peers": {
+      "path": "datasets/peers.json",
+      "title": "Trading comparables",
+      "rows": 18
+    },
+    "price_ohlc": {
+      "path": "datasets/price_ohlc.json",
+      "title": "Helios Industrial (HLX) daily share price",
+      "rows": 522
+    },
+    "price_perf": {
+      "path": "datasets/price_perf.json",
+      "title": "Relative share price performance",
+      "rows": 424
+    },
+    "price_events": {
+      "path": "datasets/price_events.json",
+      "title": "Helios Industrial share price events",
+      "rows": 12
+    },
+    "ntm_multiple": {
+      "path": "datasets/ntm_multiple.json",
+      "title": "NTM EV/EBITDA history",
+      "rows": 106
+    },
+    "financials": {
+      "path": "datasets/financials.json",
+      "title": "Helios Industrial financial summary",
+      "rows": 10
+    },
+    "segment_revenue": {
+      "path": "datasets/segment_revenue.json",
+      "title": "Revenue by segment and region",
+      "rows": 96
+    },
+    "ebitda_bridge": {
+      "path": "datasets/ebitda_bridge.json",
+      "title": "EBITDA bridge FY25A to FY26E",
+      "rows": 11
+    },
+    "ev_equity_bridge": {
+      "path": "datasets/ev_equity_bridge.json",
+      "title": "Enterprise value to equity value bridge",
+      "rows": 7
+    },
+    "valuation_ranges": {
+      "path": "datasets/valuation_ranges.json",
+      "title": "Valuation summary: implied value per share",
+      "rows": 8
+    },
+    "sensitivity_dcf": {
+      "path": "datasets/sensitivity_dcf.json",
+      "title": "DCF sensitivity: implied share price",
+      "rows": 35
+    },
+    "sensitivity_lbo": {
+      "path": "datasets/sensitivity_lbo.json",
+      "title": "LBO sensitivity: sponsor IRR",
+      "rows": 25
+    },
+    "precedents": {
+      "path": "datasets/precedents.json",
+      "title": "Selected precedent transactions",
+      "rows": 21
+    },
+    "revenue_by_country": {
+      "path": "datasets/revenue_by_country.json",
+      "title": "Revenue by country (FY25A)",
+      "rows": 36
+    },
+    "assets_locations": {
+      "path": "datasets/assets_locations.json",
+      "title": "Global footprint",
+      "rows": 47
+    },
+    "deal_flows": {
+      "path": "datasets/deal_flows.json",
+      "title": "Cross-border industrials M&A flows (2021–2026 YTD)",
+      "rows": 26
+    },
+    "ownership": {
+      "path": "datasets/ownership.json",
+      "title": "Shareholder structure",
+      "rows": 15
+    },
+    "org_structure": {
+      "path": "datasets/org_structure.json",
+      "title": "Simplified legal entity structure",
+      "rows": 15
+    },
+    "deal_timeline": {
+      "path": "datasets/deal_timeline.json",
+      "title": "Project Atlas indicative timetable",
+      "rows": 22
+    },
+    "segments_tree": {
+      "path": "datasets/segments_tree.json",
+      "title": "Revenue hierarchy: group > segment > product line (FY25A)",
+      "rows": 18
+    },
+    "pnl_flow": {
+      "path": "datasets/pnl_flow.json",
+      "title": "FY25A P&L flow (revenue to net income)",
+      "rows": 13
+    },
+    "league_table": {
+      "path": "datasets/league_table.json",
+      "title": "Global industrials M&A league table (LTM Sep-2026)",
+      "rows": 12
+    },
+    "dcf_live": {
+      "path": "datasets/dcf_live.json",
+      "title": "Live DCF by management-plan scenario",
+      "rows": 3
+    }
+  },
+  "params": {
+    "wacc": {
+      "value": 0.09,
+      "min": 0.075,
+      "max": 0.105,
+      "step": 0.0025,
+      "format": "0.00%",
+      "title": "WACC"
+    },
+    "tgr": {
+      "value": 0.025,
+      "min": 0.015,
+      "max": 0.035,
+      "step": 0.0025,
+      "format": "0.00%",
+      "title": "Terminal growth"
+    }
+  }
+}

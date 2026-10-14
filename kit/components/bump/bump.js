@@ -10,20 +10,6 @@
   var C = RK.chart, util = RK.util;
 
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
-  /**
-   * Categorical palette for peers: drops colours too close to accent-2 (reserved for the target)
-   * and near-duplicates of a colour already kept, so adjacent series stay distinguishable.
-   */
-  function paletteFor(t) {
-    function dist(x, y) {
-      var a = RK.theme.parseColor(x), b = RK.theme.parseColor(y);
-      return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
-    }
-    var base = t.cat.filter(function (c) { return dist(c, t.accent2) > 64; });
-    var pal = [];
-    base.forEach(function (c) { if (pal.every(function (k) { return dist(c, k) > 48; })) pal.push(c); });
-    return pal.length >= 3 ? pal : (base.length ? base : t.cat);
-  }
   function richKey(i) { return 'c' + i; }
 
   RK.component({
@@ -109,12 +95,12 @@
       var hl = o.highlight == null ? [] : [].concat(o.highlight);
       var isHL = function (e) { return hl.some(function (h) { return same(h, e); }); };
       var muted = o.muted === true || (o.muted === 'auto' && hl.length > 0);
-      var pal = paletteFor(t);
+      var pal = RK.theme.palette({ n: colorOrder.length });   // peer colours never resemble the accent-2 highlight
       var mutedColor = RK.theme.mix(t.ink3, t.paper, 0.45);
       var sel = ctx.selected(sf);
       var colorOf = function (e) {
         if (isHL(e)) return t.accent2;
-        return muted ? mutedColor : pal[Math.max(0, colorOrder.indexOf(e)) % pal.length];
+        return muted ? mutedColor : pal[Math.max(0, colorOrder.indexOf(e))];
       };
       var dimmed = function (e) { return sel.length && sel.indexOf(e) < 0; };
       var nameColor = function (e) {
@@ -124,7 +110,7 @@
       };
 
       /* ---------- end labels via left / right category axes (containLabel sizes the margins) ---------- */
-      var rich = { v: { color: t.ink3, fontSize: 10.5, fontFamily: t.fontNum, padding: [0, 0, 0, 6] } };
+      var rich = { v: { color: t.ink2, fontSize: 10.5, fontFamily: t.fontNum, padding: [0, 0, 0, 6] } };
       entities.forEach(function (e, i) {
         rich[richKey(i)] = { color: nameColor(e), fontSize: 11, fontFamily: t.fontSans, fontWeight: isHL(e) || !muted ? 600 : 400 };
       });
@@ -167,7 +153,7 @@
           itemStyle: { color: lc, borderColor: t.paper, borderWidth: 1.5 },
           label: o.rankLabels ? {
             show: true, position: 'inside', fontSize: N > 14 ? 9 : 10, fontWeight: 600, fontFamily: t.fontNum,
-            color: dim ? 'rgba(0,0,0,0)' : RK.theme.onColor(c, t.dark ? t.paper : t.ink, '#fff'),
+            color: dim ? 'rgba(0,0,0,0)' : RK.theme.textOn(c),
             formatter: function (p) { return String(+p.value[1] + 1); }
           } : { show: false },
           emphasis: { focus: 'series', lineStyle: { width: h ? 4 : 3.5 } },

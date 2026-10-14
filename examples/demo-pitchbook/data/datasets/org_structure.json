@@ -1,0 +1,30 @@
+{
+  "id": "org_structure",
+  "title": "Simplified legal entity structure",
+  "schema": {"fields": [
+    {"name": "id", "type": "string", "title": "Id"},
+    {"name": "parent", "type": "string", "title": "Parent"},
+    {"name": "name", "type": "string", "title": "Legal entity"},
+    {"name": "country", "type": "string", "title": "Country"},
+    {"name": "ownership_pct", "type": "number", "title": "Ownership", "format": "0%"},
+    {"name": "entity_type", "type": "string", "title": "Entity type"}
+  ]},
+  "data": [
+    {"id": "hlx", "parent": "", "name": "Helios Industrial Inc.", "country": "United States", "ownership_pct": 1.0, "entity_type": "Listed parent"},
+    {"id": "hold", "parent": "hlx", "name": "Helios Holdings LLC", "country": "United States", "ownership_pct": 1.0, "entity_type": "Holding company"},
+    {"id": "intl", "parent": "hold", "name": "Helios International B.V.", "country": "Netherlands", "ownership_pct": 1.0, "entity_type": "Holding company"},
+    {"id": "fin", "parent": "hlx", "name": "Helios Finance Ireland DAC", "country": "Ireland", "ownership_pct": 1.0, "entity_type": "Finance vehicle"},
+    {"id": "us-ops", "parent": "hold", "name": "Helios Automation Inc.", "country": "United States", "ownership_pct": 1.0, "entity_type": "Operating subsidiary"},
+    {"id": "brennick", "parent": "hold", "name": "Brennick Robotics Inc.", "country": "United States", "ownership_pct": 1.0, "entity_type": "Operating subsidiary"},
+    {"id": "mx", "parent": "hold", "name": "Helios Mexico S. de R.L. de C.V.", "country": "Mexico", "ownership_pct": 1.0, "entity_type": "Operating subsidiary"},
+    {"id": "de", "parent": "intl", "name": "Helios Automation GmbH", "country": "Germany", "ownership_pct": 1.0, "entity_type": "Operating subsidiary"},
+    {"id": "uk", "parent": "intl", "name": "Helios Sensing Ltd", "country": "United Kingdom", "ownership_pct": 1.0, "entity_type": "Operating subsidiary"},
+    {"id": "pl", "parent": "intl", "name": "Helios Software Sp. z o.o.", "country": "Poland", "ownership_pct": 1.0, "entity_type": "Operating subsidiary"},
+    {"id": "cn", "parent": "intl", "name": "Helios Industrial (Suzhou) Co., Ltd.", "country": "China", "ownership_pct": 1.0, "entity_type": "Operating subsidiary"},
+    {"id": "jv", "parent": "intl", "name": "Helios-Kanemori Motion K.K.", "country": "Japan", "ownership_pct": 0.51, "entity_type": "Joint venture"},
+    {"id": "in", "parent": "intl", "name": "Helios Industrial India Pvt. Ltd.", "country": "India", "ownership_pct": 0.74, "entity_type": "Operating subsidiary"},
+    {"id": "br", "parent": "intl", "name": "Helios do Brasil Ltda.", "country": "Brazil", "ownership_pct": 1.0, "entity_type": "Operating subsidiary"},
+    {"id": "kr-br", "parent": "intl", "name": "Helios Korea (branch)", "country": "South Korea", "ownership_pct": 1.0, "entity_type": "Branch"}
+  ],
+  "meta": {"asOf": "2026-10-10", "notes": ["parent = '' for the ultimate parent; ownership_pct is the direct holding by the parent entity.", "Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."], "source": "Helios Industrial filings and management information; ReportKit synthetic data"}
+}

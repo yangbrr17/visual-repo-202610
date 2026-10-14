@@ -9,27 +9,7 @@
   var C = RK.chart, util = RK.util;
   var MINUS = '−';
 
-  function isNum(v) { return typeof v === 'number' && isFinite(v); }
-
-  /** Re-run the layout without animation when the width changes (label room is measured in px). */
-  function relayout(render) {
-    return function (ctx) {
-      var api = render(ctx), last = ctx, update = api.update, w = api.chart.getWidth();
-      api.update = function (c) { last = c; w = api.chart.getWidth(); update(c); };
-      api.resize = function () {
-        api.chart.resize();
-        if (Math.abs(api.chart.getWidth() - w) > 4) { w = api.chart.getWidth(); update(Object.assign({}, last, { motion: false })); }
-      };
-      return api;
-    };
-  }
-  function median(a) {
-    a = a.filter(isNum).sort(function (x, y) { return x - y; });
-    if (!a.length) return null;
-    var m = a.length >> 1;
-    return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
-  }
-  function mean(a) { a = a.filter(isNum); return a.length ? a.reduce(function (s, v) { return s + v; }, 0) / a.length : null; }
+  var isNum = util.isNum;
   /** Signed label: formats that already carry a '+' are used as-is, otherwise +/− is prefixed. */
   function signed(v, fmt) {
     var code = RK.format.presets[fmt] || fmt;
@@ -37,18 +17,14 @@
     var s = RK.format(Math.abs(v), fmt);
     return v > 0 ? '+' + s : v < 0 && /[1-9]/.test(s) ? MINUS + s : s;
   }
+  /** Axis tick format: the value format with no more decimals than the tick step needs (10% not 10.0%). */
   function tickFmt(fmt, step) {
     var code = RK.format.presets[fmt] || fmt;
-    if (typeof code !== 'string' || !/[0#]/.test(code) || RK.format.isDateCode(code)) return fmt;
-    var v = Math.abs(step) * (/%/.test(code.replace(/"[^"]*"/g, '')) ? 100 : 1), dec = 0;
+    if (typeof code !== 'string' || !step || !/[0#]/.test(code) || RK.format.isDateCode(code)) return fmt;
+    var sec = code.split(';')[0].replace(/"[^"]*"/g, ''), scale = Math.pow(1000, ((sec.match(/[0#](,+)[^0#]*$/) || [])[1] || '').length);
+    var v = Math.abs(step) * (/%/.test(sec) ? 100 : 1) / scale, dec = 0;
     while (dec < 4 && Math.abs(Math.round(v * Math.pow(10, dec)) - v * Math.pow(10, dec)) > 1e-6) dec++;
     return code.replace(/([0#])\.([0#]+)/g, function (m, a, d) { var n = Math.min(dec, d.length); return a + (n ? '.' + d.slice(0, n) : ''); });
-  }
-  var measureCtx = null;
-  function textW(s, font) {
-    if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
-    measureCtx.font = font;
-    return measureCtx.measureText(String(s)).width;
   }
 
   function build(ctx, inst) {
@@ -69,7 +45,7 @@
 
     // ---- baseline: bars show value − baseline ----
     var statVals = items.filter(function (d) { return !(o.baselineExcludeHighlight && d.hi); }).map(function (d) { return d.raw; });
-    var base = o.baseline === 'median' ? median(statVals) : o.baseline === 'mean' ? mean(statVals) : isNum(o.baseline) ? o.baseline : 0;
+    var base = o.baseline === 'median' || o.baseline === 'mean' ? RK.expr.agg[o.baseline](statVals.filter(isNum)) : isNum(o.baseline) ? o.baseline : 0;
     if (base == null) base = 0;
     items.forEach(function (d) { d.v = d.raw == null ? null : d.raw - base; });
 
@@ -93,8 +69,8 @@
     var numFont = '11px ' + t.fontNum, catFont = '600 11px ' + t.fontSans;
     var vlW = 0, catW = 0;
     items.forEach(function (d) {
-      vlW = Math.max(vlW, textW(signed(d.v, fmt), numFont));
-      if (zeroLab) catW = Math.max(catW, textW(d.label, catFont));
+      vlW = Math.max(vlW, C.measure(signed(d.v, fmt), numFont));
+      if (zeroLab) catW = Math.max(catW, C.measure(d.label, catFont));
     });
     var vals = items.map(function (d) { return d.v; }).filter(isNum);
     var ext = util.extent(vals.concat([0]));
@@ -140,8 +116,10 @@
         formatter: (o.baselineLabel || (o.baseline === 'median' ? 'Median' : o.baseline === 'mean' ? 'Mean' : 'Baseline')) + (base !== 0 ? ' ' + RK.format(base, fmt) : '')
       } : { show: false },
       data: [horiz ? { xAxis: 0 } : { yAxis: 0 }].concat((o.refLines || []).map(function (r) {
-        var d = { lineStyle: { color: r.color || t.accent2, type: [4, 3], width: 1.2 },
-          label: { show: true, position: horiz ? 'start' : 'insideEndTop', color: r.color || t.accent2, fontSize: 10.5, formatter: r.label || RK.format(r.value, fmt) } };
+        // reference lines (offer / target): dashed --rk-ref, label in the line colour
+        var c = r.color || t.ref;
+        var d = { lineStyle: { color: c, type: [4, 3], width: 1.2 },
+          label: { show: true, position: horiz ? 'start' : 'insideEndTop', color: c, fontSize: 10.5, fontFamily: t.fontNum, formatter: r.label || RK.format(r.value, fmt) } };
         d[horiz ? 'xAxis' : 'yAxis'] = r.value - base;
         return d;
       }))
@@ -244,8 +222,9 @@
       highlightBand: true,
       format: null
     },
-    render: relayout(C(build, {
+    render: C(build, {
+      rebuildOnResize: true,          // label room is measured in px
       select: function (p, ctx) { return p.seriesId === 'bars' ? { field: ctx.enc.label, value: p.name } : null; }
-    }))
+    })
   });
 })();

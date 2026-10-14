@@ -14,7 +14,7 @@
     "label": {"type": "string", "required": true, "desc": "Category (company, quarter)", "default": "company"},
     "from": {"type": "number", "required": true, "desc": "Start / reference / low value", "default": "from"},
     "to": {"type": "number", "required": true, "desc": "End / actual / high value", "default": "to"},
-    "marker": {"type": "number", "required": false, "desc": "Optional third value drawn as a diamond (current price)"},
+    "marker": {"type": "number", "required": false, "desc": "Optional third value drawn as a diamond in the reference colour --rk-ref (current price)"},
     "highlight": {"type": "boolean", "required": false, "desc": "Boolean field marking the target row(s)", "default": "is_target"}
   },
   "options": {
@@ -36,7 +36,7 @@
     "downLabel": {"type": "string", "default": null, "desc": "Legend name for decreases with colorBy 'direction' (default 'Decrease')"},
     "highlight": {"type": "string|string[]", "default": null, "desc": "Label value(s) to emphasise in addition to the highlight channel"},
     "highlightBand": {"type": "boolean", "default": true, "desc": "Tinted row band behind highlighted categories"},
-    "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] vertical reference lines"},
+    "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] vertical reference lines (offer / target price), dashed in --rk-ref unless a colour is given"},
     "zero": {"type": "boolean", "default": false, "desc": "Force the value axis to include zero"},
     "dotSize": {"type": "number", "default": 9, "desc": "Dot diameter in px"},
     "format": {"type": "string", "default": null, "desc": "Value format; defaults to the from field's format (0% when normalised)"},

@@ -93,9 +93,12 @@ def _block(b: "Block", locale: str, ind: str) -> list[str]:
         if b.subtitle:
             out.append(f'{ind}    <p class="rk-block__subtitle">{esc(b.subtitle)}</p>')
         out.append(f"{ind}  </figcaption>")
-    h = _height(b.height)
-    style = f' style="--rk-h:{esc(h)}"' if h else ""
-    out.append(f'{ind}  <div class="rk-block__body"{style}></div>')
+    if b.height == "auto":   # grows with its content (tables, text, KPI rows)
+        out.append(f'{ind}  <div class="rk-block__body is-auto"></div>')
+    else:
+        h = _height(b.height)
+        style = f' style="--rk-h:{esc(h)}"' if h else ""
+        out.append(f'{ind}  <div class="rk-block__body"{style}></div>')
     out += _options_script(b.options, ind + "  ")
     foot = _block_foot(b.source, b.notes, locale)
     if foot:
@@ -213,7 +216,9 @@ def _page(report: "Report", page: "Page", section_num: str | None, ind: str) -> 
     return out
 
 
-def render_index(report: "Report", plan: "BuildPlan") -> str:
+def render_index(report: "Report", plan: "BuildPlan", *, data_source: str = "bundle", api: str | None = None) -> str:
+    """data_source: 'bundle' (default; data/bundle.js, works from file://), 'http' (fetch data/*.json; needs a
+    web server) or 'api' (fetch from a data API at *api* with the same JSON shapes; see docs/architecture.md)."""
     loc = report.locale
     title = report.title + (f" — {report.subtitle}" if report.subtitle else "")
     L: list[str] = [
@@ -224,6 +229,8 @@ def render_index(report: "Report", plan: "BuildPlan") -> str:
         '  <meta name="viewport" content="width=device-width, initial-scale=1">',
         f"  <title>{esc(title)}</title>",
         '  <meta name="rk:data" content="data/">',
+        *([f'  <meta name="rk:data-source" content="{esc(data_source)}">'] if data_source != "bundle" else []),
+        *([f'  <meta name="rk:api" content="{esc(api)}">'] if data_source == "api" and api else []),
         '  <meta name="generator" content="ReportKit">',
         f'  <meta name="rk:version" content="{esc(plan.version)}">',
         f'  <meta name="rk:built" content="{esc(plan.build_date)}">',
@@ -271,7 +278,8 @@ def render_index(report: "Report", plan: "BuildPlan") -> str:
     L.append("  </main>")
 
     # ---- scripts: vendor -> core -> components -> data
-    for src in [*plan.vendor_js, "assets/js/reportkit.js", *plan.component_js, "data/bundle.js"]:
+    data_js = ["data/bundle.js"] if data_source == "bundle" else []
+    for src in [*plan.vendor_js, "assets/js/reportkit.js", *plan.component_js, *data_js]:
         L.append(f'  <script src="{esc(src)}"></script>')
     L += ["</body>", "</html>", ""]
     return "\n".join(L)

@@ -9,34 +9,16 @@
   var C = RK.chart, util = RK.util;
   var MINUS = '−';
 
-  function isNum(v) { return typeof v === 'number' && isFinite(v); }
+  var isNum = util.isNum;
 
-  /** Re-run the layout without animation when the width changes (label room is measured in px). */
-  function relayout(render) {
-    return function (ctx) {
-      var api = render(ctx), last = ctx, update = api.update, w = api.chart.getWidth();
-      api.update = function (c) { last = c; w = api.chart.getWidth(); update(c); };
-      api.resize = function () {
-        api.chart.resize();
-        if (Math.abs(api.chart.getWidth() - w) > 4) { w = api.chart.getWidth(); update(Object.assign({}, last, { motion: false })); }
-      };
-      return api;
-    };
-  }
-
-  var measureCtx = null;
-  /** Text width in px (used to size the delta column and the room needed by end labels). */
-  function textW(s, font) {
-    if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
-    measureCtx.font = font;
-    return measureCtx.measureText(String(s)).width;
-  }
-
-  /** Axis tick format: drop decimals of the value format on large integer steps ($1,250 not $1,250.0). */
-  function tickFmt(fmt, step, max) {
-    if (typeof fmt !== 'string' || step < 1 || step % 1 || Math.abs(max) < 100) return fmt;
+  /** Axis tick format: the value format with no more decimals than the tick step needs ($1,250 not $1,250.0). */
+  function tickFmt(fmt, step) {
     var code = RK.format.presets[fmt] || fmt;
-    return code.replace(/(0)\.0+/g, '$1').replace(/(#)\.#+/g, '$1');
+    if (typeof code !== 'string' || !step || !/[0#]/.test(code) || RK.format.isDateCode(code)) return fmt;
+    var sec = code.split(';')[0].replace(/"[^"]*"/g, ''), scale = Math.pow(1000, ((sec.match(/[0#](,+)[^0#]*$/) || [])[1] || '').length);
+    var v = Math.abs(step) * (/%/.test(sec) ? 100 : 1) / scale, dec = 0;
+    while (dec < 4 && Math.abs(Math.round(v * Math.pow(10, dec)) - v * Math.pow(10, dec)) > 1e-6) dec++;
+    return code.replace(/([0#])\.([0#]+)/g, function (m, a, d) { var n = Math.min(dec, d.length); return a + (n ? '.' + d.slice(0, n) : ''); });
   }
   function signed(v, fmt) {
     if (!isNum(v)) return RK.format(v, fmt);
@@ -123,7 +105,7 @@
     var labelsOn = o.labels !== false && o.labels !== 'none' && o.labels !== 'marker';
     var size = o.dotSize || 9;
     var lblPx = 0;
-    if (labelsOn) items.forEach(function (d) { [d.pf, d.pt].forEach(function (v) { if (v != null) lblPx = Math.max(lblPx, textW(RK.format(v, fmt), '10.5px ' + t.fontNum)); }); });
+    if (labelsOn) items.forEach(function (d) { [d.pf, d.pt].forEach(function (v) { if (v != null) lblPx = Math.max(lblPx, C.measure(RK.format(v, fmt), '10.5px ' + t.fontNum)); }); });
     // end labels run past the plot edge: push the category labels / delta column out by the overflow
     var room = function (gap, side) {
       var need = labelsOn && !(norm === 'to' && side === 'right') && !(norm === 'from' && side === 'left') ? lblPx + size / 2 + 6 : 0;
@@ -161,7 +143,7 @@
       if (!labelsOn || o.labels === 'marker') return { show: false };
       if (norm === which) return { show: false };     // the normalising end is always 100%
       return {
-        show: true, distance: range ? 5 : size / 2 + 3, fontSize: 10.5, fontFamily: t.fontNum, color: t.ink3,
+        show: true, distance: range ? 5 : size / 2 + 3, fontSize: 10.5, fontFamily: t.fontNum, color: t.ink2,
         formatter: function (p) { var d = items[p.dataIndex]; return RK.format(which === 'from' ? d.pf : d.pt, fmt); }
       };
     }
@@ -177,6 +159,15 @@
       animationDelay: function (i) { return i * stagger; },
       itemStyle: { color: fromCol },
       label: endLabel('from'),
+      // reference lines (offer / target price): dashed --rk-ref, label in the line colour
+      markLine: (o.refLines || []).length ? {
+        silent: true, symbol: ['none', 'none'],
+        data: o.refLines.map(function (r) {
+          var c = r.color || t.ref;
+          return { xAxis: r.value, lineStyle: { color: c, type: [4, 3], width: 1.2 },
+            label: { show: true, position: 'start', color: c, fontSize: 10.5, fontFamily: t.fontNum, formatter: r.label || RK.format(r.value, fmt) } };
+        })
+      } : undefined,
       data: items.map(function (d, i) {
         var c = byDir ? fromCol : cols[i];
         return {
@@ -211,21 +202,14 @@
         id: 'marker', name: o.markerLabel || ctx.title(enc.marker), type: 'scatter', z: 6,
         symbol: 'diamond', symbolSize: size + 3,
         animationDelay: function (i) { return i * stagger + 420; },
-        itemStyle: { color: t.accent2, borderColor: t.paper, borderWidth: 1 },
+        itemStyle: { color: t.ref, borderColor: t.paper, borderWidth: 1 },     // current price = reference colour (accent-2 is the target)
         label: labelsOn && (o.labels === 'marker' || o.labels === 'all') ? {
-          show: true, position: 'top', distance: 3, fontSize: 10, fontFamily: t.fontNum, color: t.ink2,
+          show: true, position: 'top', distance: 3, fontSize: 10.5, fontFamily: t.fontNum, color: t.ink2,
           formatter: function (p) { return RK.format(items[p.dataIndex].pm, fmt); }
         } : { show: false },
         data: items.map(function (d, i) {
-          return { name: d.label, value: [d.pm, i], itemStyle: { color: C.dim(ctx, enc.label, d.label, t.accent2) } };
-        }),
-        markLine: (o.refLines || []).length ? {
-          silent: true, symbol: ['none', 'none'],
-          data: o.refLines.map(function (r) {
-            return { xAxis: r.value, lineStyle: { color: r.color || t.ink3, type: [4, 3], width: 1 },
-              label: { show: true, position: 'start', color: t.ink2, fontSize: 10.5, formatter: r.label || RK.format(r.value, fmt) } };
-          })
-        } : undefined
+          return { name: d.label, value: [d.pm, i], itemStyle: { color: C.dim(ctx, enc.label, d.label, t.ref) } };
+        })
       });
     }
 
@@ -240,9 +224,9 @@
     // right-aligned numbers: column width = widest label; the header is right-aligned over it
     var deltaTitle = o.deltaTitle || (o.delta === 'marker' ? 'vs. ' + (o.toLabel || ctx.title(enc.to)) : 'Change');
     var colW = 0;
-    if (o.delta) items.forEach(function (d) { colW = Math.max(colW, textW(signed(deltaOf(d), deltaFmt), '600 11px ' + t.fontNum)); });
+    if (o.delta) items.forEach(function (d) { colW = Math.max(colW, C.measure(signed(deltaOf(d), deltaFmt), '600 11px ' + t.fontNum)); });
     colW = Math.ceil(colW) + 2;
-    var headW = textW(deltaTitle, '10.5px ' + t.fontSans);
+    var headW = C.measure(deltaTitle, '10.5px ' + t.fontSans);
     var deltaAxis = o.delta ? {
       type: 'category', data: labels, inverse: true, position: 'right',
       axisLine: { show: false }, axisTick: { show: false },
@@ -265,12 +249,12 @@
 
     // ---- legend ----
     var fromName = o.fromLabel || ctx.title(enc.from), legendData = [];
-    if (range) legendData.push({ name: rangeName, icon: 'roundRect', itemStyle: { color: RK.theme.alpha(single, 0.45) } });
-    else if (byDir) legendData.push({ name: fromName, icon: 'circle', itemStyle: { color: fromCol } },
-      { name: o.upLabel || 'Increase', icon: 'circle', itemStyle: { color: up } }, { name: o.downLabel || 'Decrease', icon: 'circle', itemStyle: { color: down } });
-    else legendData.push({ name: fromName, icon: 'circle', itemStyle: { color: t.paper, borderColor: single, borderWidth: 1.5 } },
-      { name: toName, icon: 'circle', itemStyle: { color: single } });
-    if (hasMarker) legendData.push({ name: o.markerLabel || ctx.title(enc.marker), icon: 'diamond' });
+    if (range) legendData.push({ name: rangeName, itemStyle: { color: RK.theme.alpha(single, 0.45) } });
+    else if (byDir) legendData.push({ name: fromName, itemStyle: { color: fromCol } },
+      { name: o.upLabel || 'Increase', itemStyle: { color: up } }, { name: o.downLabel || 'Decrease', itemStyle: { color: down } });
+    else legendData.push({ name: fromName, itemStyle: { color: t.paper, borderColor: single, borderWidth: 1.5 } },   // hollow = 'from'
+      { name: toName, itemStyle: { color: single } });
+    if (hasMarker) legendData.push({ name: o.markerLabel || ctx.title(enc.marker), icon: 'diamond' });   // marker shape
     var showLegend = o.legend !== false;
     var hasTopRef = (o.refLines || []).length > 0;
 
@@ -286,7 +270,7 @@
     };
     var valAxis = {
       type: 'value', min: axMin, max: axMax, interval: step,
-      axisLabel: { formatter: C.axisFmt(tickFmt(fmt, step, axMax)), hideOverlap: true },
+      axisLabel: { formatter: C.axisFmt(tickFmt(fmt, step)), hideOverlap: true },
       splitLine: { show: true, lineStyle: { color: t.grid } }
     };
 
@@ -303,7 +287,7 @@
             { color: colorOf(d), label: toName, value: RK.format(d.to, rawFmt) }
           ];
           if (hasMarker) {
-            tr.push({ color: t.accent2, label: o.markerLabel || ctx.title(enc.marker), value: RK.format(d.marker, rawFmt), bold: true });
+            tr.push({ color: t.ref, label: o.markerLabel || ctx.title(enc.marker), value: RK.format(d.marker, rawFmt), bold: true });
             if (d.to != null && d.marker != null) tr.push({ label: '% of ' + toName, value: RK.format(d.to ? d.marker / d.to : NaN, '0.0%') });
             if (d.from != null && d.to != null && d.marker != null) tr.push({ label: 'Position in range', value: RK.format(d.to - d.from ? (d.marker - d.from) / (d.to - d.from) : NaN, '0%') });
           } else {
@@ -348,8 +332,9 @@
       format: null,
       legend: true
     },
-    render: relayout(C(build, {
+    render: C(build, {
+      rebuildOnResize: true,      // label room and the delta column are measured in px
       select: function (p, ctx) { return p.seriesType === 'scatter' && p.name ? { field: ctx.enc.label, value: p.name } : null; }
-    }))
+    })
   });
 })();

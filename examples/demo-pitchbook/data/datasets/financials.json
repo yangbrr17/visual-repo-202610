@@ -1,0 +1,31 @@
+{
+  "id": "financials",
+  "title": "Helios Industrial financial summary",
+  "schema": {"fields": [
+    {"name": "year", "type": "string", "title": "Year"},
+    {"name": "period", "type": "string", "title": "Actual / estimate"},
+    {"name": "fiscal_year", "type": "number", "title": "Fiscal year", "format": "0"},
+    {"name": "revenue", "type": "number", "title": "Revenue", "format": "$#,##0.0", "unit": "USD m"},
+    {"name": "gross_profit", "type": "number", "title": "Gross profit", "format": "$#,##0.0", "unit": "USD m"},
+    {"name": "ebitda", "type": "number", "title": "EBITDA", "format": "$#,##0.0", "unit": "USD m"},
+    {"name": "ebit", "type": "number", "title": "EBIT", "format": "$#,##0.0", "unit": "USD m"},
+    {"name": "net_income", "type": "number", "title": "Net income", "format": "$#,##0.0", "unit": "USD m"},
+    {"name": "capex", "type": "number", "title": "Capex", "format": "$#,##0.0", "unit": "USD m"},
+    {"name": "fcf", "type": "number", "title": "Unlevered free cash flow", "format": "$#,##0.0", "unit": "USD m"},
+    {"name": "ebitda_margin", "type": "number", "title": "EBITDA margin", "format": "0.0%"},
+    {"name": "revenue_growth", "type": "number", "title": "Revenue growth", "format": "0.0%"}
+  ]},
+  "data": [
+    {"year": "2019A", "period": "A", "fiscal_year": 2019, "revenue": 3385.0, "gross_profit": 1144.1, "ebitda": 534.8, "ebit": 382.5, "net_income": 234.4, "capex": 159.1, "fcf": 259.8, "ebitda_margin": 0.158, "revenue_growth": 0.0448},
+    {"year": "2020A", "period": "A", "fiscal_year": 2020, "revenue": 3230.0, "gross_profit": 1062.7, "ebitda": 471.6, "ebit": 326.3, "net_income": 189.2, "capex": 126.0, "fcf": 285.7, "ebitda_margin": 0.146, "revenue_growth": -0.0458},
+    {"year": "2021A", "period": "A", "fiscal_year": 2021, "revenue": 3612.0, "gross_profit": 1231.7, "ebitda": 581.5, "ebit": 419.0, "net_income": 263.2, "capex": 162.5, "fcf": 260.8, "ebitda_margin": 0.161, "revenue_growth": 0.1183},
+    {"year": "2022A", "period": "A", "fiscal_year": 2022, "revenue": 3978.0, "gross_profit": 1380.4, "ebitda": 672.3, "ebit": 493.3, "net_income": 316.0, "capex": 198.9, "fcf": 298.9, "ebitda_margin": 0.169, "revenue_growth": 0.1013},
+    {"year": "2023A", "period": "A", "fiscal_year": 2023, "revenue": 4262.0, "gross_profit": 1500.2, "ebitda": 741.6, "ebit": 549.8, "net_income": 346.4, "capex": 213.1, "fcf": 351.2, "ebitda_margin": 0.174, "revenue_growth": 0.0714},
+    {"year": "2024A", "period": "A", "fiscal_year": 2024, "revenue": 4515.0, "gross_profit": 1607.3, "ebitda": 808.2, "ebit": 605.0, "net_income": 384.8, "capex": 225.8, "fcf": 395.8, "ebitda_margin": 0.179, "revenue_growth": 0.0594},
+    {"year": "2025A", "period": "A", "fiscal_year": 2025, "revenue": 4850.0, "gross_profit": 1750.8, "ebitda": 897.2, "ebit": 679.0, "net_income": 444.8, "capex": 242.5, "fcf": 438.1, "ebitda_margin": 0.185, "revenue_growth": 0.0742},
+    {"year": "2026E", "period": "E", "fiscal_year": 2026, "revenue": 5190.0, "gross_profit": 1899.5, "ebitda": 996.5, "ebit": 763.0, "net_income": 510.8, "capex": 259.5, "fcf": 498.6, "ebitda_margin": 0.192, "revenue_growth": 0.0701},
+    {"year": "2027E", "period": "E", "fiscal_year": 2027, "revenue": 5560.0, "gross_profit": 2051.6, "ebitda": 1089.8, "ebit": 839.6, "net_income": 572.7, "capex": 278.0, "fcf": 550.1, "ebitda_margin": 0.196, "revenue_growth": 0.0713},
+    {"year": "2028E", "period": "E", "fiscal_year": 2028, "revenue": 5940.0, "gross_profit": 2209.7, "ebitda": 1188.0, "ebit": 920.7, "net_income": 638.0, "capex": 297.0, "fcf": 607.6, "ebitda_margin": 0.2, "revenue_growth": 0.0683}
+  ],
+  "meta": {"asOf": "2026-10-10", "notes": ["Fiscal year ends 31-Dec. 2026E–2028E per management plan (Base case).", "Unlevered FCF = EBITDA – capex – tax on EBIT (25%) – increase in NWC (14% of revenue growth).", "Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."], "source": "Helios Industrial filings and management information; ReportKit synthetic data", "unit": "USD m"}
+}

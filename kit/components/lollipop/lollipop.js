@@ -8,32 +8,18 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
-  function isNum(v) { return typeof v === 'number' && isFinite(v); }
+  var isNum = util.isNum;
+  function stat(name, a) { return RK.expr.agg[name](a.filter(isNum)); }   // median / mean of finite values
 
-  /** Re-run the layout without animation when the width changes (label room is measured in px). */
-  function relayout(render) {
-    return function (ctx) {
-      var api = render(ctx), last = ctx, update = api.update, w = api.chart.getWidth();
-      api.update = function (c) { last = c; w = api.chart.getWidth(); update(c); };
-      api.resize = function () {
-        api.chart.resize();
-        if (Math.abs(api.chart.getWidth() - w) > 4) { w = api.chart.getWidth(); update(Object.assign({}, last, { motion: false })); }
-      };
-      return api;
-    };
+  /** Axis tick format: the value format with no more decimals than the tick step needs (5x not 5.0x). */
+  function tickFmt(fmt, step) {
+    var code = RK.format.presets[fmt] || fmt;
+    if (typeof code !== 'string' || !step || !/[0#]/.test(code) || RK.format.isDateCode(code)) return fmt;
+    var sec = code.split(';')[0].replace(/"[^"]*"/g, ''), scale = Math.pow(1000, ((sec.match(/[0#](,+)[^0#]*$/) || [])[1] || '').length);
+    var v = Math.abs(step) * (/%/.test(sec) ? 100 : 1) / scale, dec = 0;
+    while (dec < 4 && Math.abs(Math.round(v * Math.pow(10, dec)) - v * Math.pow(10, dec)) > 1e-6) dec++;
+    return code.replace(/([0#])\.([0#]+)/g, function (m, a, d) { var n = Math.min(dec, d.length); return a + (n ? '.' + d.slice(0, n) : ''); });
   }
-  function median(a) {
-    a = a.filter(isNum).sort(function (x, y) { return x - y; });
-    if (!a.length) return null;
-    var m = a.length >> 1;
-    return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
-  }
-  /** Colours too close to the highlight accent are skipped for group colouring. */
-  function near(a, b) {
-    var x = RK.theme.parseColor(a), y = RK.theme.parseColor(b);
-    return Math.sqrt(Math.pow(x[0] - y[0], 2) + Math.pow(x[1] - y[1], 2) + Math.pow(x[2] - y[2], 2)) < 64;
-  }
-  function mean(a) { a = a.filter(isNum); return a.length ? a.reduce(function (s, v) { return s + v; }, 0) / a.length : null; }
 
   /** Signed percentage with a true minus sign (matches the other comparison components). */
   function pct(v) {
@@ -91,17 +77,17 @@
 
     // ---- colours ----
     var groups = enc.group ? util.unique(rows.map(function (r) { return r[enc.group]; }).filter(function (g) { return g != null; })) : [];
-    var groupPal = t.cat.filter(function (c) { return !near(c, t.accent2) && !near(c, t.paper); });
+    var groupPal = RK.theme.palette({ n: groups.length });   // never resembles the accent-2 target
     function baseColor(r, i) {
       if (hi[i]) return t.accent2;
-      if (groups.length) return groupPal[groups.indexOf(r[enc.group]) % groupPal.length] || t.neutral;
+      if (groups.length) return groupPal[groups.indexOf(r[enc.group])] || t.neutral;
       return t.accent;
     }
     var colors = rows.map(function (r, i) { return C.dim(ctx, enc.label, r[enc.label], baseColor(r, i)); });
 
     // ---- reference statistic ----
     var statRows = o.refExcludeHighlight ? v1.filter(function (_, i) { return !hi[i]; }) : v1;
-    var ref = o.refLine === 'median' ? median(statRows) : o.refLine === 'mean' ? mean(statRows) : isNum(o.refLine) ? o.refLine : null;
+    var ref = o.refLine === 'median' || o.refLine === 'mean' ? stat(o.refLine, statRows) : isNum(o.refLine) ? o.refLine : null;
     var refName = o.refLabel || (o.refLine === 'median' ? 'Median' : o.refLine === 'mean' ? 'Mean' : 'Ref.');
 
     // ---- value axis bounds with room for end labels ----
@@ -119,6 +105,16 @@
     var marginR = horiz ? Math.max(20, room(axMax - ext[1]) + 8) : 20;
 
     var size = o.dotSize || 9;
+    function lineItem(name, value, color, width, labelColor) {
+      var d = { name: name, value: value, lineStyle: { color: color, type: [4, 3], width: width } };
+      d[horiz ? 'xAxis' : 'yAxis'] = value;
+      d.label = {
+        show: true, position: horiz ? 'start' : 'insideEndTop', distance: 4, color: labelColor || color, fontSize: 10.5, fontFamily: t.fontNum,
+        formatter: (name ? name + ' ' : '') + RK.format(value, fmt)
+      };
+      return d;
+    }
+
     var stagger = Math.min(45, 700 / Math.max(1, rows.length));
     var delay = function (i) { return i * stagger; };
     var at = function (v, i) { return horiz ? [v, i] : [i, v]; };
@@ -161,16 +157,10 @@
       }),
       markLine: (ref != null || (o.refLines || []).length) ? {
         silent: true, symbol: ['none', 'none'], animation: false,
-        data: (ref != null ? [{ name: refName, value: ref, lineStyle: { color: t.ink3, type: [4, 3], width: 1 } }] : []).concat((o.refLines || []).map(function (r) {
-          return { name: r.label || '', value: r.value, lineStyle: { color: r.color || t.accent2, type: [4, 3], width: 1.2 } };
-        })).map(function (d) {
-          d[horiz ? 'xAxis' : 'yAxis'] = d.value;
-          d.label = {
-            show: true, position: horiz ? 'start' : 'insideEndTop', distance: 4, color: t.ink2, fontSize: 10.5, fontFamily: t.fontNum,
-            formatter: (d.name ? d.name + ' ' : '') + RK.format(d.value, fmt)
-          };
-          return d;
-        })
+        // statistic: ink-3 dashed; user reference lines (offer / target multiple): --rk-ref, label in the line colour
+        data: (ref != null ? [lineItem(refName, ref, t.ink3, 1, t.ink2)] : []).concat((o.refLines || []).map(function (r) {
+          return lineItem(r.label || '', r.value, r.color || t.ref, 1.2);
+        }))
       } : undefined
     });
 
@@ -212,14 +202,14 @@
 
     // legend swatches for groups
     groups.forEach(function (g, k) {
-      series.push({ id: 'lg-' + k, name: g, type: 'scatter', data: [], symbol: 'circle', itemStyle: { color: groupPal[k % groupPal.length] } });
+      series.push({ id: 'lg-' + k, name: g, type: 'scatter', data: [], symbol: 'circle', itemStyle: { color: groupPal[k] } });
     });
     var legendData = groups.slice();
     if (has2) {
       var lc = groups.length ? t.ink3 : t.accent;
       legendData = [
-        { name: ctx.title(enc.value), icon: 'circle', itemStyle: { color: lc, borderWidth: 0 } },
-        { name: ctx.title(enc.value2), icon: 'circle', itemStyle: { color: t.paper, borderColor: lc, borderWidth: 1.5 } }
+        { name: ctx.title(enc.value), itemStyle: { color: lc, borderWidth: 0 } },
+        { name: ctx.title(enc.value2), itemStyle: { color: t.paper, borderColor: lc, borderWidth: 1.5 } }   // hollow = second value
       ].concat(legendData);
     }
     var showLegend = o.legend !== false && legendData.length > 0;
@@ -238,7 +228,7 @@
     };
     var valAxis = {
       type: 'value', min: axMin, max: axMax, interval: step,
-      axisLabel: { formatter: C.axisFmt(fmt) },
+      axisLabel: { formatter: C.axisFmt(tickFmt(fmt, step)) },
       splitLine: { show: true, lineStyle: { color: t.grid } }
     };
     var top = (showLegend ? 28 : 6) + (horiz && hasTopRef ? 18 : 0);
@@ -286,10 +276,12 @@
       dotSize: 9,
       format: null,
       legend: true,
-      zoom: false
+      zoom: false,
+      wheelZoom: null              // zoom: null = Ctrl/Cmd + wheel or pinch (plain wheel scrolls the report) | true = plain wheel
     },
-    render: relayout(C(build, {
+    render: C(build, {
+      rebuildOnResize: true,       // label room and category label widths are measured in px
       select: function (p, ctx) { return p.seriesId === 'dot' || p.seriesId === 'dot2' ? { field: ctx.enc.label, value: p.name } : null; }
-    }))
+    })
   });
 })();

@@ -66,4 +66,5 @@
 
 .rk-ps.is-static .rk-ps__reset, .rk-ps.is-static .rk-ps__range::-webkit-slider-thumb { transition: none; }
 @media (prefers-reduced-motion: reduce) { .rk-ps__reset { transition: none; } .rk-ps__preview.is-flash td.is-live { animation: none; } }
-@media print { .rk-ps__reset, .rk-ps__base { display: none; } }
+/* print: an assumptions read-out (label · value · change), no slider controls */
+@media print { .rk-ps__reset, .rk-ps__base, .rk-ps__track, .rk-ps__minmax { display: none; } .rk-ps__value { border-color: transparent; } }

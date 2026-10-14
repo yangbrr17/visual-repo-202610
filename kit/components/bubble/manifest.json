@@ -34,7 +34,7 @@
     "sizeLegend": {"type": "boolean", "default": true, "desc": "Nested-circle size key in the right gutter"},
     "sizeTitle": {"type": "string", "default": null, "desc": "Size key title (defaults to the size field title)"},
     "colorTitle": {"type": "string", "default": null, "desc": "Continuous colour legend title (defaults to the colour field title)"},
-    "refLines": {"type": "array", "default": [], "desc": "[{axis: 'x' | 'y', value, label, color}] dashed reference lines"},
+    "refLines": {"type": "array", "default": [], "desc": "[{axis: 'x' | 'y', value, label, color}] dashed reference lines (default colour: the theme reference-line colour)"},
     "highlight": {"type": "string|string[]", "default": null, "desc": "Label / name value(s) drawn as the target; default uses the target channel"},
     "peerLabel": {"type": "string", "default": "Peers", "desc": "Legend name when there is no category colour"},
     "xScale": {"type": "string", "default": "linear", "desc": "'linear' | 'log'"},
@@ -48,6 +48,7 @@
     "tooltipFields": {"type": "string[]", "default": [], "desc": "Extra fields listed in the tooltip"},
     "brush": {"type": "boolean", "default": true, "desc": "Box-select tool that cross-filters the label field (not in timeline mode)"},
     "zoom": {"type": "boolean", "default": true, "desc": "Box zoom, Ctrl + wheel zoom, drag to pan and the hover toolbar"},
+    "wheelZoom": {"type": "boolean", "default": null, "desc": "true = a plain mouse wheel zooms; default: Ctrl/Cmd + wheel or a trackpad pinch zooms, so the wheel keeps scrolling the report"},
     "legend": {"type": "boolean", "default": true, "desc": "Category legend (top-left)"}
   },
   "interactions": ["Hover tooltip with all four dimensions", "Click a bubble to cross-filter (toggle); box-select several", "Legend toggles categories; continuous colour band handles filter by value", "Box zoom, Ctrl + wheel zoom, drag to pan, reset", "Timeline play / scrub with animated transitions and trails", "PNG / CSV export"],

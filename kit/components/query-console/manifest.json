@@ -94,6 +94,11 @@
       "default": 500,
       "desc": "Rows rendered in the table (CSV exports all rows)"
     },
+    "wheelZoom": {
+      "type": "boolean",
+      "default": null,
+      "desc": "Long line charts (> 40 periods) get a zoom slider; null = Ctrl/Cmd + wheel or pinch zooms so the plain wheel scrolls the report, true = plain wheel zooms"
+    },
     "tools": {
       "type": "boolean",
       "default": false,

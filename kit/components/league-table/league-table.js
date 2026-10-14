@@ -8,6 +8,8 @@
 (function () {
   'use strict';
   var util = RK.util, h = util.h;
+  // generic field names (link tables, bridges...) cross-filter only this dataset (house rule: scoped selections)
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|status|name|label|key|id|category|group|series)$/i;
 
   RK.component({
     id: 'league-table',
@@ -104,12 +106,12 @@
         var max = Math.max.apply(null, list.map(function (d) { return util.isNum(d.value) ? d.value : 0; }).concat([0])) || 1;
         var sel = cur.selected(enc.name);
         var showChg = o.showChange !== false && has(enc.prior);
-        var before = animate && cur.motion ? positions() : null;
-        drawHead();
-        tbody.innerHTML = '';
-        root.classList.toggle('has-sel', sel.length > 0);
         var next = new Map(), bars = [];
-        list.forEach(function (d, i) {
+        drawHead();
+        root.classList.toggle('has-sel', sel.length > 0);
+        if (animate && cur.motion) RK.motion.flip(tbody, paint); else paint();
+        function paint() { tbody.innerHTML = ''; list.forEach(row); }
+        function row(d, i) {
           var pct = util.isNum(d.value) ? Math.max(0, d.value) / max * 100 : 0;
           var fill = h('i.rk-league__fill');
           var val = h('span.rk-league__val');
@@ -131,7 +133,7 @@
           var from = prevVals.get(d.name);
           bars.push({ fill: fill, val: val, pct: pct, v: d.value, from: from == null ? null : from });
           next.set(d.name, { pct: pct, v: d.value });
-        });
+        }
         // bars: grow from 0 (first paint) or from their previous width; values count along
         function size(b, pct) { b.fill.style.width = pct + '%'; b.val.style.left = 'calc(' + pct + '% + 6px)'; }
         bars.forEach(function (b) {
@@ -144,30 +146,8 @@
           void tbody.offsetWidth;
           window.requestAnimationFrame(function () { bars.forEach(function (b) { size(b, b.pct); }); });
         }
-        if (before) flip(before);
         prevVals = next;
         first = false;
-      }
-
-      function positions() {
-        var m = new Map();
-        Array.prototype.forEach.call(tbody.children, function (tr) { m.set(tr.dataset.key, tr.getBoundingClientRect().top); });
-        return m;
-      }
-      function flip(before) {
-        var moved = [];
-        Array.prototype.forEach.call(tbody.children, function (tr) {
-          var y0 = before.get(tr.dataset.key);
-          if (y0 == null) { tr.classList.add('is-enter'); return; }
-          var dy = y0 - tr.getBoundingClientRect().top;
-          if (Math.abs(dy) < 0.5) return;
-          tr.style.transition = 'none';
-          tr.style.transform = 'translateY(' + dy + 'px)';
-          moved.push(tr);
-        });
-        if (!moved.length) return;
-        void tbody.offsetHeight;
-        moved.forEach(function (tr) { tr.style.transition = ''; tr.style.transform = ''; });
       }
 
       function onHead(e) {
@@ -181,7 +161,8 @@
       }
       function pick(tr) {
         if (!tr || cur.options.crossFilter === false || tr._rkName == null) return;
-        cur.select(cur.enc.name, tr._rkName);
+        var f = cur.enc.name;
+        cur.select(f, tr._rkName, GENERIC.test(f) && !cur.options.crossFilterScope ? { scope: 'dataset' } : null);
       }
       function onClick(e) { pick(e.target.closest('tr')); }
       function onKey(e) {

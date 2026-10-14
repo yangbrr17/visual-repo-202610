@@ -1,0 +1,19 @@
+{
+  "id": "ev_equity_bridge",
+  "title": "Enterprise value to equity value bridge",
+  "schema": {"fields": [
+    {"name": "step", "type": "string", "title": "Step"},
+    {"name": "value", "type": "number", "title": "Value", "format": "#,##0.0;(#,##0.0)", "unit": "USD m"},
+    {"name": "kind", "type": "string", "title": "Kind"}
+  ]},
+  "data": [
+    {"step": "Enterprise value (DCF base case)", "value": 9674.7, "kind": "total"},
+    {"step": "Less: gross debt", "value": -2105.0, "kind": "delta"},
+    {"step": "Plus: cash & equivalents", "value": 615.0, "kind": "delta"},
+    {"step": "Less: pension deficit", "value": -120.0, "kind": "delta"},
+    {"step": "Less: minority interests", "value": -85.0, "kind": "delta"},
+    {"step": "Plus: equity-accounted associates", "value": 60.0, "kind": "delta"},
+    {"step": "Equity value", "value": 8039.7, "kind": "total"}
+  ],
+  "meta": {"asOf": "2026-10-10", "notes": ["Implied equity value per share $50.88 on 158.0m diluted shares (= sensitivity_dcf at WACC 9.0%, TGR 2.5%).", "kind: total = absolute bar; delta = floating step.", "Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."], "source": "Project Atlas analysis (synthetic); Helios Industrial management plan", "unit": "USD m"}
+}

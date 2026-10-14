@@ -19,6 +19,8 @@
   STATS.average = STATS.mean; STATS.max = STATS.high; STATS.min = STATS.low;
 
   function truthy(v) { return v === true || v === 1 || v === 'true' || v === 'Y' || v === 'yes'; }
+  // generic field names (link tables, bridges...) cross-filter only this dataset (house rule: scoped selections)
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|status|name|label|key|id|category|group|series)$/i;
 
   /** Value outside the column's meaningful range (e.g. P/E < 0x or > 50x) -> "n.m.". */
   function isNM(c, v) {
@@ -98,11 +100,10 @@
       ? RK.theme.diverging(ext, c.mid != null ? c.mid : RK.expr.agg.median(vals), stops)
       : RK.theme.sequential(ext, stops);
     var k = ctx.options.heatIntensity;
-    var dark = t.dark ? t.paper : t.ink, light = t.dark ? t.ink : t.paper;
     return function (v) {
       if (!util.isNum(v) || isNM(c, v)) return null;
       var fill = RK.theme.mix(t.paper, scale(v), k);
-      return { bg: fill, fg: RK.theme.onColor(fill, dark, light) };
+      return { bg: fill, fg: RK.theme.textOn(fill) };
     };
   }
 
@@ -249,13 +250,16 @@
         var heats = {};
         cols.forEach(function (c) { heats[c.field] = heatOf(c0, c, rows); });
         var sel = c0.selected(enc.label);
-        var before = animate ? positions() : null;
         var clickable = o.crossFilter !== false;
-        tbody.innerHTML = '';
-        tfoot.innerHTML = '';
         root.classList.toggle('has-sel', sel.length > 0);
+        if (animate) RK.motion.flip([tbody, tfoot], paint); else paint();
 
-        seq.forEach(function (s, idx) {
+        function paint() {
+          tbody.innerHTML = '';
+          tfoot.innerHTML = '';
+          seq.forEach(row);
+        }
+        function row(s, idx) {
           var tr;
           if (s.kind === 'section') {
             tr = h('tr.is-section', h('td', { colspan: cols.length }, h('span.rk-comps__sec', s.label)));
@@ -303,32 +307,9 @@
             tr.style.setProperty('--rk-i', Math.min(idx, 40));
           }
           (s.foot ? tfoot : tbody).appendChild(tr);
-        });
-        if (before) flip(before);
+        }
       }
-
-      /* FLIP: rows that survive a re-order glide from their old position; new rows fade in */
       function bodyRows() { return Array.prototype.slice.call(tbody.children).concat(Array.prototype.slice.call(tfoot.children)); }
-      function positions() {
-        var m = new Map();
-        bodyRows().forEach(function (tr) { m.set(tr.dataset.key, tr.getBoundingClientRect().top); });
-        return m;
-      }
-      function flip(before) {
-        var moved = [];
-        bodyRows().forEach(function (tr) {
-          var y0 = before.get(tr.dataset.key);
-          if (y0 == null) { tr.classList.add('is-enter'); return; }
-          var dy = y0 - tr.getBoundingClientRect().top;
-          if (Math.abs(dy) < 0.5) return;
-          tr.style.transition = 'none';
-          tr.style.transform = 'translateY(' + dy + 'px)';
-          moved.push(tr);
-        });
-        if (!moved.length) return;
-        void table.offsetHeight; // commit the inverted positions before releasing them
-        moved.forEach(function (tr) { tr.style.transition = ''; tr.style.transform = ''; });
-      }
 
       function draw(animate) {
         var cols = columnsOf(cur);
@@ -351,7 +332,8 @@
       }
       function pick(tr) {
         if (!tr || cur.options.crossFilter === false || !tr.classList.contains('is-data')) return;
-        cur.select(cur.enc.label, tr._rkValue);
+        var f = cur.enc.label;
+        cur.select(f, tr._rkValue, GENERIC.test(f) && !cur.options.crossFilterScope ? { scope: 'dataset' } : null);
       }
       function onBodyClick(e) { pick(e.target.closest('tr')); }
       var bodies = [tbody, tfoot];

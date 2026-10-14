@@ -12,6 +12,8 @@
   var SEARCH_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5"/></svg>';
 
   function truthy(v) { return v === true || v === 1 || v === 'true' || v === 'Y' || v === 'yes'; }
+  // generic field names (link tables, bridges...) cross-filter only this dataset (house rule: scoped selections)
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|status|name|label|key|id|category|group|series)$/i;
 
   /**
    * Numeric header filter: "> 10", "<=2.5", "=7", "5-10", "5..10", "30%" (percent columns also accept "30").
@@ -220,7 +222,7 @@
       table.on('dataFiltered', function () { setTimeout(setCount, 0); });
       table.on('rowClick', function (e, row) {
         if (cur.options.crossFilter === false) return;
-        cur.select(key, row.getData()[key]);
+        cur.select(key, row.getData()[key], GENERIC.test(key) && !cur.options.crossFilterScope ? { scope: 'dataset' } : null);
       });
 
       /* ---------------- search ---------------- */

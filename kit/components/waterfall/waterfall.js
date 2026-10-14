@@ -11,31 +11,25 @@
   var MINUS = '−';
   var BAR = 0.62;          // bar width as share of the category band (connectors use the same value)
 
-  function isNum(v) { return typeof v === 'number' && isFinite(v); }
+  var isNum = util.isNum;
 
-  /** Re-run the layout without animation when the width changes (label room is measured in px). */
-  function relayout(render) {
-    return function (ctx) {
-      var api = render(ctx), last = ctx, update = api.update, w = api.chart.getWidth();
-      api.update = function (c) { last = c; w = api.chart.getWidth(); update(c); };
-      api.resize = function () {
-        api.chart.resize();
-        if (Math.abs(api.chart.getWidth() - w) > 4) { w = api.chart.getWidth(); update(Object.assign({}, last, { motion: false })); }
-      };
-      return api;
-    };
+  /** Axis tick format: the value format with no more decimals than the tick step needs (1,200 not 1,200.0). */
+  function tickFmt(fmt, step) {
+    var code = RK.format.presets[fmt] || fmt;
+    if (typeof code !== 'string' || !step || !/[0#]/.test(code) || RK.format.isDateCode(code)) return fmt;
+    var sec = code.split(';')[0].replace(/"[^"]*"/g, ''), scale = Math.pow(1000, ((sec.match(/[0#](,+)[^0#]*$/) || [])[1] || '').length);
+    var v = Math.abs(step) * (/%/.test(sec) ? 100 : 1) / scale, dec = 0;
+    while (dec < 4 && Math.abs(Math.round(v * Math.pow(10, dec)) - v * Math.pow(10, dec)) > 1e-6) dec++;
+    return code.replace(/([0#])\.([0#]+)/g, function (m, a, d) { var n = Math.min(dec, d.length); return a + (n ? '.' + d.slice(0, n) : ''); });
   }
 
   /** Greedy word wrap that may also break after hyphens / slashes (ECharts 'break' splits words mid-way). */
-  var measureCtx = null;
   function wrap(text, width, font) {
     text = String(text == null ? '' : text);
-    if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
-    measureCtx.font = font;
     var words = (text.match(/[^\s\-\/]*[\s\-\/]*/g) || [text]), lines = [], cur = '';
     words.forEach(function (w) {
       var next = cur + w;
-      if (cur && measureCtx.measureText(next.trim()).width > width) { lines.push(cur.trim()); cur = w; } else cur = next;
+      if (cur && C.measure(next.trim(), font) > width) { lines.push(cur.trim()); cur = w; } else cur = next;
     });
     if (cur.trim()) lines.push(cur.trim());
     return lines.join('\n');
@@ -103,8 +97,8 @@
     var sub = t.accent3 || RK.theme.mix(t.accent, t.paper, 0.4);
     var cats = util.unique(steps.filter(function (s) { return s.kind === 'delta' && s.category != null; }).map(function (s) { return s.category; }));
     var byCat = o.colorBy === 'category' && cats.length > 0;
-    var catPal = t.cat.slice(1);       // cat[0] is (usually) the total accent
-    function catColor(c) { var k = cats.indexOf(c); return k < 0 ? t.neutral : catPal[k % catPal.length]; }
+    var catPal = RK.theme.palette({ exclude: [t.accent], n: cats.length });   // driver colours never resemble the totals
+    function catColor(c) { var k = cats.indexOf(c); return k < 0 ? t.neutral : catPal[k]; }
 
     function colorOf(s) {
       if (s.kind === 'total') return t.accent;
@@ -162,7 +156,7 @@
       type: 'value', min: axMin, max: axMax, interval: interval,
       // kept "shown" with invisible parts: the axis must exist for the break zigzag to be drawn
       axisLine: { show: false }, axisTick: { show: false },
-      axisLabel: { show: !!o.valueAxis, formatter: C.axisFmt(fmt) },
+      axisLabel: { show: !!o.valueAxis, formatter: C.axisFmt(tickFmt(fmt, interval)) },
       splitLine: { show: !!o.valueAxis }
     };
     if (brk) {
@@ -288,10 +282,12 @@
       axisBreak: false,          // false | 'auto' | {start, end, gap} — break the axis between zero and the walk
       pctOfStart: true,          // tooltip: delta as % of the opening total
       legend: true,
-      crossFilter: false         // true = click a step to cross-filter on the label field
+      crossFilter: false,        // true = click a step to cross-filter on the label field
+      crossFilterScope: 'dataset' // step names are not a shared business dimension: filter this dataset only
     },
-    render: relayout(C(build, {
+    render: C(build, {
+      rebuildOnResize: true,     // category labels are wrapped to the measured band width
       select: function (p, c) { return p.seriesId === 'bars' ? { field: c.enc.label, value: p.name } : null; }
-    }))
+    })
   });
 })();

@@ -8,16 +8,8 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
-  /** Canvas text width (margins and wraps are sized from measured labels). */
-  var measure = (function () {
-    var c2d = null;
-    return function (text, font) {
-      c2d = c2d || document.createElement('canvas').getContext('2d');
-      c2d.font = font;
-      // +7%: the canvas may measure with a fallback face before the webfont has loaded
-      return c2d.measureText(String(text)).width * 1.07;
-    };
-  })();
+  /** Label width via the shared canvas measure; +7% because the canvas may still measure a fallback face. */
+  function measure(text, font) { return C.measure(text, font) * 1.07; }
 
   function tokenColor(t, v) {
     if (!v) return null;
@@ -43,26 +35,14 @@
   }
 
   /**
-   * Toggle a node in this block's selection. A node matches links at either end, so the filter is
-   * an expression (`source in [..] or target in [..]`), scoped to this block's dataset unless
-   * filterScope = 'global'. `values` is kept on the spec so ctx.selected(enc.source) still works.
+   * Toggle a node in this block's selection. A node matches flows at either end (source OR target);
+   * the selection is scoped by crossFilterScope (default 'dataset').
    */
   function selectNode(ctx, value) {
     var enc = ctx.enc;
     if (ctx.options.crossFilter === false || value == null || !enc.source || !enc.target) return;
-    var key = ctx.id + ':' + enc.source, cur = RK.store.filter(key);
-    var vals = cur && cur.values ? cur.values.slice() : [];
-    var i = vals.indexOf(value);
-    if (i >= 0) vals.splice(i, 1); else vals.push(value);
-    if (!vals.length) { RK.store.clearFilter(key); return; }
-    var list = '[' + vals.map(function (v) { return JSON.stringify(String(v)); }).join(', ') + ']';
-    RK.store.setFilter(key, {
-      op: 'expr', field: enc.source, values: vals, source: ctx.id,
-      expr: '`' + enc.source + '` in ' + list + ' or `' + enc.target + '` in ' + list,
-      datasets: ctx.options.filterScope === 'global' || !ctx.dataset ? undefined : [ctx.dataset.id]
-    });
+    ctx.select(enc.source, value, { either: enc.target, scope: ctx.options.filterScope || undefined });
   }
-
 
   /** Aggregate rows into nodes (with out / in totals) and links, folding the tail into "Other". */
   function model(ctx) {
@@ -137,7 +117,8 @@
       colorKey: true,           // small "Ribbon colour = …" key, top-left
       format: null,
       crossFilter: true,
-      filterScope: 'dataset'
+      crossFilterScope: 'dataset',  // dataset | global — reach of the click-to-filter selection
+      filterScope: null         // deprecated alias of crossFilterScope
     },
     render: C(build, {
       rebuildOnResize: true,     // radius and label room are computed in px from the container
@@ -161,22 +142,15 @@
     o = util.merge({}, o, { ribbonOpacity: Math.min(0.7, o.ribbonOpacity * (t.dark ? 1.45 : 1)) });
     function touchesHi(l) { return hi.indexOf(l.source) >= 0 || hi.indexOf(l.target) >= 0; }
 
-    // palette: theme categorical minus anything close to accent2 (reserved for the highlight), then tints
-    var gold = RK.theme.parseColor(t.accent2);
-    var base = t.cat.filter(function (c) {
-      if (!hi.length) return true;
-      var x = RK.theme.parseColor(c);
-      return Math.sqrt(Math.pow(x[0] - gold[0], 2) + Math.pow(x[1] - gold[1], 2) + Math.pow(x[2] - gold[2], 2)) > 90;
-    });
-    if (!base.length) base = t.cat.slice();
-    var pal = base.concat(base.map(function (c) { return RK.theme.mix(c, t.paper, 0.45); }));
+    // categorical colours kept clear of accent2 (the highlight), extended with tints instead of repeating
+    var pal = RK.theme.palette({ n: m.nodes.length });
     var ci = 0;
     var colorOf = {};
     m.nodes.forEach(function (n) {
       var c = tokenColor(t, (o.nodeColors || {})[n.name]);
       if (!c && hi.indexOf(n.name) >= 0) c = t.accent2;
       if (!c && n.isOther) c = t.neutral;
-      if (!c) c = single ? t.accent : pal[ci++ % pal.length];
+      if (!c) c = single ? t.accent : pal[ci++];
       colorOf[n.name] = c;
     });
 

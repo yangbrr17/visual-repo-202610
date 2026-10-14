@@ -34,6 +34,7 @@
     "tooltipFields": {"type": "string[]", "default": [], "desc": "Extra fields listed in the tooltip"},
     "brush": {"type": "boolean", "default": true, "desc": "Box-select tool that cross-filters the label field"},
     "zoom": {"type": "boolean", "default": true, "desc": "Box zoom, Ctrl + wheel zoom, drag to pan and the hover toolbar; false = static chart"},
+    "wheelZoom": {"type": "boolean", "default": null, "desc": "true = a plain mouse wheel zooms; default: Ctrl/Cmd + wheel or a trackpad pinch zooms, so the wheel keeps scrolling the report"},
     "legend": {"type": "boolean", "default": true, "desc": "Category legend (top-left)"}
   },
   "interactions": ["Hover tooltip with both metrics (+ extra fields)", "Click a point to cross-filter (toggle)", "Box-select points to cross-filter", "Box zoom, Ctrl + wheel zoom, drag to pan, reset", "Legend toggles categories", "Animated transitions when filters change", "PNG / CSV export"],

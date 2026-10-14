@@ -1,0 +1,24 @@
+{
+  "id": "kpis",
+  "title": "Key performance indicators",
+  "schema": {"fields": [
+    {"name": "id", "type": "string", "title": "Id"},
+    {"name": "label", "type": "string", "title": "KPI"},
+    {"name": "value", "type": "number", "title": "Value"},
+    {"name": "format", "type": "string", "title": "Value format"},
+    {"name": "delta", "type": "number", "title": "Change"},
+    {"name": "delta_format", "type": "string", "title": "Change format"},
+    {"name": "period", "type": "string", "title": "Period"},
+    {"name": "spark", "type": "array", "title": "Trend (12 points)"},
+    {"name": "good", "type": "string", "title": "Favourable direction"}
+  ]},
+  "data": [
+    {"id": "revenue_ltm", "label": "Revenue (LTM)", "value": 5108.4, "format": "$#,##0\"m\"", "delta": 0.0736, "delta_format": "+0.0%;-0.0%;0.0%", "period": "LTM Sep-26 vs. LTM Sep-25", "spark": [406.0, 431.0, 477.5, 380.9, 413.3, 443.3, 395.6, 428.2, 461.5, 398.8, 422.8, 449.5], "good": "up"},
+    {"id": "ebitda_margin_ltm", "label": "EBITDA margin (LTM)", "value": 0.1908, "format": "0.0%", "delta": 78.0, "delta_format": "+#,##0\" bps\";-#,##0\" bps\";0\" bps\"", "period": "LTM Sep-26 vs. LTM Sep-25", "spark": [0.1953, 0.1919, 0.1937, 0.1827, 0.1843, 0.1824, 0.1933, 0.189, 0.1939, 0.1932, 0.1974, 0.197], "good": "up"},
+    {"id": "share_price", "label": "Share price", "value": 42.5, "format": "$#,##0.00", "delta": 0.1268, "delta_format": "+0.0%;-0.0%;0.0%", "period": "09-Oct-2026 vs. 1 year ago", "spark": [40.45, 39.8, 40.63, 40.6, 44.09, 41.63, 39.02, 44.14, 40.86, 45.41, 42.4, 42.5], "good": "up"},
+    {"id": "ev_ebitda_ntm", "label": "EV / NTM EBITDA", "value": 7.68, "format": "0.0x", "delta": -0.05, "delta_format": "+0.0x;-0.0x;0.0x", "period": "vs. 1 year ago", "spark": [8.05, 7.87, 7.93, 7.86, 8.34, 7.89, 7.43, 8.14, 7.58, 8.19, 7.68, 7.68], "good": "up"},
+    {"id": "net_leverage", "label": "Net debt / LTM EBITDA", "value": 1.53, "format": "0.0x", "delta": -0.39, "delta_format": "+0.0x;-0.0x;0.0x", "period": "Sep-26 vs. Sep-25", "spark": [1.92, 1.87, 1.82, 1.84, 1.81, 1.77, 1.71, 1.68, 1.61, 1.62, 1.55, 1.53], "good": "down"},
+    {"id": "order_backlog", "label": "Order backlog", "value": 3965.0, "format": "$#,##0\"m\"", "delta": 0.084, "delta_format": "+0.0%;-0.0%;0.0%", "period": "30-Sep-2026 vs. 30-Sep-2025", "spark": [3657.7, 3652.6, 3724.7, 3741.4, 3739.5, 3773.7, 3826.9, 3858.7, 3860.8, 3886.4, 3901.4, 3965.0], "good": "up"}
+  ],
+  "meta": {"asOf": "2026-10-10", "notes": ["Each row carries its own value/delta format code; spark = 12 monthly points, oldest first.", "good = direction of change that is favourable ('up' | 'down').", "Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."], "source": "Helios Industrial filings and management information; ReportKit synthetic data"}
+}

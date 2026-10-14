@@ -1,7 +1,7 @@
 /* pivot-table — extends the shared .rk-table pitchbook styles */
 .rk-pivot { position: relative; height: 100%; }
 .rk-pivot.is-auto { height: auto; }
-.rk-pivot__scroll { height: 100%; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--rk-rule) transparent; }
+.rk-pivot__scroll { height: 100%; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--rk-rule) transparent; }
 .rk-pivot.is-auto .rk-pivot__scroll { height: auto; overflow-y: visible; }
 
 .rk-pivot__table { border-collapse: separate; border-spacing: 0; line-height: 1.3; }
@@ -63,15 +63,6 @@
 .rk-pivot .rk-table tr.is-stat td { background: var(--rk-surface); font-weight: 600; color: var(--rk-ink); }
 .rk-pivot .rk-table tr.is-stat.is-stat-first td { border-top: 1.5px solid var(--rk-accent); }
 
-/* tooltip */
-.rk-pivot__tip {
-  position: fixed; left: 0; top: 0; z-index: 90; pointer-events: none; font-family: var(--rk-font-sans);
-  padding: 8px 10px; border: 1px solid var(--rk-rule); border-radius: 6px;
-  background: var(--rk-tooltip-bg); color: var(--rk-tooltip-ink); box-shadow: 0 8px 24px rgba(15, 23, 42, .14);
-  opacity: 0; transition: opacity 120ms, transform 160ms var(--rk-ease); white-space: nowrap;
-}
-.rk-pivot__tip.is-on { opacity: 1; }
-
 /* motion */
 .rk-pivot tr.is-in { animation: rk-pivot-in 420ms var(--rk-ease) both; animation-delay: calc(var(--rk-i, 0) * 20ms + 60ms); }
 .rk-pivot tr.is-enter { animation: rk-pivot-in 320ms var(--rk-ease) both; }
@@ -81,5 +72,5 @@
   .rk-pivot tr.is-in, .rk-pivot tr.is-enter { animation: none; }
   .rk-pivot__scroll { height: auto; overflow: visible; }
   .rk-pivot thead, .rk-pivot tfoot { position: static; }
-  .rk-pivot__tip { display: none; }
+  .rk-pivot__tg { visibility: hidden; }   /* no buttons on paper; keeps the indent */
 }

@@ -820,3 +820,26 @@ class TestKitAndCli(KitTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DataSourceAndAutoHeightTests(unittest.TestCase):
+    """height='auto' and the http / api data-source modes."""
+
+    def test_auto_height_and_api_mode(self):
+        import tempfile
+        from pathlib import Path
+        from reportkit import Report
+        root = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as tmp:
+            r = Report("T")
+            r.dataset("kpis", root / "kit/samples/datasets/kpis.json")
+            r.page("P").block("kpi-tiles", data="kpis", height="auto")
+            out = r.build(Path(tmp) / "a", kit=root)
+            html = (out / "index.html").read_text()
+            self.assertIn('class="rk-block__body is-auto"', html)
+            self.assertIn('data/bundle.js', html)
+            out2 = r.build(Path(tmp) / "b", kit=root, data_source="api", api="https://example.test/api/r/1/")
+            html2 = (out2 / "index.html").read_text()
+            self.assertNotIn('src="data/bundle.js"', html2)
+            self.assertIn('<meta name="rk:data-source" content="api">', html2)
+            self.assertIn('<meta name="rk:api" content="https://example.test/api/r/1/">', html2)

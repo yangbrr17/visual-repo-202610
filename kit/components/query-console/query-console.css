@@ -125,7 +125,7 @@
 @keyframes rk-qc-in { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
 
 /* ---------- reference panel ---------- */
-.rk-qc__ref { grid-column: 2; grid-row: 2 / 4; min-height: 0; overflow: auto; padding: 0 10px 14px; border-left: 1px solid var(--rk-rule); background: var(--rk-surface); font-size: 12px; overscroll-behavior: contain; }
+.rk-qc__ref { grid-column: 2; grid-row: 2 / 4; min-height: 0; overflow: auto; padding: 0 10px 14px; border-left: 1px solid var(--rk-rule); background: var(--rk-surface); font-size: 12px; }
 .rk-qc-ref__top { position: sticky; top: 0; z-index: 1; padding: 10px 0 6px; background: var(--rk-surface); }
 .rk-qc-ref__q { width: 100%; height: 28px; padding: 0 9px; border: 1px solid var(--rk-rule); border-radius: var(--rk-radius); background: var(--rk-paper); color: var(--rk-ink); font-size: 12px; outline: none; }
 .rk-qc-ref__q:focus { border-color: var(--rk-accent-3); }

@@ -10,27 +10,7 @@
   var C = RK.chart, util = RK.util;
   var MINUS = '−';
 
-  function isNum(v) { return typeof v === 'number' && isFinite(v); }
-
-  /** Re-run the layout without animation when the width changes (label room is measured in px). */
-  function relayout(render) {
-    return function (ctx) {
-      var api = render(ctx), last = ctx, update = api.update, w = api.chart.getWidth();
-      api.update = function (c) { last = c; w = api.chart.getWidth(); update(c); };
-      api.resize = function () {
-        api.chart.resize();
-        if (Math.abs(api.chart.getWidth() - w) > 4) { w = api.chart.getWidth(); update(Object.assign({}, last, { motion: false })); }
-      };
-      return api;
-    };
-  }
-  function median(a) {
-    a = a.filter(isNum).sort(function (x, y) { return x - y; });
-    if (!a.length) return null;
-    var m = a.length >> 1;
-    return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
-  }
-  function mean(a) { a = a.filter(isNum); return a.length ? a.reduce(function (s, v) { return s + v; }, 0) / a.length : null; }
+  var isNum = util.isNum;
   function signed(v, fmt) {
     if (!isNum(v)) return RK.format(v, fmt);
     var s = RK.format(Math.abs(v), fmt);
@@ -39,16 +19,11 @@
   /** Axis tick format: the value format with no more decimals than the tick step needs. */
   function tickFmt(fmt, step) {
     var code = RK.format.presets[fmt] || fmt;
-    if (typeof code !== 'string' || !/[0#]/.test(code) || RK.format.isDateCode(code)) return fmt;
-    var v = Math.abs(step) * (/%/.test(code.replace(/"[^"]*"/g, '')) ? 100 : 1), dec = 0;
+    if (typeof code !== 'string' || !step || !/[0#]/.test(code) || RK.format.isDateCode(code)) return fmt;
+    var sec = code.split(';')[0].replace(/"[^"]*"/g, ''), scale = Math.pow(1000, ((sec.match(/[0#](,+)[^0#]*$/) || [])[1] || '').length);
+    var v = Math.abs(step) * (/%/.test(sec) ? 100 : 1) / scale, dec = 0;
     while (dec < 4 && Math.abs(Math.round(v * Math.pow(10, dec)) - v * Math.pow(10, dec)) > 1e-6) dec++;
     return code.replace(/([0#])\.([0#]+)/g, function (m, a, d) { var n = Math.min(dec, d.length); return a + (n ? '.' + d.slice(0, n) : ''); });
-  }
-  var measureCtx = null;
-  function textW(s, font) {
-    if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
-    measureCtx.font = font;
-    return measureCtx.measureText(String(s)).width;
   }
 
   /** Tinted full-width row band behind highlighted categories (like .rk-table tr.is-target). */
@@ -79,7 +54,7 @@
     var isHi = function (r) { return (hf && !!r[hf] && r[hf] !== 'false') || hlist.indexOf(r[enc.label]) >= 0; };
     if (!hasTarget) {
       var all = ctx.rows.filter(function (r) { return !(o.targetExcludeHighlight && isHi(r)); }).map(function (r) { return r[enc.value]; });
-      constTarget = o.target === 'median' ? median(all) : o.target === 'mean' ? mean(all) : isNum(o.target) ? o.target : null;
+      constTarget = o.target === 'median' || o.target === 'mean' ? RK.expr.agg[o.target](all.filter(isNum)) : isNum(o.target) ? o.target : null;
     }
 
     var items = ctx.rows.map(function (r) {
@@ -212,9 +187,9 @@
     var numFont = '11px ' + t.fontNum, headFont = '10.5px ' + t.fontSans;
     var vHead = o.valueTitle || 'Actual', dHead = o.varianceTitle || ('vs. ' + targetName.toLowerCase());
     var vW = 0, dW = 0;
-    items.forEach(function (d) { vW = Math.max(vW, textW(vText(d), numFont)); dW = Math.max(dW, textW(dText(d), '600 ' + numFont)); });
-    vW = Math.ceil(Math.max(vW, textW(vHead, headFont))) + 4;
-    dW = Math.ceil(Math.max(dW, textW(dHead, headFont))) + 4;
+    items.forEach(function (d) { vW = Math.max(vW, C.measure(vText(d), numFont)); dW = Math.max(dW, C.measure(dText(d), '600 ' + numFont)); });
+    vW = Math.ceil(Math.max(vW, C.measure(vHead, headFont))) + 4;
+    dW = Math.ceil(Math.max(dW, C.measure(dHead, headFont))) + 4;
     var colGap = 14;
     var rich = {
       v: { width: showVal ? vW : 0, align: 'right', color: t.ink, fontFamily: t.fontNum, fontSize: 11 },
@@ -262,19 +237,19 @@
       splitLine: { show: false }
     };
 
-    var legendData = bandNames.map(function (n, i) { return { name: n, icon: 'rect', itemStyle: { color: shades[i] } }; });
+    var legendData = bandNames.map(function (n, i) { return { name: n, itemStyle: { color: shades[i] } }; });
     if (o.colorByTarget) {
       // two swatches explain the pos / neg bar colours; they map to empty series
       var okName = o.metLabel || 'Meets target', koName = o.missLabel || 'Misses target';
       series.push({ id: 'lg-ok', name: okName, type: 'bar', data: [], itemStyle: { color: t.pos } },
         { id: 'lg-ko', name: koName, type: 'bar', data: [], itemStyle: { color: t.neg } });
-      legendData.push({ name: okName, icon: 'rect', itemStyle: { color: t.pos } }, { name: koName, icon: 'rect', itemStyle: { color: t.neg } });
-    } else legendData.push({ name: actualName, icon: 'rect', itemStyle: { color: t.accent } });
+      legendData.push({ name: okName, itemStyle: { color: t.pos } }, { name: koName, itemStyle: { color: t.neg } });
+    } else legendData.push({ name: actualName, itemStyle: { color: t.accent } });
     if (items.some(function (d) { return d.target != null; })) legendData.push({ name: targetName, icon: 'path://M0,0 h3 v14 h-3 z', itemStyle: { color: t.ink } });
     var showLegend = o.legend !== false;
 
     return {
-      legend: C.legend(ctx, { show: showLegend, data: legendData, selectedMode: false, itemWidth: 12, itemHeight: 9 }),
+      legend: C.legend(ctx, { show: showLegend, data: legendData, selectedMode: false }),
       grid: C.grid(ctx, { top: (showLegend ? 30 : 6) + (showVal || showVar ? 16 : 0), left: 4, right: 8, bottom: rowScale ? 2 : 4 }),
       tooltip: {
         trigger: 'item',
@@ -327,8 +302,9 @@
       format: null,
       legend: true
     },
-    render: relayout(C(build, {
+    render: C(build, {
+      rebuildOnResize: true,      // the actual | variance columns are measured in px
       select: function (p, ctx) { return p.seriesId === 'actual' || p.seriesId === 'target' ? { field: ctx.enc.label, value: p.name } : null; }
-    }))
+    })
   });
 })();

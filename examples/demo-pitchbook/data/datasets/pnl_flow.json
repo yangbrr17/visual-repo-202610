@@ -1,0 +1,25 @@
+{
+  "id": "pnl_flow",
+  "title": "FY25A P&L flow (revenue to net income)",
+  "schema": {"fields": [
+    {"name": "source", "type": "string", "title": "From"},
+    {"name": "target", "type": "string", "title": "To"},
+    {"name": "value", "type": "number", "title": "Value", "format": "$#,##0.0", "unit": "USD m"}
+  ]},
+  "data": [
+    {"source": "Factory Automation", "target": "Revenue", "value": 1820.7},
+    {"source": "Motion Control", "target": "Revenue", "value": 1290.1},
+    {"source": "Sensors & Instrumentation", "target": "Revenue", "value": 1009.7},
+    {"source": "Software & Services", "target": "Revenue", "value": 729.5},
+    {"source": "Revenue", "target": "Cost of goods sold", "value": 3099.2},
+    {"source": "Revenue", "target": "Gross profit", "value": 1750.8},
+    {"source": "Gross profit", "target": "Operating expenses", "value": 853.6},
+    {"source": "Gross profit", "target": "EBITDA", "value": 897.2},
+    {"source": "EBITDA", "target": "D&A", "value": 218.2},
+    {"source": "EBITDA", "target": "EBIT", "value": 679.0},
+    {"source": "EBIT", "target": "Net interest", "value": 86.0},
+    {"source": "EBIT", "target": "Income tax", "value": 148.2},
+    {"source": "EBIT", "target": "Net income", "value": 444.8}
+  ],
+  "meta": {"asOf": "2026-10-10", "notes": ["Sankey links; inflow equals outflow at every intermediate node. Opex excludes D&A.", "Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."], "source": "Helios Industrial filings and management information; ReportKit synthetic data", "unit": "USD m"}
+}

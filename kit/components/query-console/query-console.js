@@ -100,12 +100,6 @@
     var s = Math.max(0, (Date.now() - t) / 1000);
     return s < 60 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : s < 86400 ? Math.round(s / 3600) + ' h ago' : Math.round(s / 86400) + ' d ago';
   }
-  function filterApplies(spec, ds) {
-    if (spec.datasets && spec.datasets.indexOf(ds.id) < 0) return false;
-    if (spec.op === 'expr') return !!spec._compiled && spec._compiled.fields.every(function (f) { return ds.has(f); });
-    if (spec.op === 'search') return !spec.field || ds.has(spec.field);
-    return ds.has(spec.field);
-  }
   function loadHistory() {
     try { var v = JSON.parse(window.localStorage.getItem(HKEY) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
   }
@@ -313,7 +307,7 @@
     var re = new RegExp('(^|\\s)' + kw + '\\s', 'i'), m = re.exec(text);
     return m ? m.index + m[1].length : -1;
   }
-  function validate(text, dsId) {
+  function validate(text, dsId, self) {
     if (!String(text).trim()) return { empty: true };
     var spec = RK.query.parse(text);
     var ds = RK.data.get(spec.from || dsId);
@@ -350,7 +344,7 @@
       if (chk.aggregate) return { error: '"where" filters rows — aggregates such as sum() or median() are not allowed there', pos: wp, end: wp + spec.where.length };
     }
     try {
-      var res = RK.query(text, { dataset: dsId });
+      var res = RK.query(text, { dataset: dsId, exclude: self });
       return { ok: true, res: res, spec: spec, ds: ds };
     } catch (e) {
       var sp = /sort/i.test(e.message) ? clausePos(text, 'sort') : -1;
@@ -381,6 +375,7 @@
       addMetric: true,      // "Add as metric" for row-level formula columns
       highlight: null,      // value(s) whose result rows / bars are highlighted (e.g. the target company)
       maxRows: 500,         // rows rendered in the table (CSV always exports all)
+      wheelZoom: null,      // long line charts: null = Ctrl/Cmd + wheel or pinch zooms (plain wheel scrolls the page); true = plain wheel
       tools: false
     },
     render: function (ctx) {
@@ -689,7 +684,7 @@
       }
       function runValidation() {
         if (!alive) return;
-        var v = validate(ta.value, st.ds);
+        var v = validate(ta.value, st.ds, ctx.id);
         if (v.empty) { err = null; setStatus('idle', 'Type a query, pick an example or use the reference panel →'); }
         else if (v.error) {
           err = v.pos >= 0 ? { pos: v.pos, end: v.end } : null;
@@ -934,7 +929,7 @@
         if (!text || !text.trim()) return;
         var t0 = (window.performance || Date).now();
         var res;
-        try { res = RK.query(text, { dataset: st.ds }); }
+        try { res = RK.query(text, { dataset: st.ds, exclude: ctx.id }); }
         catch (e) {
           if (st.tab === 'query') runValidation();
           else setStatus('error', friendlyError(e.message, DS()));
@@ -993,7 +988,7 @@
       }
       function activeFilters() {
         var ds = RK.data.get(result.dataset), fs = RK.store.filters();
-        return Object.keys(fs).filter(function (k) { return filterApplies(fs[k], ds); });
+        return Object.keys(fs).filter(function (k) { return fs[k].source !== ctx.id && RK.data.applies(fs[k], ds); });
       }
 
       function paintResults(rerun) {
@@ -1067,10 +1062,15 @@
       // line : category looks like a year / date; short annual series with mixed units become the
       //        classic columns + line combo (e.g. revenue bars + margin line on the right axis)
       var lastRows = null, panelMode = false;
+      /** Axis ticks in the column format, without decimals on whole ticks ($#,##0.0 -> $4,000; 0.0x -> 10x; 2.5x stays). */
       function axisFmt(fmt) {
-        var code = String(RK.format.presets[fmt] || fmt || '');
-        var whole = fmtKind(code) === 'num' && /\.0+/.test(code) ? code.replace(/\.0+/g, '') : null;   // $#,##0.0 -> $#,##0 on axes
-        return function (v) { return RK.format(v, whole && (Math.abs(v) >= 100 || v === 0) ? whole : (fmt || 'auto')); };
+        var code = String(RK.format.presets[fmt] || fmt || 'auto');
+        var whole = RK.format.decimals(code) ? code.replace(/\.[0#]+/g, '') : null;
+        var zeros = new RegExp('\\' + RK.format.config.decimal + '0+(?!\\d)');
+        return function (v) {
+          var full = RK.format(v, code);
+          return whole && zeros.test(full) ? RK.format(v, whole) : full;
+        };
       }
       function isEstimate(c) { return typeof c === 'string' && /\d{2}\s?[EFPB]$/i.test(c.trim()); }
       function paintChart(rows, rerun) {
@@ -1119,6 +1119,7 @@
           return { show: true, position: pos, distance: 4, color: t.ink2, fontSize: 10.5, fontFamily: t.fontNum, formatter: function (p) { return RK.format(valueOf(p.value), fmt); } };
         }
         var opt, dropped = 0;
+        var pal = RK.theme.palette({ n: 8 });   // series colours kept clear of accent-2 (reserved for the highlighted target)
 
         if (horiz && !sdim) {
           // ---- side-by-side horizontal panels sharing the category axis ----
@@ -1141,7 +1142,7 @@
           var top = n > 1 ? 24 : 8;
           var showVals = cats.length <= 24;
           opt = {
-            animation: ctx.motion, color: t.cat,
+            animation: ctx.motion, color: pal,
             title: n > 1 ? panels.map(function (p, i) {
               return { text: panelTitle(p), left: labelW + i * (pw + valPad + gap), top: 2, textStyle: { fontSize: 11, fontWeight: 600, color: t.ink2, fontFamily: t.fontSans, width: pw + valPad - 8, overflow: 'truncate' } };
             }) : [],
@@ -1166,7 +1167,7 @@
             series: panels.map(function (p, i) {
               return {
                 name: p.title, type: 'bar', xAxisIndex: i, yAxisIndex: i, barMaxWidth: 26, barCategoryGap: '32%',
-                data: barData(byCat(rows, p.name), t.cat[0], true),     // one colour: panels are labelled, accent-2 stays for the target
+                data: barData(byCat(rows, p.name), pal[0], true),     // one colour: panels are labelled, accent-2 stays for the target
                 label: showVals ? labelCfg(p.format || 'auto', 'right') : { show: false },
                 emphasis: { focus: 'none' }
               };
@@ -1189,19 +1190,16 @@
           var lineLabels = cats.length <= 15 && (kind === 'bar' ? hasRight : plotted.length <= 2);
           var showLabels = barLabels || lineLabels;
           if (sdim) {
-            var gi = 0;
-            RK.util.groupBy(rows, function (r) { return r[sdim.name]; }).forEach(function (list, name) {
-              var color = RK.theme.color(gi++);
+            var groups = RK.util.groupBy(rows, function (r) { return r[sdim.name]; }), gi = 0;
+            var gpal = RK.theme.palette({ n: groups.size });   // extended with tints instead of repeating
+            groups.forEach(function (list, name) {
               legend.push(String(name));
-              series.push(mk(String(name), byCat(list, meas[0].name), meas[0], 0, color, kind, false));
+              series.push(mk(String(name), byCat(list, meas[0].name), meas[0], 0, gpal[gi++], kind, false));
             });
           } else {
-            // the second-unit line takes accent-2 unless a bar already uses that colour (e.g. the ink theme)
-            var barCols = plotted.filter(function (p) { return p.axis === 0; }).map(function (p, i) { return String(RK.theme.color(i)).toLowerCase(); });
-            var lineCol = [t.accent2].concat(t.cat).filter(function (c) { return barCols.indexOf(String(c).toLowerCase()) < 0; })[0] || t.accent2;
             plotted.forEach(function (p, i) {
               var asLine = kind === 'line' || p.axis === 1;
-              var color = p.axis === 1 && kind === 'bar' ? lineCol : RK.theme.color(i);
+              var color = pal[i % pal.length];
               legend.push(p.col.title);
               series.push(mk(p.col.title, byCat(rows, p.col.name), p.col, p.axis, color, asLine ? 'line' : 'bar', single));
             });
@@ -1240,12 +1238,14 @@
             if (barMax > 0) valAxis[0].max = function (e) { return RK.util.niceStep(e.max * 1.65, 1) * Math.ceil(e.max * 1.65 / RK.util.niceStep(e.max * 1.65, 1)); };
             valAxis.push({ type: 'value', position: 'right', min: lo - span * 1.9, max: hi + span * 0.35, axisLabel: { show: false }, splitLine: { show: false }, axisLine: { show: false } });
           } else if (p1) valAxis.push({ type: 'value', scale: true, position: 'right', axisLabel: { formatter: axisFmt(p1.col.format) }, splitLine: { show: false } });
-          var zoom = kind === 'line' && cats.length > 40 ? [{ type: 'inside', xAxisIndex: 0, filterMode: 'none' }, { type: 'slider', xAxisIndex: 0, height: 16, bottom: 4, showDetail: false, brushSelect: false, filterMode: 'none' }] : [];
+          // long series: Ctrl/Cmd + wheel or pinch zooms (plain wheel scrolls the report), slider on screen only
+          var zoom = kind === 'line' && cats.length > 40 ? RK.chart.zoom(ctx, 'x', { height: 16 }) : [];
+          var slider = zoom.some(function (z) { return z.type === 'slider'; });
           var showLegend = legend.length > 1;
           opt = {
-            animation: ctx.motion, color: t.cat,
-            legend: { show: showLegend, top: 0, left: 0, type: 'scroll', data: legend },
-            grid: { left: 4, right: p1 && kind !== 'bar' ? 8 : (horiz && showLabels ? 36 : 16), top: showLegend ? 34 : 14, bottom: zoom.length ? 28 : 4, containLabel: true },
+            animation: ctx.motion, color: pal,
+            legend: RK.chart.legend(ctx, { show: showLegend, data: legend }),
+            grid: { left: 4, right: p1 && kind !== 'bar' ? 8 : (horiz && showLabels ? 36 : 16), top: showLegend ? 34 : 14, bottom: slider ? 28 : 4, containLabel: true },
             tooltip: {
               trigger: 'axis', axisPointer: { type: kind === 'bar' ? 'shadow' : 'line' }, confine: true,
               formatter: function (ps) {

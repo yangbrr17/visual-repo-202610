@@ -202,13 +202,6 @@
         var strField = ds.fields.filter(function (f) { return f.type === 'string' || f.type === 'date'; })[0];
         var fields = (p.fields || [strField && strField.name].concat(computedNames)).filter(function (n) { return n && ds.has(n); });
         var totals = p.total === true ? fields.filter(function (n) { return ds.field(n).type === 'number'; }) : (p.total || []);
-        var compiled = {};
-        fields.forEach(function (n) {
-          var f = ds.field(n);
-          if (f.formula) {
-            try { compiled[n] = RK.expr.compile(f.formula, { fields: ds.fields }); } catch (e) { /* invalid formula: shown as n.a. */ }
-          }
-        });
         var wrap = h('div.rk-ps__preview');
         if (p.title) wrap.appendChild(h('div.rk-ps__ptitle', p.title));
         var table = h('table.rk-table.rk-ps__table');
@@ -219,22 +212,29 @@
           defs.forEach(function (d) { out[d.name] = d.base; });
           return out;
         }
+        /** Base-case row: the dataset's computed fields re-evaluated in order with the base params (chains included). */
+        function baseRow(r, env) {
+          var b = RK.util.merge({}, r);
+          ds.computed.forEach(function (c) { try { b[c.def.name] = c.compiled.eval(b, env); } catch (e) { b[c.def.name] = null; } });
+          return b;
+        }
         function draw() {
           var data = RK.data.view(ds, p.where ? { where: p.where } : null);
           var env = { params: baseParams() };
+          var live = {};   // computed fields driven by a @param directly or through another computed field
+          ds.computed.forEach(function (c) { live[c.def.name] = c.compiled.params.length > 0 || c.compiled.fields.some(function (f) { return live[f]; }); });
           var thead = h('thead', h('tr', fields.map(function (n) {
             var f = ds.field(n);
             return h('th', { class: f.type === 'number' ? 'is-num' : null }, f.title || n);
           })));
           var tbody = h('tbody', data.map(function (r) {
+            var base = null;
             return h('tr', fields.map(function (n) {
               var f = ds.field(n), v = r[n];
               var td = h('td', { class: f.type === 'number' ? 'is-num' : null }, RK.format(v, f.format));
-              var c = compiled[n];
-              if (c && c.params.length) {
+              if (live[n]) {
                 td.classList.add('is-live');
-                var b;
-                try { b = c.eval(r, env); } catch (e) { b = null; }
+                var b = (base || (base = baseRow(r, env)))[n];
                 if (isNum(v) && isNum(b) && b !== 0 && Math.abs(v / b - 1) > 1e-9) {
                   var chg = v / b - 1;
                   td.appendChild(h('span.rk-ps__chg', { class: chg > 0 ? 'is-up' : 'is-down' }, RK.format(chg, '+0.0%;-0.0%')));

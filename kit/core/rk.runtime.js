@@ -55,6 +55,42 @@
       return { el: overlay, close: close };
     },
 
+    /**
+     * Body-level hover tooltip for DOM components (tables): position:fixed on <body>, so scroll
+     * containers never clip it; styled like the ECharts tooltips; hides on any scroll; never printed.
+     *   var tip = RK.ui.tip();
+     *   tip.show(RK.chart.tip(title, rows, foot), cellEl);   // centred above the anchor (below if no room)
+     *   tip.hide(); tip.destroy();
+     */
+    tip: function () {
+      var el = h('div.rk-uitip.rk-noprint', {
+        'aria-hidden': 'true',
+        style: {
+          position: 'fixed', left: '0', top: '0', 'z-index': '90', 'pointer-events': 'none', opacity: '0',
+          padding: '8px 10px', border: '1px solid var(--rk-rule)', 'border-radius': '6px', 'white-space': 'nowrap',
+          background: 'var(--rk-tooltip-bg)', color: 'var(--rk-tooltip-ink)', 'font-family': 'var(--rk-font-sans)',
+          'box-shadow': '0 8px 24px rgba(15, 23, 42, .14)', transition: 'opacity 120ms, transform 160ms var(--rk-ease)'
+        }
+      });
+      document.body.appendChild(el);
+      function hide() { el.style.opacity = '0'; }
+      global.addEventListener('scroll', hide, { passive: true, capture: true });
+      return {
+        el: el,
+        show: function (html, anchor) {
+          el.innerHTML = html;
+          el.style.opacity = '1';
+          var r = anchor.getBoundingClientRect(), tw = el.offsetWidth, th = el.offsetHeight;
+          var x = util.clamp(r.left + r.width / 2 - tw / 2, 6, Math.max(6, global.innerWidth - tw - 6));
+          var y = r.top - th - 8;
+          if (y < 6) y = r.bottom + 8;
+          el.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+        },
+        hide: hide,
+        destroy: function () { global.removeEventListener('scroll', hide, { capture: true }); el.remove(); }
+      };
+    },
+
     /** Plain formatted HTML table for a set of rows/fields (used by "view data"). */
     table: function (rows, fields, opts) {
       opts = opts || {};

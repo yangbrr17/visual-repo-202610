@@ -186,8 +186,8 @@ def _check_block(report: "Report", kit: Kit, b: "Block", where: str, errors: lis
         if not isinstance(b.span, int) or isinstance(b.span, bool) or not 1 <= b.span <= 12:
             errors.append(f"{where}: span must be an integer 1-12, got {b.span!r}")
         h = b.height
-        if h is not None and not ((_is_num(h) and h > 0) or (isinstance(h, str) and _CSS_LENGTH_RE.match(h))):
-            errors.append(f"{where}: height must be a positive number of px or a CSS length like '50vh', got {h!r}")
+        if h is not None and h != "auto" and not ((_is_num(h) and h > 0) or (isinstance(h, str) and _CSS_LENGTH_RE.match(h))):
+            errors.append(f"{where}: height must be a positive number of px, a CSS length like '50vh', or 'auto', got {h!r}")
 
     manifest = kit.component(b.component)
     if manifest is None:

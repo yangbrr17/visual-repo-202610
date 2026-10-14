@@ -9,6 +9,8 @@
 (function () {
   'use strict';
   var util = RK.util, h = util.h;
+  // generic field names (link tables, bridges...) cross-filter only this dataset (house rule: scoped selections)
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|status|name|label|key|id|category|group|series)$/i;
 
   var SHOW = {
     value: null,
@@ -106,10 +108,9 @@
 
       var thead = h('thead'), tbody = h('tbody'), tfoot = h('tfoot');
       var table = h('table.rk-table.rk-pivot__table', thead, tbody, tfoot);
-      var tip = h('div.rk-pivot__tip', { 'aria-hidden': 'true' });
+      var tip = RK.ui.tip();
       var root = h('div.rk-pivot', { class: auto ? 'is-auto' : null }, h('div.rk-pivot__scroll', table));
       ctx.el.appendChild(root);
-      document.body.appendChild(tip); // fixed-position tooltip: never clipped by the page
       var model = null;
 
       /* ---------------- model ---------------- */
@@ -223,11 +224,10 @@
           if (vals.length > 1) {
             var ext = util.extent(vals), stops = (o.heat === 'div' ? t.div : t.seq);
             var sc = o.heat === 'div' ? RK.theme.diverging(ext, RK.expr.agg.median(vals), stops) : RK.theme.sequential(ext, stops);
-            var dark = t.dark ? t.paper : t.ink, light = t.dark ? t.ink : t.paper;
             heat = function (v) {
               if (!util.isNum(v)) return null;
               var fill = RK.theme.mix(t.paper, sc(v), o.heatIntensity);
-              return { bg: fill, fg: RK.theme.onColor(fill, dark, light) };
+              return { bg: fill, fg: RK.theme.textOn(fill) };
             };
           }
         }
@@ -345,13 +345,14 @@
         if (tg && tr && tr._rkNode) { toggle(tr); return; }
         if (cur.options.crossFilter === false) return;
         var name = e.target.closest('.rk-pivot__name.is-clickable');
-        if (name && tr && tr._rkNode) { cur.select(tr._rkNode.dim.field, tr._rkNode.value); return; }
+        if (name && tr && tr._rkNode) { select(tr._rkNode.dim.field, tr._rkNode.value); return; }
         var ch = e.target.closest('th.rk-pivot__ch.is-clickable');
-        if (ch && model.col && model.col.field) cur.select(model.col.field, ch._rkCol);
+        if (ch && model.col && model.col.field) select(model.col.field, ch._rkCol);
       }
+      function select(f, v) { cur.select(f, v, GENERIC.test(f) && !cur.options.crossFilterScope ? { scope: 'dataset' } : null); }
       function onOver(e) {
         var td = e.target.closest('td.rk-pivot__v, td.rk-pivot__tot');
-        if (!td || !td._rkCell || cur.options.tooltip === false) { tip.classList.remove('is-on'); return; }
+        if (!td || !td._rkCell || cur.options.tooltip === false) { tip.hide(); return; }
         var m = model, n = td._rkCell.node, ck = td._rkCell.ck;
         var path = [];
         for (var p = n; p && p.level >= 0; p = p.parent) path.unshift(label(p.dim, p.value));
@@ -363,19 +364,11 @@
         var rowTot = m.total(n);
         if (m.col && ck !== '\u0002' && util.isNum(raw) && rowTot && (m.o.agg === 'sum' || m.o.agg === 'count')) rows.push({ label: '% of row', value: RK.format(raw / rowTot, '0.0%') });
         var cnt = ck === '\u0002' ? n.n : (n.cells.get(ck) || []).length;
-        tip.innerHTML = RK.chart.tip(title, rows, cnt + (cnt === 1 ? ' record' : ' records'));
-        tip.classList.add('is-on');
-        var r = td.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
-        var x = util.clamp(r.left + r.width / 2 - tw / 2, 6, Math.max(6, window.innerWidth - tw - 6));
-        var y = r.top - th - 8;
-        if (y < 6) y = r.bottom + 8;
-        tip.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+        tip.show(RK.chart.tip(title, rows, cnt + (cnt === 1 ? ' record' : ' records')), td);
       }
-      function onLeave() { tip.classList.remove('is-on'); }
       table.addEventListener('click', onClick);
       table.addEventListener('mouseover', onOver);
-      table.addEventListener('mouseleave', onLeave);
-      window.addEventListener('scroll', onLeave, { passive: true, capture: true });
+      table.addEventListener('mouseleave', tip.hide);
 
       draw(false);
 
@@ -384,10 +377,9 @@
         destroy: function () {
           table.removeEventListener('click', onClick);
           table.removeEventListener('mouseover', onOver);
-          table.removeEventListener('mouseleave', onLeave);
-          window.removeEventListener('scroll', onLeave, { capture: true });
+          table.removeEventListener('mouseleave', tip.hide);
           root.remove();
-          tip.remove();
+          tip.destroy();
           if (auto) cur.el.classList.remove('is-auto');
         }
       };

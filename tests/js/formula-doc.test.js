@@ -1,5 +1,6 @@
-// Run: node tests/js/formula-doc.test.js           verify every example in docs/formula-language.md
-//      node tests/js/formula-doc.test.js --write   regenerate the result tables under ```rkq blocks
+// Run: node tests/js/formula-doc.test.js             verify every example in docs/formula-language.md
+//      node tests/js/formula-doc.test.js --verbose   ... and list each query example
+//      node tests/js/formula-doc.test.js --write     regenerate the result tables under ```rkq blocks
 //
 // Executable documentation. In docs/formula-language.md:
 //   ```js rk-setup ... ```                 JavaScript run in the sandbox (RK in scope) before the following examples
@@ -20,6 +21,7 @@ const { root, loadSamples } = require('./_harness');
 
 const DOC = path.join(root, 'docs/formula-language.md');
 const WRITE = process.argv.includes('--write');
+const VERBOSE = process.argv.includes('--verbose');
 const MAX_ROWS = 10;
 
 /** CommonMark-ish code spans of one table row. */
@@ -103,7 +105,12 @@ function opts(comment) {
       }
       const q = body.filter(l => l.trim() && !l.trim().startsWith('--')).join(' ').trim();
       let rendered;
-      try { rendered = renderTable(RK, RK.query(q)); stats.query++; } catch (e) { fail(i, 'query: ' + q, (e.name || 'Error') + ': ' + e.message); rendered = null; }
+      try {
+        const res = RK.query(q);
+        rendered = renderTable(RK, res); stats.query++;
+        const head = (lines.slice(0, i).reverse().find(l => /^### /.test(l)) || '').replace(/^### (\S+).*/, '$1');
+        if (VERBOSE) console.log(`  query ${head.padEnd(5)} ${String(res.rows.length).padStart(2)} rows x ${res.columns.length} cols  ${q.length > 70 ? q.slice(0, 67) + '...' : q}`);
+      } catch (e) { fail(i, 'query: ' + q, (e.name || 'Error') + ': ' + e.message); rendered = null; }
       const tb = tableAt(j + 1);
       const existing = lines.slice(tb.start, tb.end).join('\n');
       // keep a trailing "… n more rows" note together with the table
@@ -163,10 +170,19 @@ function opts(comment) {
     }
   }
 
+  // completeness: every function the engine exposes is documented in §8
+  const sec8 = (text.split(/^## 8\. /m)[1] || '').split(/^## 9\. /m)[0];
+  const documented = new Set((sec8.match(/`[a-z_0-9]+\(/g) || []).map(x => x.slice(1, -1)));
+  (sec8.match(/\/ `([a-z_0-9]+)`/g) || []).forEach(x => documented.add(x.replace(/\/ `|`/g, '')));   // aliases: "/ `iif`"
+  const engineFns = RK.expr.functions.scalar.concat(RK.expr.functions.aggregate, ['iif']);
+  const missing = engineFns.filter(f => !documented.has(f));
+  stats.functions = engineFns.length;
+  if (missing.length) fail(0, '§8 function reference', 'not documented: ' + missing.join(', '));
+
   if (WRITE) { fs.writeFileSync(DOC, out.join('\n')); console.log('tables rewritten'); }
   for (const f of failures) console.error('FAIL', f);
   const total = stats.query + stats.expr + stats.format + stats.error;
-  console.log(`formula-doc: ${stats.query} queries, ${stats.expr} formulas, ${stats.format} format codes, ${stats.error} error messages, ${stats.setup} setup blocks — ${total - failures.length}/${total} verified${failures.length ? ', ' + failures.length + ' FAILED' : ''}`);
+  console.log(`formula-doc: ${stats.query} queries, ${stats.expr} formulas, ${stats.format} format codes, ${stats.error} error messages, ${stats.setup} setup blocks — ${total - failures.length}/${total} verified${failures.length ? ', ' + failures.length + ' FAILED' : ''}; ${stats.functions} engine functions documented`);
   console.log(`core: ${path.relative(root, require('./_harness').coreDir) || '.'}, node ${process.version}`);
   if (failures.length) process.exitCode = 1;
 })().catch(e => { console.error(e); process.exitCode = 1; });

@@ -65,13 +65,21 @@ const server = http.createServer((req, res) => {
       } else {
         await page.waitForTimeout(2500);
       }
-      // scroll through to trigger lazy renders / reveals, then back to top
-      await page.evaluate(async () => { for (let y = 0; y < document.body.scrollHeight; y += 600) { window.scrollTo(0, y); await new Promise(r => setTimeout(r, 60)); } window.scrollTo(0, 0); });
+      // scroll through to trigger lazy renders / reveals (pause at the bottom), then back to top
+      await page.evaluate(async () => {
+        for (let y = 0; y < document.body.scrollHeight; y += 500) { window.scrollTo(0, y); await new Promise(r => setTimeout(r, 80)); }
+        window.scrollTo(0, document.body.scrollHeight); await new Promise(r => setTimeout(r, 600));
+        window.scrollTo(0, 0);
+      });
       await page.waitForTimeout(1200);
+      if (pageArg) {   // report / gallery pages: every mounted block must have rendered
+        states = await page.evaluate(() => (window.RK && RK.blocks ? RK.blocks().map(b => ({ id: b.id, component: b.component, state: b.state, msg: b._errorEl ? b._errorEl.textContent : null })) : []));
+      }
       const file = path.join(outDir, `${t.name}${theme !== 'navy' ? '-' + theme : ''}.png`);
       await page.screenshot({ path: file, fullPage: true });
       const bad = states.filter(s => s.state !== 'rendered');
       const ok = !errors.length && !bad.length && (pageArg || states.length > 0);
+      if (pageArg) console.log(`      ${states.length} blocks mounted on page`);
       if (!ok) failed++;
       console.log(`${ok ? 'PASS' : 'FAIL'}  ${t.name}  (${states.length} blocks)  -> ${path.relative(ROOT, file)}`);
       bad.forEach(s => console.log(`      block ${s.id} state=${s.state} ${s.msg || ''}`));

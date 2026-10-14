@@ -160,13 +160,40 @@ textarea.rk-input { height: auto; padding: 8px 10px; line-height: 1.45; resize: 
 .rk-map { border-radius: var(--rk-radius); overflow: hidden; font-family: var(--rk-font-sans); }
 .rk-map.leaflet-container { background: var(--rk-map-water); font: inherit; }
 .rk-map .leaflet-control-zoom { border: 1px solid var(--rk-rule) !important; box-shadow: none !important; border-radius: var(--rk-radius) !important; overflow: hidden; }
-.rk-map .leaflet-control-zoom a { width: 26px; height: 26px; line-height: 24px; color: var(--rk-ink-2); background: var(--rk-paper); border-bottom-color: var(--rk-rule); }
+.rk-map .leaflet-control-zoom a { width: 26px; height: 26px; line-height: 24px; font-size: 15px; color: var(--rk-ink-2); background: var(--rk-paper); border-bottom-color: var(--rk-rule); }
 .rk-map .leaflet-control-zoom a:hover { color: var(--rk-accent); background: var(--rk-surface); }
 .rk-map.leaflet-container .leaflet-control-attribution { background: color-mix(in srgb, var(--rk-paper) 80%, transparent); color: var(--rk-ink-3); font-size: 9px; }
 .rk-map .leaflet-pane svg, .rk-map .leaflet-marker-icon svg { max-width: none !important; max-height: none !important; }
 .rk-map .leaflet-control-attribution a { color: var(--rk-ink-3); }
 .rk-map .leaflet-tooltip { background: var(--rk-tooltip-bg); color: var(--rk-tooltip-ink); border: 1px solid var(--rk-rule); border-radius: 6px; box-shadow: 0 8px 24px rgba(15, 23, 42, .14); padding: 8px 10px; font-size: 12px; }
 .rk-map .leaflet-tooltip::before { display: none; }
-.rk-map-legend { padding: 8px 10px; background: color-mix(in srgb, var(--rk-paper) 92%, transparent); border: 1px solid var(--rk-rule); border-radius: var(--rk-radius); font-size: 11px; color: var(--rk-ink-2); line-height: 1.4; }
-.rk-map-legend__title { font-weight: 600; color: var(--rk-ink); margin-bottom: 4px; }
+.rk-map-legend { max-width: 340px; padding: 7px 9px; background: color-mix(in srgb, var(--rk-paper) 92%, transparent); border: 1px solid var(--rk-rule); border-radius: var(--rk-radius); font-size: 10.5px; color: var(--rk-ink-2); line-height: 1.4; }
+.rk-map-legend__title { font-weight: 600; color: var(--rk-ink); margin-bottom: 4px; white-space: nowrap; }
 .rk-map-legend__ticks { display: flex; justify-content: space-between; font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; color: var(--rk-ink-3); margin-top: 2px; }
+
+/* map components (RK.geo.view / legendItems / sizeLegend / labels) */
+.rk-geo-leg.is-row { display: flex; align-items: flex-start; gap: 18px; }
+.rk-geo-leg.is-row > .rk-geo-leg__sec + .rk-geo-leg__sec { margin-top: 0; }
+.rk-geo-leg__sec + .rk-geo-leg__sec, .rk-geo-leg__sec + .rk-geo-leg__item { margin-top: 8px; }
+.rk-geo-leg__items { display: flex; flex-direction: column; gap: 2px; }
+.rk-geo-leg__item { display: flex; align-items: center; gap: 7px; white-space: nowrap; font-variant-numeric: tabular-nums; transition: opacity var(--rk-dur-fast); }
+.rk-geo-leg__item.is-click { cursor: pointer; border-radius: 2px; }
+.rk-geo-leg__item.is-click:hover span, .rk-geo-leg__item.is-click:focus-visible span { color: var(--rk-ink); }
+.rk-geo-leg__item.is-click:focus-visible { outline: 1px solid var(--rk-accent); outline-offset: 1px; }
+.rk-geo-leg__item.is-off { opacity: .38; }
+.rk-geo-leg__sw { flex: none; width: 10px; height: 10px; border-radius: 2px; }
+.rk-geo-leg__n { margin-left: auto; padding-left: 10px; color: var(--rk-ink-3); font-size: 10px; }
+.rk-geo-leg__ramp .rk-legend__ramp { width: 150px; }
+.rk-geo-leg__size svg { display: block; overflow: visible; max-width: none; }
+.rk-geo-leg__size text { font-size: 10px; fill: var(--rk-ink-2); font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; }
+.rk-geo-label-anchor { pointer-events: none; }
+.rk-geo-label {
+  position: absolute; left: 0; top: 0; white-space: nowrap; pointer-events: none;
+  padding: 0 3px; border-radius: 2px; background: color-mix(in srgb, var(--rk-paper) 80%, transparent);
+  font-size: 10.5px; line-height: 1.35; color: var(--rk-ink); font-variant-numeric: tabular-nums;
+}
+.rk-geo-label b { font-weight: 600; }
+.rk-geo-label span { color: var(--rk-ink-2); font-family: var(--rk-font-num); font-weight: 500; }
+.rk-geo-label.is-hidden { visibility: hidden; }
+.rk-geo.is-motion .rk-geo-label { transition: opacity var(--rk-dur) var(--rk-ease); }
+@media print { .rk-map .leaflet-control-zoom, .rk-geo-toggle { display: none; } }

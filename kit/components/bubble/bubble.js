@@ -33,56 +33,32 @@
     var mag = Math.pow(10, Math.floor(Math.log10(v))), n = v / mag;
     return (n >= 5 ? 5 : n >= 2.5 ? 2.5 : n >= 2 ? 2 : 1) * mag;
   }
-  /** Perceptual-ish similarity: close hue and lightness (or near-identical greys). */
-  function similar(a, b) {
-    function hsl(c) {
-      var p = RK.theme.parseColor(c), r = p[0] / 255, g = p[1] / 255, bl = p[2] / 255;
-      var mx = Math.max(r, g, bl), mn = Math.min(r, g, bl), l = (mx + mn) / 2, d = mx - mn, h = 0;
-      var s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
-      if (d) h = mx === r ? ((g - bl) / d) % 6 : mx === g ? (bl - r) / d + 2 : (r - g) / d + 4;
-      return [(h * 60 + 360) % 360, s, l, p];
-    }
-    var x = hsl(a), y = hsl(b);
-    if (x[1] < 0.15 || y[1] < 0.15) {
-      return Math.sqrt(Math.pow(x[3][0] - y[3][0], 2) + Math.pow(x[3][1] - y[3][1], 2) + Math.pow(x[3][2] - y[3][2], 2)) < 40;
-    }
-    var dh = Math.abs(x[0] - y[0]); dh = Math.min(dh, 360 - dh);
-    return dh < 22 && Math.abs(x[2] - y[2]) < 0.22;
-  }
+  /** Strip all-zero decimals: "$1,800.0" -> "$1,800", "18.0x" -> "18x". */
+  function trim0(s) { return s.replace(/\.0+(?=\D*$)/, ''); }
   /**
-   * Category palette: theme order, but skipping colours similar to accent2 (reserved for the target)
-   * or to a colour already picked, so neighbouring categories stay distinguishable.
+   * Tick labels in the field format, without decimals while the tick step is whole ("18x", "5%" — not
+   * "18.0x"); `step` is a number or a function (live interval while zoomed). Log axes: whole ticks only.
    */
-  function catPalette(values, t) {
-    var pool = [];
-    t.cat.forEach(function (c) { if (!similar(c, t.accent2) && pool.every(function (p) { return !similar(c, p); })) pool.push(c); });
-    t.cat.forEach(function (c) { if (pool.indexOf(c) < 0 && !similar(c, t.accent2)) pool.push(c); });  // reuse the rest if needed
-    if (!pool.length) pool = t.cat;
-    var map = {};
-    values.forEach(function (v, i) { map[v] = pool[i % pool.length]; });
-    return function (v) { return map[v] || t.neutral; };
-  }
-  /** Axis tick formatter: the field format, but whole ticks >= 100 (any whole tick on a log axis) drop ".0" — "$1,800" not "$1,800.0". */
-  function axisFmt(fmt, log) {
+  function ticks(fmt, step, log) {
     return function (v) {
-      var s = RK.format(v, fmt);
-      return Math.round(v) === v && (log || Math.abs(v) >= 100) ? s.replace(/\.0+(?=\D*$)/, '') : s;
+      var s = RK.format(v, fmt), st = typeof step === 'function' ? step() : step;
+      if (log) return Math.round(v) === v ? trim0(s) : s;
+      return st && !/\.\d*[1-9]/.test(RK.format(st, fmt)) ? trim0(s) : s;
     };
   }
-  function textW(s, px) { return String(s).length * (px || 11) * 0.58; }
+  /** Live tick interval of a value axis (changes while zoomed); `dflt` before the first layout. */
+  function axisStep(inst, axis, dflt) {
+    try { return inst.getModel().getComponent(axis, 0).axis.scale.getInterval() || dflt; } catch (e) { return dflt; }
+  }
+  /** Generic field names cross-filter only this block's dataset; business dimensions (company, country …) stay global. */
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
+  function scoped(ctx, f) { return GENERIC.test(f) ? { scope: ctx.options.crossFilterScope || 'dataset' } : null; }
   function sortPeriods(list) {
     var nums = list.every(function (v) { return typeof v === 'number'; });
     return list.slice().sort(function (a, b) { return nums ? a - b : String(a).localeCompare(String(b)); });
   }
 
   /* ---------------- label placement (greedy, think-cell style) ---------------- */
-  var measureCtx = null;
-  function measure(text, font) {
-    if (measureCtx === null) { try { measureCtx = document.createElement('canvas').getContext('2d') || false; } catch (e) { measureCtx = false; } }
-    if (!measureCtx) return String(text).length * 6.2;
-    measureCtx.font = font;
-    return measureCtx.measureText(String(text)).width;
-  }
   function gridRect(inst) {
     try { return inst.getModel().getComponent('grid', 0).coordinateSystem.getRect(); }
     catch (e) { return { x: 0, y: 0, width: inst.getWidth(), height: inst.getHeight() }; }
@@ -227,9 +203,7 @@
     if (!st.selField) return;
     var vals = st.points.filter(function (p) { return p.x >= xr[0] && p.x <= xr[1] && p.y >= yr[0] && p.y <= yr[1]; })
       .map(function (p) { return p.key; });
-    var key = st.ctx.id + ':' + st.selField;
-    if (vals.length) RK.store.setFilter(key, { field: st.selField, op: 'in', values: util.unique(vals), source: st.ctx.id });
-    else RK.store.clearFilter(key);
+    st.ctx.setSelection(st.selField, util.unique(vals), scoped(st.ctx, st.selField));   // empty box clears
   }
 
   /* ---------------- option builder ---------------- */
@@ -267,7 +241,7 @@
     var stops = cType === 'diverging' ? t.div : (t.seq.length > 4 ? t.seq.slice(2) : t.seq);
     var cScale = continuous ? RK.theme.sequential(cDom, stops) : null;   // identical ramp to the visualMap -> label contrast
     var groups = cType === 'category' ? util.unique(allRows.map(function (r) { return r[colorF]; }).filter(function (v) { return v != null; })) : [];
-    var palette = catPalette(groups.length ? groups : [0], t);
+    var palette = RK.theme.categoricalSafe(groups.length ? groups : [0]);   // peers never resemble the accent2 target
 
     /* size: area ∝ value (diameter ∝ √value), scaled to the unfiltered maximum so filtering never rescales */
     var sMax = sizeF ? util.extent(allRows.map(function (r) { return Math.abs(r[sizeF]); }))[1] : 0;
@@ -325,7 +299,7 @@
           var oid = L.id + '#' + (data.length - 1);
           obstacles.push({ x: it.value[0], y: it.value[1], r: d / 2 + 0.5, id: oid, name: L.name });
           if (!name || !(L.target || labelled.has(r))) return;
-          var font = (L.target ? '700 ' : '500 ') + '10.5px ' + t.fontSans, tw = measure(name, font);
+          var font = (L.target ? '700 ' : '500 ') + '10.5px ' + t.fontSans, tw = C.measure(name, font);
           var inside = d >= tw + 8;
           var eff = RK.theme.mix(t.paper, fill || t.cat[0], opacity);
           specs.push({ seriesId: L.id + ':lab', index: labs.length, x: it.value[0], y: it.value[1], r: d / 2, w: tw + 2, h: 13,
@@ -334,7 +308,7 @@
             value: it.value, name: name, symbolSize: d,
             label: {
               show: false,   // shown by layoutLabels() once a free position is found
-              color: dim ? RK.theme.alpha(t.ink2, 0.35) : inside ? RK.theme.onColor(eff, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#ffffff') : (L.target ? t.ink : t.ink2),
+              color: dim ? RK.theme.alpha(t.ink2, 0.35) : inside ? RK.theme.textOn(eff) : (L.target ? t.ink : t.ink2),
               textBorderWidth: inside ? 0 : 2.5, fontWeight: L.target ? 700 : 500
             }
           });

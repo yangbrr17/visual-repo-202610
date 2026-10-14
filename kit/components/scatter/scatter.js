@@ -41,53 +41,22 @@
     var a = Math.abs(v);
     return RK.format(v, a >= 100 ? '#,##0' : a >= 10 ? '0.0' : '0.00');
   }
-  /** Perceptual-ish similarity: close hue and lightness (or near-identical greys). */
-  function similar(a, b) {
-    function hsl(c) {
-      var p = RK.theme.parseColor(c), r = p[0] / 255, g = p[1] / 255, bl = p[2] / 255;
-      var mx = Math.max(r, g, bl), mn = Math.min(r, g, bl), l = (mx + mn) / 2, d = mx - mn, h = 0;
-      var s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
-      if (d) h = mx === r ? ((g - bl) / d) % 6 : mx === g ? (bl - r) / d + 2 : (r - g) / d + 4;
-      return [(h * 60 + 360) % 360, s, l, p];
-    }
-    var x = hsl(a), y = hsl(b);
-    if (x[1] < 0.15 || y[1] < 0.15) {
-      return Math.sqrt(Math.pow(x[3][0] - y[3][0], 2) + Math.pow(x[3][1] - y[3][1], 2) + Math.pow(x[3][2] - y[3][2], 2)) < 40;
-    }
-    var dh = Math.abs(x[0] - y[0]); dh = Math.min(dh, 360 - dh);
-    return dh < 22 && Math.abs(x[2] - y[2]) < 0.22;
-  }
-  /**
-   * Category palette: theme order, but skipping colours similar to accent2 (reserved for the target)
-   * or to a colour already picked, so neighbouring categories stay distinguishable.
-   */
-  function catPalette(values, t) {
-    var pool = [];
-    t.cat.forEach(function (c) { if (!similar(c, t.accent2) && pool.every(function (p) { return !similar(c, p); })) pool.push(c); });
-    t.cat.forEach(function (c) { if (pool.indexOf(c) < 0 && !similar(c, t.accent2)) pool.push(c); });  // reuse the rest if needed
-    if (!pool.length) pool = t.cat;
-    var map = {};
-    values.forEach(function (v, i) { map[v] = pool[i % pool.length]; });
-    return function (v) { return map[v] || t.neutral; };
-  }
-  /** Axis tick formatter: the field format, but whole ticks >= 100 (any whole tick on a log axis) drop ".0" — "$1,800" not "$1,800.0". */
-  function axisFmt(fmt, log) {
+  /** Tick labels in the field format, without decimals while the tick step is whole ("18x", "5%" — not "18.0x"). */
+  function ticks(fmt, step) {
     return function (v) {
-      var s = RK.format(v, fmt);
-      return Math.round(v) === v && (log || Math.abs(v) >= 100) ? s.replace(/\.0+(?=\D*$)/, '') : s;
+      var s = RK.format(v, fmt), st = typeof step === 'function' ? step() : step;
+      return st && !/\.\d*[1-9]/.test(RK.format(st, fmt)) ? s.replace(/\.0+(?=\D*$)/, '') : s;
     };
   }
-  /** Rough rendered width (px) of an axis label — used to space the rotated y-axis name. */
-  function textW(s, px) { return String(s).length * (px || 11) * 0.58; }
+  /** Live tick interval of a value axis (changes while zoomed); `dflt` before the first layout. */
+  function axisStep(inst, axis, dflt) {
+    try { return inst.getModel().getComponent(axis, 0).axis.scale.getInterval() || dflt; } catch (e) { return dflt; }
+  }
+  /** Generic field names cross-filter only this block's dataset; business dimensions (company, sector …) stay global. */
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
+  function scoped(ctx, f) { return GENERIC.test(f) ? { scope: ctx.options.crossFilterScope || 'dataset' } : null; }
 
   /* ---------------- label placement (greedy, think-cell style) ---------------- */
-  var measureCtx = null;
-  function measure(text, font) {
-    if (measureCtx === null) { try { measureCtx = document.createElement('canvas').getContext('2d') || false; } catch (e) { measureCtx = false; } }
-    if (!measureCtx) return String(text).length * 6.2;
-    measureCtx.font = font;
-    return measureCtx.measureText(String(text)).width;
-  }
   function gridRect(inst) {
     try { return inst.getModel().getComponent('grid', 0).coordinateSystem.getRect(); }
     catch (e) { return { x: 0, y: 0, width: inst.getWidth(), height: inst.getHeight() }; }
@@ -220,9 +189,7 @@
     var vals = st.points.filter(function (p) {
       return p.x >= xr[0] && p.x <= xr[1] && p.y >= yr[0] && p.y <= yr[1];
     }).map(function (p) { return p.key; });
-    var key = st.ctx.id + ':' + st.selField;
-    if (vals.length) RK.store.setFilter(key, { field: st.selField, op: 'in', values: util.unique(vals), source: st.ctx.id });
-    else RK.store.clearFilter(key);
+    st.ctx.setSelection(st.selField, util.unique(vals), scoped(st.ctx, st.selField));   // empty box clears
   }
 
   var build = function (ctx, inst) {
@@ -242,7 +209,7 @@
     var showLabels = !!labelF && (o.labels === 'auto' ? rows.length <= 40 : !!o.labels);
     // stable colours: category order from the unfiltered data so filtering never re-colours points
     var groups = colorF ? util.unique(ctx.allRows.map(function (r) { return r[colorF]; }).filter(function (v) { return v != null; })) : [];
-    var palette = catPalette(groups, t);
+    var palette = RK.theme.categoricalSafe(groups);   // peers never resemble the accent2 target
     var sel = selField ? ctx.selected(selField) : [];
     var peers = rows.filter(function (r) { return !isTarget(r); });
     var targets = rows.filter(isTarget);
@@ -285,7 +252,7 @@
         if (list.length) layers.push({ id: 'g-' + g, name: String(g), color: palette(g), rows: list });
       });
     } else if (peers.length) {
-      layers.push({ id: 'peers', name: o.peerLabel, color: catPalette([0], t)(0), rows: peers });
+      layers.push({ id: 'peers', name: o.peerLabel, color: RK.theme.palette({ n: 1 })[0], rows: peers });
     }
     targets.forEach(function (r, i) {
       layers.push({ id: 'target-' + i, name: String(r[nameF] == null ? 'Target' : r[nameF]), color: t.accent2, rows: [r], target: true });
@@ -311,7 +278,7 @@
       if (!showLabels) return;
       var font = (L.target ? '700 11px ' : '400 10.5px ') + t.fontSans;
       var items = L.data.map(function (d, i) {
-        specs.push({ seriesId: L.id + ':lab', index: i, x: d.value[0], y: d.value[1], r: L.sz / 2, w: measure(d.name, font) + 2, h: L.target ? 14 : 13,
+        specs.push({ seriesId: L.id + ':lab', index: i, x: d.value[0], y: d.value[1], r: L.sz / 2, w: C.measure(d.name, font) + 2, h: L.target ? 14 : 13,
           force: !!L.target, id: L.id + '#' + i, name: L.name });
         return { value: d.value, name: d.name, label: { show: false, color: d.dim ? RK.theme.alpha(L.target ? t.ink : t.ink2, 0.35) : (L.target ? t.ink : t.ink2) } };
       });
@@ -377,17 +344,19 @@
     }
 
     inst.__rk = { ctx: ctx, points: points, selField: selField };
-    inst.__rkCanBrush = !!selField && o.brush !== false;
+    inst.__rkCanBrush = !!selField && o.brush !== false && o.crossFilter !== false;
 
-    var yLabW = Math.max(textW(RK.format(ye.min, yFmt)), textW(RK.format(ye.max, yFmt)));
+    var yTick = ticks(yFmt, function () { return axisStep(inst, 'yAxis', ye.step); });
+    var labFont = '11px ' + t.fontNum;
+    var yLabW = Math.max(C.measure(ticks(yFmt, ye.step)(ye.min), labFont), C.measure(ticks(yFmt, ye.step)(ye.max), labFont));
     var legendNames = layers.map(function (L) { return L.name; });
     if (fit) legendNames.push({ name: fitName, icon: 'path://M0 4.2h18v1.6H0z', itemWidth: 16, itemHeight: 9 });
     var showLegend = legendOn && legendNames.length > 1;
     var interactive = !ctx.print && o.zoom !== false;
-    var zs = zoomState(inst), zoomed = zs.some(function (z) { return z.start > 0 || z.end < 100; });
+    var zoomed = zoomState(inst).some(function (z) { return z.start > 0 || z.end < 100; });
 
     return {
-      legend: C.legend(ctx, { show: showLegend, data: legendNames, right: interactive ? 92 : 0, icon: 'circle', itemWidth: 9, itemHeight: 9 }),
+      legend: C.legend(ctx, { show: showLegend, data: legendNames, right: interactive ? 92 : 0 }),
       // containLabel:false lets ECharts 6 fit axis labels *and* axis names inside the container (outerBounds)
       grid: C.grid(ctx, { top: (showLegend || interactive ? 30 : 10) + (q && util.isNum(q.x) ? 14 : 0), right: 8, left: 2, bottom: 2, containLabel: false }),
       tooltip: {
@@ -409,20 +378,19 @@
       xAxis: {
         type: 'value', min: xe.min, max: xe.max, splitNumber: Math.round((xe.max - xe.min) / xe.step), name: o.xTitle || ctx.title(enc.x), nameLocation: 'middle', nameGap: 26,
         axisLine: { show: true, onZero: false, lineStyle: { color: t.axis } },
-        axisLabel: { formatter: axisFmt(xFmt), hideOverlap: true, showMinLabel: !zoomed, showMaxLabel: !zoomed },
+        axisLabel: { formatter: ticks(xFmt, function () { return axisStep(inst, 'xAxis', xe.step); }), hideOverlap: true, showMinLabel: !zoomed, showMaxLabel: !zoomed },
         splitLine: { show: true, lineStyle: { color: t.grid } }
       },
       yAxis: {
         type: 'value', min: ye.min, max: ye.max, splitNumber: Math.round((ye.max - ye.min) / ye.step), name: o.yTitle || ctx.title(enc.y), nameLocation: 'middle', nameGap: Math.round(yLabW + 14),
         axisLine: { show: false, onZero: false },
-        axisLabel: { formatter: axisFmt(yFmt), showMinLabel: !zoomed, showMaxLabel: !zoomed },
+        axisLabel: { formatter: yTick, showMinLabel: !zoomed, showMaxLabel: !zoomed },
         splitLine: { show: true, lineStyle: { color: t.grid } }
       },
       toolbox: { show: false },  // the brush is driven from the HTML toolbar
-      dataZoom: interactive ? [
-        util.merge({ type: 'inside', xAxisIndex: 0, filterMode: 'none', zoomOnMouseWheel: 'ctrl', moveOnMouseMove: true, moveOnMouseWheel: false }, zs[0]),
-        util.merge({ type: 'inside', yAxisIndex: 0, filterMode: 'none', zoomOnMouseWheel: 'ctrl', moveOnMouseMove: true, moveOnMouseWheel: false }, zs[1])
-      ] : [],
+      // inside zoom on both axes: Ctrl/Cmd + wheel or pinch (plain wheel scrolls the report unless options.wheelZoom);
+      // RK.chart keeps the zoom window across filter updates
+      dataZoom: interactive ? [C.zoom(ctx, 'x')[0], C.zoom(ctx, 'y')[0]] : [],
       brush: interactive ? {
         toolbox: [], xAxisIndex: 0, yAxisIndex: 0, brushMode: 'single', transformable: false, removeOnClick: true, throttleType: 'debounce', throttleDelay: 120,
         brushStyle: { borderWidth: 1, color: RK.theme.alpha(t.accent3 || t.accent, 0.08), borderColor: RK.theme.alpha(t.accent3 || t.accent, 0.7) },
@@ -433,11 +401,13 @@
   };
 
   var base = C(build, {
-    select: function (p, ctx) {
-      if (!p.data || !p.data.row || !p.componentType || p.componentType !== 'series') return null;
-      var st = p.data.row, enc = ctx.enc, ds = ctx.dataset;
-      var f = enc.label && ds.has(enc.label) ? enc.label : (enc.name && ds.has(enc.name) ? enc.name : null);
-      return f ? { field: f, value: st[f] } : null;
+    on: {
+      // click a point -> toggle it in the cross-filter on the label (or name) field
+      click: function (p, ctx, inst) {
+        var f = inst.__rk && inst.__rk.selField;
+        if (p.componentType !== 'series' || !p.data || !p.data.row || !f || ctx.options.crossFilter === false) return;
+        ctx.select(f, p.data.row[f], scoped(ctx, f));
+      }
     },
     init: function (inst) {
       inst.on('brushEnd', function (params) { onBrushEnd(params, inst); });
@@ -449,9 +419,8 @@
       });
       inst.on('brush', function (params) {
         // a click on empty canvas removes the box: clear the box selection as well
-        if (inst.__rkMode === 'select' && params.areas && !params.areas.length && inst.__rk && inst.__rk.selField) {
-          RK.store.clearFilter(inst.__rk.ctx.id + ':' + inst.__rk.selField);
-        }
+        var st = inst.__rk;
+        if (inst.__rkMode === 'select' && params.areas && !params.areas.length && st && st.selField) st.ctx.setSelection(st.selField, []);
       });
     }
   });
@@ -476,6 +445,7 @@
       tooltipFields: [],       // extra fields listed in the tooltip
       brush: true,             // box-select tool -> cross-filter on the label field
       zoom: true,              // box zoom, ctrl + wheel zoom, drag to pan; false = static chart
+      wheelZoom: null,         // true: a plain mouse wheel zooms (default: Ctrl/Cmd + wheel or pinch, so the page scrolls)
       legend: true
     },
     render: function (ctx) {

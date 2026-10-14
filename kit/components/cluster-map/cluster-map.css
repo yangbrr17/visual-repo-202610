@@ -1,36 +1,6 @@
 /* cluster-map */
 
-/* ---- geo kit (identical block in every RK geo component css) ---- */
-.rk-geo .leaflet-control-zoom a { font-size: 15px; }
-.rk-geo .leaflet-interactive { cursor: pointer; }
-.rk-geo.rk-map .leaflet-control-attribution { background: color-mix(in srgb, var(--rk-paper) 80%, transparent); color: var(--rk-ink-3); }
-/* base.css caps svg at max-width:100%; leaflet only lifts that for its overlay pane — custom panes need it too */
-.rk-geo .leaflet-pane svg, .rk-geo .leaflet-marker-icon svg { max-width: none !important; max-height: none !important; }
-.rk-geo .rk-map-legend { max-width: 340px; box-shadow: none; padding: 7px 9px; font-size: 10.5px; }
-.rk-geo .rk-map-legend__title { white-space: nowrap; }
-.rk-geo-leg.is-row { display: flex; align-items: flex-start; gap: 18px; }
-.rk-geo-leg.is-row > .rk-geo-leg__sec + .rk-geo-leg__sec { margin-top: 0; }
-.rk-geo-leg__sec + .rk-geo-leg__sec, .rk-geo-leg__sec + .rk-geo-leg__item { margin-top: 8px; }
-.rk-geo-leg__items { display: flex; flex-direction: column; gap: 2px; }
-.rk-geo-leg__item { display: flex; align-items: center; gap: 7px; white-space: nowrap; font-variant-numeric: tabular-nums; transition: opacity var(--rk-dur-fast); }
-.rk-geo-leg__item.is-click { cursor: pointer; }
-.rk-geo-leg__item.is-click:hover span { color: var(--rk-ink); }
-.rk-geo-leg__item.is-off { opacity: .38; }
-.rk-geo-leg__sw { flex: none; width: 9px; height: 9px; border-radius: 50%; }
-.rk-geo-leg__sw.is-square { width: 12px; height: 10px; border-radius: 1px; }
-.rk-geo-leg__sw.is-line { width: 16px; height: 3px; border-radius: 2px; }
-.rk-geo-leg__n { margin-left: auto; padding-left: 10px; color: var(--rk-ink-3); font-size: 10px; }
-.rk-geo-leg__ramp .rk-legend__ramp { width: 150px; }
-.rk-geo-label-anchor { pointer-events: none; }
-.rk-geo-label {
-  position: absolute; left: 0; top: 0; white-space: nowrap; pointer-events: none;
-  padding: 0 3px; border-radius: 2px; background: color-mix(in srgb, var(--rk-paper) 80%, transparent);
-  font-size: 10.5px; line-height: 1.35; color: var(--rk-ink); font-variant-numeric: tabular-nums;
-}
-.rk-geo-label.is-hidden { visibility: hidden; }
-.rk-geo.is-motion .rk-geo-label { transition: opacity var(--rk-dur) var(--rk-ease); }
-@media print { .rk-geo .leaflet-control-zoom, .rk-geo .rk-geo-toggle { display: none; } }
-/* ---- end geo kit ---- */
+/* shared map styles (legend, labels, controls) live in kit/styles/components.css (maps) */
 
 .rk-cluster__icon { background: none; border: 0; }
 .rk-cluster__icon svg, .rk-cluster__key svg { display: block; overflow: visible; max-width: none !important; max-height: none !important; }

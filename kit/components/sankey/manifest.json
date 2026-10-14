@@ -19,7 +19,7 @@
     "orient": {"type": "string", "default": "horizontal", "desc": "horizontal | vertical"},
     "nodeAlign": {"type": "string", "default": "left", "desc": "Column of sink nodes: left (P&L — costs branch off where they occur) | right | justify (all sinks in the last column)"},
     "nodeOrder": {"type": "string", "default": "data", "desc": "data: keep row order within a column, cost nodes below profit lines | auto: ECharts relaxation to minimise crossings"},
-    "colorBy": {"type": "string", "default": "stage", "desc": "stage: ordinal ramp by column (dark → light) | node: categorical colour per node"},
+    "colorBy": {"type": "string", "default": "stage", "desc": "stage: ordinal ramp by column (dark → light) | node: categorical colour per node, kept clear of the highlight, cost and explicit node colours"},
     "nodeColors": {"type": "object", "default": {}, "desc": "{nodeName: colour} — theme token ('accent', 'accent2', 'neg', 'cat3' …) or CSS colour; overrides colorBy"},
     "costNodes": {"type": "string[]", "default": [], "desc": "Node names drawn as costs / leakage in the theme's negative colour"},
     "highlight": {"type": "string|string[]", "default": null, "desc": "Node name(s) drawn in accent2 (e.g. 'Net income')"},
@@ -34,7 +34,8 @@
     "draggable": {"type": "boolean", "default": false, "desc": "Allow dragging nodes"},
     "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field's format"},
     "crossFilter": {"type": "boolean", "default": true, "desc": "Click a node to select it: keeps its links in focus and filters other blocks"},
-    "filterScope": {"type": "string", "default": "dataset", "desc": "dataset: the selection only filters blocks bound to the same dataset (field names like 'source' are generic) | global"}
+    "crossFilterScope": {"type": "string", "default": "dataset", "desc": "dataset: the selection only filters blocks bound to the same dataset (field names like 'source' are generic) | global"},
+    "filterScope": {"type": "string", "default": null, "desc": "Deprecated alias of crossFilterScope (still honoured when set)"}
   },
   "interactions": ["Hover a node or link: adjacency emphasis + tooltip with inflow / outflow / % shares", "Click a node to keep its flows in focus and cross-filter (click again to clear)", "Animated re-layout when filters change", "PNG / CSV export"],
   "samples": [

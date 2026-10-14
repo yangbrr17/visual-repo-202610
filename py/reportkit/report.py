@@ -320,10 +320,14 @@ class Report:
         return render_index(self, plan(self, kit, build_date=build_date))
 
     def build(self, out_dir: str | os.PathLike, *, clean: bool = True, validate: bool = True,
-              kit: Any = None, build_date: str | None = None) -> Path:
-        """Write the self-contained report folder; returns its path (open ``<path>/index.html``)."""
+              kit: Any = None, build_date: str | None = None, data_source: str = "bundle",
+              api: str | None = None) -> Path:
+        """Write the self-contained report folder; returns its path (open ``<path>/index.html``).
+
+        data_source='bundle' (default, works from file://) | 'http' | 'api' (with api='https://.../')."""
         from .build import build
-        return build(self, out_dir, clean=clean, validate=validate, kit=kit, build_date=build_date)
+        return build(self, out_dir, clean=clean, validate=validate, kit=kit, build_date=build_date,
+                     data_source=data_source, api=api)
 
     # ------------------------------------------------------------------ spec
     def to_spec(self, base_dir: str | os.PathLike | None = None) -> dict:

@@ -1,0 +1,38 @@
+{
+  "id": "deal_timeline",
+  "title": "Project Atlas indicative timetable",
+  "schema": {"fields": [
+    {"name": "workstream", "type": "string", "title": "Workstream"},
+    {"name": "task", "type": "string", "title": "Task"},
+    {"name": "start", "type": "date", "title": "Start", "format": "dd mmm yyyy"},
+    {"name": "end", "type": "date", "title": "End", "format": "dd mmm yyyy"},
+    {"name": "phase", "type": "string", "title": "Phase"},
+    {"name": "milestone", "type": "boolean", "title": "Milestone"},
+    {"name": "owner", "type": "string", "title": "Owner"}
+  ]},
+  "data": [
+    {"workstream": "Process management", "task": "Kick-off meeting", "start": "2026-09-07", "end": "2026-09-07", "phase": "Preparation", "milestone": true, "owner": "Northbridge Capital"},
+    {"workstream": "Financial", "task": "Business plan & model", "start": "2026-09-08", "end": "2026-10-23", "phase": "Preparation", "milestone": false, "owner": "Helios management"},
+    {"workstream": "Financial", "task": "Vendor due diligence report", "start": "2026-09-14", "end": "2026-11-13", "phase": "Preparation", "milestone": false, "owner": "Ashby Grant (VDD)"},
+    {"workstream": "Marketing", "task": "Teaser & information memorandum", "start": "2026-09-08", "end": "2026-10-16", "phase": "Preparation", "milestone": false, "owner": "Northbridge Capital"},
+    {"workstream": "Marketing", "task": "Buyer universe & outreach list", "start": "2026-09-14", "end": "2026-10-02", "phase": "Preparation", "milestone": false, "owner": "Northbridge Capital"},
+    {"workstream": "Legal", "task": "Legal vendor due diligence", "start": "2026-09-21", "end": "2026-11-20", "phase": "Preparation", "milestone": false, "owner": "Harrow & Lyle LLP"},
+    {"workstream": "Process management", "task": "Board approval to launch", "start": "2026-10-20", "end": "2026-10-20", "phase": "Preparation", "milestone": true, "owner": "Board of Directors"},
+    {"workstream": "Marketing", "task": "Teaser distribution & NDAs", "start": "2026-10-26", "end": "2026-11-13", "phase": "Marketing", "milestone": false, "owner": "Northbridge Capital"},
+    {"workstream": "Marketing", "task": "Information memorandum distribution", "start": "2026-11-16", "end": "2026-11-20", "phase": "Marketing", "milestone": false, "owner": "Northbridge Capital"},
+    {"workstream": "Process management", "task": "Indicative offers due", "start": "2026-12-11", "end": "2026-12-11", "phase": "Marketing", "milestone": true, "owner": "Northbridge Capital"},
+    {"workstream": "Process management", "task": "Shortlist bidders", "start": "2026-12-14", "end": "2026-12-18", "phase": "Marketing", "milestone": false, "owner": "Board of Directors"},
+    {"workstream": "Due diligence", "task": "Virtual data room open", "start": "2027-01-04", "end": "2027-02-19", "phase": "Due diligence", "milestone": false, "owner": "Harrow & Lyle LLP"},
+    {"workstream": "Due diligence", "task": "Management presentations", "start": "2027-01-11", "end": "2027-01-22", "phase": "Due diligence", "milestone": false, "owner": "Helios management"},
+    {"workstream": "Due diligence", "task": "Site visits", "start": "2027-01-18", "end": "2027-02-05", "phase": "Due diligence", "milestone": false, "owner": "Helios management"},
+    {"workstream": "Due diligence", "task": "Confirmatory Q&A", "start": "2027-01-25", "end": "2027-02-26", "phase": "Due diligence", "milestone": false, "owner": "Helios management"},
+    {"workstream": "Legal", "task": "SPA mark-ups", "start": "2027-02-01", "end": "2027-03-05", "phase": "Negotiation", "milestone": false, "owner": "Harrow & Lyle LLP"},
+    {"workstream": "Process management", "task": "Final binding bids", "start": "2027-03-05", "end": "2027-03-05", "phase": "Negotiation", "milestone": true, "owner": "Northbridge Capital"},
+    {"workstream": "Process management", "task": "Exclusivity & final negotiations", "start": "2027-03-08", "end": "2027-03-26", "phase": "Negotiation", "milestone": false, "owner": "Northbridge Capital"},
+    {"workstream": "Process management", "task": "Signing & announcement", "start": "2027-03-31", "end": "2027-03-31", "phase": "Signing & closing", "milestone": true, "owner": "Board of Directors"},
+    {"workstream": "Regulatory", "task": "Antitrust & FDI approvals", "start": "2027-04-01", "end": "2027-06-25", "phase": "Signing & closing", "milestone": false, "owner": "Harrow & Lyle LLP"},
+    {"workstream": "Legal", "task": "Shareholder vote", "start": "2027-05-20", "end": "2027-05-20", "phase": "Signing & closing", "milestone": true, "owner": "Board of Directors"},
+    {"workstream": "Process management", "task": "Closing", "start": "2027-07-01", "end": "2027-07-01", "phase": "Signing & closing", "milestone": true, "owner": "Northbridge Capital"}
+  ],
+  "meta": {"asOf": "2026-10-10", "notes": ["Milestones have start = end. Indicative and subject to change.", "Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."], "source": "Northbridge Capital (fictional sell-side adviser)"}
+}
