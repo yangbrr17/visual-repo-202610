@@ -90,7 +90,7 @@
         if (it.median) return t.ink3;
         if (it.hl) return t.accent2;
         if (o.colorBy === 'category') return catColor(it.group != null ? it.group : it.label);
-        if (o.colorBy === 'neutral') return it.sel ? t.accent : RK.theme.mix(t.ink3, t.paper, 0.3);
+        if (o.colorBy === 'neutral') return it.sel ? t.accent : RK.theme.mix(t.ink3, t.paper, 0.2);
         if (!U.isNum(it.a) || !U.isNum(it.b) || it.a === it.b) return t.neutral;
         var up = it.b > it.a;
         return (o.good === 'down' ? !up : up) ? t.pos : t.neg;
@@ -133,6 +133,9 @@
           var hasA = U.isNum(it.a), hasB = U.isNum(it.b);
           var pa = hasA ? api.coord([0, it.a]) : null, pb = hasB ? api.coord([1, it.b]) : null;
           if (hasA && hasB) {
+            // the dashed median sits on a paper halo so lines beneath do not fill its gaps
+            if (it.median) kids.push({ type: 'line', z2: 14, silent: true, shape: { x1: pa[0], y1: pa[1], x2: pb[0], y2: pb[1] },
+              style: { stroke: t.paper, lineWidth: lw + 2.5 }, blur: { style: { opacity: 0.15 } }, enterFrom: { shape: { x2: pa[0], y2: pa[1] } } });
             kids.push({
               type: 'line', z2: it.hl ? 20 : it.median ? 15 : 1,
               shape: { x1: pa[0], y1: pa[1], x2: pb[0], y2: pb[1] },

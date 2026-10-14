@@ -14,6 +14,9 @@
  *
  * String equality is case-insensitive. Division by zero -> NaN (formatted "n.m."),
  * null propagates (formatted "n.a.").
+ *
+ * Hardening: every lookup table has no prototype and is read with has(), so names such as "constructor" or
+ * "__proto__" are ordinary identifiers; nesting depth is bounded (ExprError, never a RangeError / hang).
  */
 (function (global) {
   'use strict';
@@ -32,10 +35,21 @@
   var IDENT_START = /[A-Za-z_À-￿]/;
   var IDENT_PART = /[A-Za-z0-9_À-￿]/;
   var OPS = ['==', '!=', '<>', '<=', '>=', '&&', '||', '+', '-', '*', '/', '^', '<', '>', '=', '!', '(', ')', ',', '?', ':', '[', ']'];
-  var KEYWORDS = { and: 1, or: 1, not: 1, in: 1, true: 1, false: 1, null: 1 };
+  // own-property lookups only: "constructor", "__proto__", "toString" ... must never resolve to Object.prototype members
+  function has(obj, key) { return obj != null && Object.prototype.hasOwnProperty.call(obj, key); }
+  /** Lookup table without a prototype (read it with has()). */
+  function dict(o) { var d = Object.create(null); for (var k in o) if (has(o, k)) d[k] = o[k]; return d; }
+  var KEYWORDS = dict({ and: 1, or: 1, not: 1, in: 1, true: 1, false: 1, null: 1 });
+
+  // Bounds that keep parsing, compiling and evaluating far from the engine's stack limit (~1,000 nested parentheses
+  // overflowed V8 before): parser recursion (parentheses, calls, lists, unary -, not, ^, ?:) and AST depth (long chains
+  // such as a 10,000-term "1+1+...").
+  var MAX_NESTING = 256, MAX_DEPTH = 1024;
+  var TOO_DEEP = 'Formula is too deeply nested or too long — split it into several computed fields';
 
   function tokenize(src) {
     var toks = [], i = 0, n = src.length;
+    var closeAt = -2;   // next "]" after the current "[" (cached: one forward scan in total, not one per "[")
     while (i < n) {
       var c = src[i];
       if (/\s/.test(c)) { i++; continue; }
@@ -78,7 +92,7 @@
         var id = '';
         while (i < n && IDENT_PART.test(src[i])) id += src[i++];
         var low = id.toLowerCase();
-        if (KEYWORDS[low]) toks.push({ t: 'kw', v: low, pos: start });
+        if (has(KEYWORDS, low)) toks.push({ t: 'kw', v: low, pos: start });
         else toks.push({ t: 'id', v: id, pos: start });
         continue;
       }
@@ -86,7 +100,8 @@
       if (c === '[') {
         var prev = toks[toks.length - 1];
         var prevIsOperand = prev && (prev.t === 'num' || prev.t === 'str' || prev.t === 'id' || prev.t === 'param' || (prev.t === 'op' && (prev.v === ')' || prev.v === ']')));
-        var close = src.indexOf(']', i + 1);
+        if (closeAt !== -1 && closeAt <= i) closeAt = src.indexOf(']', i + 1);
+        var close = closeAt;
         var inner = close > 0 ? src.slice(i + 1, close) : '';
         if (!prevIsOperand && close > 0 && !(prev && prev.t === 'kw' && prev.v === 'in') && /^[^\[\],"']+$/.test(inner) && /[A-Za-zÀ-￿]/.test(inner) && !/^\s*-?\d/.test(inner)) {
           toks.push({ t: 'id', v: inner.trim(), quoted: true, pos: start });
@@ -109,7 +124,7 @@
   /* ------------------------------------------------------------------ *
    * Parser (precedence climbing)
    * ------------------------------------------------------------------ */
-  function Parser(toks) { this.toks = toks; this.i = 0; }
+  function Parser(toks) { this.toks = toks; this.i = 0; this.depth = 0; }
   Parser.prototype.peek = function () { return this.toks[this.i]; };
   Parser.prototype.next = function () { return this.toks[this.i++]; };
   Parser.prototype.isOp = function (v) { var t = this.peek(); return t.t === 'op' && t.v === v; };
@@ -120,13 +135,21 @@
     return t;
   };
 
+  /** One level of recursive descent (parenthesis, argument, list item, unary -, not, ^): bounded by MAX_NESTING. */
+  Parser.prototype.nest = function (fn) {
+    if (++this.depth > MAX_NESTING) throw new ExprError(TOO_DEEP, this.peek().pos);
+    var out = fn.call(this);
+    this.depth--;
+    return out;
+  };
   Parser.prototype.parse = function () {
     var e = this.ternary();
     var t = this.peek();
     if (t.t !== 'eof') throw new ExprError('Unexpected "' + (t.v != null ? t.v : t.t) + '"', t.pos);
     return e;
   };
-  Parser.prototype.ternary = function () {
+  Parser.prototype.ternary = function () { return this.nest(this.cond); };
+  Parser.prototype.cond = function () {
     var c = this.or();
     if (this.isOp('?')) {
       this.next();
@@ -148,14 +171,14 @@
     return a;
   };
   Parser.prototype.not = function () {
-    if (this.isKw('not') || this.isOp('!')) { this.next(); return { type: 'un', op: 'not', a: this.not() }; }
+    if (this.isKw('not') || this.isOp('!')) { this.next(); return { type: 'un', op: 'not', a: this.nest(this.not) }; }
     return this.cmp();
   };
-  var CMP = { '==': '==', '=': '==', '!=': '!=', '<>': '!=', '<': '<', '<=': '<=', '>': '>', '>=': '>=' };
+  var CMP = dict({ '==': '==', '=': '==', '!=': '!=', '<>': '!=', '<': '<', '<=': '<=', '>': '>', '>=': '>=' });
   Parser.prototype.cmp = function () {
     var a = this.add();
     var t = this.peek();
-    if (t.t === 'op' && CMP[t.v]) { this.next(); return { type: 'bin', op: CMP[t.v], a: a, b: this.add() }; }
+    if (t.t === 'op' && has(CMP, t.v)) { this.next(); return { type: 'bin', op: CMP[t.v], a: a, b: this.add() }; }
     if (t.t === 'kw' && t.v === 'in') {
       this.next();
       var list;
@@ -193,13 +216,13 @@
     return a;
   };
   Parser.prototype.unary = function () {
-    if (this.isOp('-')) { this.next(); return { type: 'un', op: 'neg', a: this.unary() }; }
-    if (this.isOp('+')) { this.next(); return this.unary(); }
+    if (this.isOp('-')) { this.next(); return { type: 'un', op: 'neg', a: this.nest(this.unary) }; }
+    if (this.isOp('+')) { this.next(); return this.nest(this.unary); }
     return this.pow();
   };
   Parser.prototype.pow = function () {
     var a = this.primary();
-    if (this.isOp('^')) { this.next(); return { type: 'bin', op: '^', a: a, b: this.unary() }; }
+    if (this.isOp('^')) { this.next(); return { type: 'bin', op: '^', a: a, b: this.nest(this.unary) }; }
     return a;
   };
   Parser.prototype.primary = function () {
@@ -250,8 +273,11 @@
     return a == b; // eslint-disable-line eqeqeq
   }
   function cmp(a, b) {
-    if (typeof a === 'string' && typeof b === 'string') return a.localeCompare(b);
-    return num(a) - num(b);
+    // case-insensitive like eq(), so "a" >= "A" agrees with "a" == "A"
+    if (typeof a === 'string' && typeof b === 'string') return a.localeCompare(b, undefined, { sensitivity: 'accent' });
+    var x = num(a), y = num(b);
+    // text that is not a number ("n.a.", "NM", "2021-03-18") is not comparable with a number: NaN makes <, >, <=, >= false
+    return x === null || y === null ? NaN : x - y;
   }
   function arith(op, a, b) {
     if (op === '+' && (typeof a === 'string' || typeof b === 'string')) return String(isNull(a) ? '' : a) + String(isNull(b) ? '' : b);
@@ -270,6 +296,16 @@
     for (var i = 0; i < vals.length; i++) { var v = num(vals[i]); if (v !== null && !isNaN(v)) out.push(v); }
     return out;
   }
+  /** min (dir -1) / max (dir 1) without Function.apply (RangeError above ~120k rows); all-text columns
+   *  such as ISO dates ("2019-03-18") compare as text so min(date) / max(date) work. */
+  function extreme(vals, dir) {
+    var a = numbers(vals), best = null, i;
+    if (!a.length) {
+      for (i = 0; i < vals.length; i++) if (typeof vals[i] === 'string' && vals[i] !== '') a.push(vals[i]);
+    }
+    for (i = 0; i < a.length; i++) if (best === null || (dir < 0 ? a[i] < best : a[i] > best)) best = a[i];
+    return best;
+  }
   function quantile(sorted, p) {
     if (!sorted.length) return null;
     var idx = (sorted.length - 1) * p, lo = Math.floor(idx), hi = Math.ceil(idx);
@@ -277,9 +313,24 @@
   }
   function toDate(v) { return RK.format && RK.format.toDate ? RK.format.toDate(v) : new Date(v); }
 
-  var SCALAR = {
+  /**
+   * Excel ROUND(): half away from zero on the 15-significant-digit decimal value, num_digits truncated, never -0.
+   * round(1.005, 2) = 1.01 and round(-2.5) = -3 (Math.round: 1 and -2). Shares RK.format's decimal-string rounding so
+   * a rounded value and its display always agree; the fallback only runs if rk.format.js is not loaded.
+   */
+  function excelRound(x, d) {
+    if (RK.format && RK.format.round) return RK.format.round(x, d);
+    d = Math.trunc(d) || 0;
+    var f = Math.pow(10, d), y = Math.abs(x) * f;
+    if (!isFinite(y)) return x;
+    y = Math.round(+y.toPrecision(15));
+    y = d >= 0 ? y / f : y * Math.pow(10, -d);
+    return y === 0 ? 0 : (x < 0 ? -y : y);
+  }
+
+  var SCALAR = dict({
     abs: function (x) { x = num(x); return x === null ? null : Math.abs(x); },
-    round: function (x, d) { x = num(x); if (x === null) return null; var f = Math.pow(10, num(d) || 0); return Math.round(x * f) / f; },
+    round: function (x, d) { x = num(x); return x === null ? null : excelRound(x, num(d) || 0); },
     floor: function (x) { x = num(x); return x === null ? null : Math.floor(x); },
     ceil: function (x) { x = num(x); return x === null ? null : Math.ceil(x); },
     sqrt: function (x) { x = num(x); return x === null ? null : (x < 0 ? NaN : Math.sqrt(x)); },
@@ -289,7 +340,13 @@
     log: function (x, b) { x = num(x); if (x === null) return null; if (x <= 0) return NaN; return b == null ? Math.log10(x) : Math.log(x) / Math.log(num(b)); },
     log10: function (x) { x = num(x); return x === null ? null : (x <= 0 ? NaN : Math.log10(x)); },
     sign: function (x) { x = num(x); return x === null ? null : Math.sign(x); },
-    clamp: function (x, lo, hi) { x = num(x); return x === null ? null : Math.max(num(lo), Math.min(num(hi), x)); },
+    clamp: function (x, lo, hi) {
+      x = num(x); lo = num(lo); hi = num(hi);              // a null / missing bound means "no bound"
+      if (x === null) return null;
+      if (lo !== null && x < lo) x = lo;
+      if (hi !== null && x > hi) x = hi;
+      return x;
+    },
     div: function (a, b) { a = num(a); b = num(b); return a === null || b === null || b === 0 ? null : a / b; },
     pct_change: function (a, b) { a = num(a); b = num(b); return a === null || b === null ? null : (b === 0 ? NaN : a / b - 1); },
     cagr: function (end, start, years) {
@@ -300,28 +357,28 @@
     },
     coalesce: function () { for (var i = 0; i < arguments.length; i++) if (!isNull(arguments[i]) && !(typeof arguments[i] === 'number' && isNaN(arguments[i]))) return arguments[i]; return null; },
     isnull: function (x) { return isNull(x) || (typeof x === 'number' && isNaN(x)); },
-    between: function (x, lo, hi) { x = num(x); return x !== null && x >= num(lo) && x <= num(hi); },
+    between: function (x, lo, hi) { x = num(x); lo = num(lo); hi = num(hi); return x !== null && (lo === null || x >= lo) && (hi === null || x <= hi); },
     number: function (x) { return num(x); },
     text: function (x, f) { return f != null && RK.format ? RK.format(x, f) : (isNull(x) ? '' : String(x)); },
     len: function (s) { return isNull(s) ? 0 : String(s).length; },
     lower: function (s) { return isNull(s) ? s : String(s).toLowerCase(); },
     upper: function (s) { return isNull(s) ? s : String(s).toUpperCase(); },
     concat: function () { return [].slice.call(arguments).map(function (v) { return isNull(v) ? '' : String(v); }).join(''); },
-    contains: function (s, sub) { return !isNull(s) && String(s).toLowerCase().indexOf(String(sub).toLowerCase()) >= 0; },
-    startswith: function (s, p) { return !isNull(s) && String(s).toLowerCase().indexOf(String(p).toLowerCase()) === 0; },
-    endswith: function (s, p) { if (isNull(s)) return false; s = String(s).toLowerCase(); p = String(p).toLowerCase(); return s.slice(-p.length) === p; },
+    contains: function (s, sub) { return !isNull(s) && sub != null && String(s).toLowerCase().indexOf(String(sub).toLowerCase()) >= 0; },
+    startswith: function (s, p) { return !isNull(s) && p != null && String(s).toLowerCase().indexOf(String(p).toLowerCase()) === 0; },
+    endswith: function (s, p) { if (isNull(s) || p == null) return false; s = String(s).toLowerCase(); p = String(p).toLowerCase(); return !p.length || s.slice(-p.length) === p; },
     year: function (d) { d = toDate(d); return d ? d.getFullYear() : null; },
     month: function (d) { d = toDate(d); return d ? d.getMonth() + 1 : null; },
     quarter: function (d) { d = toDate(d); return d ? Math.floor(d.getMonth() / 3) + 1 : null; }
-  };
-  var LAZY = { if: true, iif: true };
+  });
+  var LAZY = dict({ if: true, iif: true });
 
-  var AGG = {
+  var AGG = dict({
     sum: function (v) { var a = numbers(v); return a.length ? a.reduce(function (s, x) { return s + x; }, 0) : null; },
     avg: function (v) { var a = numbers(v); return a.length ? a.reduce(function (s, x) { return s + x; }, 0) / a.length : null; },
     median: function (v) { var a = numbers(v).sort(function (x, y) { return x - y; }); return quantile(a, 0.5); },
-    min: function (v) { var a = numbers(v); return a.length ? Math.min.apply(null, a) : null; },
-    max: function (v) { var a = numbers(v); return a.length ? Math.max.apply(null, a) : null; },
+    min: function (v) { return extreme(v, -1); },
+    max: function (v) { return extreme(v, 1); },
     count: function (v) { var c = 0; for (var i = 0; i < v.length; i++) if (!isNull(v[i])) c++; return c; },
     countd: function (v) { var s = new Set(); for (var i = 0; i < v.length; i++) if (!isNull(v[i])) s.add(v[i]); return s.size; },
     stdev: function (v) {
@@ -331,32 +388,41 @@
     },
     first: function (v) { for (var i = 0; i < v.length; i++) if (!isNull(v[i])) return v[i]; return null; },
     last: function (v) { for (var i = v.length - 1; i >= 0; i--) if (!isNull(v[i])) return v[i]; return null; }
-  };
+  });
   AGG.mean = AGG.avg;
   AGG.average = AGG.avg;
   AGG.stddev = AGG.stdev;
   // aggregates with extra arguments
-  var AGG_EXTRA = {
+  var AGG_EXTRA = dict({
     pctl: function (vals, p) { var a = numbers(vals).sort(function (x, y) { return x - y; }); return quantile(a, num(p)); },
     wavg: function (vals, weights) {
       var s = 0, w = 0;
       for (var i = 0; i < vals.length; i++) {
         var x = num(vals[i]), y = num(weights[i]);
-        if (x === null || y === null || isNaN(x)) continue;
+        if (x === null || y === null || isNaN(x) || isNaN(y)) continue;
         s += x * y; w += y;
       }
       return w ? s / w : null;
     }
-  };
+  });
   AGG_EXTRA.percentile = AGG_EXTRA.pctl;
 
   function isAggCall(node) {
     if (node.type !== 'call') return false;
-    if (AGG_EXTRA[node.name]) return true;
-    if (!AGG[node.name]) return false;
+    if (has(AGG_EXTRA, node.name)) return true;
+    if (!has(AGG, node.name)) return false;
     // min/max with 2+ args are scalar
     if ((node.name === 'min' || node.name === 'max') && node.args.length > 1) return false;
     return true;
+  }
+  // allowed argument counts [min, max] of aggregate functions (default: exactly 1)
+  var AGG_ARITY = dict({ count: [0, 1], wavg: [2, 2], pctl: [1, 2], percentile: [1, 2] });
+  function usesField(node) {
+    if (!node || typeof node !== 'object') return false;
+    if (node.type === 'field') return true;
+    var kids = [node.a, node.b, node.c].concat(node.args || [], node.items || []);
+    for (var i = 0; i < kids.length; i++) if (kids[i] && usesField(kids[i])) return true;
+    return false;
   }
   function containsAgg(node) {
     if (!node || typeof node !== 'object') return false;
@@ -390,10 +456,13 @@
       if (f.title) byKey[norm(f.title)] = byKey[norm(f.title)] || name;
     });
     return function (name, pos) {
-      if (Object.prototype.hasOwnProperty.call(byKey, norm(name))) return byKey[norm(name)];
-      var sugg = names.map(function (n) { return [n, levenshtein(norm(name), norm(n))]; })
+      var key = norm(name);
+      if (has(byKey, key)) return byKey[key];
+      // edit distance is O(len^2): no suggestions for absurdly long names (pasted text), and the message is truncated
+      var sugg = key.length > 64 ? [] : names.map(function (n) { return [n, levenshtein(key, norm(n).slice(0, 64))]; })
         .sort(function (x, y) { return x[1] - y[1]; }).slice(0, 3).map(function (x) { return x[0]; });
-      throw new ExprError('Unknown field "' + name + '"' + (sugg.length ? ' — did you mean ' + sugg.join(', ') + '?' : ''), pos);
+      var shown = name.length > 80 ? name.slice(0, 77) + '...' : name;
+      throw new ExprError('Unknown field "' + shown + '"' + (sugg.length ? ' — did you mean ' + sugg.join(', ') + '?' : ''), pos);
     };
   }
 
@@ -404,6 +473,7 @@
     this.resolve = makeResolver(opts.fields);
     this.fieldsUsed = [];
     this.paramsUsed = [];
+    this.seen = { f: Object.create(null), p: Object.create(null) };   // dedupe in O(1), not indexOf per reference
   }
 
   Compiler.prototype.row = function (node) {
@@ -412,14 +482,15 @@
       case 'lit': return function () { return node.v; };
       case 'field': {
         var name = this.resolve(node.name, node.pos);
-        if (this.fieldsUsed.indexOf(name) < 0) this.fieldsUsed.push(name);
-        return function (row) { return row ? row[name] : null; };
+        node.resolved = name;   // schema name of the field ([Enterprise value] -> "ev"), for callers that inspect the AST
+        if (!has(this.seen.f, name)) { this.seen.f[name] = 1; this.fieldsUsed.push(name); }
+        return function (row) { return has(row, name) ? row[name] : null; };
       }
       case 'param': {
-        if (this.paramsUsed.indexOf(node.name) < 0) this.paramsUsed.push(node.name);
+        if (!has(this.seen.p, node.name)) { this.seen.p[node.name] = 1; this.paramsUsed.push(node.name); }
         return function (row, env) {
           var p = env && env.params ? env.params : (RK.store ? RK.store.params() : {});
-          if (!(node.name in p)) throw new ExprError('Unknown parameter @' + node.name, node.pos);
+          if (!has(p, node.name)) throw new ExprError('Unknown parameter @' + node.name, node.pos);
           return p[node.name];
         };
       }
@@ -467,18 +538,19 @@
 
   Compiler.prototype.scalarCall = function (node, args) {
     var name = node.name;
-    if (LAZY[name]) {
+    if (has(LAZY, name)) {
       if (args.length < 2) throw new ExprError('if(condition, then, else) needs at least 2 arguments', node.pos);
       return function (r, e) { return args[0](r, e) ? args[1](r, e) : (args[2] ? args[2](r, e) : null); };
     }
     if (name === 'min' || name === 'max') {
-      var mm = Math[name];
+      var dir = name === 'min' ? -1 : 1;
       return function (r, e) {
-        var vals = numbers(args.map(function (f) { return f(r, e); }));
-        return vals.length ? mm.apply(null, vals) : null;
+        var vals = numbers(args.map(function (f) { return f(r, e); })), best = null;   // a loop: no apply() argument limit
+        for (var i = 0; i < vals.length; i++) if (best === null || (dir < 0 ? vals[i] < best : vals[i] > best)) best = vals[i];
+        return best;
       };
     }
-    var fn = SCALAR[name];
+    var fn = has(SCALAR, name) ? SCALAR[name] : null;
     if (!fn) throw new ExprError('Unknown function ' + name + '()', node.pos);
     return function (r, e) { return fn.apply(null, args.map(function (f) { return f(r, e); })); };
   };
@@ -487,10 +559,19 @@
   Compiler.prototype.agg = function (node) {
     var self = this;
     if (isAggCall(node)) {
-      var name = node.name;
+      var name = node.name, ar = has(AGG_ARITY, name) ? AGG_ARITY[name] : [1, 1], argc = node.args.length;
+      if (argc < ar[0] || argc > ar[1]) {
+        throw new ExprError(name + '() expects ' + (ar[0] === ar[1] ? ar[0] : ar[0] + '-' + ar[1]) + ' argument' + (ar[0] === 1 && ar[1] === 1 ? '' : 's') + ', got ' + argc, node.pos);
+      }
+      if (name !== 'wavg' && argc === 2 && usesField(node.args[1])) {
+        throw new ExprError(name + '() percentile must be a number or @param (e.g. 0.9 or 90%), not a field', node.pos);
+      }
+      for (var ni = 0; ni < argc; ni++) {
+        if (containsAgg(node.args[ni])) throw new ExprError('Aggregates cannot be nested: ' + name + '() contains another aggregate — compute the inner value in its own column or computed field', node.pos);
+      }
       if (name === 'count' && node.args.length === 0) return function (rows) { return rows.length; };
       var inner = node.args.map(function (n) { return self.row(n); });
-      if (AGG_EXTRA[name]) {
+      if (has(AGG_EXTRA, name)) {
         var fx = AGG_EXTRA[name];
         if (name === 'wavg') {
           return function (rows, env) {
@@ -529,7 +610,39 @@
   /* ------------------------------------------------------------------ *
    * Public API
    * ------------------------------------------------------------------ */
-  var cache = new Map();
+  // compile() results for schema-less formulas (filters, text placeholders), keyed by source text. Bounded: a long
+  // session typing distinct expressions into a filter must not grow it forever (oldest entries are dropped).
+  var cache = new Map(), CACHE_MAX = 500;
+
+  /** Depth of the AST without recursion: a 100,000-term "1+1+..." is a 100,000-deep left chain. */
+  function checkDepth(ast) {
+    var stack = [ast], depths = [1];
+    while (stack.length) {
+      var node = stack.pop(), d = depths.pop();
+      if (d > MAX_DEPTH) throw new ExprError(TOO_DEEP, node.pos != null ? node.pos : -1);
+      var kids = [node.a, node.b, node.c].concat(node.args || [], node.items || []);
+      for (var i = 0; i < kids.length; i++) if (kids[i] && typeof kids[i] === 'object') { stack.push(kids[i]); depths.push(d + 1); }
+    }
+  }
+
+  // Backstop for the bounds above: a stack overflow still surfaces as an ExprError, not a RangeError (V8 /
+  // JavaScriptCore) or InternalError "too much recursion" (Firefox), e.g. when a formula is evaluated deep inside a
+  // component's own call stack.
+  function tooDeep(e) {
+    var overflow = e && (e instanceof RangeError || e.name === 'InternalError') && /stack|recursion/i.test(e.message);
+    return overflow ? new ExprError(TOO_DEEP) : e;
+  }
+  // an aggregate formula needs the rows of a group: say so instead of "TypeError: rows.map is not a function"
+  function asRows(fn, src) {
+    var shown = src.length > 80 ? src.slice(0, 77) + '...' : src;
+    return function (rows, env) {
+      if (!Array.isArray(rows)) throw new ExprError('"' + shown + '" is an aggregate formula (sum, avg, ...): evaluate it on an array of rows, not a single record');
+      return fn(rows, env);
+    };
+  }
+  function guardDepth(fn) {
+    return function (x, env) { try { return fn(x, env); } catch (e) { throw tooDeep(e); } };
+  }
 
   /**
    * compile(src, {fields}) -> { src, aggregate, fields, params, eval(row|rows, env) }
@@ -537,14 +650,21 @@
    */
   function compile(src, opts) {
     opts = opts || {};
-    var key = opts.fields ? null : src;
-    if (key && cache.has(key)) return cache.get(key);
-    var ast = new Parser(tokenize(String(src))).parse();
-    var c = new Compiler(opts);
-    var aggregate = containsAgg(ast);
-    var fn = aggregate ? c.agg(ast) : c.row(ast);
+    var key = opts.fields ? null : String(src);
+    if (key !== null && cache.has(key)) return cache.get(key);
+    var ast, c, aggregate, fn;
+    try {
+      ast = new Parser(tokenize(String(src))).parse();
+      checkDepth(ast);
+      c = new Compiler(opts);
+      aggregate = containsAgg(ast);
+      fn = guardDepth(aggregate ? asRows(c.agg(ast), String(src)) : c.row(ast));
+    } catch (e) { throw tooDeep(e); }
     var out = { src: src, ast: ast, aggregate: aggregate, fields: c.fieldsUsed, params: c.paramsUsed, eval: fn };
-    if (key) cache.set(key, out);
+    if (key !== null) {
+      if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value);
+      cache.set(key, out);
+    }
     return out;
   }
 

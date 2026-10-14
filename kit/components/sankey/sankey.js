@@ -128,8 +128,7 @@
       else if (o.percentOf) refNode = g.byName.get(o.percentOf) || null;
 
       // colours
-      var ord = t.ord && t.ord.length ? t.ord : [t.accent, t.accent3, t.cat[2]];
-      var stageRamp = RK.theme.ramp(ord.slice(0, Math.max(2, Math.min(ord.length, 4))));
+      var stageRamp = RK.theme.ramp(t.ord.slice(0, 4));   // ordinal ramp (dark -> light) by column
       // colorBy 'node': categorical colours kept clear of the highlight, the cost colour and explicit node colours
       var custom = {}, free = [];
       nodes.forEach(function (n) {

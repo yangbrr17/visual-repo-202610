@@ -573,7 +573,8 @@
     },
     render: function (ctx) {
       var api = base(ctx), inst = api.chart;
-      var bar = !ctx.print && ctx.options.zoom !== false ? toolbar(ctx, inst) : null;
+      var bar = ctx.options.zoom !== false ? toolbar(ctx, inst) : null;
+      if (bar) bar.hidden = !!ctx.print;   // print: no buttons (also re-checked on every print refresh)
       var relabel = util.rafThrottle(function () { layoutLabels(inst); });
       layoutLabels(inst);
       inst.on('datazoom', relabel);
@@ -582,6 +583,7 @@
       api.resize = function () { resize(); layoutLabels(inst); };
       // timeline options (baseOption + options) cannot be replace-merged: rebuild them in place, keeping the period
       api.update = function (c) {
+        if (bar) bar.hidden = !!c.print;
         if (!c.options.timeField) update(c);
         else inst.setOption(build(c, inst), { notMerge: true });
         layoutLabels(inst);

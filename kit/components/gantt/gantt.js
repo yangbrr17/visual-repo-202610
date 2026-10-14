@@ -39,6 +39,19 @@
     return out;
   }
 
+  /**
+   * ECharts' inside-zoom controller consumes every wheel event over the plot (preventDefault) even with
+   * zoomOnMouseWheel 'ctrl', which would block page scrolling. Installed on the ECharts viewport
+   * (disposed with the chart): plain wheels bypass it, so the page scrolls and only Ctrl + wheel / pinch
+   * reaches the time zoom; options.wheelZoom: true opts out.
+   */
+  function passWheel(inst, ctx) {
+    var root = inst.getZr().painter.getViewportRoot();
+    function onWheel(e) { if (!e.ctrlKey && ctx.options.wheelZoom !== true) e.stopPropagation(); }
+    root.addEventListener('wheel', onWheel, true);
+    root.addEventListener('mousewheel', onWheel, true);
+  }
+
   /** Visible x window of the chart (honours dataZoom), falling back to the full domain. */
   function zoomWindow(inst, S) {
     var lo = S.lo, hi = S.hi;
@@ -83,7 +96,7 @@
       crossFilterScope: 'dataset',  // workstream / phase / task are timetable-specific: filter this dataset only
       legend: true,
       zoom: true,
-      wheelZoom: null           // true: plain wheel zooms (default: Ctrl/Cmd + wheel or pinch; plain wheel scrolls the page)
+      wheelZoom: null           // true: plain wheel zooms (default: Ctrl + wheel or pinch; a plain wheel scrolls the page)
     },
     render: C(function build(ctx, inst) {
       var o = ctx.options, t = ctx.theme, enc = ctx.enc;
@@ -422,6 +435,7 @@
         return k ? { field: G.selField, value: G.selValue(k) } : null;
       },
       rebuildOnResize: true,     // label column, calendar tiers and bar geometry depend on the width
+      init: passWheel,
       on: {
         datazoom: function (params, ctx, inst) {
           var S = inst.__rkGantt;

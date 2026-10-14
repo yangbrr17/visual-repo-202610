@@ -348,7 +348,7 @@ def build(out: Path) -> Path:
                     {"field": "premium_30d", "title": "Premium", "group": "30-day VWAP"},
                 ]})
     p.block("histogram", data="precedents", span=4, height=plot_h(t, block_sub=True), title="Premium to 30-day VWAP",
-            subtitle="Transactions since 2019 with a disclosed premium",
+            subtitle="Disclosed premia, 2019–2026",
             options={"encode": {"value": "premium_30d", "label": "target", "name": "target"},
                      "binWidth": 0.05, "format": "0%", "stats": ["median"]})
 
@@ -383,23 +383,24 @@ def build(out: Path) -> Path:
                source="Share register as of 30-Sep-2026; company information")
     p.block("donut", data="ownership", span=5, height=plot_h(t), title="Shareholders by investor type",
             options={"encode": {"label": "type", "value": "shares_m"}, "centerLabel": "Shares (m)"})
-    p.block("bar", data="ownership", span=7, height=plot_h(t), title="Largest shareholders (% of shares outstanding)",
-            options={"encode": {"x": "holder", "y": "pct"}, "where": "type != \"Retail\" and type != \"Insider\"",
-                     "orientation": "horizontal", "sort": "desc", "highlight": "Ardent Family Holdings",
-                     "format": "0.0%"})
+    p.block("comps-table", data="ownership", span=7, height=plot_h(t), title="Largest shareholders", options={
+        "encode": {"label": "holder"}, "labelTitle": "Holder", "where": "type != \"Retail\" and type != \"Insider\"",
+        "highlight": "Ardent Family Holdings", "stats": [], "dense": True, "scroll": False, "crossFilter": False,
+        "sort": {"field": "pct", "dir": "desc"},
+        "columns": [{"field": "type", "title": "Type"}, {"field": "country", "title": "Country"},
+                    {"field": "shares_m", "title": "Shares (m)"}, {"field": "pct", "title": "% of total", "heat": "seq"},
+                    {"field": "change_qoq_m", "title": "QoQ (m)", "sign": True}]})
 
     t = "A two-stage auction can deliver signing by end-March 2027 and closing in July"
-    p = r.page(t, kicker="Next steps", id="timetable", subtitle="Indicative timetable; today = 14-Oct-2026",
-               source=FIRM)
-    p.block("gantt", data="deal_timeline", height=plot_h(t, block_head=False),
-            options={"today": "2026-10-14", "calendar": "months", "zoom": False, "groupHeaders": False})
+    p = r.page(t, kicker="Next steps · indicative timetable", id="timetable", source=FIRM)
+    p.block("gantt", data="deal_timeline", height=plot_h(t, block_head=False, page_sub=False),
+            options={"today": "2026-10-14", "calendar": "months", "zoom": False})
 
     # ------------------------------------------------------------------ appendix
-    t = "Explore the data: build your own metrics and queries"
-    p = r.page(t, kicker="Appendix · client analysis", id="explore",
-               subtitle="Pick fields or type a query; results respect the filters in the top bar",
-               source="All analysis runs locally in your browser; no data leaves this file.")
-    p.block("query-console", data="peers", height=plot_h(t, block_head=False), options={
+    t = "Appendix: explore the data and build your own metrics and queries"
+    p = r.page(t, nav="Appendix · client analysis", id="explore",   # no kicker: the console needs the room
+               source="Runs locally in your browser and respects the top-bar filters; no data leaves this file.")
+    p.block("query-console", data="peers", height=480, options={   # the console needs >= 480 px
         "datasets": ["peers", "financials", "precedents", "segment_revenue"],
         "highlight": "Helios Industrial", "tab": "query",
         "builder": {"values": [{"agg": "median", "field": "ev_ebitda_25e"}, {"agg": "median", "field": "ebitda_margin_25e"}],

@@ -25,12 +25,24 @@
   var RK = global.RK || (global.RK = {});
   var util = RK.util;
 
+  /* Prototype-safe access. Field names, filter keys and param names come from data and users, so lookup tables have
+   * no prototype (Object.create(null)) or are read with has(), and records are read with get() / written with put():
+   * a field called "constructor" never reads Object.prototype.constructor, and "__proto__" stays an ordinary key. */
+  function has(obj, key) { return obj != null && Object.prototype.hasOwnProperty.call(obj, key); }
+  function get(row, key) { return has(row, key) ? row[key] : undefined; }
+  /** obj[key] = v that also works for a field literally named "__proto__" (assignment would swap the prototype and drop the value). */
+  function put(obj, key, v) {
+    if (key === '__proto__') Object.defineProperty(obj, key, { value: v, writable: true, enumerable: true, configurable: true });
+    else obj[key] = v;
+  }
+  function dict(o) { var d = Object.create(null); for (var k in o) if (has(o, k)) d[k] = o[k]; return d; }
+
   /* ------------------------------------------------------------------ *
    * Dataset
    * ------------------------------------------------------------------ */
   function inferType(rows, name) {
     for (var i = 0; i < Math.min(rows.length, 50); i++) {
-      var v = rows[i][name];
+      var v = get(rows[i], name);
       if (v == null || v === '') continue;
       if (typeof v === 'number') return 'number';
       if (typeof v === 'boolean') return 'boolean';
@@ -51,7 +63,7 @@
     if (data.length && Array.isArray(data[0]) && fields) {
       data = data.map(function (arr) {
         var o = {};
-        for (var i = 0; i < fields.length; i++) o[fields[i].name] = arr[i];
+        for (var i = 0; i < fields.length; i++) put(o, fields[i].name, arr[i]);
         return o;
       });
     }
@@ -70,28 +82,59 @@
     var self = this;
     this.fields.forEach(function (f) { self._index[f.name] = f; });
     this.computed = [];
+    this._rev = 0;   // schema revision: bumped when computed fields change (per-dataset caches compare it)
     (json.computed || []).forEach(function (c) { self.addComputed(c, true); });
   }
 
   Dataset.prototype.field = function (name) { return this._index[name] || null; };
   Dataset.prototype.has = function (name) { return !!this._index[name]; };
   Dataset.prototype.fieldNames = function () { return this.fields.map(function (f) { return f.name; }); };
-  Dataset.prototype.values = function (name) { return this.rows.map(function (r) { return r[name]; }); };
+  Dataset.prototype.values = function (name) { return this.rows.map(function (r) { return get(r, name); }); };
   Dataset.prototype.distinct = function (name) { return util.unique(this.values(name).filter(function (v) { return v != null && v !== ''; })); };
   Dataset.prototype.format = function (name) { var f = this._index[name]; return f && f.format; };
 
   /**
-   * Add a derived field computed by an RK.expr formula. Values are materialised on each row and
-   * recomputed automatically when a referenced @param changes.
+   * Computed fields in evaluation order: definition order, except that a field always runs after the computed fields
+   * it reads (a redefinition may read a field defined after it). A cycle (a -> b -> a) is an ExprError.
+   */
+  function orderComputed(list) {
+    var at = Object.create(null), state = Object.create(null), out = [], path = [];
+    list.forEach(function (x, i) { at[x.def.name] = i; });
+    function visit(x) {
+      var name = x.def.name;
+      if (state[name] === 2) return;
+      if (state[name] === 1) {
+        var loop = path.slice(path.indexOf(name)).concat(name);
+        throw new RK.expr.ExprError('Computed fields cannot reference each other in a loop (' + loop.join(' -> ') + ') — give the result a new name');
+      }
+      state[name] = 1; path.push(name);
+      x.compiled.fields.forEach(function (f) { if (f !== name && has(at, f)) visit(list[at[f]]); });
+      path.pop(); state[name] = 2;
+      out.push(x);
+    }
+    list.forEach(visit);
+    return out;
+  }
+
+  /**
+   * Add (or redefine) a derived field computed by an RK.expr formula. Values are materialised on each row and
+   * recomputed automatically when a referenced @param, or a computed field it reads, changes. A redefinition keeps
+   * its place, so the fields that read it are recomputed after it. A formula may not read its own field: x = x * 1.1
+   * would compound on every recompute (every slider move).
    */
   Dataset.prototype.addComputed = function (spec, silent) {
     var c = RK.expr.compile(spec.formula, { fields: this.fields });
     if (c.aggregate) throw new RK.expr.ExprError('Computed fields must be row formulas (no sum/avg/...)');
+    if (c.fields.indexOf(spec.name) >= 0) throw new RK.expr.ExprError('Computed field "' + spec.name + '" cannot reference itself — give the result a new name');
     var def = { name: spec.name, title: spec.title || spec.name, type: spec.type || 'number', format: spec.format, formula: spec.formula, computed: true };
+    var entry = { def: def, compiled: c }, list = this.computed.slice(), i = list.length;
+    while (i-- > 0) if (list[i].def.name === def.name) break;
+    if (i >= 0) list[i] = entry; else list.push(entry);
+    list = orderComputed(list);   // throws on a loop before anything has changed
     var existing = this._index[def.name];
     if (existing) util.merge(existing, def); else { this.fields.push(def); this._index[def.name] = def; }
-    this.computed = this.computed.filter(function (x) { return x.def.name !== def.name; });
-    this.computed.push({ def: def, compiled: c });
+    this.computed = list;
+    this._rev++;
     this._materialize(def.name);
     if (!silent) RK.bus.emit('data:changed', { dataset: this.id, field: def.name });
     return def;
@@ -101,6 +144,7 @@
     this.computed = this.computed.filter(function (x) { return x.def.name !== name; });
     this.fields = this.fields.filter(function (f) { return f.name !== name; });
     delete this._index[name];
+    this._rev++;
     this.rows.forEach(function (r) { delete r[name]; });
     RK.bus.emit('data:changed', { dataset: this.id, field: name });
   };
@@ -108,15 +152,17 @@
   Dataset.prototype._materialize = function (onlyName, paramName) {
     var env = { params: RK.store.params() };
     var rows = this.rows;
-    var dirty = {};   // computed fields recomputed in this pass: dependants are recomputed too (definition order)
+    // computed fields recomputed in this pass; the fields that read them are recomputed too, in evaluation order
+    var dirty = Object.create(null);
+    function readsDirty(c) { return c.compiled.fields.some(function (f) { return has(dirty, f); }); }
     this.computed.forEach(function (c) {
-      if (onlyName && c.def.name !== onlyName && !c.compiled.fields.some(function (f) { return dirty[f]; })) return;
-      if (paramName && c.compiled.params.indexOf(paramName) < 0 && !c.compiled.fields.some(function (f) { return dirty[f]; })) return;
+      if (onlyName && c.def.name !== onlyName && !readsDirty(c)) return;
+      if (paramName && c.compiled.params.indexOf(paramName) < 0 && !readsDirty(c)) return;
       dirty[c.def.name] = true;
       for (var i = 0; i < rows.length; i++) {
         var v;
         try { v = c.compiled.eval(rows[i], env); } catch (e) { v = null; }
-        rows[i][c.def.name] = v;
+        put(rows[i], c.def.name, v);
       }
     });
   };
@@ -138,7 +184,7 @@
       return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     }
     var lines = [fields.map(function (f) { return esc(f.title || f.name); }).join(',')];
-    rows.forEach(function (r) { lines.push(fields.map(function (f) { return esc(r[f.name]); }).join(',')); });
+    rows.forEach(function (r) { lines.push(fields.map(function (f) { return esc(get(r, f.name)); }).join(',')); });
     return '﻿' + lines.join('\n');
   };
 
@@ -148,7 +194,8 @@
    * Store: filters, params, generic state
    * ------------------------------------------------------------------ */
   var store = RK.store = (function () {
-    var filters = {}, params = {}, state = {}, subs = [], pending = [], scheduled = false;
+    // keyed by user / data supplied names: no prototype ("constructor", "toString" are ordinary keys)
+    var filters = Object.create(null), params = Object.create(null), state = Object.create(null), subs = [], pending = [], scheduled = false;
 
     function notify(change) {
       pending.push(change);
@@ -180,7 +227,7 @@
         notify({ type: 'filter', key: key, spec: spec });
       },
       clearFilter: function (key) {
-        if (!(key in filters)) return;
+        if (!has(filters, key)) return;
         var prev = filters[key];
         delete filters[key];
         notify({ type: 'filter', key: key, spec: null, prev: prev });
@@ -190,7 +237,7 @@
       },
       /** toggle a value inside an 'in' filter (used by click-to-filter / cross-filter). */
       toggleValue: function (key, field, value, source, extra) {
-        var cur = filters[key];
+        var cur = get(filters, key);
         var vals = cur && cur.values ? cur.values.slice() : [];
         var i = vals.indexOf(value);
         if (i >= 0) vals.splice(i, 1); else vals.push(value);
@@ -210,13 +257,13 @@
         if (extra.datasets) spec.datasets = extra.datasets;
         store.setFilter(key, spec);
       },
-      filter: function (key) { return filters[key] || null; },
+      filter: function (key) { return get(filters, key) || null; },
       filters: function () { return filters; },
 
       params: function () { return params; },
-      param: function (name) { return params[name]; },
+      param: function (name) { return get(params, name); },
       setParam: function (name, value) {
-        if (params[name] === value) return;
+        if (has(params, name) && params[name] === value) return;
         params[name] = value;
         RK.data.ids().forEach(function (id) {
           var ds = RK.data.get(id);
@@ -227,12 +274,12 @@
       defineParams: function (defs) {
         Object.keys(defs || {}).forEach(function (k) {
           var d = defs[k];
-          params[k] = util.isObj(d) ? d.value : d;
+          put(params, k, util.isObj(d) ? d.value : d);
         });
       },
 
-      get: function (k) { return state[k]; },
-      set: function (k, v) { if (state[k] === v) return; state[k] = v; notify({ type: 'state', key: k, value: v }); },
+      get: function (k) { return get(state, k); },
+      set: function (k, v) { if (has(state, k) && state[k] === v) return; state[k] = v; notify({ type: 'state', key: k, value: v }); },
 
       subscribe: function (fn) {
         subs.push(fn);
@@ -250,11 +297,27 @@
     return a - b;
   }
 
+  /**
+   * expr filters compile against each dataset's schema, so titles ([Enterprise value]), `names with spaces` and
+   * case variants resolve as in queries; null when the formula does not fit this dataset (a field it lacks), and the
+   * filter then does not apply to it. Compiled once per (filter, dataset, schema revision).
+   */
+  var exprMemo = new WeakMap();
+  function exprFor(spec, ds) {
+    var memo = exprMemo.get(spec);
+    if (!memo) exprMemo.set(spec, memo = Object.create(null));
+    var m = has(memo, ds.id) ? memo[ds.id] : null;
+    if (!m || m.ds !== ds || m.rev !== ds._rev || m.expr !== spec.expr) {
+      var c = null;
+      try { c = RK.expr.compile(spec.expr, { fields: ds.fields }); } catch (e) { c = null; }
+      m = memo[ds.id] = { ds: ds, rev: ds._rev, expr: spec.expr, c: c };
+    }
+    return m.c;
+  }
+
   function filterApplies(spec, ds) {
     if (spec.datasets && spec.datasets.indexOf(ds.id) < 0) return false;
-    if (spec.op === 'expr') {
-      return spec._compiled && spec._compiled.fields.every(function (f) { return ds.has(f); });
-    }
+    if (spec.op === 'expr') return !!(spec._compiled && exprFor(spec, ds));
     if (spec.op === 'search') return !spec.field || ds.has(spec.field);
     return ds.has(spec.field);
   }
@@ -264,15 +327,15 @@
     switch (spec.op) {
       case 'in': {
         var set = new Set(spec.values.map(function (v) { return typeof v === 'string' ? v.toLowerCase() : v; }));
-        return function (r) { var v = r[f]; return set.has(typeof v === 'string' ? v.toLowerCase() : v); };
+        return function (r) { var v = get(r, f); return set.has(typeof v === 'string' ? v.toLowerCase() : v); };
       }
-      case 'not_in': {
-        var nset = new Set(spec.values);
-        return function (r) { return !nset.has(r[f]); };
+      case 'not_in': {   // case-insensitive, like 'in' and RK.expr ==
+        var nset = new Set((spec.values || []).map(function (v) { return typeof v === 'string' ? v.toLowerCase() : v; }));
+        return function (r) { var v = get(r, f); return !nset.has(typeof v === 'string' ? v.toLowerCase() : v); };
       }
-      case 'eq': return function (r) { return r[f] === spec.value; };
+      case 'eq': return function (r) { return get(r, f) === spec.value; };
       case 'between': return function (r) {
-        var v = r[f];
+        var v = get(r, f);
         if (v == null || v === '') return false;
         if (spec.min != null && cmpVal(v, spec.min, type) < 0) return false;
         if (spec.max != null && cmpVal(v, spec.max, type) > 0) return false;
@@ -282,12 +345,13 @@
         var q = String(spec.text).toLowerCase();
         var cols = f ? [f] : ds.fields.filter(function (x) { return x.type === 'string'; }).map(function (x) { return x.name; });
         return function (r) {
-          for (var i = 0; i < cols.length; i++) { var v = r[cols[i]]; if (v != null && String(v).toLowerCase().indexOf(q) >= 0) return true; }
+          for (var i = 0; i < cols.length; i++) { var v = get(r, cols[i]); if (v != null && String(v).toLowerCase().indexOf(q) >= 0) return true; }
           return false;
         };
       }
       case 'expr': {
-        var c = spec._compiled, env = { params: store.params() };
+        var c = exprFor(spec, ds), env = { params: store.params() };
+        if (!c) return function () { return false; };
         return function (r) { try { return !!c.eval(r, env); } catch (e) { return false; } };
       }
     }
@@ -351,16 +415,17 @@
   function aggregate(rows, spec) {
     var by = spec.by || [];
     var measures = (spec.measures || []).map(function (m) {
-      var src = m.expr || (m.op ? m.op + '(' + m.field + ')' : m.field);
-      return { name: m.name || src, c: RK.expr.compile(src, { fields: spec.fields }) };
+      var ref = m.field == null ? '' : '`' + m.field + '`';            // field names may contain spaces
+      var src = m.expr || (m.op ? m.op + '(' + ref + ')' : ref);
+      return { name: m.name || m.expr || (m.op ? m.op + '(' + (m.field == null ? '' : m.field) + ')' : m.field), c: RK.expr.compile(src, { fields: spec.fields }) };
     });
     var env = { params: store.params() };
-    var groups = by.length ? util.groupBy(rows, function (r) { return by.map(function (b) { return r[b]; }).join('\u0001'); }) : new Map([['', rows]]);
+    var groups = by.length ? util.groupBy(rows, function (r) { return by.map(function (b) { return get(r, b); }).join('\u0001'); }) : new Map([['', rows]]);
     var out = [];
     groups.forEach(function (g) {
       var rec = {};
-      by.forEach(function (b) { rec[b] = g[0][b]; });
-      measures.forEach(function (m) { rec[m.name] = m.c.aggregate ? m.c.eval(g, env) : m.c.eval(g[0], env); });
+      by.forEach(function (b) { put(rec, b, get(g[0], b)); });
+      measures.forEach(function (m) { put(rec, m.name, m.c.aggregate ? m.c.eval(g, env) : m.c.eval(g[0], env)); });
       out.push(rec);
     });
     return out;
@@ -370,20 +435,23 @@
    * Query engine (client "type your own metric" console)
    * ------------------------------------------------------------------ *
    * Text syntax:
-   *   <items> [from <dataset>] [by <fields>] [where <expr>] [sort <column> [asc|desc]] [top <n>]
+   *   <items> [from <dataset>] [by <fields>] [where <expr>] [sort [by] <column> [asc|desc]] [top <n>]
    *   items := expr [as "Label"] [format "0.0x"], ...      (* = all fields)
    * Examples:
    *   median(ev_ebitda_25e), avg(ebitda_margin) by sector
    *   company, ev / ebitda_25e as "EV/EBITDA" format "0.0x" where region == "Asia" sort 2 desc top 5
    *   sum(revenue) as "Revenue" by region, year where year >= 2024
    */
-  var CLAUSES = ['group by', 'order by', 'from', 'by', 'where', 'sort', 'top', 'limit'];
+  // clause keywords, longest first ("sort by" before "sort" and "by"); blanks or a line break inside "group by" etc.
+  var CLAUSE_RE = /(group\s+by|order\s+by|sort\s+by|from|by|where|sort|top|limit)(?=\s|$)/iy;
+  // clauses that may appear once: "order by" and "sort by" are "sort", "group by" is "by", "limit" is "top"
+  var CLAUSE_KIND = dict({ 'group by': 'by', 'order by': 'sort', 'sort by': 'sort', limit: 'top' });
 
   function splitTopLevel(text, sepFn) {
     var parts = [], depth = 0, q = null, start = 0;
     for (var i = 0; i < text.length; i++) {
       var c = text[i];
-      if (q) { if (c === q) q = null; continue; }
+      if (q) { if (c === '\\' && q !== '`') i++; else if (c === q) q = null; continue; }   // "a \" b": same escapes as RK.expr
       if (c === '"' || c === "'" || c === '`') { q = c; continue; }
       if (c === '(' || c === '[') depth++;
       else if (c === ')' || c === ']') depth--;
@@ -402,60 +470,90 @@
     var found = [];
     splitTopLevel(src, function (t, i) {
       if (i > 0 && !/\s/.test(t[i - 1])) return 0;
-      for (var k = 0; k < CLAUSES.length; k++) {
-        var kw = CLAUSES[k];
-        var seg = t.substr(i, kw.length).toLowerCase();
-        if (seg === kw && (i + kw.length >= t.length || /\s/.test(t[i + kw.length]))) {
-          found.push({ kw: kw, at: i, len: kw.length });
-          return kw.length;
-        }
-      }
-      return 0;
+      CLAUSE_RE.lastIndex = i;
+      var m = CLAUSE_RE.exec(t);
+      if (!m) return 0;
+      found.push({ kw: m[1].toLowerCase().replace(/\s+/, ' '), at: i, len: m[0].length });
+      return m[0].length;
     });
     var spec = { select: [], by: [], where: null, sort: [], limit: null, from: null };
     var headEnd = found.length ? found[0].at : src.length;
     var head = src.slice(0, headEnd).trim();
+    var seen = Object.create(null);
     found.forEach(function (f, idx) {
       var end = idx + 1 < found.length ? found[idx + 1].at : src.length;
       var body = src.slice(f.at + f.len, end).trim();
+      var kind = has(CLAUSE_KIND, f.kw) ? CLAUSE_KIND[f.kw] : f.kw;
+      if (seen[kind]) throw new RK.expr.ExprError('"' + f.kw + '" appears more than once — combine conditions with "and", or list several columns separated by commas');
+      seen[kind] = true;
       switch (f.kw) {
         case 'from': spec.from = body.replace(/^[`"']|[`"']$/g, ''); break;
         case 'by': case 'group by':
-          spec.by = splitTopLevel(body, function (t, i) { return t[i] === ',' ? 1 : 0; }).map(function (p) { return p.text.trim().replace(/^`|`$/g, ''); }).filter(Boolean);
+          spec.by = splitTopLevel(body, function (t, i) { return t[i] === ',' ? 1 : 0; }).map(function (p) { return p.text.trim(); }).filter(Boolean);   // keep `quotes`: "HQ city" is two tokens
           break;
         case 'where': spec.where = body; break;
-        case 'sort': case 'order by':
+        case 'sort': case 'sort by': case 'order by':
           spec.sort = splitTopLevel(body, function (t, i) { return t[i] === ',' ? 1 : 0; }).map(function (p) {
-            var m = p.text.trim().match(/^(.*?)(?:\s+(asc|desc))?$/i);
-            return { key: m[1].trim().replace(/^["'`]|["'`]$/g, ''), dir: (m[2] || 'desc').toLowerCase() };
+            var txt = p.text.trim(), m = txt.match(/\s(asc|desc)$/i);
+            return { key: (m ? txt.slice(0, m.index) : txt).trim().replace(/^["'`]|["'`]$/g, ''), dir: (m ? m[1] : 'desc').toLowerCase() };
           });
           break;
-        case 'top': case 'limit': spec.limit = parseInt(body, 10) || null; break;
+        case 'top': case 'limit':
+          // "top -3" used to drop the last 3 rows, "top 0" / "top ten" silently returned everything
+          if (!/^\d+$/.test(body) || +body < 1) throw new RK.expr.ExprError('"' + f.kw + '" expects a whole number of rows, e.g. top 10 (got "' + body + '")');
+          spec.limit = +body;
+          break;
       }
     });
     if (head) {
       spec.select = splitTopLevel(head, function (t, i) { return t[i] === ',' ? 1 : 0; }).map(function (p) {
         var item = p.text.trim(), fmt = null, label = null;
-        var fm = item.match(/\s+format\s+("([^"]*)"|'([^']*)'|(\S+))\s*$/i);
-        if (fm) { fmt = fm[2] || fm[3] || fm[4]; item = item.slice(0, fm.index).trim(); }
-        var am = item.match(/\s+as\s+("([^"]*)"|'([^']*)'|`([^`]*)`|([\wÀ-￿]+))\s*$/i);
-        if (am) { label = am[2] || am[3] || am[4] || am[5]; item = item.slice(0, am.index).trim(); }
+        for (var pass = 0; pass < 2; pass++) {   // "as" and "format" may come in either order
+          // single \s before the keyword + trimmed item: linear time (\s+...\s*$ backtracked O(n^2) on long blanks)
+          var fm = fmt === null && item.match(/\sformat\s+("([^"]*)"|'([^']*)'|(\S+))$/i);
+          if (fm) { fmt = fm[2] || fm[3] || fm[4]; item = item.slice(0, fm.index).trim(); }
+          var am = label === null && item.match(/\sas\s+("([^"]*)"|'([^']*)'|`([^`]*)`|([\wÀ-￿]+))$/i);
+          if (am) { label = am[2] || am[3] || am[4] || am[5]; item = item.slice(0, am.index).trim(); }
+        }
         return { expr: item, as: label, format: fmt };
       }).filter(function (s) { return s.expr; });
     }
     return spec;
   }
 
-  function guessFormat(c, ds) {
-    // single field or aggregate over a single field -> inherit that field's format
-    var ast = c.ast;
-    if (ast.type === 'field' && ds.field(c.fields[0])) return ds.field(c.fields[0]).format;
-    if (ast.type === 'call' && ast.args.length && ast.args[0].type === 'field' && ast.name !== 'count' && ast.name !== 'countd') {
-      var f = ds.field(c.fields[0]);
-      return f && f.format;
+  // functions whose result has the unit of their first argument (sum(ev) is in dollars like ev) ...
+  var SAME_UNIT = dict({ sum: 1, avg: 1, mean: 1, average: 1, median: 1, min: 1, max: 1, first: 1, last: 1, pctl: 1, percentile: 1,
+    wavg: 1, stdev: 1, stddev: 1, abs: 1, round: 1, floor: 1, ceil: 1, clamp: 1, coalesce: 1 });
+  // ... and functions with a unit of their own: pct_change(revenue, ...) is a %, not "$0"; year(date) is 2019, not a date
+  var RESULT_FORMAT = dict({ count: '#,##0', countd: '#,##0', pct_change: '0.0%', cagr: '0.0%', year: '0', month: '0', quarter: '0' });
+
+  /** Two formats that must agree; undefined (a number literal or null) fits either. */
+  function agree(a, b) { return a === undefined ? b : (b === undefined || a === b ? a : null); }
+
+  /**
+   * Display format of a query column, inferred from the formula: the result keeps the format of the field it is
+   * computed from when it keeps that field's unit. ev, sum(ev), -ev, round(avg(ev), 1), ev_26e - ev_25e and
+   * sum(if(x, ev, 0)) keep ev's format; count() is "#,##0", pct_change() / cagr() "0.0%", year() "0"; ratios,
+   * products, text and other functions get null (General). Returns undefined for a number literal / null.
+   */
+  function inferFormat(node, ds) {
+    switch (node.type) {
+      case 'field': { var f = ds.field(node.resolved || node.name); return f && f.format != null ? f.format : null; }
+      case 'lit': return node.v === null || typeof node.v === 'number' ? undefined : null;
+      case 'un': return node.op === 'neg' ? inferFormat(node.a, ds) : null;
+      case 'cond': return agree(inferFormat(node.a, ds), inferFormat(node.b, ds));
+      case 'bin': return node.op === '+' || node.op === '-' ? agree(inferFormat(node.a, ds), inferFormat(node.b, ds)) : null;
+      case 'call':
+        if (has(RESULT_FORMAT, node.name)) return RESULT_FORMAT[node.name];
+        if (node.name === 'if' || node.name === 'iif') return node.args.length < 2 ? null : agree(inferFormat(node.args[1], ds), node.args[2] ? inferFormat(node.args[2], ds) : undefined);
+        if (has(SAME_UNIT, node.name) && node.args.length) return inferFormat(node.args[0], ds);
+        return null;
     }
-    if (ast.type === 'call' && (ast.name === 'count' || ast.name === 'countd')) return '#,##0';
     return null;
+  }
+  function guessFormat(c, ds) {
+    var f = inferFormat(c.ast, ds);
+    return f === undefined ? null : f;
   }
 
   /**
@@ -479,6 +577,7 @@
       rows = rows.filter(function (r) { return !!w.eval(r, env); });
     }
     var by = (spec.by || []).map(function (b) {
+      if (ds.has(b)) return b;                                   // spec objects may pass raw names with spaces
       var c = RK.expr.compile(b, { fields: fields });
       if (c.ast.type !== 'field') throw new RK.expr.ExprError('"by" expects field names, got "' + b + '"');
       return c.fields[0];
@@ -498,29 +597,38 @@
         title: it.as || (single ? single.title : it.expr),
         format: it.format || guessFormat(c, ds),
         compiled: c,
-        type: single ? single.type : 'number'
+        type: single ? single.type : null      // expressions: typed from their values below
       };
     });
     var isAgg = by.length > 0 || cols.some(function (c) { return c.compiled.aggregate; });
     var outRows;
     if (isAgg) {
       var keyCols = by.filter(function (b) { return !cols.some(function (c) { return c.name === b; }); });
-      var groups = by.length ? util.groupBy(rows, function (r) { return by.map(function (b) { return r[b]; }).join('\u0001'); }) : new Map([['', rows]]);
+      var groups = by.length ? util.groupBy(rows, function (r) { return by.map(function (b) { return get(r, b); }).join('\u0001'); }) : new Map([['', rows]]);
       outRows = [];
       groups.forEach(function (g) {
         var rec = {};
-        keyCols.forEach(function (b) { rec[b] = g[0][b]; });
-        cols.forEach(function (c) { rec[c.name] = c.compiled.aggregate ? c.compiled.eval(g, env) : c.compiled.eval(g[0], env); });
+        keyCols.forEach(function (b) { put(rec, b, get(g[0], b)); });
+        cols.forEach(function (c) { put(rec, c.name, c.compiled.aggregate ? c.compiled.eval(g, env) : c.compiled.eval(g[0], env)); });
         outRows.push(rec);
       });
       cols = keyCols.map(function (b) { var f = ds.field(b); return { name: b, title: f.title, format: f.format, type: f.type }; }).concat(cols);
     } else {
       outRows = rows.map(function (r) {
         var rec = {};
-        cols.forEach(function (c) { rec[c.name] = c.compiled.eval(r, env); });
+        cols.forEach(function (c) { put(rec, c.name, c.compiled.eval(r, env)); });
         return rec;
       });
     }
+    // if(..., "Net cash", "Net debt") is text, min(date) a date: type expression columns by their first value
+    cols.forEach(function (c) {
+      if (c.type) return;
+      c.type = 'number';
+      for (var i = 0; i < outRows.length; i++) {
+        var v = outRows[i][c.name];
+        if (v != null && v !== '') { c.type = inferType([outRows[i]], c.name); break; }
+      }
+    });
     (spec.sort || []).slice().reverse().forEach(function (s) {
       var col = null;
       if (/^\d+$/.test(s.key)) col = cols[parseInt(s.key, 10) - 1];
@@ -534,7 +642,7 @@
         return (typeof x === 'string' ? x.localeCompare(y) : x - y) * dir;
       });
     });
-    if (spec.limit) outRows = outRows.slice(0, spec.limit);
+    if (spec.limit > 0) outRows = outRows.slice(0, Math.floor(spec.limit));   // spec objects: a non-positive limit is no limit
     return {
       dataset: ds.id,
       aggregate: isAgg,

@@ -38,13 +38,15 @@
       var fmt = o.format || ctx.fmtOf(enc.low) || '#,##0.00';
       var labels = rows.map(function (r) { return r[enc.label]; });
 
-      // colours: peers by group (clear of accent2 = the band and of the reference-line colour), reference rows grey
+      // colours: peers by group (clear of accent2 = the band, of the reference-line colour and of greys), reference rows grey
       var refGroups = [].concat(o.referenceGroups || []);
       function isRef(r) { return !!enc.group && refGroups.indexOf(r[enc.group]) >= 0; }
       var groups = enc.group ? util.unique(rows.map(function (r) { return r[enc.group]; })) : [];
       var peers = groups.filter(function (g) { return refGroups.indexOf(g) < 0; });
       var byGroup = !!enc.group && o.groupColors !== false;
-      var pal = RK.theme.palette({ n: Math.max(2, peers.length), exclude: [t.accent2, t.ref] });
+      var all = RK.theme.palette({ n: Math.max(2, peers.length) + 4, exclude: [t.accent2, t.ref] });
+      var pal = all.filter(function (c) { var x = RK.theme.parseColor(c); return Math.max(x[0], x[1], x[2]) - Math.min(x[0], x[1], x[2]) >= 40; });
+      if (pal.length < 2) pal = all;
       function groupColor(g) { return refGroups.indexOf(g) >= 0 ? t.neutral : pal[peers.indexOf(g)]; }
       function colorOf(r, i) { return isRef(r) ? t.neutral : byGroup ? groupColor(r[enc.group]) : pal[i % 2]; }
 
@@ -80,7 +82,6 @@
       var showLegend = byGroup && o.legend !== false && groups.length > 1;
       var bandLabel = o.refBand && o.refBand.label ? o.refBand.label : null;
       var top = (showLegend ? 26 : 0) + (bandLabel ? 18 : 0) + (mark.length ? 26 : 10);
-      var valueLabel = { color: t.ink2, fontSize: 11, fontFamily: t.fontNum, textBorderColor: t.paper, textBorderWidth: 2 };
 
       var series = [
         { id: 'base', type: 'bar', stack: 'ff', silent: true, itemStyle: { color: 'transparent' }, tooltip: { show: false },
@@ -91,10 +92,6 @@
             var c = C.dim(ctx, enc.label, r[enc.label], colorOf(r, i));
             return { value: (r[enc.high] != null && r[enc.low] != null) ? r[enc.high] - r[enc.low] : null, itemStyle: { color: c } };
           }),
-          label: o.showValues ? util.merge({
-            show: true, position: 'right', distance: 6,
-            formatter: function (p) { return RK.format(highs[p.dataIndex], fmt); }
-          }, valueLabel) : { show: false },
           markLine: mark.length ? { silent: true, symbol: ['none', 'none'], data: mark } : undefined,
           markArea: o.refBand ? {
             silent: true,
@@ -105,12 +102,21 @@
           } : undefined
         }
       ];
-      // low labels on a ghost series so they sit left of the bar
+      // low / high labels on a ghost series above the reference lines; each label is backed by what is painted
+      // behind it (paper, or the band) so a dashed line never runs through the figures
       if (o.showValues) {
+        var band = o.refBand ? [Math.min(o.refBand.from, o.refBand.to), Math.max(o.refBand.from, o.refBand.to)] : null;
+        var bandFill = RK.theme.mix(t.accent2, t.paper, 0.88), perPx = (axMax - axMin) / plotW, ends = [];
+        var end = function (v, i, side) {
+          if (!util.isNum(v)) return;
+          var mid = v + side * (8 + C.measure(RK.format(v, fmt), '11px ' + t.fontNum) / 2) * perPx;
+          ends.push({ value: [v, i], label: { position: side < 0 ? 'left' : 'right', backgroundColor: band && mid >= band[0] && mid <= band[1] ? bandFill : t.paper } });
+        };
+        rows.forEach(function (r, i) { end(lows[i], i, -1); end(highs[i], i, 1); });
         series.push({
-          id: 'lowlab', type: 'scatter', silent: true, symbolSize: 0, tooltip: { show: false },
-          data: lows.map(function (v, i) { return [v, i]; }),
-          label: util.merge({ show: true, position: 'left', distance: 6, formatter: function (p) { return RK.format(p.value[0], fmt); } }, valueLabel)
+          id: 'values', type: 'scatter', silent: true, symbolSize: 0, z: 6, tooltip: { show: false }, data: ends,
+          label: { show: true, distance: 4, padding: [1, 2], color: t.ink2, fontSize: 11, fontFamily: t.fontNum,
+            formatter: function (p) { return RK.format(p.value[0], fmt); } }
         });
       }
       // group key: empty series carry the legend swatches (the bars themselves are one stacked series)

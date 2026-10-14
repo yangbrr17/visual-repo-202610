@@ -31,39 +31,30 @@
   }
 
   /**
-   * Wheel rule (same as RK.chart.zoom): a plain wheel scrolls the report, Ctrl/Cmd + wheel or a
-   * trackpad pinch zooms the graph. A plain wheel over the chart flashes a hint so zoom stays
-   * discoverable; options.wheelZoom === true restores plain-wheel zoom.
+   * Wheel rule (as RK.chart.zoom): a plain wheel scrolls the report, Ctrl/Cmd + wheel or a trackpad
+   * pinch zooms. Installed on the ECharts viewport (disposed with the chart): plain wheels are stopped
+   * before the ECharts roam controller swallows them, and a short hint keeps the zoom discoverable.
+   * options.wheelZoom === true restores plain-wheel zoom.
    */
-  function guardWheel(ctx, api) {
-    var el = ctx.el, hint = null, timer = null;
+  function wheelGuard(inst, ctx) {
+    var root = inst.getZr().painter.getViewportRoot(), hint = null, timer = null;
     function onWheel(e) {
-      var o = ctx.options;
-      if (e.ctrlKey || e.metaKey || o.wheelZoom === true || o.roam === false || ctx.print) return;
-      e.stopPropagation();          // never reaches the ECharts roam controller: the page scrolls
+      if (e.ctrlKey || e.metaKey || ctx.options.wheelZoom === true || ctx.options.roam === false) return;
+      e.stopPropagation();
       if (!hint) {
         hint = RK.util.h('div.rk-noprint', { 'aria-hidden': 'true', style: {
-          position: 'absolute', right: '8px', bottom: '8px', padding: '3px 8px', 'pointer-events': 'none', 'z-index': '3',
+          position: 'absolute', right: '8px', bottom: '8px', padding: '3px 8px', 'pointer-events': 'none',
           font: '11px ' + ctx.theme.fontSans, color: 'var(--rk-ink-2)', background: 'var(--rk-tooltip-bg)',
           border: '1px solid var(--rk-rule)', 'border-radius': '4px', opacity: '0', transition: 'opacity 160ms'
         } }, (/Mac|iP/.test(navigator.platform) ? '\u2318' : 'Ctrl') + ' + scroll to zoom \u00b7 drag to pan');
-        el.appendChild(hint);
+        root.appendChild(hint);
       }
       hint.style.opacity = '1';
       clearTimeout(timer);
       timer = setTimeout(function () { hint.style.opacity = '0'; }, 1400);
     }
-    el.addEventListener('wheel', onWheel, true);
-    el.addEventListener('mousewheel', onWheel, true);
-    var destroy = api.destroy;
-    api.destroy = function () {
-      el.removeEventListener('wheel', onWheel, true);
-      el.removeEventListener('mousewheel', onWheel, true);
-      clearTimeout(timer);
-      if (hint) hint.remove();
-      destroy();
-    };
-    return api;
+    root.addEventListener('wheel', onWheel, true);
+    root.addEventListener('mousewheel', onWheel, true);
   }
 
   /** Nodes + edges with degree / weighted degree; nodes missing from nodesData are derived. */
@@ -210,16 +201,15 @@
       crossFilterScope: 'dataset',  // dataset | global — reach of the click-to-filter selection
       filterScope: null         // deprecated alias of crossFilterScope
     },
-    render: function (ctx) {
-      return guardWheel(ctx, C(build, {
-        rebuildOnResize: true,     // positions are solved in px for the container size
-        on: {
-          click: function (p, c) {
-            if (p.dataType === 'node' && p.data && p.data.rkId != null) selectNode(c, p.data.rkId);
-          }
+    render: C(build, {
+      rebuildOnResize: true,     // positions are solved in px for the container size
+      init: wheelGuard,
+      on: {
+        click: function (p, c) {
+          if (p.dataType === 'node' && p.data && p.data.rkId != null) selectNode(c, p.data.rkId);
         }
-      })(ctx));
-    }
+      }
+    })
   });
 
   function build(ctx, inst) {

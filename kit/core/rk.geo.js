@@ -271,9 +271,12 @@
     map.createPane('rk-labels').style.zIndex = 640;
     map.on('dragstart', function () { st.moved = true; });
     map.on('zoomstart', function () { if (!st.fitting) st.moved = true; });
-    if (wheel === 'click') {   // plain-wheel zoom armed by a click on the map, disarmed when the pointer leaves
+    if (wheel === 'click') {   // plain-wheel zoom armed by a click on the map, disarmed when the pointer leaves it
+      var disarm = function () { map.scrollWheelZoom.disable(); };
       map.on('click', function () { map.scrollWheelZoom.enable(); });
-      map.on('mouseout', function () { map.scrollWheelZoom.disable(); });
+      // DOM mouseleave, not Leaflet's map 'mouseout' (which never fires when the pointer exits over a hoverable layer)
+      L.DomEvent.on(el, 'mouseleave', disarm);
+      map.on('unload', function () { L.DomEvent.off(el, 'mouseleave', disarm); });
     }
     /** Legend box in container px, with the corner it sits in. */
     function legendBox() {

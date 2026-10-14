@@ -7,6 +7,8 @@
 (function () {
   'use strict';
   var C = RK.chart, U = RK.util;
+  // house rule: generic fields cross-filter only this block's dataset; business dimensions filter globally
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|series|category|group|label|name|key|id|status|variable)$/i;
 
   RK.component({
     id: 'small-multiples',
@@ -31,8 +33,10 @@
       return C(function (c, chart) { return build(c, chart, state); }, {
         rebuildOnResize: true,                                      // panel geometry is in pixels
         select: function (p, c) {
-          var m = /^f-(\d+)$/.exec(p.seriesId || '');
-          return m ? { field: c.enc.facet, value: state.facets[+m[1]] } : null;
+          var m = /^f-(\d+)$/.exec(p.seriesId || ''), f = c.enc.facet;
+          if (!m || c.options.crossFilter === false) return null;
+          c.select(f, state.facets[+m[1]], GENERIC.test(f) && !c.options.crossFilterScope ? { scope: 'dataset' } : null);
+          return null;
         }
       })(ctx);
     }
@@ -69,7 +73,7 @@
     /* ---------------- pixel layout ---------------- */
     var fTick = '10px ' + t.fontNum, fLast = '600 10.5px ' + t.fontNum;
     var yLabW = Math.max.apply(null, scales.map(function (s) {
-      var w = 0, f = axisFmt(fmt, s.step);
+      var w = 0, f = tickFmt(fmt, s.step);
       for (var v = s.min; v <= s.max + 1e-9; v += s.step) w = Math.max(w, measure(f(v), fTick));
       return w;
     })) + 8;
@@ -106,13 +110,13 @@
         gridIndex: i, axisTick: { show: false }, splitLine: { show: false },
         axisLine: { show: true, lineStyle: { color: t.axis } },
         axisPointer: { label: { show: false } },
-        axisLabel: { show: showX, fontSize: 10, hideOverlap: true, color: t.ink3 }
+        axisLabel: { show: showX, fontSize: 10, hideOverlap: true }          // compact panels: 10px, theme colours
       }, isTime
         ? { type: 'time', min: xs[0], max: xs[xs.length - 1], splitNumber: 3, axisLabel: { formatter: function (v) { return RK.format(new Date(v), dfmt); } } }
         : { type: 'category', data: xs, boundaryGap: type === 'bar', axisLabel: { interval: 'auto' } }));
       yAxes.push({
         gridIndex: i, type: 'value', min: s.min, max: s.max, interval: s.step,
-        axisLabel: { show: showY, fontSize: 10, formatter: axisFmt(fmt, s.step) },
+        axisLabel: { show: showY, fontSize: 10, formatter: tickFmt(fmt, s.step) },
         splitLine: { show: true, lineStyle: { color: t.grid } },
         axisPointer: { show: false }
       });
@@ -252,22 +256,22 @@
     return a > 0 ? b / a - 1 : NaN;
   }
 
-  var canvas = null;
-  function measure(text, font) {
-    try {
-      canvas = canvas || document.createElement('canvas');
-      var g = canvas.getContext('2d');
-      g.font = font;
-      return Math.ceil(g.measureText(String(text)).width);
-    } catch (e) { return String(text).length * 6; }
-  }
+  function measure(text, font) { return Math.ceil(C.measure(text, font)); }
 
-  /** Axis formatter that drops decimals when the tick step is whole ("$1,000.0" -> "$1,000"). */
-  function axisFmt(code, step) {
-    code = RK.format.presets[code] || code || 'auto';
-    var trimmed = String(code).replace(/([0#])\.[0#]+/g, '$1');
-    function num(s) { return parseFloat(String(s).replace(/[^\d.\-]/g, '')); }
-    var whole = trimmed !== code && step != null && num(RK.format(step, code)) === num(RK.format(step, trimmed));
-    return function (v) { return RK.format(v, whole ? trimmed : code); };
+  /**
+   * Axis tick formatter (house style: no decimals when the tick step is whole at display precision,
+   * "$6,000" not "$6,000.0", "20%" not "20.0%"). step: number, function returning the live step,
+   * or an array of tick values; null decides per value.
+   */
+  function tickFmt(code, step) {
+    code = String(RK.format.presets[code] || code || 'auto');
+    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
+    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
+    function whole(v) { return num(v, code) === num(v, trimmed); }
+    return function (v) {
+      var s = typeof step === 'function' ? step() : step;
+      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
+      return RK.format(v, ok ? trimmed : code);
+    };
   }
 })();

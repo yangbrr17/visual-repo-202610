@@ -39,14 +39,16 @@
       variant: 'plain'      // plain | boxed | accent
     },
     render: function (ctx) {
-      var o = ctx.options, enc = ctx.enc, t = ctx.theme;
       ctx.el.classList.add('is-auto');
-      var grid = h('div.rk-kpi', { class: 'rk-kpi--' + o.variant, style: o.columns ? { '--rk-kpi-cols': o.columns } : null });
+      var grid = h('div.rk-kpi'), prev = null;
 
-      function build(rows) {
+      function build(c) {
+        var o = c.options, enc = c.enc, t = c.theme, next = {};
+        grid.className = 'rk-kpi rk-kpi--' + o.variant;
+        if (o.columns) grid.style.setProperty('--rk-kpi-cols', o.columns); else grid.style.removeProperty('--rk-kpi-cols');
         grid.innerHTML = '';
-        rows.forEach(function (r, i) {
-          var fmt = (enc.format && r[enc.format]) || ctx.fmtOf(enc.value) || 'auto';
+        c.rows.forEach(function (r, i) {
+          var fmt = (enc.format && r[enc.format]) || c.fmtOf(enc.value) || 'auto';
           var valueEl = h('div.rk-kpi__value.rk-num');
           var delta = enc.delta ? r[enc.delta] : null;
           var good = (enc.good && r[enc.good]) || 'up';
@@ -58,21 +60,26 @@
               h('span.rk-kpi__arrow', { 'aria-hidden': 'true' }, delta === 0 ? '■' : (positive ? '▲' : '▼')),
               RK.format(delta, dfmt));
           }
-          var spark = o.sparkline && enc.spark && Array.isArray(r[enc.spark]) ? sparkline(r[enc.spark], t.accent3 || t.cat[1], RK.theme.alpha(t.accent3 || t.cat[1], 0.12)) : null;
+          var line = t.accent3 || t.cat[1];
+          var spark = o.sparkline && enc.spark && Array.isArray(r[enc.spark]) ? sparkline(r[enc.spark], line, RK.theme.alpha(line, 0.12)) : null;
           var tile = h('div.rk-kpi__tile', { style: { '--rk-i': i } },
             h('div.rk-kpi__label', r[enc.label]),
             valueEl,
             h('div.rk-kpi__meta', deltaEl, enc.period && r[enc.period] ? h('span.rk-kpi__period', r[enc.period]) : null),
             spark);
           grid.appendChild(tile);
-          RK.motion.countUp(valueEl, r[enc.value], { format: fmt, animate: o.countUp && ctx.motion });
+          // first reveal counts up from 0; filter / param updates glide from the previous figure
+          var key = r[enc.label] + '#' + i, value = r[enc.value];
+          next[key] = value;
+          RK.motion.countUp(valueEl, value, { format: fmt, from: prev && RK.util.isNum(prev[key]) ? prev[key] : 0, duration: prev ? 700 : 1100, animate: o.countUp && c.motion });
         });
+        prev = next;
       }
-      build(ctx.rows);
+      build(ctx);
       ctx.el.appendChild(grid);
       return {
-        update: function (c) { ctx = c; build(c.rows); },
-        destroy: function () { grid.remove(); }
+        update: build,
+        destroy: function () { grid.remove(); ctx.el.classList.remove('is-auto'); }
       };
     }
   });

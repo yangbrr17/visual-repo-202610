@@ -450,13 +450,14 @@
     },
     render: function (ctx) {
       var api = base(ctx), inst = api.chart;
-      var bar = !ctx.print && ctx.options.zoom !== false ? toolbar(ctx, inst) : null;
+      var bar = ctx.options.zoom !== false ? toolbar(ctx, inst) : null;
+      if (bar) bar.hidden = !!ctx.print;   // print: no buttons (also re-checked on every print refresh)
       var relabel = util.rafThrottle(function () { layoutLabels(inst); });
       layoutLabels(inst);
       inst.on('datazoom', relabel);
       inst.on('legendselectchanged', relabel);
       var update = api.update, resize = api.resize, destroy = api.destroy;
-      api.update = function (c) { update(c); layoutLabels(inst); };
+      api.update = function (c) { update(c); layoutLabels(inst); if (bar) bar.hidden = !!c.print; };
       api.resize = function () { resize(); layoutLabels(inst); };
       api.destroy = function () { if (bar) bar.remove(); destroy(); };
       return api;

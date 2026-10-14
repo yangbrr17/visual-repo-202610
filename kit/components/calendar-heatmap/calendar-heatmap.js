@@ -69,8 +69,8 @@
         // empty days (weekends, holidays) must stay distinct from the lowest bucket, also in dark themes
         itemStyle: { color: t.dark ? RK.theme.mix(t.paper, t.ink, 0.035) : t.surface, borderColor: t.paper, borderWidth: 2 },
         splitLine: { show: true, lineStyle: { color: t.rule, width: 1 } },
-        dayLabel: { firstDay: 1, nameMap: ['', 'Mon', '', 'Wed', '', 'Fri', ''], color: t.ink3, fontSize: 10, margin: 6, fontFamily: t.fontSans },
-        monthLabel: { nameMap: 'EN', color: t.ink2, fontSize: 10.5, margin: 6, position: 'start', align: 'left', fontFamily: t.fontSans },
+        dayLabel: { firstDay: 1, nameMap: ['', 'Mon', '', 'Wed', '', 'Fri', ''], color: t.ink3, fontSize: 11, margin: 6, fontFamily: t.fontSans },
+        monthLabel: { nameMap: 'EN', color: t.ink2, fontSize: 11, margin: 6, position: 'start', align: 'left', fontFamily: t.fontSans },
         yearLabel: { show: multi, position: 'left', margin: 34, color: t.ink2, fontSize: 11, fontWeight: 600, fontFamily: t.fontSans }
       };
     });
@@ -109,11 +109,11 @@
     var lo = sorted[0], hi = sorted[sorted.length - 1];
     var scale = o.scale === 'linear' || o.scale === 'quantile' ? o.scale : (hi - q(0.5) > 3 * (q(0.95) - q(0.5)) ? 'quantile' : 'linear');
     var ramp = RK.theme.ramp(t.seq);
-    var common = { show: show, orient: 'horizontal', left: 0, top: 0, textStyle: { color: t.ink2, fontSize: 10.5, fontFamily: t.fontNum } };
+    var common = { show: show, orient: 'horizontal', left: 0, top: 0, textStyle: { color: t.ink2, fontSize: 11, fontFamily: t.fontNum } };
     if (scale === 'linear') {
       return U.merge(common, {
         type: 'continuous', min: lo, max: hi, calculable: true, realtime: true,
-        itemWidth: 10, itemHeight: 130, formatter: function (v) { return RK.format(v, fmt); },
+        itemWidth: 10, itemHeight: 130, formatter: tickFmt(fmt),     // per value: whole bounds drop decimals, dragged handles keep them
         inRange: { color: [0.18, 0.4, 0.62, 0.82, 1].map(ramp) },
         outOfRange: { color: t.surface2 || t.surface },
         handleStyle: { borderColor: t.ink3 }, indicatorStyle: { borderColor: t.paper }
@@ -121,12 +121,13 @@
     }
     var cuts = U.unique([0.2, 0.4, 0.6, 0.8].map(function (p) { return roundSig(q(p), 2); })).filter(function (v) { return v > lo && v < hi; });
     var cols = [0.18, 0.38, 0.58, 0.78, 1].map(ramp);
+    var cut = tickFmt(fmt, cuts);         // bucket bounds read like axis ticks: "74–85", not "74.0–85.0"
     var pieces = [];
     for (var i = 0; i <= cuts.length; i++) {
       var p = { color: cols[Math.round(i * (cols.length - 1) / Math.max(1, cuts.length))] };
       if (i > 0) p.gte = cuts[i - 1];
       if (i < cuts.length) p.lt = cuts[i];
-      p.label = i === 0 ? '< ' + RK.format(cuts[0], fmt) : i === cuts.length ? '≥ ' + RK.format(cuts[i - 1], fmt) : RK.format(cuts[i - 1], fmt) + '–' + RK.format(cuts[i], fmt);
+      p.label = i === 0 ? '< ' + cut(cuts[0]) : i === cuts.length ? '≥ ' + cut(cuts[i - 1]) : cut(cuts[i - 1]) + '–' + cut(cuts[i]);
       pieces.push(p);
     }
     return U.merge(common, {
@@ -195,7 +196,7 @@
           emphasis: { style: { stroke: t.ink, lineWidth: 1.5 } } }, enter(x, y))];
         if (showText && r.width > 26) {
           kids.push(U.merge({ type: 'text', x: r.x + r.width / 2, y: r.y + r.height / 2,
-            style: { text: RK.format(v, fmt), fill: textOn(fill, t), font: font, align: 'center', verticalAlign: 'middle' } }, enter(x, y)));
+            style: { text: RK.format(v, fmt), fill: RK.theme.textOn(fill), font: font, align: 'center', verticalAlign: 'middle' } }, enter(x, y)));
         }
         return { type: 'group', children: kids };
       }
@@ -241,10 +242,10 @@
         show: hasLegend, type: 'continuous', seriesIndex: 0, dimension: 2,
         min: -lim, max: lim, calculable: true, realtime: true,
         orient: 'horizontal', left: 0, top: 0, itemWidth: 10, itemHeight: 140,
-        textStyle: { color: t.ink2, fontSize: 10.5, fontFamily: t.fontNum },
+        textStyle: { color: t.ink2, fontSize: 11, fontFamily: t.fontNum },
         inRange: { color: t.div.slice() },
         outOfRange: { color: t.surface2 || t.surface },
-        formatter: function (v) { return RK.format(v, fmt); }
+        formatter: tickFmt(fmt)
       },
       xAxis: {
         type: 'category', data: xCats, position: 'top',
@@ -255,7 +256,7 @@
       yAxis: {
         type: 'category', data: yCats.map(String), inverse: true,
         axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
-        axisLabel: { color: t.ink, fontWeight: 600, fontSize: 11, fontFamily: t.fontNum }
+        axisLabel: { color: t.ink2, fontWeight: 600, fontSize: 11, fontFamily: t.fontNum }
       },
       series: series
     };
@@ -301,6 +302,20 @@
     return 10 * mag;
   }
 
-  /** Readable text on a fill in any theme (dark themes have a light ink, so "dark text" is the paper colour). */
-  function textOn(fill, t) { return RK.theme.onColor(fill, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#fff'); }
+  /**
+   * Axis tick formatter (house style: no decimals when the tick step is whole at display precision,
+   * "$6,000" not "$6,000.0", "20%" not "20.0%"). step: number, function returning the live step,
+   * or an array of tick values; null decides per value.
+   */
+  function tickFmt(code, step) {
+    code = String(RK.format.presets[code] || code || 'auto');
+    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
+    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
+    function whole(v) { return num(v, code) === num(v, trimmed); }
+    return function (v) {
+      var s = typeof step === 'function' ? step() : step;
+      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
+      return RK.format(v, ok ? trimmed : code);
+    };
+  }
 })();

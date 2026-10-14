@@ -7,7 +7,7 @@
   "deps": ["echarts"],
   "summary": "Process timetable: tasks grouped by workstream, bars coloured by phase, milestone diamonds, two-tier calendar header, today line and time zoom.",
   "summary_zh": "交易流程时间表：按工作流分组的任务条（按阶段着色）、里程碑菱形、双层日历表头、“今天”线与时间缩放。",
-  "description_zh": "投行交易流程页（出售流程、IPO、再融资）的标准时间表。每行一个任务，按工作流（encode.group）分组并带粗体分组标题行与汇总括线；任务条按阶段（encode.phase）着色并在左上角给出图例；milestone 为 true 或开始=结束日期的任务画成菱形并标注日期。顶部为双层日历表头（月/周起始日，随缩放自动切换为年/月或年/季度），可用 today 画出“今天”竖线并淡化已过去的时间段。鼠标悬停显示起止日期、工期（天/周）和负责人；点击任务或分组标题可按工作流交叉筛选其他组件；Ctrl/⌘ + 滚轮、双指捏合或底部滑块缩放时间轴（普通滚轮照常滚动页面）。",
+  "description_zh": "投行交易流程页（出售流程、IPO、再融资）的标准时间表。每行一个任务，按工作流（encode.group）分组并带粗体分组标题行与汇总括线；任务条按阶段（encode.phase）着色并在左上角给出图例；milestone 为 true 或开始=结束日期的任务画成菱形并标注日期。顶部为双层日历表头（月/周起始日，随缩放自动切换为年/月或年/季度），可用 today 画出“今天”竖线并淡化已过去的时间段。鼠标悬停显示起止日期、工期（天/周）和负责人；点击任务或分组标题可按工作流交叉筛选其他组件；Ctrl + 滚轮、双指捏合或底部滑块缩放时间轴（普通滚轮照常滚动页面）。",
   "best_for": [
     "Sell-side / buy-side process timetable",
     "IPO, refinancing or integration workplans",
@@ -50,13 +50,13 @@
     "crossFilter": {"type": "boolean", "default": true, "desc": "Click a task or a workstream label to cross-filter other blocks"},
     "crossFilterScope": {"type": "string", "default": "dataset", "desc": "dataset: the selection only filters blocks bound to the same dataset (workstream / phase / task are timetable-specific) | global"},
     "legend": {"type": "boolean", "default": true, "desc": "Phase / milestone legend, top-left"},
-    "zoom": {"type": "boolean", "default": true, "desc": "Time zoom (Ctrl/⌘ + wheel / pinch + slider); the calendar header re-tiers as you zoom"},
-    "wheelZoom": {"type": "boolean", "default": null, "desc": "true: zoom on a plain mouse wheel; default: a plain wheel scrolls the page, Ctrl/⌘ + wheel or pinch zooms"}
+    "zoom": {"type": "boolean", "default": true, "desc": "Time zoom (Ctrl + wheel / pinch + slider); the calendar header re-tiers as you zoom"},
+    "wheelZoom": {"type": "boolean", "default": null, "desc": "true: zoom on a plain mouse wheel; default: a plain wheel scrolls the page, Ctrl + wheel or pinch zooms"}
   },
   "interactions": [
     "Tooltip with start / end dates, duration in days and weeks, owner and status vs. today",
     "Click a task or a workstream label to cross-filter by workstream (others dim)",
-    "Ctrl/⌘ + wheel, pinch or slider zoom on the time axis (a plain wheel scrolls the page); header switches between weeks, months and quarters",
+    "Ctrl + wheel, pinch or slider zoom on the time axis (a plain wheel scrolls the page); header switches between weeks, months and quarters",
     "Legend toggles phases and milestones",
     "Staggered bar wipe-in and milestone pop on entry; smooth updates on filter changes",
     "PNG / CSV export"
