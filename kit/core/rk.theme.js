@@ -43,9 +43,20 @@
     var x = parseColor(c).slice(0, 3).map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
     return 0.2126 * x[0] + 0.7152 * x[1] + 0.0722 * x[2];
   }
-  /** Readable text color (ink or white) on top of a fill. */
+  function contrast(a, b) {
+    var la = luminance(a), lb = luminance(b);
+    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+  }
+  /** Readable text colour on top of a fill: whichever candidate has the higher WCAG contrast ratio. */
   function onColor(fill, dark, light) {
-    return luminance(fill) > 0.4 ? (dark || '#111827') : (light || '#ffffff');
+    dark = dark || '#111827'; light = light || '#ffffff';
+    return contrast(fill, dark) >= contrast(fill, light) ? dark : light;
+  }
+  /** Perceptual-ish distance between two colours (redmean RGB, 0..~765). */
+  function distance(a, b) {
+    var x = parseColor(a), y = parseColor(b), rm = (x[0] + y[0]) / 2;
+    var dr = x[0] - y[0], dg = x[1] - y[1], db = x[2] - y[2];
+    return Math.sqrt((2 + rm / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rm) / 256) * db * db);
   }
   function ramp(stops) {
     return function (t) {
@@ -178,6 +189,8 @@
     mix: mix,
     alpha: alpha,
     onColor: onColor,
+    contrast: contrast,
+    distance: distance,
     luminance: luminance,
     parseColor: parseColor,
     toHex: toHex,
@@ -203,6 +216,41 @@
     textOn: function (fill) {
       var t = theme.tokens();
       return onColor(fill, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#ffffff');
+    },
+
+    /**
+     * Categorical colours that stay distinct from colours you reserve (by default the target
+     * highlight accent2) and from each other. Falls back to tints/shades instead of repeating.
+     *   RK.theme.palette()                       -> colours safe next to a highlighted target
+     *   RK.theme.palette({exclude: [], n: 12})   -> plain categorical, extended to 12
+     */
+    palette: function (opts) {
+      opts = opts || {};
+      var t = theme.tokens();
+      var exclude = opts.exclude != null ? [].concat(opts.exclude) : [t.accent2];
+      var minD = opts.minDistance || 90;
+      var out = [];
+      t.cat.forEach(function (c) {
+        if (exclude.some(function (e) { return e && distance(c, e) < minD; })) return;
+        if (out.some(function (o) { return distance(c, o) < minD * 0.6; })) return;
+        out.push(c);
+      });
+      var n = opts.n || out.length, base = out.slice(), k = 0;
+      while (out.length < n && base.length) {          // extend with lighter / darker variants
+        var src = base[k % base.length], round = Math.floor(k / base.length) + 1;
+        out.push(round % 2 ? mix(src, t.paper, 0.45) : mix(src, t.ink, 0.3));
+        k++;
+      }
+      return out.slice(0, n);
+    },
+
+    /** Stable value -> colour map using palette(opts); highlighted values get accent2. */
+    categoricalSafe: function (values, opts) {
+      opts = opts || {};
+      var t = theme.tokens(), pal = theme.palette({ n: values.length, exclude: opts.exclude });
+      var map = {}, hl = [].concat(opts.highlight || []), i = 0;
+      values.forEach(function (v) { map[v] = hl.indexOf(v) >= 0 ? t.accent2 : pal[i++ % pal.length]; });
+      return function (v) { return map[v] || t.neutral; };
     },
 
     /** Categorical color for index i (wraps). */

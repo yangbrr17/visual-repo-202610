@@ -109,6 +109,14 @@
     var self = this;
     var opts = this.options();
     var ds = this.datasetId ? RK.data.get(this.datasetId) : null;
+    function selExtra(opt) {
+      opt = opt || {};
+      var scope = opt.scope || opts.crossFilterScope || 'global';
+      var extra = { either: opt.either, allowEmpty: opt.allowEmpty };
+      if (opt.datasets) extra.datasets = opt.datasets;
+      else if (scope === 'dataset' && ds) extra.datasets = [ds.id];
+      return extra;
+    }
     var viewOpts = { exclude: this.id, ignore: opts.ignoreFilters, filters: opts.filters !== false };
     var rows = ds ? RK.data.view(ds, viewOpts) : [];
     if (ds && opts.where) {
@@ -134,7 +142,19 @@
       store: RK.store,
       data: function (id) { return RK.data.get(id); },
       view: function (id, o) { return RK.data.view(id, util.merge({ exclude: self.id }, o || {})); },
-      select: function (field, value) { RK.store.toggleValue(self.id + ':' + field, field, value, self.id); },
+      /**
+       * Cross-filter: toggle one value of this block's selection on `field`.
+       * opt.scope: 'global' (default; every dataset with that field) | 'dataset' (only this block's dataset)
+       * opt.either: second field for link tables (select a node on either end, e.g. source/target)
+       * Block option crossFilterScope sets the default scope.
+       */
+      select: function (field, value, opt) {
+        RK.store.toggleValue(self.id + ':' + field, field, value, self.id, selExtra(opt));
+      },
+      /** Replace the whole selection on `field` (brush / lasso). Empty array clears it unless opt.allowEmpty. */
+      setSelection: function (field, values, opt) {
+        RK.store.setValues(self.id + ':' + field, field, values, self.id, selExtra(opt));
+      },
       selected: function (field) { var f = RK.store.filter(self.id + ':' + field); return f && f.values ? f.values : []; },
       clearSelection: function () { RK.store.clearFilters(self.id); },
       print: printing,
@@ -244,7 +264,7 @@
         var a = document.createElement('a');
         a.href = url; a.download = (self.id || 'chart') + '.png';
         document.body.appendChild(a); a.click(); a.remove();
-      });
+      }).catch(function (e) { console.warn('[RK] PNG export failed for', self.id, e); });
     });
     btn('expand', 'Expand', function () { self.expand(); });
     var head = this.el.querySelector(':scope > .rk-block__head');

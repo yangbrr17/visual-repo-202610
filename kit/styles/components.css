@@ -162,7 +162,8 @@ textarea.rk-input { height: auto; padding: 8px 10px; line-height: 1.45; resize: 
 .rk-map .leaflet-control-zoom { border: 1px solid var(--rk-rule) !important; box-shadow: none !important; border-radius: var(--rk-radius) !important; overflow: hidden; }
 .rk-map .leaflet-control-zoom a { width: 26px; height: 26px; line-height: 24px; color: var(--rk-ink-2); background: var(--rk-paper); border-bottom-color: var(--rk-rule); }
 .rk-map .leaflet-control-zoom a:hover { color: var(--rk-accent); background: var(--rk-surface); }
-.rk-map .leaflet-control-attribution { background: color-mix(in srgb, var(--rk-paper) 80%, transparent); color: var(--rk-ink-3); font-size: 9px; }
+.rk-map.leaflet-container .leaflet-control-attribution { background: color-mix(in srgb, var(--rk-paper) 80%, transparent); color: var(--rk-ink-3); font-size: 9px; }
+.rk-map .leaflet-pane svg, .rk-map .leaflet-marker-icon svg { max-width: none !important; max-height: none !important; }
 .rk-map .leaflet-control-attribution a { color: var(--rk-ink-3); }
 .rk-map .leaflet-tooltip { background: var(--rk-tooltip-bg); color: var(--rk-tooltip-ink); border: 1px solid var(--rk-rule); border-radius: 6px; box-shadow: 0 8px 24px rgba(15, 23, 42, .14); padding: 8px 10px; font-size: 12px; }
 .rk-map .leaflet-tooltip::before { display: none; }

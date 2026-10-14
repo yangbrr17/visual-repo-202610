@@ -141,7 +141,9 @@
   chart.zoom = function (ctx, axis, extra) {
     if (ctx.options.zoom === false) return [];
     var key = (axis || 'x') + 'AxisIndex';
-    var inside = { type: 'inside', filterMode: 'none' };
+    // plain wheel scrolls the report; Ctrl/Cmd + wheel (and trackpad pinch) zooms. options.wheelZoom: true to zoom on plain wheel
+    var wheel = ctx.options.wheelZoom != null ? ctx.options.wheelZoom : 'ctrl';
+    var inside = { type: 'inside', filterMode: 'none', zoomOnMouseWheel: wheel, moveOnMouseWheel: false, moveOnMouseMove: true };
     inside[key] = 0;
     var out = [inside];
     if (ctx.options.zoomSlider !== false && !ctx.print) {

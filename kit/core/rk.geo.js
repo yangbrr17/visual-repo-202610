@@ -18,6 +18,43 @@
 
   var raw = Object.create(null), cache = Object.create(null);
 
+  /* world-atlas targets spherical renderers; rings that jump across +/-180 (Russia, Fiji) draw a
+     stripe across planar maps (Leaflet, ECharts geo). Split them into planar pieces once, on load. */
+  function crossLat(a, b) {
+    var bx = b[0] + (a[0] > 0 ? 360 : -360), e = a[0] > 0 ? 180 : -180;
+    return a[1] + (b[1] - a[1]) * (e - a[0]) / ((bx - a[0]) || 1);
+  }
+  function splitRing(ring) {
+    var j = [];
+    for (var i = 1; i < ring.length; i++) if (Math.abs(ring[i][0] - ring[i - 1][0]) > 180) j.push(i);
+    if (j.length === 1) {   // polar ring (Antarctica): close it along the pole
+      var a = ring[j[0] - 1], b = ring[j[0]], la = crossLat(a, b), pole = a[1] < 0 ? -90 : 90, ea = a[0] > 0 ? 180 : -180;
+      return [ring.slice(0, j[0]).concat([[ea, la], [ea, pole], [-ea, pole], [-ea, la]], ring.slice(j[0]))];
+    }
+    if (j.length !== 2) return [ring];
+    var p = ring[j[0] - 1], q = ring[j[0]], r = ring[j[1] - 1], s2 = ring[j[1]], l1 = crossLat(p, q), l2 = crossLat(r, s2);
+    var side = function (pt) { return pt[0] > 0 ? 180 : -180; };
+    return [
+      [[side(s2), l2]].concat(ring.slice(j[1]), ring.slice(0, j[0]), [[side(p), l1]]),
+      [[side(q), l1]].concat(ring.slice(j[0], j[1]), [[side(r), l2]])
+    ];
+  }
+  function planar(fc) {
+    if (fc.__rkPlanar) return fc;
+    fc.features.forEach(function (f) {
+      var g = f.geometry;
+      if (!g || (g.type !== 'Polygon' && g.type !== 'MultiPolygon')) return;
+      var out = [], hit = false;
+      (g.type === 'Polygon' ? [g.coordinates] : g.coordinates).forEach(function (poly) {
+        var parts = splitRing(poly[0]);
+        if (parts.length > 1 || parts[0] !== poly[0]) { hit = true; parts.forEach(function (pt) { out.push([pt]); }); } else out.push(poly);
+      });
+      if (hit) f.geometry = { type: 'MultiPolygon', coordinates: out };
+    });
+    fc.__rkPlanar = true;
+    return fc;
+  }
+
   function toFeatures(name) {
     if (cache[name]) return cache[name];
     var d = raw[name];
@@ -35,6 +72,7 @@
       if (f.id != null && /^\d+$/.test(String(f.id))) f.id = String(f.id).padStart(3, '0');
       f.properties = f.properties || {};
     });
+    planar(fc);
     cache[name] = fc;
     return fc;
   }
@@ -58,6 +96,7 @@
     register: function (name, data) { raw[name] = data; delete cache[name]; },
     has: function (name) { return !!(raw[name] || (global.__RK_GEO && global.__RK_GEO[name])); },
     features: toFeatures,
+    planar: planar,
     centroid: centroid,
 
     /** Register a basemap with ECharts (echarts.registerMap) and return its name. */
@@ -95,7 +134,8 @@
 
     /**
      * Themed Leaflet map with an offline land basemap (no tiles).
-     * opts: {basemap:'world-110m', tiles:{url, attribution}, center:[lat,lon], zoom, bounds:[[s,w],[n,e]], minZoom, maxZoom}
+     * opts: {basemap:'world-110m', tiles:{url, attribution}, center:[lat,lon], zoom, bounds:[[s,w],[n,e]], minZoom, maxZoom,
+     *        scrollWheelZoom (default false), antarctica (default false)}
      * Returns {map, land, fit(boundsOrLatLngs)}. Caller is responsible for map.remove() in destroy().
      */
     leaflet: function (ctx, opts) {
@@ -109,7 +149,8 @@
         zoomSnap: 0.25,
         zoomDelta: 0.5,
         wheelPxPerZoomLevel: 120,
-        scrollWheelZoom: opts.scrollWheelZoom != null ? opts.scrollWheelZoom : 'center',
+        // wheel zoom would hijack page scrolling in a long report: off unless asked (zoom buttons / pinch / dblclick still work)
+        scrollWheelZoom: opts.scrollWheelZoom != null ? opts.scrollWheelZoom : false,
         worldCopyJump: false,
         minZoom: opts.minZoom != null ? opts.minZoom : 1,
         maxZoom: opts.maxZoom != null ? opts.maxZoom : 8,
@@ -125,7 +166,9 @@
         L.tileLayer(opts.tiles.url, { attribution: opts.tiles.attribution || '', maxZoom: 18 }).addTo(map);
       } else if (opts.basemap !== false) {
         var name = opts.basemap || 'world-110m';
-        land = L.geoJSON(toFeatures(name), {
+        var landFc = toFeatures(name);
+        if (opts.antarctica !== true) landFc = { type: 'FeatureCollection', features: landFc.features.filter(function (f) { return f.id !== '010'; }) };
+        land = L.geoJSON(landFc, {
           interactive: false,
           style: function () { return { color: t.mapBorder || t.paper, weight: 0.6, fillColor: t.mapLand || t.surface2, fillOpacity: 1 }; }
         }).addTo(map);

@@ -108,9 +108,11 @@
   Dataset.prototype._materialize = function (onlyName, paramName) {
     var env = { params: RK.store.params() };
     var rows = this.rows;
+    var dirty = {};   // computed fields recomputed in this pass: dependants are recomputed too (definition order)
     this.computed.forEach(function (c) {
-      if (onlyName && c.def.name !== onlyName) return;
-      if (paramName && c.compiled.params.indexOf(paramName) < 0) return;
+      if (onlyName && c.def.name !== onlyName && !c.compiled.fields.some(function (f) { return dirty[f]; })) return;
+      if (paramName && c.compiled.params.indexOf(paramName) < 0 && !c.compiled.fields.some(function (f) { return dirty[f]; })) return;
+      dirty[c.def.name] = true;
       for (var i = 0; i < rows.length; i++) {
         var v;
         try { v = c.compiled.eval(rows[i], env); } catch (e) { v = null; }
@@ -163,7 +165,9 @@
     return {
       /** spec: {field, op:'in'|'not_in'|'between'|'search'|'expr'|'eq', values|value|min|max|text|expr, source?, datasets?} */
       setFilter: function (key, spec) {
-        if (spec == null || (spec.op === 'in' && (!spec.values || !spec.values.length)) ||
+        // spec.allowEmpty: an empty 'in' list means "match nothing" instead of "no filter"
+        if (spec && spec.op === 'in' && spec.allowEmpty && (!spec.values || !spec.values.length)) spec.values = [];
+        else if (spec == null || (spec.op === 'in' && (!spec.values || !spec.values.length)) ||
             (spec.op === 'search' && !spec.text) || (spec.op === 'expr' && !spec.expr) ||
             (spec.op === 'between' && spec.min == null && spec.max == null)) {
           return store.clearFilter(key);
@@ -177,19 +181,34 @@
       },
       clearFilter: function (key) {
         if (!(key in filters)) return;
+        var prev = filters[key];
         delete filters[key];
-        notify({ type: 'filter', key: key, spec: null });
+        notify({ type: 'filter', key: key, spec: null, prev: prev });
       },
       clearFilters: function (source) {
         Object.keys(filters).forEach(function (k) { if (!source || filters[k].source === source) store.clearFilter(k); });
       },
       /** toggle a value inside an 'in' filter (used by click-to-filter / cross-filter). */
-      toggleValue: function (key, field, value, source) {
+      toggleValue: function (key, field, value, source, extra) {
         var cur = filters[key];
-        var vals = cur && cur.op === 'in' ? cur.values.slice() : [];
+        var vals = cur && cur.values ? cur.values.slice() : [];
         var i = vals.indexOf(value);
         if (i >= 0) vals.splice(i, 1); else vals.push(value);
-        store.setFilter(key, { field: field, op: 'in', values: vals, source: source });
+        store.setValues(key, field, vals, source, extra);
+      },
+      /** Replace the whole value list of an 'in' filter (brush / lasso selections). extra: {datasets, either, allowEmpty} */
+      setValues: function (key, field, values, source, extra) {
+        extra = extra || {};
+        if ((!values || !values.length) && !extra.allowEmpty) return store.clearFilter(key);
+        var spec;
+        if (extra.either) {
+          // a node in a link table: match rows where it is on either end (source or target)
+          var list = JSON.stringify(values || []);
+          spec = { op: 'expr', field: field, values: values, expr: '`' + field + '` in ' + list + ' or `' + extra.either + '` in ' + list };
+        } else spec = { field: field, op: 'in', values: values || [], allowEmpty: !!extra.allowEmpty };
+        spec.source = source;
+        if (extra.datasets) spec.datasets = extra.datasets;
+        store.setFilter(key, spec);
       },
       filter: function (key) { return filters[key] || null; },
       filters: function () { return filters; },
@@ -310,8 +329,9 @@
     for (var i = 0; i < changes.length; i++) {
       var ch = changes[i];
       if (ch.type === 'filter') {
-        if (!ch.spec) return true; // removal: we no longer know its field, be safe
-        if (filterApplies(ch.spec, ds)) return true;
+        var spec = ch.spec || ch.prev;
+        if (!spec) return true;
+        if (filterApplies(spec, ds)) return true;
       } else if (ch.type === 'param') {
         if (ds.usesParam(ch.key)) return true;
       } else if (ch.type === 'data') {
@@ -451,7 +471,7 @@
       throw new RK.expr.ExprError(dsId ? 'Unknown dataset "' + dsId + '" (available: ' + hint + ')' : 'Choose a dataset (from <name>) — available: ' + hint);
     }
     var fields = ds.fields;
-    var rows = opts.filtered === false ? ds.rows : view(ds);
+    var rows = opts.filtered === false ? ds.rows : view(ds, { exclude: opts.exclude, ignore: opts.ignore });
     var env = { params: store.params() };
     if (spec.where) {
       var w = RK.expr.compile(spec.where, { fields: fields });
@@ -551,6 +571,7 @@
     ids: function () { return Object.keys(datasets); },
     view: view,
     affected: affected,
+    applies: filterApplies,
     aggregate: aggregate,
 
     adapter: function (name, fn) { adapters[name] = fn; },

@@ -9,8 +9,8 @@
 //                                          formula and result (row formulas run on row N, aggregates on all rows;
 //                                          a result written `≈ 9.15` is compared to the shown precision)
 //   <!-- verify:format -->                 next table: last three code cells = value, format code, output
-//   <!-- verify:error [dataset=peers] -->  next table: last two code cells = input (a query if it contains " from ",
-//                                          else a formula) and the start of the error message ("…" = prefix)
+//   <!-- verify:error [dataset=peers] -->  next table: first two code cells = input (a query if it contains " from ",
+//                                          or written RK.query("…"), else a formula) and the error message ("…" = prefix)
 // Sample data: kit/samples/datasets/{peers,financials,precedents,segment_revenue}.json,
 // params @wacc = 9%, @g = 2%, @multiple = 10.0x.
 'use strict';
@@ -65,7 +65,9 @@ function cell(s) { return String(s).replace(/\|/g, '\\|').replace(/\n/g, ' '); }
 
 function renderTable(RK, res) {
   const head = '| ' + res.columns.map(c => cell(c.title)).join(' | ') + ' |';
-  const sep = '|' + res.columns.map(c => (c.type === 'number' ? '---:' : '---')).join('|') + '|';
+  // right-align columns whose values are numbers (query columns built from expressions are typed 'number' even for text)
+  const numeric = res.columns.map(c => res.rows.every(r => r[c.name] == null || typeof r[c.name] === 'number'));
+  const sep = '|' + numeric.map(n => (n ? '---:' : '---')).join('|') + '|';
   const body = res.rows.slice(0, MAX_ROWS).map(r => '| ' + res.columns.map(c => cell(RK.format(r[c.name], c.format))).join(' | ') + ' |');
   const more = res.rows.length > MAX_ROWS ? ['', `*… ${res.rows.length - MAX_ROWS} more rows / 另有 ${res.rows.length - MAX_ROWS} 行*`] : [];
   return [head, sep].concat(body, more).join('\n');
@@ -112,7 +114,8 @@ function opts(comment) {
         if (!WRITE) fail(i, 'query result differs: ' + q, 'expected (doc):\n' + (existing || '(no table)') + '\n    actual:\n' + rendered);
       }
       for (let k = j + 1; k < tb.start; k++) out.push(lines[k]);
-      if (WRITE && rendered !== null) out.push(rendered); else for (let k = tb.start; k < noteEnd; k++) out.push(lines[k]);
+      if (WRITE && rendered !== null) { out.push(rendered); if ((lines[noteEnd] || '').trim()) out.push(''); }
+      else for (let k = tb.start; k < noteEnd; k++) out.push(lines[k]);
       i = noteEnd - 1;
       continue;
     }
@@ -142,10 +145,12 @@ function opts(comment) {
           stats.format++;
         } else {
           if (spans.length < 2) throw new Error('row needs two code cells (input, message)');
-          const [src, want] = spans.slice(-2);
+          const [src, want] = spans.slice(0, 2);
           let err = null;
           try {
-            if (/\sfrom\s/i.test(' ' + src + ' ')) RK.query(src);
+            const call = src.match(/^RK\.query\(("(?:[^"\\]|\\.)*")\)$/);
+            if (call) RK.query(JSON.parse(call[1]));
+            else if (/\sfrom\s/i.test(' ' + src + ' ')) RK.query(src);
             else { const { ds, rows } = ctxRows(o); const c = RK.expr.compile(src, { fields: ds.fields }); c.aggregate ? c.eval(rows, { params: RK.store.params() }) : c.eval(rows[0], { params: RK.store.params() }); }
           } catch (e) { err = e; }
           if (!err) throw new Error(`\`${src}\` did not throw`);
