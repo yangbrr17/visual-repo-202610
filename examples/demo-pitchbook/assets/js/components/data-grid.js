@@ -4,6 +4,10 @@
  * header filters (text "contains", numbers ">10", "<=2.5", "5-10", "30%"), global search box, sorting,
  * paging or virtual scroll inside the block height, frozen leading columns, grouped headers, CSV
  * download, row click -> cross-filter, live update with global filters (replaceData keeps sort / filters).
+ * Print (ctx.print, i.e. between the runtime's beforeprint and afterprint): the virtual grid is swapped for a
+ * static pitchbook <table class="rk-table"> with the same columns, titles, formats and row order (the grid's
+ * current sort, search and header filters), as many rows as fit the block + "… n more rows"; the grid
+ * comes back unchanged afterwards.
  */
 (function () {
   'use strict';
@@ -155,6 +159,55 @@
     return out;
   }
 
+  /** UI string via RK.i18n ({name} placeholders). */
+  function tr(key, fb, vars) {
+    if (RK.i18n && typeof RK.i18n.t === 'function') return RK.i18n.t(key, fb, vars || null);
+    return String(fb).replace(/\{(\w+)\}/g, function (m, k) { return vars && vars[k] != null ? String(vars[k]) : m; });
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('en', {
+      'dataGrid.moreRows': '\u2026 {n} more rows',
+      'dataGrid.moreRow': '\u2026 1 more row',
+      'dataGrid.sortedBy': 'sorted by {field} {dir}',
+      'dataGrid.tableFilters': 'table search / column filters applied ({n} of {total} rows)'
+    });
+    RK.i18n.add('zh-CN', {
+      'dataGrid.moreRows': '\u2026 另有 {n} 行未显示',
+      'dataGrid.moreRow': '\u2026 另有 1 行未显示',
+      'dataGrid.sortedBy': '按{field}{dir}排序',
+      'dataGrid.tableFilters': '已应用表内搜索 / 列筛选（{n} / {total} 行）'
+    });
+  }
+
+  /** Same row objects in the same order (RK.data.view returns references to the dataset rows). */
+  function sameRows(a, b) {
+    if (a === b) return true;
+    if (!a || !b || a.length !== b.length) return false;
+    for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  }
+
+  /**
+   * Stable multi-key sort like the grid's sorters: [{field, dir}] in priority order, numbers numerically,
+   * text with localeCompare, empty values at the bottom in either direction (alignEmptyValues: 'bottom').
+   */
+  function sortRows(rows, sorters, specs) {
+    if (!sorters.length) return rows.slice();
+    var num = {};
+    specs.forEach(function (c) { num[c.field] = c.num; });
+    function empty(v) { return v == null || v === '' || (typeof v === 'number' && isNaN(v)); }
+    return rows.map(function (r, i) { return { r: r, i: i }; }).sort(function (a, b) {
+      for (var k = 0; k < sorters.length; k++) {
+        var f = sorters[k].field, d = sorters[k].dir === 'desc' ? -1 : 1, x = a.r[f], y = b.r[f];
+        var ex = empty(x), ey = empty(y);
+        if (ex || ey) { if (ex && ey) continue; return ex ? 1 : -1; }
+        var c = num[f] ? (+x) - (+y) : typeof x === 'boolean' ? (x === y ? 0 : x ? 1 : -1) : String(x).localeCompare(String(y));
+        if (c) return c * d;
+      }
+      return a.i - b.i;
+    }).map(function (x) { return x.r; });
+  }
+
   RK.component({
     id: 'data-grid',
     deps: ['tabulator'],
@@ -178,6 +231,8 @@
       if (!window.Tabulator) throw new Error('Tabulator is not loaded (vendor/tabulator/tabulator.min.js)');
       var cur = ctx, o = ctx.options, built = false, pending = null, query = '';
       var key = keyField(ctx), specs = specsOf(ctx);
+      var table = null, gridRows = null;          // the grid is created on the first screen render (never for print)
+      var printEl = null, printSize = '';          // static print table while ctx.print
 
       var root = h('div.rk-dgrid');
       var bar = h('div.rk-dgrid__bar');
@@ -207,37 +262,6 @@
       function tableHeight() { return Math.max(160, Math.floor(ctx.el.clientHeight - bar.offsetHeight - 8)); }
 
       var sorts = o.sort ? [].concat(o.sort).map(function (s) { return { column: s.field, dir: s.dir || 'asc' }; }) : [];
-      var config = {
-        data: rowsCopy(ctx),
-        columns: columnDefs(ctx, specs),
-        layout: o.layout,
-        renderVertical: 'virtual',
-        headerFilterLiveFilterDelay: 200,
-        printAsHtml: true,          // browser print shows every (filtered) row, not the virtual window
-        printRowRange: 'active',
-        initialSort: sorts,
-        placeholder: 'No matching rows',
-        headerSortClickElement: 'header',
-        columnHeaderVertAlign: 'bottom',
-        index: key,
-        rowFormatter: function (row) {
-          var d = row.getData(), el = row.getElement(), sel = cur.selected(key);
-          el.classList.toggle('is-target', isTarget(d));
-          el.classList.toggle('is-selected', sel.indexOf(d[key]) >= 0);
-          el.classList.toggle('is-dim', sel.length > 0 && sel.indexOf(d[key]) < 0);
-          el.classList.toggle('is-clickable', cur.options.crossFilter !== false);
-        }
-      };
-      if (o.pagination) {
-        // paged grids shrink to their rows; virtual-scroll grids fill the block height
-        config.pagination = true;
-        config.paginationSize = +o.pagination || 10;
-        config.paginationCounter = 'rows';
-        config.maxHeight = tableHeight();
-      } else {
-        config.height = tableHeight();
-      }
-      var table = new window.Tabulator(holder, config);
 
       /* ---------------- horizontal scroll cue + whole-row viewport ---------------- */
       var tholder = null;
@@ -270,26 +294,61 @@
         count.textContent = shown === total ? RK.format(total, '#,##0') + ' rows' : RK.format(shown, '#,##0') + ' of ' + RK.format(total, '#,##0') + ' rows';
       }
       function restyle() {
+        if (!built) return;
         root.classList.toggle('has-sel', cur.selected(key).length > 0);
         table.getRows().forEach(function (r) { r.reformat(); });
       }
 
-      table.on('tableBuilt', function () {
-        built = true;
-        tholder = holder.querySelector('.tabulator-tableholder');
-        if (tholder) tholder.addEventListener('scroll', edges, { passive: true });
-        if (cur.motion) root.classList.add('is-in');
-        fitRows();
-        edges();
-        setCount();
-        if (pending) { var p = pending; pending = null; apply(p); }
-      });
-      table.on('dataFiltered', function () { setTimeout(function () { setCount(); edges(); }, 0); });
-      table.on('renderComplete', function () { edges(); });
-      table.on('rowClick', function (e, row) {
-        if (cur.options.crossFilter === false) return;
-        cur.select(key, row.getData()[key], GENERIC.test(key) && !cur.options.crossFilterScope ? { scope: 'dataset' } : null);
-      });
+      /** Create the Tabulator grid for the current rows (first screen render). */
+      function buildGrid() {
+        gridRows = cur.rows;
+        var config = {
+          data: rowsCopy(cur),
+          columns: columnDefs(cur, specs),
+          layout: o.layout,
+          renderVertical: 'virtual',
+          headerFilterLiveFilterDelay: 200,
+          printAsHtml: false,         // print: this component swaps in its own static table (ctx.print)
+          initialSort: sorts,
+          placeholder: 'No matching rows',
+          headerSortClickElement: 'header',
+          columnHeaderVertAlign: 'bottom',
+          index: key,
+          rowFormatter: function (row) {
+            var d = row.getData(), el = row.getElement(), sel = cur.selected(key);
+            el.classList.toggle('is-target', isTarget(d));
+            el.classList.toggle('is-selected', sel.indexOf(d[key]) >= 0);
+            el.classList.toggle('is-dim', sel.length > 0 && sel.indexOf(d[key]) < 0);
+            el.classList.toggle('is-clickable', cur.options.crossFilter !== false);
+          }
+        };
+        if (o.pagination) {
+          // paged grids shrink to their rows; virtual-scroll grids fill the block height
+          config.pagination = true;
+          config.paginationSize = +o.pagination || 10;
+          config.paginationCounter = 'rows';
+          config.maxHeight = tableHeight();
+        } else {
+          config.height = tableHeight();
+        }
+        table = new window.Tabulator(holder, config);
+        table.on('tableBuilt', function () {
+          built = true;
+          tholder = holder.querySelector('.tabulator-tableholder');
+          if (tholder) tholder.addEventListener('scroll', edges, { passive: true });
+          if (cur.motion) root.classList.add('is-in');
+          fitRows();
+          edges();
+          setCount();
+          if (pending) { var p = pending; pending = null; apply(p); }
+        });
+        table.on('dataFiltered', function () { setTimeout(function () { setCount(); edges(); }, 0); });
+        table.on('renderComplete', function () { edges(); });
+        table.on('rowClick', function (e, row) {
+          if (cur.options.crossFilter === false) return;
+          cur.select(key, row.getData()[key], GENERIC.test(key) && !cur.options.crossFilterScope ? { scope: 'dataset' } : null);
+        });
+      }
 
       /* ---------------- search ---------------- */
       function matches(d) {
@@ -325,16 +384,157 @@
       }
       if (dl) dl.addEventListener('click', onDownload);
 
+      /* ---------------- print: static pitchbook table instead of the virtual grid ---------------- */
+      var PRINT_CAP = 400;      // rows laid out before trimming to the block height
+
+      /** Rows as the grid shows them: its own active view (sort, search, header filters) when it holds these rows. */
+      function printRows() {
+        var srt = built ? table.getSorters().map(function (s) { return { field: s.field, dir: s.dir }; })
+          : sorts.map(function (s) { return { field: s.column, dir: s.dir }; });
+        if (built && sameRows(cur.rows, gridRows)) {
+          var hf = table.getHeaderFilters ? table.getHeaderFilters().filter(function (f) { return f.value != null && f.value !== ''; }) : [];
+          return { rows: table.getData('active'), local: !!query || hf.length > 0, sorters: srt };
+        }
+        return { rows: sortRows(query ? cur.rows.filter(matches) : cur.rows, srt, specs), local: !!query, sorters: srt };
+      }
+      function printCell(s, d) {
+        var v = d[s.field], txt = RK.format(v, s.format);
+        var td = h('td', { class: s.num ? 'is-num' : null, style: s.align ? { 'text-align': s.align } : null });
+        if (v == null || v === '') td.appendChild(h('span.rk-dgrid__na', txt));
+        else if (s.num && s.sign && util.isNum(v)) td.appendChild(h('span', { class: v < 0 ? 'is-neg' : v > 0 ? 'is-pos' : null }, txt));
+        else if (!s.num) td.appendChild(h('span.rk-dgrid-print__t', txt));      // ellipsis box when columns must be narrowed
+        else td.appendChild(document.createTextNode(txt));
+        return td;
+      }
+      function printHead() {
+        var thead = h('thead');
+        function th(s, span) {
+          return h('th', { class: s.num ? 'is-num' : null, scope: 'col', rowspan: span > 1 ? String(span) : null, style: s.align ? { 'text-align': s.align } : null },
+            s.title == null ? '' : String(s.title));
+        }
+        if (cur.options.columnGroups === false || !specs.some(function (s) { return s.group; })) {
+          thead.appendChild(h('tr', specs.map(function (s) { return th(s, 1); })));
+          return thead;
+        }
+        // contiguous columns sharing a group label share one spanning cell (as in the grid)
+        var top = h('tr.rk-table__group'), bottom = h('tr');
+        for (var i = 0; i < specs.length; i++) {
+          var s = specs[i];
+          if (!s.group) { top.appendChild(th(s, 2)); continue; }
+          var n = 1;
+          while (i + n < specs.length && specs[i + n].group === s.group) n++;
+          top.appendChild(h('th.rk-dgrid-print__grp', { colspan: String(n), scope: 'colgroup' }, h('span', String(s.group))));
+          for (var j = 0; j < n; j++) bottom.appendChild(th(specs[i + j], 1));
+          i += n - 1;
+        }
+        thead.appendChild(top);
+        thead.appendChild(bottom);
+        return thead;
+      }
+      function outerH(el) {
+        var cs = getComputedStyle(el);
+        return el.offsetHeight + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+      }
+      /** Narrow the text columns (ellipsis) in proportion to their width until the table fits availW. */
+      function squeeze(tbl, tbody, availW) {
+        var first = tbody.rows[0];
+        if (!first) return;
+        var cols = [];
+        specs.forEach(function (s, i) {
+          var td = first.cells[i], sp = td && td.firstChild;
+          if (!s.num && sp && sp.classList && sp.classList.contains('rk-dgrid-print__t')) cols.push({ i: i, pad: td.offsetWidth - sp.offsetWidth });
+        });
+        for (var pass = 0; pass < 4 && cols.length && tbl.offsetWidth > availW + 0.5; pass++) {
+          var over = tbl.offsetWidth - availW, tot = 0;
+          cols.forEach(function (c) { c.w = first.cells[c.i].offsetWidth; tot += c.w; });
+          if (!tot) return;
+          cols.forEach(function (c) {
+            var max = Math.max(48, Math.floor(c.w - Math.ceil(over * c.w / tot) - c.pad)) + 'px';
+            [].forEach.call(tbody.rows, function (r) {
+              var sp = r.cells[c.i] && r.cells[c.i].firstChild;
+              if (sp && sp.classList && sp.classList.contains('rk-dgrid-print__t')) sp.style.maxWidth = max;
+            });
+          });
+        }
+      }
+      function buildPrint() {
+        var v = printRows(), rows = v.rows, total = rows.length, sel = cur.selected(key);
+        var tbody = h('tbody', rows.slice(0, PRINT_CAP).map(function (d) {
+          var cls = (isTarget(d) ? 'is-target ' : '') + (sel.length && sel.indexOf(d[key]) >= 0 ? 'is-selected' : '');
+          return h('tr', { class: cls.trim() || null }, specs.map(function (s) { return printCell(s, d); }));
+        }));
+        var tbl = h('table.rk-table.rk-dgrid-print__table', printHead(), tbody);
+        var note = h('p.rk-dgrid-print__more');
+        var wrap = h('div.rk-dgrid-print', { style: { position: 'relative' } }, tbl, note);
+        if (printEl) printEl.remove();
+        printEl = wrap;
+        cur.el.appendChild(wrap);
+
+        function fmtN(n) { return RK.format(n, '#,##0'); }
+        function setNote(k) {
+          var hidden = total - k, parts = [];
+          if (hidden > 0) {
+            parts.push(hidden === 1 ? tr('dataGrid.moreRow', '… 1 more row') : tr('dataGrid.moreRows', '… {n} more rows', { n: fmtN(hidden) }));
+            var s0 = v.sorters[0];
+            if (s0) {
+              var spec0 = specs.filter(function (s) { return s.field === s0.field; })[0];
+              var name = spec0 && spec0.title != null ? String(spec0.title) : cur.title(s0.field);
+              parts.push(tr('dataGrid.sortedBy', 'sorted by {field} {dir}', { field: name, dir: s0.dir === 'desc' ? '↓' : '↑' }));
+            }
+          }
+          if (v.local) parts.push(tr('dataGrid.tableFilters', 'table search / column filters applied ({n} of {total} rows)', { n: fmtN(total), total: fmtN(cur.rows.length) }));
+          note.textContent = parts.join(' · ');
+          note.hidden = !parts.length;
+        }
+
+        // width: compact type first, then narrow the text columns
+        var availW = wrap.clientWidth;
+        if (tbl.offsetWidth > availW + 0.5) wrap.classList.add('is-compact');
+        if (tbl.offsetWidth > availW + 0.5) squeeze(tbl, tbody, availW);
+        // height: the rows whose bottom edge fits above the footnote line
+        var body = cur.el, auto = body.classList.contains('is-auto') || cur.block.classList.contains('rk-block--auto');
+        var avail = auto ? Infinity : body.clientHeight, trs = tbody.rows;
+        setNote(trs.length);
+        if (avail > 0 && wrap.offsetHeight > avail + 0.5 && trs.length > 1) {
+          setNote(trs.length - 1);
+          var noteH = outerH(note), top = tbl.offsetTop, k = trs.length;
+          while (k > 1 && top + trs[k - 1].offsetTop + trs[k - 1].offsetHeight + noteH > avail) k--;
+          while (trs.length > k) tbody.removeChild(tbody.lastChild);
+          setNote(k);
+          while (wrap.offsetHeight > avail + 0.5 && trs.length > 1) { tbody.removeChild(tbody.lastChild); setNote(trs.length); }
+        }
+        printSize = body.clientWidth + 'x' + body.clientHeight;
+      }
+      function showPrint() {
+        root.style.setProperty('display', 'none');
+        buildPrint();
+      }
+      function hidePrint() {
+        if (printEl) { printEl.remove(); printEl = null; printSize = ''; }
+        root.style.removeProperty('display');
+        if (!built) return;
+        if (!cur.options.pagination) table.setHeight(tableHeight());
+        table.redraw(true);
+        fitRows();
+        edges();
+      }
+
       /* ---------------- updates ---------------- */
       function apply(c) {
         cur = c;
+        if (c.print) { showPrint(); return; }    // the grid keeps its state (sort, filters, search) while hidden
+        if (printEl) hidePrint();
+        if (!table) { buildGrid(); return; }
         if (!built) { pending = c; return; }
+        gridRows = c.rows;
         table.replaceData(rowsCopy(c)).then(function () { restyle(); setCount(); fitRows(); edges(); });
       }
+      if (ctx.print) showPrint(); else buildGrid();
 
       return {
         update: apply,
         resize: function () {
+          if (printEl) { if (cur.el.clientWidth + 'x' + cur.el.clientHeight !== printSize) buildPrint(); return; }
           if (!built) return;
           if (!cur.options.pagination) table.setHeight(tableHeight());
           table.redraw();
@@ -346,7 +546,8 @@
           if (search) search.removeEventListener('input', onSearch);
           if (dl) dl.removeEventListener('click', onDownload);
           if (cur.options.searchFilters) RK.store.clearFilter(cur.id + ':search');
-          try { table.destroy(); } catch (e) { /* not yet built */ }
+          if (table) { try { table.destroy(); } catch (e) { /* not yet built */ } }
+          if (printEl) printEl.remove();
           root.remove();
         }
       };

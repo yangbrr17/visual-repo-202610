@@ -8,6 +8,20 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'funnel.pctOfFirst': '占首阶段比例', 'funnel.pctOfTop': '占顶层比例', 'funnel.convFrom': '自{stage}的转化率', 'funnel.pctOf': '占{stage}比例',
+      'funnel.avgPerUnit': '单位平均值'
+    });
+  }
+
   /** Label width via the shared canvas measure; +7% because the canvas may still measure a fallback face. */
   function measure(text, font) { return C.measure(text, font) * 1.07; }
 
@@ -67,7 +81,7 @@
       var cols = [];
       if (o.columns !== false) {
         if (hasSec) cols.push({ title: titled(enc.secondary), text: secs.map(function (v) { return RK.format(v, sfmt); }) });
-        if (o.cumulative !== false) cols.push({ title: '% of ' + (o.conversion === 'first' ? 'first' : 'top'), text: vals.map(function (v) { return RK.format(v == null ? null : (first ? v / first : NaN), '0.0%'); }) });
+        if (o.cumulative !== false) cols.push({ title: o.conversion === 'first' ? tr('funnel.pctOfFirst', '% of first') : tr('funnel.pctOfTop', '% of top'), text: vals.map(function (v) { return RK.format(v == null ? null : (first ? v / first : NaN), '0.0%'); }) });
         if (!o.cumulative && !hasSec) cols = [];
       }
       cols.forEach(function (c) {
@@ -186,12 +200,12 @@
         tooltip: {
           trigger: 'item',
           formatter: function (p) {
-            var i = p.dataIndex, tr = [{ color: colors[i], label: ctx.title(enc.value), value: RK.format(vals[i], fmt), bold: true }];
-            if (hasSec) tr.push({ label: ctx.title(enc.secondary), value: RK.format(secs[i], sfmt) });
-            if (i > 0) tr.push({ label: 'Conversion from ' + stages[i - 1], value: RK.format(vals[i] == null || !vals[i - 1] ? null : vals[i] / vals[i - 1], '0.0%') });
-            if (i > 0) tr.push({ label: '% of ' + stages[0], value: RK.format(vals[i] == null || !first ? null : vals[i] / first, '0.0%') });
-            if (hasSec && util.isNum(secs[i]) && vals[i]) tr.push({ label: 'Average per unit', value: RK.format(secs[i] / vals[i], 'auto') });
-            return C.tip(stages[i], tr);
+            var i = p.dataIndex, tipRows = [{ color: colors[i], label: ctx.title(enc.value), value: RK.format(vals[i], fmt), bold: true }];
+            if (hasSec) tipRows.push({ label: ctx.title(enc.secondary), value: RK.format(secs[i], sfmt) });
+            if (i > 0) tipRows.push({ label: tr('funnel.convFrom', 'Conversion from {stage}', { stage: stages[i - 1] }), value: RK.format(vals[i] == null || !vals[i - 1] ? null : vals[i] / vals[i - 1], '0.0%') });
+            if (i > 0) tipRows.push({ label: tr('funnel.pctOf', '% of {stage}', { stage: stages[0] }), value: RK.format(vals[i] == null || !first ? null : vals[i] / first, '0.0%') });
+            if (hasSec && util.isNum(secs[i]) && vals[i]) tipRows.push({ label: tr('funnel.avgPerUnit', 'Average per unit'), value: RK.format(secs[i] / vals[i], 'auto') });
+            return C.tip(stages[i], tipRows);
           }
         },
         series: [{

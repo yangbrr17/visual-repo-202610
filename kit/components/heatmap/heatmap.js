@@ -8,6 +8,19 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'heatmap.year': '全年', 'heatmap.months': '1月,2月,3月,4月,5月,6月,7月,8月,9月,10月,11月,12月'
+    });
+  }
+
   function mean(a) { return a.length ? a.reduce(function (s, v) { return s + v; }, 0) / a.length : null; }
   var SUMMARY = {
     sum: { label: 'Total', fn: function (a) { return a.reduce(function (s, v) { return s + v; }, 0); } },
@@ -15,9 +28,16 @@
     compound: { label: 'Year', fn: function (a) { return a.reduce(function (s, v) { return s * (1 + v); }, 1) - 1; } }
   };
 
+  /** Summary column name in the report locale. */
+  function summaryName(k) { return k === 'sum' ? tr('total', 'Total') : k === 'mean' ? tr('average', 'Average') : tr('heatmap.year', 'Year'); }
+
   /** Category label mapping: 'months' (1-12 -> Jan..Dec) or a {value: label} object. */
   function labeller(spec, fmt) {
-    if (spec === 'months') return function (v) { var n = +v; return n >= 1 && n <= 12 ? RK.format.config.months[n - 1] : String(v); };
+    if (spec === 'months') {
+      var names = tr('heatmap.months', RK.format.config.months.join(',')).split(',');
+      if (names.length !== 12) names = RK.format.config.months;
+      return function (v) { var n = +v; return n >= 1 && n <= 12 ? names[n - 1] : String(v); };
+    }
     if (util.isObj(spec)) return function (v) { return spec[v] != null ? spec[v] : String(v); };
     return function (v) { return typeof v === 'number' && fmt ? RK.format(v, fmt) : String(v); };
   }
@@ -115,7 +135,7 @@
 
       /* summary column */
       var sm = o.summary && SUMMARY[o.summary] ? SUMMARY[o.summary] : null;
-      var smKey = sm ? (o.summaryLabel || sm.label) : null;
+      var smKey = sm ? (o.summaryLabel || summaryName(o.summary)) : null;
       var xCats = sm ? xs.concat([smKey]) : xs;
 
       /* labels on/off + size from the available cell size */

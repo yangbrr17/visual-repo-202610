@@ -37,6 +37,14 @@
   var C = RK.chart, U = RK.util, G = RK.geo;
   var SQRT3 = Math.sqrt(3);
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+
   //  ISO   adcode  short   official name        简称  English           row col  aliases (| separated)
   var RAW = [
     ['BJ', '11', '北京', '北京市', '京', 'Beijing', 1, 4, 'Peking'],
@@ -115,10 +123,21 @@
     en: { noData: 'No data', filtered: 'Not in the current filter', rank: 'Rank', rows: 'rows', values: 'values', sum: 'sum', avg: 'avg.',
       note: 'Schematic; no boundaries implied' }
   };
-  function uiLang(o) {
-    if (o.uiLang === 'zh' || o.uiLang === 'en') return o.uiLang;
-    var loc = (RK.data && RK.data.manifest && RK.data.manifest.report && RK.data.manifest.report.locale) || document.documentElement.lang || 'en';
-    return /^zh/i.test(loc) ? 'zh' : 'en';
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    var zhPack = {};
+    Object.keys(TXT.zh).forEach(function (k) { zhPack['chinaTilemap.' + k] = TXT.zh[k]; });
+    RK.i18n.add('zh-CN', zhPack);
+  }
+  /** UI strings: options.uiLang ('zh' | 'en') forces a language; otherwise RK.i18n (report locale), else <html lang>. */
+  function uiText(o) {
+    if (o.uiLang === 'zh' || o.uiLang === 'en') return TXT[o.uiLang];
+    if (!(RK.i18n && typeof RK.i18n.t === 'function')) {
+      var loc = (RK.data && RK.data.manifest && RK.data.manifest.report && RK.data.manifest.report.locale) || document.documentElement.lang || 'en';
+      return TXT[/^zh/i.test(loc) ? 'zh' : 'en'];
+    }
+    var out = {};
+    Object.keys(TXT.en).forEach(function (k) { out[k] = tr('chinaTilemap.' + k, TXT.en[k]); });
+    return out;
   }
 
   /* ---------------- colour scale ---------------- */
@@ -596,7 +615,7 @@
   function build(ctx, inst) {
     var o = ctx.options, t = ctx.theme, enc = ctx.enc;
     var vf = enc.value, idf = enc.id;
-    var lang = o.lang === 'en' ? 'en' : 'zh', txt = TXT[uiLang(o)];
+    var lang = o.lang === 'en' ? 'en' : 'zh', txt = uiText(o);
     var fmt = o.format || ctx.fmtOf(vf) || 'auto';
     var join = o.join === 'adcode' || o.join === 'name' ? o.join : 'auto';
     var aggFn = RK.expr.agg[o.agg] || RK.expr.agg.sum;
@@ -766,7 +785,7 @@
       var x = tiles[p.dataIndex], pr = x.p;
       var title = lang === 'zh' ? pr.zh + '  ' + pr.en : pr.en + '  ' + pr.zh;
       var aggLab = x.rows && x.rows.length > 1 ? ' (' + (!o.agg || o.agg === 'sum' ? txt.sum : /^(avg|mean|average)$/.test(o.agg) ? txt.avg : o.agg) + ')' : '';
-      var rows = [{ color: x.has ? x.base : null, label: ctx.title(vf) + aggLab, value: x.has ? RK.format(x.v, fmt) : 'n.a.' }];
+      var rows = [{ color: x.has ? x.base : null, label: ctx.title(vf) + aggLab, value: x.has ? RK.format(x.v, fmt) : RK.format(null, fmt) }];
       if (x.has) rows.push({ label: txt.rank, value: x.rank + ' / ' + ranked.length });
       if (x.rows && x.rows.length) {
         extra.forEach(function (f) {

@@ -1,0 +1,21 @@
+{
+  "id": "valuation",
+  "title": "凯斯勒估值区间（企业价值）",
+  "schema": {"fields": [
+    {"name": "method", "type": "string", "title": "估值方法"},
+    {"name": "group", "type": "string", "title": "类别"},
+    {"name": "low", "type": "number", "title": "低值", "format": "#,##0.0", "unit": "人民币亿元"},
+    {"name": "high", "type": "number", "title": "高值", "format": "#,##0.0", "unit": "人民币亿元"},
+    {"name": "basis", "type": "string", "title": "依据"},
+    {"name": "order", "type": "number", "title": "顺序", "format": "0"}
+  ]},
+  "data": [
+    {"method": "DCF（永续增长法）", "group": "内在价值", "low": 85.1, "high": 113.3, "basis": "WACC 8.0%–9.0%，永续增长率 1.5%–2.5%", "order": 1},
+    {"method": "DCF（含协同效应）", "group": "内在价值", "low": 102.5, "high": 138.2, "basis": "协同效应实现率 75%，扣除整合成本 3.0 亿元", "order": 2},
+    {"method": "欧洲可比公司", "group": "市场法", "low": 88.4, "high": 107.0, "basis": "EV/EBITDA 2026E 9.5x–11.5x", "order": 3},
+    {"method": "A股/港股可比公司", "group": "参考", "low": 111.6, "high": 139.5, "basis": "EV/EBITDA 2026E 12.0x–15.0x（估值重估参考）", "order": 4},
+    {"method": "欧洲先例交易", "group": "交易法", "low": 84.3, "high": 105.4, "basis": "EV/LTM EBITDA 10.0x–12.5x", "order": 5},
+    {"method": "中资出海并购先例", "group": "交易法", "low": 92.7, "high": 113.8, "basis": "EV/LTM EBITDA 11.0x–13.5x", "order": 6}
+  ],
+  "meta": {"source": "北桥资本分析", "unit": "人民币亿元"}
+}

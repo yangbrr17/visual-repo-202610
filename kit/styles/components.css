@@ -158,6 +158,18 @@ textarea.rk-input { height: auto; padding: 8px 10px; line-height: 1.45; resize: 
 .rk-btn--primary { background: var(--rk-accent); border-color: var(--rk-accent); color: #fff; }
 .rk-btn--primary:hover { background: color-mix(in srgb, var(--rk-accent) 86%, #fff); color: #fff; }
 [data-rk-theme="ink"] .rk-btn--primary { color: #0f1724; }
+.rk-btn:focus-visible {
+  outline: 2px solid transparent; outline-offset: 2px;     /* transparent: still drawn in forced-colors mode */
+  border-color: var(--rk-accent-3); box-shadow: 0 0 0 2px var(--rk-paper), 0 0 0 4px var(--rk-accent-3);   /* gap + solid ring */
+}
+/* anchors styled as buttons (the builder's Excel download, gallery CTAs): the same look as button.rk-btn — no
+   underline, no link / visited colour (explicit :visited pairs keep the specificity of the primary variant) */
+a.rk-btn { text-decoration: none; white-space: nowrap; user-select: none; -webkit-user-select: none; }
+a.rk-btn, a.rk-btn:visited { color: var(--rk-ink-2); }
+a.rk-btn:hover, a.rk-btn:visited:hover { color: var(--rk-accent); text-decoration: none; }
+a.rk-btn--primary, a.rk-btn--primary:visited, a.rk-btn--primary:hover, a.rk-btn--primary:visited:hover { color: #fff; }
+[data-rk-theme="ink"] a.rk-btn--primary, [data-rk-theme="ink"] a.rk-btn--primary:visited,
+[data-rk-theme="ink"] a.rk-btn--primary:hover, [data-rk-theme="ink"] a.rk-btn--primary:visited:hover { color: #0f1724; }
 .rk-chip {
   display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px 0 10px;
   border-radius: 999px; border: 1px solid var(--rk-rule); background: var(--rk-surface);

@@ -1,0 +1,28 @@
+{
+  "id": "deal_terms",
+  "title": "Proposal terms (live with the offer price)",
+  "schema": {"fields": [
+    {"name": "current", "type": "number", "title": "Current share price", "format": "$0.00"},
+    {"name": "unaffected", "type": "number", "title": "Unaffected share price (17-Jun-2026)", "format": "$0.00"},
+    {"name": "vwap30_unaffected", "type": "number", "title": "Unaffected 30-day VWAP", "format": "$0.00"},
+    {"name": "shares", "type": "number", "title": "Diluted shares (m)", "format": "#,##0.0"},
+    {"name": "net_debt", "type": "number", "title": "Net debt", "format": "$#,##0"},
+    {"name": "ebitda_25a", "type": "number", "title": "EBITDA 2025A", "format": "$#,##0.0"},
+    {"name": "ebitda_26e", "type": "number", "title": "EBITDA 2026E", "format": "$#,##0.0"},
+    {"name": "ni_26e", "type": "number", "title": "Net income 2026E", "format": "$#,##0.0"}
+  ]},
+  "data": [
+    {"current": 42.5, "unaffected": 39.3, "vwap30_unaffected": 39.66, "shares": 158.0, "net_debt": 1490.0, "ebitda_25a": 897.2, "ebitda_26e": 996.5, "ni_26e": 510.8}
+  ],
+  "meta": {"source": "Northbridge Capital analysis; FactSet, company filings; market data as of 10-Oct-2026", "unit": "USD m"},
+  "computed": [
+    {"name": "equity_value", "formula": "@offer * shares", "title": "Implied equity value", "format": "$#,##0"},
+    {"name": "implied_ev", "formula": "equity_value + net_debt", "title": "Implied enterprise value", "format": "$#,##0"},
+    {"name": "ev_ebitda_25a", "formula": "implied_ev / ebitda_25a", "title": "Implied EV / EBITDA 2025A", "format": "0.0x"},
+    {"name": "ev_ebitda_26e", "formula": "implied_ev / ebitda_26e", "title": "Implied EV / EBITDA 2026E", "format": "0.0x"},
+    {"name": "pe_26e", "formula": "equity_value / ni_26e", "title": "Implied P / E 2026E", "format": "0.0x"},
+    {"name": "prem_current", "formula": "@offer / current - 1", "title": "Premium to current", "format": "0%"},
+    {"name": "prem_unaffected", "formula": "@offer / unaffected - 1", "title": "Premium to unaffected", "format": "0%"},
+    {"name": "prem_vwap_unaffected", "formula": "@offer / vwap30_unaffected - 1", "title": "Premium to unaffected 30-day VWAP", "format": "0%"}
+  ]
+}

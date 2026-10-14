@@ -1,0 +1,32 @@
+{
+  "id": "buyers",
+  "title": "Potential acquirers: assessment inputs",
+  "schema": {"fields": [
+    {"name": "buyer", "type": "string", "title": "Buyer"},
+    {"name": "ticker", "type": "string", "title": "Ticker"},
+    {"name": "type", "type": "string", "title": "Buyer type"},
+    {"name": "hq", "type": "string", "title": "Headquarters"},
+    {"name": "synergies", "type": "number", "title": "Run-rate synergies", "format": "$#,##0\"m\"", "unit": "USD m"},
+    {"name": "standalone", "type": "number", "title": "Ability to pay, no synergies", "format": "$#,##0.00", "unit": "USD per share"},
+    {"name": "fit", "type": "number", "title": "Strategic fit", "format": "0"},
+    {"name": "regulatory", "type": "number", "title": "Regulatory risk", "format": "0"},
+    {"name": "certainty", "type": "number", "title": "Deal certainty", "format": "0"},
+    {"name": "comment", "type": "string", "title": "Comment"},
+    {"name": "synergy_ps", "type": "number", "title": "Synergy value per share", "format": "$#,##0.00"},
+    {"name": "with_synergies", "type": "number", "title": "Ability to pay, with synergies", "format": "$#,##0.00"},
+    {"name": "cash_capacity", "type": "number", "title": "Cash capacity at 3.0x leverage", "format": "$#,##0.0,\"bn\"", "unit": "USD m"}
+  ]},
+  "data": [
+    {"buyer": "Kanemori Systems", "ticker": "KNMR", "type": "Strategic", "hq": "Japan", "synergies": 160, "standalone": 48.5, "fit": 5, "regulatory": 3, "certainty": 2, "comment": "Best product fit; still integrating Tarrant Automation ($8.3bn, pending).", "synergy_ps": 7.59, "with_synergies": 56.09, "cash_capacity": 1424.8},
+    {"buyer": "Valdris Controls", "ticker": "VLDS", "type": "Strategic", "hq": "Switzerland", "synergies": 150, "standalone": 48.0, "fit": 5, "regulatory": 4, "certainty": 3, "comment": "Largest European overlap; Phase II EU review likely.", "synergy_ps": 7.12, "with_synergies": 55.12, "cash_capacity": 2716.0},
+    {"buyer": "Corvane Automation", "ticker": "CRVA", "type": "Strategic", "hq": "Germany", "synergies": 140, "standalone": 47.5, "fit": 4, "regulatory": 4, "certainty": 2, "comment": "Smaller than Helios: a share-heavy merger rather than a cash bid.", "synergy_ps": 6.65, "with_synergies": 54.15, "cash_capacity": 2365.9},
+    {"buyer": "Tessaro Robotics", "ticker": "TSRO", "type": "Strategic", "hq": "United States", "synergies": 120, "standalone": 49.5, "fit": 4, "regulatory": 3, "certainty": 4, "comment": "Strongest balance sheet among US strategics; HSR second request possible.", "synergy_ps": 5.7, "with_synergies": 55.2, "cash_capacity": 4102.7},
+    {"buyer": "Norrvik Drives", "ticker": "NRVK", "type": "Strategic", "hq": "Sweden", "synergies": 95, "standalone": 48.0, "fit": 3, "regulatory": 2, "certainty": 4, "comment": "Motion-control adjacency; limited overlap in automation.", "synergy_ps": 4.51, "with_synergies": 52.51, "cash_capacity": 4200.0},
+    {"buyer": "Orbisant Software", "ticker": "ORBT", "type": "Strategic", "hq": "United Kingdom", "synergies": 55, "standalone": 50.5, "fit": 3, "regulatory": 1, "certainty": 3, "comment": "Values Sensors and Software at a software multiple; hardware a non-core fit.", "synergy_ps": 2.61, "with_synergies": 53.11, "cash_capacity": 3581.6},
+    {"buyer": "Quintar Sensing", "ticker": "QNTR", "type": "Strategic", "hq": "Canada", "synergies": 45, "standalone": 49.0, "fit": 2, "regulatory": 1, "certainty": 3, "comment": "Interested in Sensors & Instrumentation only; carve-out alternative.", "synergy_ps": 2.14, "with_synergies": 51.14, "cash_capacity": 3577.3},
+    {"buyer": "Granite Arch Partners", "ticker": null, "type": "Financial sponsor", "hq": "United States", "synergies": 120, "standalone": 46.4, "fit": 3, "regulatory": 2, "certainty": 5, "comment": "Current bidder; platform synergies with portfolio companies Pellston Automation and Brightwell Motion.", "synergy_ps": 5.7, "with_synergies": 52.1, "cash_capacity": null},
+    {"buyer": "Bluefield Capital Partners", "ticker": null, "type": "Financial sponsor", "hq": "United States", "synergies": 20, "standalone": 45.8, "fit": 2, "regulatory": 1, "certainty": 4, "comment": "Owns Sefton Industrial Software (acquired Mar-2026).", "synergy_ps": 0.95, "with_synergies": 46.75, "cash_capacity": null},
+    {"buyer": "Ashgrove Equity", "ticker": null, "type": "Financial sponsor", "hq": "United Kingdom", "synergies": 10, "standalone": 45.2, "fit": 2, "regulatory": 1, "certainty": 3, "comment": "Mid-market sponsor; would need a club deal for an equity cheque of this size.", "synergy_ps": 0.47, "with_synergies": 45.67, "cash_capacity": null}
+  ],
+  "meta": {"asOf": "2026-10-10", "notes": ["Ability to pay without synergies: strategics = DCF at the buyer's cost of capital; sponsors = LBO at a 20% IRR and 5.0x leverage.", "Scores 1 (low) to 5 (high); regulatory risk 5 = highest risk.", "Illustrative: all companies, banks and investors are fictional."], "source": "Northbridge Capital analysis"}
+}

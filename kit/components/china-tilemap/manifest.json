@@ -162,7 +162,7 @@
     "Click a tile to cross-filter (others dim; shared dimensions such as province filter the report, other fields such as adcode this dataset only)",
     "Hover a legend class to focus its tiles; click it to cross-filter the whole class",
     "Provinces excluded by other filters fade to pale ghost tiles with animated colour transitions; staggered west-to-east entrance",
-    "PNG / SVG export including legend and note; print-safe (SVG, no animation)"
+    "PNG / CSV export (the PNG includes legend and note); print-safe (SVG, no animation)"
   ],
   "samples": [
     {

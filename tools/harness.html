@@ -9,6 +9,7 @@
     /tools/harness.html?c=bar                  all manifest samples of one component
     /tools/harness.html?c=bar&theme=ink        another theme
     /tools/harness.html?c=bar,football-field   several components
+    /tools/harness.html?c=bar&lang=zh-CN       report locale (component strings, 万/亿 compact units)
   Sets window.__RK_HARNESS = {done, errors[], blocks[]} for tools/smoke.mjs.
 -->
 <style>
@@ -23,6 +24,12 @@
   var comps = (Q.get('c') || 'bar').split(',').filter(Boolean);
   var theme = Q.get('theme') || 'navy';
   document.documentElement.setAttribute('data-rk-theme', theme);
+  // ?lang=zh-CN: report locale (as Report(locale=...) emits it), read by RK.i18n when the core loads
+  var lang = Q.get('lang');
+  if (lang) {
+    document.documentElement.setAttribute('lang', lang);
+    var lm = document.createElement('meta'); lm.name = 'rk:locale'; lm.content = lang; document.head.appendChild(lm);
+  }
   var H = window.__RK_HARNESS = { done: false, errors: [], blocks: [] };
   window.addEventListener('error', function (e) { H.errors.push(String(e.message || e)); });
   var origErr = console.error;

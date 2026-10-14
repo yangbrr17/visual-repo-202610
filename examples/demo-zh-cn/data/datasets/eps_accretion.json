@@ -1,0 +1,30 @@
+{
+  "id": "eps_accretion",
+  "title": "每股收益增厚 / 摊薄（实时）",
+  "schema": {"fields": [
+    {"name": "year", "type": "string", "title": "年度"},
+    {"name": "acq_ni", "type": "number", "title": "华辰智能独立净利润", "format": "#,##0.0"},
+    {"name": "acq_shares", "type": "number", "title": "现有股本（亿股）", "format": "#,##0.00"},
+    {"name": "tgt_ni_eur", "type": "number", "title": "凯斯勒净利润（亿欧元）", "format": "0.00"},
+    {"name": "syn_full", "type": "number", "title": "税前协同效应（全面实现）", "format": "#,##0.0"},
+    {"name": "ppa", "type": "number", "title": "无形资产摊销（税后）", "format": "#,##0.0"},
+    {"name": "loan", "type": "number", "title": "并购贷款", "format": "#,##0.0"},
+    {"name": "cash_used", "type": "number", "title": "使用自有资金", "format": "#,##0.0"},
+    {"name": "new_shares", "type": "number", "title": "定增新股（亿股）", "format": "0.00"}
+  ]},
+  "data": [
+    {"year": "2027E", "acq_ni": 25.4, "acq_shares": 12.0, "tgt_ni_eur": 0.64, "syn_full": 1.6, "ppa": 1.2, "loan": 40.0, "cash_used": 28.0, "new_shares": 0.6667},
+    {"year": "2028E", "acq_ni": 28.9, "acq_shares": 12.0, "tgt_ni_eur": 0.73, "syn_full": 2.6, "ppa": 1.2, "loan": 40.0, "cash_used": 28.0, "new_shares": 0.6667},
+    {"year": "2029E", "acq_ni": 32.6, "acq_shares": 12.0, "tgt_ni_eur": 0.81, "syn_full": 3.2, "ppa": 1.2, "loan": 40.0, "cash_used": 28.0, "new_shares": 0.6667}
+  ],
+  "meta": {"notes": ["假设2027年1月1日完成交割、收购对价已锁汇；自有资金机会成本按1.5%计。"], "source": "北桥资本分析；华辰智能一致预期（示例）", "unit": "人民币亿元"},
+  "computed": [
+    {"name": "tgt_ni", "formula": "tgt_ni_eur * @fx", "title": "凯斯勒净利润", "format": "#,##0.0"},
+    {"name": "syn_net", "formula": "syn_full * @synergy * (1 - 0.25)", "title": "税后协同效应", "format": "#,##0.0"},
+    {"name": "fin_cost", "formula": "(loan * @loan_rate + cash_used * 0.015) * (1 - 0.25)", "title": "税后融资成本", "format": "#,##0.0"},
+    {"name": "pf_ni", "formula": "acq_ni + tgt_ni + syn_net - fin_cost - ppa", "title": "备考净利润", "format": "#,##0.0"},
+    {"name": "eps_sa", "formula": "acq_ni / acq_shares", "title": "独立每股收益", "format": "0.00"},
+    {"name": "eps_pf", "formula": "pf_ni / (acq_shares + new_shares)", "title": "备考每股收益", "format": "0.00"},
+    {"name": "accretion", "formula": "eps_pf / eps_sa - 1", "title": "增厚 / (摊薄)", "format": "+0.0%;-0.0%;0.0%"}
+  ]
+}

@@ -11,7 +11,8 @@
  *
  * Each filter reads its values / extent from `data` (dataset id, default: the block's dataset) and
  * writes RK.store.setFilter(key, spec) with key = field by default, so two bars on the same field stay
- * in sync. The chips row lists the bar's own filters AND chart cross-filter selections (store filters
+ * in sync; spec.label carries the control's label (or the field title) so the page's "Filtered view"
+ * stamp and the block badges read "Region = Europe" rather than the raw field name. The chips row lists the bar's own filters AND chart cross-filter selections (store filters
  * with a `source`), each removable, plus "Reset all". Facet counts and the range histogram respect the
  * other active filters. Dropdowns are custom popovers attached to <body> (never clipped by a page),
  * fully keyboard operable (listbox / slider / switch ARIA patterns). Inline layout inside .rk-topbar:
@@ -140,16 +141,20 @@
       raw: f, ds: ds, field: f.field || null, type: type,
       key: f.key || f.field || (type + ':' + (f.label || 'filter')),
       label: f.label || (fld && fld.title) || f.field || tr('search', 'Search'),
+      // human name written into every spec (spec.label): the "Filtered view" stamp and block badges read
+      // "Region = Europe", not the raw field name, even on datasets that title the field differently
+      specLabel: f.label || (fld && fld.title) || null,
       format: f.format || (fld && fld.format) || null,
       fieldType: fld ? fld.type : null
     };
   }
 
-  /** Write a filter spec for control c (null clears it). */
+  /** Write a filter spec for control c (null clears it); spec.label = the control's human label. */
   function put(c, spec) {
     if (spec) {
       if (!spec.field && c.field && spec.op !== 'expr') spec.field = c.field;
       if (c.raw.datasets) spec.datasets = c.raw.datasets;
+      if (c.specLabel && spec.label == null) spec.label = String(c.specLabel);
     }
     RK.store.setFilter(c.key, spec);
   }

@@ -1,0 +1,28 @@
+{
+  "id": "dcf_scenario",
+  "title": "Live DCF by management-plan scenario",
+  "schema": {"fields": [
+    {"name": "scenario", "type": "string", "title": "Scenario"},
+    {"name": "fcf_26", "type": "number", "title": "FCF 2026E", "format": "$#,##0"},
+    {"name": "fcf_27", "type": "number", "title": "FCF 2027E", "format": "$#,##0"},
+    {"name": "fcf_28", "type": "number", "title": "FCF 2028E", "format": "$#,##0"},
+    {"name": "fcf_29", "type": "number", "title": "FCF 2029E", "format": "$#,##0"},
+    {"name": "fcf_30", "type": "number", "title": "FCF 2030E", "format": "$#,##0"},
+    {"name": "net_debt", "type": "number", "title": "Net debt", "format": "$#,##0"},
+    {"name": "other_adj", "type": "number", "title": "Other EV adjustments", "format": "#,##0;(#,##0)"},
+    {"name": "shares", "type": "number", "title": "Diluted shares (m)", "format": "#,##0.0"}
+  ]},
+  "data": [
+    {"scenario": "Downside", "fcf_26": 474.5, "fcf_27": 487.9, "fcf_28": 506.8, "fcf_29": 527.9, "fcf_30": 546.4, "net_debt": 1490.0, "other_adj": -145.0, "shares": 158.0},
+    {"scenario": "Base", "fcf_26": 498.6, "fcf_27": 550.1, "fcf_28": 607.6, "fcf_29": 664.3, "fcf_30": 717.0, "net_debt": 1490.0, "other_adj": -145.0, "shares": 158.0},
+    {"scenario": "Upside", "fcf_26": 511.9, "fcf_27": 588.8, "fcf_28": 675.3, "fcf_29": 764.6, "fcf_30": 854.7, "net_debt": 1490.0, "other_adj": -145.0, "shares": 158.0}
+  ],
+  "meta": {"source": "Northbridge Capital analysis; Helios management plan scenarios", "unit": "USD m"},
+  "computed": [
+    {"name": "pv_fcf", "formula": "fcf_26 / (1 + @wacc) ^ 1 + fcf_27 / (1 + @wacc) ^ 2 + fcf_28 / (1 + @wacc) ^ 3 + fcf_29 / (1 + @wacc) ^ 4 + fcf_30 / (1 + @wacc) ^ 5", "title": "PV of FCF 2026E–30E", "format": "$#,##0"},
+    {"name": "pv_tv", "formula": "fcf_30 * (1 + @tgr) / (@wacc - @tgr) / (1 + @wacc) ^ 5", "title": "PV of terminal value", "format": "$#,##0"},
+    {"name": "implied_ev", "formula": "pv_fcf + pv_tv", "title": "Enterprise value", "format": "$#,##0"},
+    {"name": "implied_price", "formula": "(implied_ev - net_debt + other_adj) / shares", "title": "Value per share", "format": "$0.00"},
+    {"name": "premium", "formula": "implied_price / 42.5 - 1", "title": "Premium to current", "format": "+0%;-0%;0%"}
+  ]
+}

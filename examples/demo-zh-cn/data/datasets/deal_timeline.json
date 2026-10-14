@@ -1,0 +1,34 @@
+{
+  "id": "deal_timeline",
+  "title": "交易时间表",
+  "schema": {"fields": [
+    {"name": "workstream", "type": "string", "title": "工作流"},
+    {"name": "task", "type": "string", "title": "事项"},
+    {"name": "start", "type": "date", "title": "开始", "format": "yyyy\"年\"m\"月\"d\"日\""},
+    {"name": "end", "type": "date", "title": "结束", "format": "yyyy\"年\"m\"月\"d\"日\""},
+    {"name": "phase", "type": "string", "title": "阶段"},
+    {"name": "milestone", "type": "boolean", "title": "里程碑"},
+    {"name": "owner", "type": "string", "title": "负责方"}
+  ]},
+  "data": [
+    {"workstream": "尽职调查与谈判", "task": "财务、法律、税务与技术尽调", "start": "2026-10-19", "end": "2026-12-04", "phase": "准备", "milestone": false, "owner": "华辰智能 / 北桥资本"},
+    {"workstream": "尽职调查与谈判", "task": "提交不具约束力报价", "start": "2026-11-06", "end": "2026-11-06", "phase": "准备", "milestone": true, "owner": "华辰智能"},
+    {"workstream": "尽职调查与谈判", "task": "提交约束性报价", "start": "2026-12-18", "end": "2026-12-18", "phase": "谈判", "milestone": true, "owner": "华辰智能"},
+    {"workstream": "尽职调查与谈判", "task": "股权购买协议（SPA）谈判", "start": "2026-12-07", "end": "2027-01-22", "phase": "谈判", "milestone": false, "owner": "律师 / 北桥资本"},
+    {"workstream": "尽职调查与谈判", "task": "签署 SPA 并公告", "start": "2027-01-29", "end": "2027-01-29", "phase": "谈判", "milestone": true, "owner": "交易双方"},
+    {"workstream": "公司决策", "task": "董事会审议交易方案", "start": "2027-01-27", "end": "2027-01-27", "phase": "谈判", "milestone": true, "owner": "华辰智能董事会"},
+    {"workstream": "公司决策", "task": "股东大会审议", "start": "2027-03-16", "end": "2027-03-16", "phase": "审批", "milestone": true, "owner": "华辰智能股东"},
+    {"workstream": "境内审批", "task": "发改委境外投资项目备案", "start": "2027-02-01", "end": "2027-03-31", "phase": "审批", "milestone": false, "owner": "华辰智能"},
+    {"workstream": "境内审批", "task": "商务部门境外投资备案", "start": "2027-02-08", "end": "2027-04-09", "phase": "审批", "milestone": false, "owner": "华辰智能"},
+    {"workstream": "境内审批", "task": "外汇登记（经办银行）", "start": "2027-04-12", "end": "2027-04-30", "phase": "审批", "milestone": false, "owner": "经办银行"},
+    {"workstream": "境内审批", "task": "经营者集中申报", "start": "2027-02-15", "end": "2027-05-14", "phase": "审批", "milestone": false, "owner": "律师"},
+    {"workstream": "境外审批", "task": "德国外商投资审查", "start": "2027-02-01", "end": "2027-05-28", "phase": "审批", "milestone": false, "owner": "德国律师"},
+    {"workstream": "境外审批", "task": "欧盟反垄断申报", "start": "2027-02-15", "end": "2027-04-30", "phase": "审批", "milestone": false, "owner": "德国律师"},
+    {"workstream": "融资", "task": "并购贷款银团组建", "start": "2026-12-01", "end": "2027-02-26", "phase": "融资", "milestone": false, "owner": "牵头银行"},
+    {"workstream": "融资", "task": "A股定增：审核与注册", "start": "2027-03-22", "end": "2027-07-30", "phase": "融资", "milestone": false, "owner": "保荐机构"},
+    {"workstream": "融资", "task": "定增发行与缴款", "start": "2027-08-02", "end": "2027-08-20", "phase": "融资", "milestone": false, "owner": "保荐机构"},
+    {"workstream": "交割与整合", "task": "交割", "start": "2027-09-15", "end": "2027-09-15", "phase": "交割", "milestone": true, "owner": "交易双方"},
+    {"workstream": "交割与整合", "task": "投后整合百日计划", "start": "2027-09-15", "end": "2027-12-24", "phase": "交割", "milestone": false, "owner": "整合办公室"}
+  ],
+  "meta": {"notes": ["时间表为初步安排，取决于审批进度。"], "source": "北桥资本分析（示例）"}
+}

@@ -56,7 +56,7 @@
   "interactions": [
     "Tooltip with start / end dates, duration in days and weeks, owner and status vs. today",
     "Click a task or a workstream label to cross-filter by workstream (others dim)",
-    "Ctrl + wheel, pinch or slider zoom on the time axis (a plain wheel scrolls the page); header switches between weeks, months and quarters",
+    "Time-axis zoom: slider; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page); the header switches between weeks, months and quarters",
     "Legend toggles phases and milestones",
     "Staggered bar wipe-in and milestone pop on entry; smooth updates on filter changes",
     "PNG / CSV export"

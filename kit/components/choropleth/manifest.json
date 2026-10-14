@@ -37,7 +37,7 @@
     "filterField": {"type": "string", "default": null, "desc": "Field used for click-to-filter; defaults to encode.id. Use 'country' to link with assets_locations. Shared business dimensions (country, company, sector, region, segment, year…) filter the whole report; other fields (site name, type, from / to…) only this block's dataset — set crossFilterScope to override"},
     "scrollZoom": {"type": "boolean|string", "default": "click", "desc": "Plain mouse-wheel zoom: 'click' (armed after clicking the map, so page scrolling is never hijacked) | true | false. Ctrl/Cmd + wheel or a trackpad pinch always zooms; +/- buttons and drag too"}
   },
-  "interactions": ["Hover highlight + tooltip (value, rank, extra fields)", "Click a country to cross-filter (dims the others)", "Zoom / pan (+/- buttons, Ctrl/Cmd + wheel or pinch; plain wheel after a click)", "Micro-states / territories without a polygon shown as coloured points (same scale, hover and click)", "Smooth colour transitions when filters change", "PNG export"],
+  "interactions": ["Hover highlight + tooltip (value, rank, extra fields)", "Click a country to cross-filter (dims the others)", "Ctrl/⌘ + wheel or pinch to zoom; drag to pan; +/− buttons (plain wheel scrolls the page until the map is clicked)", "Micro-states / territories without a polygon shown as coloured points (same scale, hover and click)", "Smooth colour transitions when filters change", "PNG export"],
   "samples": [
     {"title": "Revenue 2025A by country (USD m)", "data": "revenue_by_country", "height": 480, "span": 9,
      "options": {"encode": {"id": "iso_num", "value": "revenue", "label": "country"}, "tooltip": ["growth", "employees"], "filterField": "country"}},

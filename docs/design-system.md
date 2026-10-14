@@ -36,11 +36,14 @@
 | 打印 | 13.333 in × 7.5 in = PowerPoint widescreen = 960×540 pt | ✅ `print.css`：`@page { size: 13.333in 7.5in; margin: 0 }`，每个 `.rk-page` 一张 |
 | 屏幕最大宽 | `--rk-deck-max: 1320px`，左侧 nav `236px` | ✅ `layout.css` |
 | 窄屏 | 取消 16:9，改为纵向流式排版（reflow） | ✅ `@media` 中 `.rk-page { aspect-ratio: auto }` |
+| Letter / A4 | US Letter 横向 11 × 8.5 in、A4 横向 297 × 210 mm | ✅ `Report(page_size="letter" \| "a4")` → `<html data-rk-page-size>`（屏幕比例 `layout.css`，打印 `print.css`）+ builder 追加的 `@page` 规则 |
+| 打印适配 | 内容溢出 block 的表格 / 网格打印时不能被裁掉 | ✅ `RK.runtime.printFit()`：打印时把溢出内容按 CSS `zoom` 缩小到 block 内（最小 0.55）；block `printFit: false` 关闭 |
 
 **决策说明**：research 04 实测美国投行 deck 基本都是 **US Letter 横向 11×8.5 in（1.294）**，没有一家是 16:9
 （例：GS "Project Jewel" https://www.sec.gov/Archives/edgar/data/1274173/000110465926008735/tm2534023d8_ex99-civ.htm ）。
 我们仍以 16:9 为默认，原因有两点：交付物以屏幕交互为主；页面要能直接贴进 widescreen PPT。另外，research 09 实测 Chromium `page.pdf()` 能精确产出 960×540 pt
-的页面，不需要缩放或重排（§8.1）。Letter / A4 作为可选的命名页面（named page），状态 ⬜。
+的页面，不需要缩放或重排（§8.1）。Letter / A4 横向作为报告级选项已实现 ✅（`page_size`，见上表）；
+同一份报告内混用不同页面尺寸（named page）不支持。
 
 ### 1.2 页面槽位（自上而下）
 
@@ -68,6 +71,7 @@
 | Subtitle / units | `.rk-page__subtitle` | 写单位口径：`USD m unless otherwise stated`、`($ in millions, except per share data)`；14px `--rk-ink-3` | GS / Evercore 单位行（04 §2） |
 | Block 标题 | `.rk-block__title` / `__subtitle` | 图表名词短语（不重复结论）+ 单位或期间；14px / 11px | — |
 | Source | `.rk-page__source` | 以 `Source:` 开头，附 `market data as of DD-MMM-YYYY`。不写时，builder 会自动汇总本页所用 dataset 的 `meta.source` ✅ | 04 §2："Source 行必须有" |
+| Filtered view | `.rk-page__filtered` | 有全局筛选或交叉选择作用于本页时，运行时自动写 “Filtered view: Region = Europe · …”（`highlight` 色小字，打印保留）✅；`filters=False` 的页面永不显示 | 截图 / PDF 转发时不被误读为全量数据 |
 | Notes | `.rk-page__notes` | 用 `(1) (2)` 编号，和表内标记一一对应；数据中的 n.m. 阈值必须在这里注明 | Chaus DEFM14A n.m. 先例（04 §6.2） |
 | Confidentiality | `.rk-page__conf` | 默认取 `report.confidentiality`（"Strictly private & confidential"），大写，`letter-spacing:.06em` | GS / Centerview / Evercore |
 | Page number | `.rk-page__num` | 运行时自动编号 ✅；右下角，tabular，600 | GS 右下页码 |
@@ -81,7 +85,9 @@
 | Valuation summary | DCF and precedents support $46–58 per share, above the $46.10 proposal |
 | Revenue by segment | Software grows to 41% of revenue by 2028E, driving the margin step-up |
 
-- 标题里的数字由数据算出（f-string / `{{median(x)|0.0x}}` 占位符），不要手打（`docs/pipeline-guide.md` §10 检查清单）。
+- 标题里的数字由数据算出，不要手打（`docs/pipeline-guide.md` §10 检查清单）。会随筛选或参数变化的数字写成**标题模板** ✅：
+  `r.page("Peers trade at a median {{peers: median(ev_ebitda_25e) | 0.0x}} NTM EBITDA")`——客户筛选到 Europe 后标题与图表一致
+  （`docs/architecture.md` §7.1）；静态数字用 f-string 即可。
 - 审阅时只看导航栏里的标题，应该能读出完整故事线（horizontal logic，04 §10）。
 
 ### 1.3 栅格
@@ -171,7 +177,8 @@ ECharts 侧（`rk.theme.js` 中的 `echartsTheme`）：全局 `textStyle` 12px�
 5. **pos / neg 只用于 delta 列、bridge 增减和 diverging 热力图**，并且必须同时带符号：`+5.2%` / `(3.1%)` / ▲▼。
    单页最多 1 个 diverging 语义。KPI tile 用 `good` 通道（该行字段值为 `'down'`）声明"下降为好"（如 leverage、成本）✅。
 6. **中国惯例 红涨绿跌**：ECharts candlestick 默认就是红涨绿跌（06 §0-3）。kit 的 candlestick / price-volume 已改为读取 `t.pos` / `t.neg`
-   （西方惯例）✅。面向中国客户时，建一个主题变体对调 `--rk-pos` 和 `--rk-neg` 即可，组件不用改。
+   （西方惯例）✅。面向中国客户时用 `Report(updown="cn")`（`<html data-rk-updown="cn">`）✅：运行时对调 `--rk-pos` / `--rk-neg`
+   和 `RK.theme.tokens().pos/neg`，四套主题都适用、换主题后仍然有效，组件不用改（`RK.theme.setUpdown('cn' | 'us')` 可在运行时切换）。
 7. **暗色不是自动反色**：`ink` 主题有单独一套 token。暗色色板必须在暗底上单独验证（§3.4）。
 8. **大屏风格禁用**：霓虹、发光、渐变柱、玻璃拟态、3D、飞线、水球图、词云，都不适合投行交付物（06 §11）。
 
@@ -213,10 +220,11 @@ lightness band、chroma ≥ 0.10、相邻 CVD ΔE ≥ 8、正常视觉 ΔE ≥ 1
 剩余 7 色**按原顺序**仍然全部 PASS（navy 12.0 / 19.5，bronze 12.8 / 17.4，slate 16.0 / 18.1，ink 12.9 / 17.7）。
 `RK.theme.palette()` 在有目标高亮时就是这样剔除颜色的，所以这些色板可以直接配合目标高亮使用。
 
-### 3.5 现行 kit token 审计（2026-10-14）
+### 3.5 kit token 审计（2026-10-14）与修正状态
 
 kit 主题里的 categorical **并不等同于上表**：cat-1 被设成品牌深色（作"主系列"），cat-8 被设成灰色（作 "Other"）。
-这两格是**语义槽位**，本来就不在 categorical 验证范围内。但即便只看 slot 2–7，验证结果也不全是 PASS：
+这两格是**语义槽位**，本来就不在 categorical 验证范围内。审计时 slot 2–7 的结果如下；**表中"建议"一列已全部写入
+`kit/styles/themes/*.css`** ✅（navy、slate、ink 的 cat-2…cat-7 与建议值逐一相同，bronze 保持不变）：
 
 | 主题 | slot 2–7 结果 | 问题 | 建议（已用 validator 验证 PASS） |
 |---|---|---|---|
@@ -226,20 +234,26 @@ kit 主题里的 categorical **并不等同于上表**：cat-1 被设成品牌�
 | ink | FAIL | 4 色超出暗色 lightness band（L 0.71–0.87 > 0.67），3 色 chroma < 0.10；相邻 CVD ΔE 4.3、正常视觉 ΔE 12.3 | 用 §3.4 "navy · dark" 一行（去掉 gold）：`#d5683b #129d97 #8a69be #639346 #449fc9 #b74e74`（9.6 / 17.7；前 3 色 9.6 / 19.8） |
 
 同时，bronze 的 ordinal 浅端 `#dfc7a3` 只有 1.61:1，slate 的 `#a9bad0` 只有 1.98:1，都低于 2:1 下限。
-改用 §3.4 的 4 阶版本，或者删掉第 5 阶。**修正属于 token 改动，要另开任务做**（§10）。
-做完后按 §4.2 第 4 步重跑 validator。
+已改用 §3.4 的 4 阶版本 ✅：bronze、slate 的 `--rk-ord-5` 设为 `initial`（不继承 navy 的第 5 阶）。
+
+之后的视觉 QA 又改了一处：slate 的目标高亮 `--rk-accent-2` 从 teal `#1b8a8f` 改为金色 `#c98a00`（teal 与图表系列色太接近）。
+它与 slate cat-2 `#c38700` 几乎同色——有目标高亮时 `RK.theme.palette()` 会剔除这一格，但手工指定 `cat2` 的组件要避免与目标高亮同屏。
+所有主题另有文字安全的 `--rk-accent-2-ink`（≥ 4.5:1），用于高亮色的文字标签。
 
 ### 3.6 对比度（WCAG 2.x，相对 `--rk-paper` 实测）
 
-| 主题 | ink | ink-2 | ink-3（脚注 10px） | accent-2 | ref | pos | neg | axis |
-|---|---|---|---|---|---|---|---|---|
-| navy | 17.1 | 9.0 | 4.53 ✅ | 3.09 | 6.54 | 4.91 | 5.66 | 3.03 |
-| bronze | 15.3 | 9.3 | **4.22 ✗** | 11.3 | 6.43 | 5.64 | 5.86 | 2.85 |
-| slate | 16.3 | 8.9 | 4.51 ✅ | 4.13 | 5.44 | **4.18 ✗** | 4.67 | 2.93 |
-| ink | 15.3 | 9.9 | 5.85 ✅ | 9.13 | 7.42 | 7.24 | 6.23 | 2.94 |
+2026-10-14 按现行 token 重算：
 
-- 小字（< 18px）需要 ≥ 4.5:1，因此 bronze 的 `--rk-ink-3` 和 slate 的 `--rk-pos`（当它被用作文字色时）需要加深 ⬜。
-- 图形标记需要 ≥ 3:1：navy 的 accent-2（3.09）刚好达标，所以金色高亮条不能再调浅。
+| 主题 | ink | ink-2 | ink-3（脚注 10px） | accent-2 | accent-2-ink（文字） | ref | pos | neg | axis |
+|---|---|---|---|---|---|---|---|---|---|
+| navy | 17.1 | 9.0 | 4.53 ✅ | 3.09 | 4.87 ✅ | 6.54 | 4.91 | 5.66 | 3.03 |
+| bronze | 15.3 | 9.3 | 5.24 ✅ | 11.3 | 11.3 ✅ | 6.43 | 5.64 | 5.86 | 2.85 |
+| slate | 16.3 | 8.9 | 4.51 ✅ | **2.95** | 5.70 ✅ | 5.44 | 5.23 ✅ | 4.67 | 2.93 |
+| ink | 15.3 | 9.9 | 5.85 ✅ | 9.13 | 9.13 ✅ | 7.42 | 7.24 | 6.23 | 2.94 |
+
+- 小字（< 18px）需要 ≥ 4.5:1：审计时不达标的 bronze `--rk-ink-3`（原 4.22）和 slate `--rk-pos`（原 4.18）已加深 ✅。
+- 图形标记需要 ≥ 3:1：navy 的 accent-2（3.09）刚好达标，所以金色高亮条不能再调浅；slate 改为金色后的 accent-2 只有 **2.95**，
+  略低于 3:1（目标高亮条旁通常有数值标签，影响有限），建议加深到约 `#b67d00` ⬜（§10）。
 - 网格线和轴线刻意做弱（< 3:1）。它们是辅助线，不承载信息。
 
 ---
@@ -252,11 +266,11 @@ kit 主题里的 categorical **并不等同于上表**：cat-1 被设成品牌�
 |---|---|---|---|---|
 | `navy`（默认） | Navy classic | Bulge-bracket pitchbook：深 navy + 冷蓝 + 一个 muted gold | `#0b2d5b` / `#b08d57` / `#b3261e` | `:root` 同时等于 navy |
 | `bronze` | Bronze & ivory | 精品投行 / 私行：暖纸面、espresso 文字、bronze 主色，navy 作对比色 | `#6b4f36` / `#1f3a5f` / `#b3261e` | 和 serif 标题最搭（ref 原为 `#8f2c47`，与 cat-2 撞色，c4f9b5d 改为 `#b3261e`） |
-| `slate` | Slate modern | 咨询风：冷灰 + teal 点缀 | `#1f2a44` / `#1b8a8f` / `#c0392b` | 适合内部 dashboard |
+| `slate` | Slate modern | 咨询风：冷灰 + 金色目标高亮 | `#1f2a44` / `#c98a00` / `#c0392b` | 适合内部 dashboard（高亮原为 teal `#1b8a8f`，966e3b7 改为金色，见 §3.5） |
 | `ink` | Ink (dark) | 屏幕 / 会议室大屏演示的暗色模式 | `#7fa7d9` / `#d6b47a` / `#ef8a8a` | **打印时 `print.css` 会强制换回纸面色** |
 
 注：bronze 的 `--rk-highlight`（`#a78155`）和 `--rk-accent-2`（`#1f3a5f`）不是同一个颜色，其他三套主题里两者相同。
-写组件时，目标高亮统一用 `t.accent2`。
+写组件时，目标高亮统一用 `t.accent2`；高亮色的文字标签用 `--rk-accent-2-ink`。主题名称在中文报告里由 i18n 键 `theme.<id>` 翻译。
 
 ### 4.2 新建主题（只改 token，不改组件）
 
@@ -264,8 +278,9 @@ kit 主题里的 categorical **并不等同于上表**：cat-1 被设成品牌�
 2. **改 token**：结构色 → 文字色 → accent / accent-2 / ref → pos / neg → cat / ord / seq / div → map / tooltip。
    必须把所有 token 写全。漏写的 token 会继承 `:root`（即 navy）的值，而 `rk.theme.js` 的 fallback 只覆盖一部分。
 3. **登记**：在 `kit/build.json` 的 `styles` 和 `themes` 里加入新主题（可选：`themeLabels: {"<id>": "Label"}`）。
-   Python builder 会据此拼接 CSS 并生成主题下拉框。运行时的 `RK.theme.list` / `labels` 目前写死在 `rk.theme.js` 里。
-   不改核心代码时，可以在 `reportkit.js` 之后执行 `RK.theme.list.push('<id>'); RK.theme.labels['<id>'] = '…'`，这样"记住上次主题"也会生效 🟡。
+   Python builder 会据此拼接 CSS、生成主题下拉框，并写出 `<meta name="rk:themes" content="navy,bronze,…">`，
+   运行时 `RK.theme.init()` 以它为 `RK.theme.list`（"记住上次主题"按报告保存在 `rk:theme:<reportKey>`）✅。
+   手写 HTML 时可调用 `RK.theme.register('<id>', 'Label')`；中文标签用 `RK.i18n.add('zh-CN', {'theme.<id>': '…'})`。
 4. **验证**（必做）：
    ```bash
    node validate_palette.js "<cat-2..cat-7>" --mode light --surface "<paper>"           # 暗色主题用 --mode dark
@@ -307,7 +322,7 @@ kit 主题里的 categorical **并不等同于上表**：cat-1 被设成品牌�
 | 日期 | 表格 `dd mmm yyyy` / `dd-mmm-yyyy`；轴 `mmm-yy`；季度 `"Q"q yyyy` | `14 Oct 2026` / `Oct-26` / `Q4 2026` |
 | 期间后缀 | 列头 `2025A / 2026E / LTM / NTM / 4Q'25E` | 写在字段 `title` 里 |
 | 区间 | 两端各自格式化，中间用 en dash `–` | `$42.97 – $58.15`、`19.1x – 27.4x` |
-| 中文单位 | 同一份报告只用一套：万 / 亿，或者 m / bn | `yyyy"年"m"月"d"日"` ✅；万 / 亿可通过改 `RK.format.config.compactUnits` 实现 🟡 |
+| 中文单位 | 同一份报告只用一套：万 / 亿，或者 m / bn | `yyyy"年"m"月"d"日"` ✅；`Report(locale="zh-CN")` 时 `auto` 紧凑单位自动换成 亿 / 万（`1.5e9` → `15亿`）✅，页面自定义的 `compactUnits` 不被覆盖 |
 
 ### 5.2 单位放在哪里
 
@@ -357,7 +372,7 @@ kit 主题里的 categorical **并不等同于上表**：cat-1 被设成品牌�
 | 1920×1080 整页缩放 (scale-to-fit) 的大屏布局 | 12 栅格 + 打印页面尺寸 |
 | 自动轮播表格、自动轮换 tooltip | 读者控制节奏：可排序的静态表 + 分页 |
 | LLM 或用户文本进入 ECharts HTML formatter | kit 自己的 tooltip 渲染器 + `textContent` |
-| 用 CSS `zoom` 缩放页面 | `transform: scale()`（`zoom` 会让 ECharts 命中错误的柱，09 §8.3） |
+| 屏幕上用 CSS `zoom` 缩放页面 | `transform: scale()`（`zoom` 会让 ECharts 命中错误的柱，09 §8.3）。打印没有指针交互，所以 `print.css` 的 Letter / A4 页面和 printFit 用 `zoom` 是允许的 |
 
 ---
 
@@ -396,7 +411,9 @@ NN/g 动画时长（https://www.nngroup.com/articles/animation-duration/ ）、0
 - 数据标签颜色由 `RK.theme.textOn(fill)` 按 WCAG 对比度自动选深色或浅色，明暗主题都适用。
 - 增减同时用 ▲▼ 箭头、符号和括号表达，颜色只是冗余编码；KPI 箭头带 `aria-hidden`，读屏只读数字。
 - count-up 用 `aria-label` 提供最终值；遵守 `prefers-reduced-motion`。
-- `<html lang>` 跟随 `report.locale`。
+- `<html lang>` 跟随 `report.locale`；运行时界面文字（工具栏、对话框、筛选提示、aria-label）走 `RK.i18n`，内置 en / zh-CN ✅。
+- ECharts `aria` 统一开启 ✅（`rk.chart.js`：`aria: {enabled: true, decal: {show: false}}`，读屏获得自动生成的图表描述，描述语言跟随报告 locale）；
+  block `options.aria: false` 可关闭。
 
 **规则**
 - 文字 ≥ 4.5:1，图形标记 ≥ 3:1（§3.6）。不能只靠颜色区分系列：≤ 4 条线时直接标注，散点用形状或标签区分。
@@ -404,9 +421,8 @@ NN/g 动画时长（https://www.nngroup.com/articles/animation-duration/ ）、0
 - 最小字号 10px（`--rk-fs-xs`），只能用于脚注和页脚；交互控件文字 ≥ 11px。
 
 **缺口 ⬜**
-- ECharts 的 `aria` 选项（自动生成图表描述和 decal 图案）尚未开启。建议在 `rk.chart.js` 里统一打开 `aria: {enabled: true}`。
-  decal 只在单色打印模式下启用。
-- bronze 的 `--rk-ink-3` 只有 4.22:1，slate 的 `--rk-pos` 只有 4.18:1（§3.6）。
+- decal 图案（单色打印模式下区分系列）尚未启用。
+- slate 的 `--rk-accent-2` 只有 2.95:1（图形标记门槛 3:1，§3.6）。
 - 打印成 PDF 后没有 tagged 结构；builder 走 Playwright 时可以加 `tagged=True, outline=True`（09 §8.1）。
 
 ---
@@ -414,28 +430,33 @@ NN/g 动画时长（https://www.nngroup.com/articles/animation-duration/ ）、0
 ## 9. 交付前设计 QA 清单
 
 - [ ] 每页：action title（结论 + 数字，≤ 2 行）、units subtitle、Source、as-of、Notes 编号与表内标记一致、机密标记、页码。
+- [ ] 会随筛选变化的标题数字用模板写；筛选到一个子集后，标题、图表、页脚 “Filtered view” 三者一致；不该被筛选的页设了 `filters=False`。
 - [ ] 只读导航栏里的标题，能读出完整故事线。
 - [ ] 所有数字都经过格式码；负数用括号；n.a. / n.m. / – 的语义正确；n.m. 不参与统计且阈值写进了脚注。
 - [ ] 份额类标签加总等于显示的总计；同一份报告里单位体系一致（m / bn 和 万 / 亿 不混用）。
 - [ ] 每页数据色 ≤ 4–5 种；目标只用 accent2；参考线只用 ref；红绿必带符号。
 - [ ] 组件里没有硬编码颜色；新主题已经跑过 validator 和 WCAG 检查。
-- [ ] `prefers-reduced-motion` 和打印预览下，每页都显示终态，不出现半截动画；打印出来每页都是 16:9，没有内容被裁掉。
+- [ ] `prefers-reduced-motion` 和打印预览下，每页都显示终态，不出现半截动画；打印出来每页都是 16:9（或所选 Letter / A4），
+      没有内容被裁掉（溢出的表格由 printFit 缩小；缩到 0.55 仍放不下时要拆页）。
+- [ ] 中文报告：`locale="zh-CN"`、显式中文 `confidentiality`、万 / 亿 与 m / bn 不混用；需要时 `updown="cn"`。
 - [ ] `ink` 主题打印出来是浅色纸面。
 
 ---
 
 ## 10. 设计系统层面的待办（本次审阅发现）
 
-| # | 项 | 位置 | 优先级 |
-|---|---|---|---|
-| 1 | navy / slate / ink 的 categorical slot 2–7 改成 §3.5 中已验证的顺序或色值；bronze、slate 的 ordinal 浅端加深 | `themes/*.css` | P0 |
-| 2 | bronze `--rk-ink-3`、slate `--rk-pos` 提到 ≥ 4.5:1 | `themes/*.css` | P0 |
-| 3 | validator vendor 到 `tools/`，接入 `check.sh`（categorical + ordinal + 文字对比度） | `tools/` | P1 |
-| 4 | `rk.format`：`roundToTotal()`、`formatRange()`、`unitOn`、house-style 开关、万 / 亿 preset | `rk.format.js` | P1 |
-| 5 | ECharts 入场和更新时长改为 600 / 400 ms；新增 `?motion=off` | `rk.theme.js` / `rk.motion.js` | P2 |
-| 6 | ECharts `aria` + 单色打印 decal | `rk.chart.js` | P2 |
-| 7 | DRAFT 章、Letter / A4 命名页面、`RK.theme.list` 从 `build.json` 注入 | `layout.css` / `print.css` / builder | P2 |
-| 8 | 中文字体子集化（Noto Sans SC），以及 `zero` / `case` 等 OpenType 特性（上游 inter-ui） | builder / `kit/fonts` | P3 |
+| # | 项 | 位置 | 优先级 | 状态 |
+|---|---|---|---|---|
+| 1 | navy / slate / ink 的 categorical slot 2–7 改成 §3.5 中已验证的顺序或色值；bronze、slate 的 ordinal 浅端加深 | `themes/*.css` | P0 | ✅ |
+| 2 | bronze `--rk-ink-3`、slate `--rk-pos` 提到 ≥ 4.5:1 | `themes/*.css` | P0 | ✅ |
+| 3 | validator vendor 到 `tools/`，接入 `check.sh`（categorical + ordinal + 文字对比度） | `tools/` | P1 | ⬜ |
+| 4 | `rk.format`：`roundToTotal()`、`formatRange()`、`unitOn`、house-style 开关；万 / 亿 preset | `rk.format.js` | P1 | 🟡 万 / 亿随 `locale="zh-CN"` 自动切换 ✅，其余 ⬜ |
+| 5 | ECharts 入场和更新时长改为 600 / 400 ms；新增 `?motion=off` | `rk.theme.js` / `rk.motion.js` | P2 | ⬜（现为 900 / 600 ms） |
+| 6 | ECharts `aria` + 单色打印 decal | `rk.chart.js` | P2 | 🟡 aria ✅，decal ⬜ |
+| 7 | DRAFT 章、Letter / A4 页面、`RK.theme.list` 从 `build.json` 注入 | `layout.css` / `print.css` / builder | P2 | 🟡 Letter / A4 ✅、主题列表（`rk:themes` meta）✅，DRAFT 章 ⬜ |
+| 8 | 中文字体子集化（Noto Sans SC），以及 `zero` / `case` 等 OpenType 特性（上游 inter-ui） | builder / `kit/fonts` | P3 | ⬜ |
+| 9 | slate `--rk-accent-2`（2.95:1）加深到 ≥ 3:1，并与 cat-2 拉开 | `themes/slate.css` | P2 | ⬜ |
+| 10 | comps-table 统计行增加 75th / 25th 分位 | `comps-table` | P2 | ⬜ |
 
 ---
 

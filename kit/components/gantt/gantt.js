@@ -10,6 +10,25 @@
   var C = RK.chart;
   var DAY = 864e5, TIER = 18;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'gantt.fmtMonthLong': 'yyyy"年"m"月"', 'gantt.fmtMonthYear': 'yyyy"年"m"月"', 'gantt.fmtMonth': 'm"月"',
+      'gantt.fmtDate': 'yyyy"年"m"月"d"日"', 'gantt.fmtDay': 'm"月"d"日"', 'gantt.fmtDateShort': 'yy"年"m"月"d"日"', 'gantt.today': '今天',
+      'gantt.milestone': '里程碑', 'gantt.task': '任务', 'gantt.date': '日期', 'gantt.duration': '工期', 'gantt.days': '{n} 天',
+      'gantt.day': '{n} 天', 'gantt.weeks': '（{n} 周）', 'gantt.daysShort': '{n}天', 'gantt.weeksShort': '{n}周', 'gantt.completed': '已完成',
+      'gantt.startsIn': '{n} 天后开始', 'gantt.inProgress': '进行中 — 已过时间 {pct}'
+    });
+  }
+  /** Milestone legend / tooltip name: options.milestoneName, in the report locale when left at the default. */
+  function msName(o) { return o.milestoneName === 'Milestone' ? tr('gantt.milestone', 'Milestone') : o.milestoneName; }
+
   function ts(v) { var d = RK.format.toDate(v); return d && !isNaN(d) ? d.getTime() : null; }
   function isTrue(v) { return v === true || v === 1 || v === 'true' || v === 'TRUE' || v === 'Y' || v === 'yes'; }
   function weekStart(t, ws) { var d = new Date(t); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() - ws + 7) % 7)); return d.getTime(); }
@@ -21,17 +40,23 @@
    * Calendar header periods for a visible window [lo, hi] at pxPerDay.
    * -> [{s, e, tier (0 upper | 1 lower), text, grid (draw gridline at s)}]
    */
+  /** Month header text in the report locale: full code, or a one-letter / numeric form for narrow columns. */
+  function monthText(t, narrow) {
+    var code = tr('gantt.fmtMonth', 'mmm');
+    if (!narrow) return RK.format(new Date(t), code);
+    return code === 'mmm' ? RK.format(new Date(t), 'mmm').charAt(0) : RK.format(new Date(t), 'm');
+  }
   function calendar(lo, hi, pxPerDay, o) {
     var out = [], monthPx = pxPerDay * 30.4;
     var mode = o.calendar && o.calendar !== 'auto' ? o.calendar : pxPerDay * 7 >= 17 ? 'weeks' : monthPx >= 20 ? 'months' : 'quarters';
     var t, n;
     if (mode === 'weeks') {
-      var mfmt = monthPx >= 92 ? 'mmmm yyyy' : monthPx >= 52 ? 'mmm yyyy' : monthPx >= 26 ? 'mmm' : null;
-      for (t = monthStart(lo); t < hi; t = n) { n = addMonths(t, 1); out.push({ s: t, e: n, tier: 0, text: mfmt ? RK.format(new Date(t), mfmt) : RK.format(new Date(t), 'mmm').charAt(0), grid: true }); }
+      var mfmt = monthPx >= 92 ? tr('gantt.fmtMonthLong', 'mmmm yyyy') : monthPx >= 52 ? tr('gantt.fmtMonthYear', 'mmm yyyy') : monthPx >= 26 ? tr('gantt.fmtMonth', 'mmm') : null;
+      for (t = monthStart(lo); t < hi; t = n) { n = addMonths(t, 1); out.push({ s: t, e: n, tier: 0, text: mfmt ? RK.format(new Date(t), mfmt) : monthText(t, true), grid: true }); }
       for (t = weekStart(lo, o.weekStart); t < hi; t = n) { n = addDays(t, 7); out.push({ s: t, e: n, tier: 1, text: String(new Date(t).getDate()) }); }
     } else if (mode === 'months') {
       for (t = new Date(new Date(lo).getFullYear(), 0, 1).getTime(); t < hi; t = n) { n = addMonths(t, 12); out.push({ s: t, e: n, tier: 0, text: RK.format(new Date(t), 'yyyy'), grid: true }); }
-      for (t = monthStart(lo); t < hi; t = n) { n = addMonths(t, 1); out.push({ s: t, e: n, tier: 1, text: RK.format(new Date(t), 'mmm').slice(0, monthPx >= 26 ? 3 : 1), grid: monthPx >= 26 }); }   // 'Jan' or 'J'
+      for (t = monthStart(lo); t < hi; t = n) { n = addMonths(t, 1); out.push({ s: t, e: n, tier: 1, text: monthText(t, monthPx < 26), grid: monthPx >= 26 }); }   // 'Jan' or 'J'
     } else {
       for (t = new Date(new Date(lo).getFullYear(), 0, 1).getTime(); t < hi; t = n) { n = addMonths(t, 12); out.push({ s: t, e: n, tier: 0, text: RK.format(new Date(t), 'yyyy'), grid: true }); }
       for (t = monthStart(lo, 3); t < hi; t = n) { n = addMonths(t, 3); out.push({ s: t, e: n, tier: 1, text: 'Q' + RK.format(new Date(t), 'q'), grid: false }); }
@@ -101,8 +126,8 @@
     render: C(function build(ctx, inst) {
       var o = ctx.options, t = ctx.theme, enc = ctx.enc;
       var S = inst.__rkGantt || (inst.__rkGantt = {});
-      var dfmt = o.dateFormat || ctx.fmtOf(enc.start) || 'dd mmm yyyy';
-      if (!RK.format.isDateCode(dfmt)) dfmt = 'dd mmm yyyy';
+      var dfmt = o.dateFormat || ctx.fmtOf(enc.start) || tr('gantt.fmtDate', 'dd mmm yyyy');
+      if (!RK.format.isDateCode(dfmt)) dfmt = tr('gantt.fmtDate', 'dd mmm yyyy');
 
       /* ---------- tasks ---------- */
       var tasks = [];
@@ -247,7 +272,7 @@
         // 'label' would repeat the row label right beside it (every milestone has its own labelled row): the
         // name is only drawn when the row label column is hidden (labelWidth 0), otherwise the date
         var named = o.milestoneLabel === 'label' && labW <= 0;
-        var text = named ? k.label : (o.milestoneLabel === 'date' || o.milestoneLabel === 'label') ? RK.format(new Date(k.s), 'd mmm') : null;
+        var text = named ? k.label : (o.milestoneLabel === 'date' || o.milestoneLabel === 'label') ? RK.format(new Date(k.s), tr('gantt.fmtDay', 'd mmm')) : null;
         if (text && p[0] + r + 4 < cs.x + cs.width) {
           kids.push({ type: 'text', x: p[0] + r + 4, y: p[1], silent: true,
             style: { text: text, fill: fill === t.ink ? t.ink2 : fill, font: (named ? '500 ' : '600 ') + '11px ' + t.fontSans, verticalAlign: 'middle', stroke: t.paper, lineWidth: 3 },
@@ -318,7 +343,7 @@
       function renderToday(params, api) {
         var cs = params.coordSys, x = api.coord([todayTs, 0])[0];
         if (x < cs.x || x > cs.x + cs.width) return null;
-        var label = o.todayLabel + ' ' + RK.format(new Date(todayTs), 'd mmm'), font = '600 11px ' + t.fontSans;
+        var label = (o.todayLabel === 'Today' ? tr('gantt.today', 'Today') : o.todayLabel) + ' ' + RK.format(new Date(todayTs), tr('gantt.fmtDay', 'd mmm')), font = '600 11px ' + t.fontSans;
         var half = C.measure(label, font) / 2, lx = Math.max(cs.x + half, Math.min(cs.x + cs.width + 12 - half, x));   // keep the label inside the chart
         return { type: 'group', children: [
           { type: 'line', silent: true, shape: { x1: x, y1: cs.y, x2: x, y2: cs.y + cs.height + 3 }, style: { stroke: t.ref, lineWidth: 1.25, lineDash: [4, 3] } },
@@ -347,7 +372,7 @@
         var list = tasks.filter(function (k) { return !k.ms && k.phase === ph; });
         if (!list.length) return;
         series.push({
-          id: 'ph-' + pi, name: ph == null ? 'Task' : ph, type: 'custom', z: 3,
+          id: 'ph-' + pi, name: ph == null ? tr('gantt.task', 'Task') : ph, type: 'custom', z: 3,
           itemStyle: { color: phaseColor(ph) },
           renderItem: renderBar, encode: { x: [0, 1], y: 2, tooltip: [] },
           data: list.map(function (k) { return [k.s, k.barEnd, k.y, tasks.indexOf(k)]; })
@@ -356,7 +381,7 @@
       var msList = tasks.filter(function (k) { return k.ms; });
       if (msList.length) {
         series.push({
-          id: 'ms', name: o.milestoneName, type: 'custom', z: 4, itemStyle: { color: t.ink },
+          id: 'ms', name: msName(o), type: 'custom', z: 4, itemStyle: { color: t.ink },
           renderItem: renderMilestone, encode: { x: 0, y: 2, tooltip: [] },
           data: msList.map(function (k) { return [k.s, k.s, k.y, tasks.indexOf(k)]; })
         });
@@ -365,8 +390,8 @@
       /* ---------- tooltip ---------- */
       function durText(k, short) {
         var days = Math.round((k.barEnd - k.s) / DAY);
-        if (short) return days >= 14 ? RK.format(days / 7, '0.#') + 'w' : days + 'd';
-        return days + (days === 1 ? ' day' : ' days') + (days >= 7 ? ' (' + RK.format(days / 7, '0.0') + ' weeks)' : '');
+        if (short) return days >= 14 ? tr('gantt.weeksShort', '{n}w', { n: RK.format(days / 7, '0.#') }) : tr('gantt.daysShort', '{n}d', { n: days });
+        return tr(days === 1 ? 'gantt.day' : 'gantt.days', days === 1 ? '{n} day' : '{n} days', { n: days }) + (days >= 7 ? ' ' + tr('gantt.weeks', '({n} weeks)', { n: RK.format(days / 7, '0.0') }) : '');
       }
       function tip(p) {
         var k = tasks[p.value[3]];
@@ -374,14 +399,15 @@
         var rows = [];
         if (enc.group && k.group) rows.push({ label: ctx.title(enc.group), value: k.group });
         if (k.phase != null) rows.push({ color: phaseColor(k.phase), label: ctx.title(enc.phase), value: k.phase });
-        if (k.ms) rows.push({ label: 'Date', value: RK.format(new Date(k.s), dfmt), bold: true });
+        if (k.ms) rows.push({ label: tr('gantt.date', 'Date'), value: RK.format(new Date(k.s), dfmt), bold: true });
         else {
           rows.push({ label: ctx.title(enc.start), value: RK.format(new Date(k.s), dfmt) });
           rows.push({ label: ctx.title(enc.end), value: RK.format(new Date(k.e), dfmt) });
-          rows.push({ label: 'Duration', value: durText(k), bold: true });
+          rows.push({ label: tr('gantt.duration', 'Duration'), value: durText(k), bold: true });
         }
         if (enc.owner && k.row[enc.owner] != null) rows.push({ label: ctx.title(enc.owner), value: String(k.row[enc.owner]) });
-        var foot = k.ms ? o.milestoneName : (todayTs != null ? (k.barEnd <= todayTs ? 'Completed' : k.s > todayTs ? 'Starts in ' + Math.ceil((k.s - todayTs) / DAY) + ' days' : 'In progress — ' + Math.round((todayTs - k.s) / (k.barEnd - k.s) * 100) + '% of time elapsed') : null);
+        var foot = k.ms ? msName(o) : (todayTs != null ? (k.barEnd <= todayTs ? tr('gantt.completed', 'Completed') : k.s > todayTs ? tr('gantt.startsIn', 'Starts in {n} days', { n: Math.ceil((k.s - todayTs) / DAY) })
+          : tr('gantt.inProgress', 'In progress — {pct} of time elapsed', { pct: RK.format((todayTs - k.s) / (k.barEnd - k.s), '0%') })) : null);
         return C.tip(k.label, rows, foot);
       }
 
@@ -411,7 +437,7 @@
       };
 
       // RK.chart keeps the user's zoom window across filter updates and resizes (keepZoom)
-      var dataZoom = zoomOn ? C.zoom(ctx, 'x', { bottom: 4, labelFormatter: function (v) { return RK.format(new Date(v), 'd mmm yy'); } }) : [];
+      var dataZoom = zoomOn ? C.zoom(ctx, 'x', { bottom: 4, labelFormatter: function (v) { return RK.format(new Date(v), tr('gantt.fmtDateShort', 'd mmm yy')); } }) : [];
 
       return {
         animation: !!ctx.motion,

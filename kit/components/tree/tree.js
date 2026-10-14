@@ -12,6 +12,24 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'tree.hint': '{key} + 滚轮或双指缩放 · 拖动平移', 'tree.entity': '实体', 'tree.highlighted': '重点标注', 'tree.hidden': '已折叠的子公司',
+      'tree.expand': '点击展开', 'tree.collapse': '点击折叠', 'tree.parent': '母公司', 'tree.direct': '直接{Field}',
+      'tree.effective': '实际（穿透）{Field}', 'tree.subsidiaries': '子公司数量'
+    });
+  }
+  /** Category of entities without one, and the legend entry of highlighted entities, in the report locale. */
+  function entityCat() { return tr('tree.entity', 'Entity'); }
+  function hlName() { return tr('tree.highlighted', 'Highlighted'); }
+
   /** Label width via the shared canvas measure; +7% because the canvas may still measure a fallback face. */
   function measure(text, font) { return C.measure(text, font) * 1.07; }
 
@@ -143,7 +161,7 @@
           position: 'absolute', right: '8px', bottom: '8px', padding: '3px 8px', 'pointer-events': 'none',
           font: '11px ' + ctx.theme.fontSans, color: 'var(--rk-ink-2)', background: 'var(--rk-tooltip-bg)',
           border: '1px solid var(--rk-rule)', 'border-radius': '4px', opacity: '0', transition: 'opacity 160ms'
-        } }, (/Mac|iP/.test(navigator.platform) ? '\u2318' : 'Ctrl') + ' + scroll to zoom \u00b7 drag to pan');
+        } }, tr('tree.hint', '{key} + wheel or pinch to zoom \u00b7 drag to pan', { key: /Mac|iP/.test(navigator.platform) ? '\u2318' : 'Ctrl' }));
         root.appendChild(hint);
       }
       hint.style.opacity = '1';
@@ -247,7 +265,7 @@
 
     // categories -> colours (legend is a key only: hiding a type would orphan connectors). The highlight
     // is an accent2 ring around the entity, so its box keeps its category colour (legend stays true)
-    var cats = util.unique(model.list.map(function (n) { return n.cat || 'Entity'; }));
+    var cats = util.unique(model.list.map(function (n) { return n.cat || entityCat(); }));
     var pal = RK.theme.palette({ n: cats.length }), catColor = {};   // categorical, kept clear of accent2 (the highlight)
     cats.forEach(function (c, i) { catColor[c] = tokenColor(t, (o.categoryColors || {})[c]) || pal[i]; });
     /** Box outline in the category colour, lifted towards ink where it would fade into the paper (dark themes). */
@@ -286,7 +304,7 @@
 
     var W = ctx.el.clientWidth || 900, H = ctx.el.clientHeight || 420;
     var hasHi = visible.some(isHi);
-    var legendCats = cats.concat(hasHi ? ['Highlighted'] : []);
+    var legendCats = cats.concat(hasHi ? [hlName()] : []);
     var showLegend = o.legend !== false && (cats.length > 1 || hasHi);
     // plain legend wraps onto more rows instead of paging: reserve the rows it needs
     var legRows = 1, legX = 0;
@@ -332,11 +350,11 @@
     /** accent2 ring just outside a highlighted entity: the box keeps its category fill and outline. */
     function halo(n, x, y, size, symbol) {
       var grow = function (d) { return Array.isArray(size) ? [size[0] + d, size[1] + d] : size + d; };
-      layer('hi:' + n.id, x, y, symbol, grow(10), t.accent2, legendCats.indexOf('Highlighted'));
+      layer('hi:' + n.id, x, y, symbol, grow(10), t.accent2, legendCats.indexOf(hlName()));
       layer('hi2:' + n.id, x, y, symbol, grow(5), t.paper);
     }
     function boxStyle(n) {
-      var c = catColor[n.cat || 'Entity'], filled = o.rootFilled && n.depth === 0;
+      var c = catColor[n.cat || entityCat()], filled = o.rootFilled && n.depth === 0;
       var fill = filled ? c : RK.theme.mix(c, t.paper, 0.9);
       var on = filled ? RK.theme.textOn(fill) : t.ink;   // readable on the fill in light and dark themes
       return { fill: fill, text: on, sub: filled ? RK.theme.alpha(on, 0.78) : t.ink3, border: filled ? c : strokeOf(c), bw: filled ? 0 : 1.2 };
@@ -481,7 +499,7 @@
           if (st.bw) layer('bd:' + n.id, p[0], p[1], 'rect', [boxW, boxH], st.border);
           nodes.push({
             id: 'n:' + n.id, name: n.name, rkFor: n.id, x: p[0], y: p[1],
-            symbol: 'rect', symbolSize: [boxW - 2 * st.bw, boxH - 2 * st.bw], category: cats.indexOf(n.cat || 'Entity'),
+            symbol: 'rect', symbolSize: [boxW - 2 * st.bw, boxH - 2 * st.bw], category: cats.indexOf(n.cat || entityCat()),
             itemStyle: { color: st.fill, borderWidth: 0 },
             label: {
               show: true, position: 'inside', align: 'center', verticalAlign: 'middle',
@@ -607,12 +625,12 @@
       });
       var dots = [], labelled = [];
       visible.forEach(function (n) {
-        var c = catColor[n.cat || 'Entity'], center = n.depth === 0 && single;
+        var c = catColor[n.cat || entityCat()], center = n.depth === 0 && single;
         var size = center ? 18 : (n.children.length ? 12 : 9);
         if (isHi(n)) halo(n, n._p[0], n._p[1], size, 'circle');
         nodes.push({
           id: 'n:' + n.id, name: n.name, rkFor: n.id, x: n._p[0], y: n._p[1],
-          symbol: 'circle', symbolSize: size, category: cats.indexOf(n.cat || 'Entity'),
+          symbol: 'circle', symbolSize: size, category: cats.indexOf(n.cat || entityCat()),
           itemStyle: { color: c, borderColor: t.paper, borderWidth: 1 },
           label: { show: true },
           cursor: n.children.length && o.collapsible !== false ? 'pointer' : 'default'
@@ -694,7 +712,7 @@
     var bx = util.extent(nodes.map(function (d) { return d.x; })), by = util.extent(nodes.map(function (d) { return d.y; }));
     var box = { left: bx[0], top: by[0], width: Math.max(1, bx[1] - bx[0]), height: Math.max(1, by[1] - by[0]) };
     var catList = legendCats.map(function (c) {
-      return c === 'Highlighted' && hasHi
+      return c === hlName() && hasHi
         ? { name: c, itemStyle: { color: RK.theme.alpha(t.accent2, 0.12), borderColor: t.accent2, borderWidth: 2 } }
         : { name: c, itemStyle: { color: catColor[c] } };
     });
@@ -703,7 +721,7 @@
       legend: C.legend(ctx, {
         show: showLegend, selectedMode: false, type: 'plain',
         data: legendCats.map(function (c) {
-          return c === 'Highlighted' ? { name: c, itemStyle: { color: RK.theme.alpha(t.accent2, 0.12), borderColor: t.accent2, borderWidth: 2 } } : c;
+          return c === hlName() ? { name: c, itemStyle: { color: RK.theme.alpha(t.accent2, 0.12), borderColor: t.accent2, borderWidth: 2 } } : c;
         })
       }),
       tooltip: {
@@ -712,15 +730,15 @@
           if (p.dataType !== 'node' || !p.data) return '';
           var n = model.byId.get(p.data.rkFor);
           if (!n) return '';
-          if (p.data.rkDummy) return C.tip(n.name, [{ label: 'Hidden subsidiaries', value: RK.format(n.descendants, '#,##0') }], 'Click to expand');
+          if (p.data.rkDummy) return C.tip(n.name, [{ label: tr('tree.hidden', 'Hidden subsidiaries'), value: RK.format(n.descendants, '#,##0') }], tr('tree.expand', 'Click to expand'));
           var rows = [];
           if (n.country) rows.push({ label: ctx.title(enc.country), value: n.country });
           if (n.cat) rows.push({ color: catColor[n.cat], label: ctx.title(enc.category), value: n.cat });
-          if (n.parent) rows.push({ label: 'Parent', value: n.parent.name });
-          if (n.depth > 0) rows.push({ label: 'Direct ' + String(ctx.title(enc.pct)).toLowerCase(), value: RK.format(n.pct, pfmt) });
-          if (n.depth > 0) rows.push({ label: 'Effective ' + String(ctx.title(enc.pct)).toLowerCase(), value: RK.format(n.eff, pfmt), bold: true });
-          if (n.children.length) rows.push({ label: 'Subsidiaries', value: RK.format(n.descendants, '#,##0') });
-          var foot = n.children.length && o.collapsible !== false ? (collapsed.has(n.id) ? 'Click to expand' : 'Click to collapse') : null;
+          if (n.parent) rows.push({ label: tr('tree.parent', 'Parent'), value: n.parent.name });
+          if (n.depth > 0) rows.push({ label: tr('tree.direct', 'Direct {field}', { field: String(ctx.title(enc.pct)).toLowerCase(), Field: String(ctx.title(enc.pct)) }), value: RK.format(n.pct, pfmt) });
+          if (n.depth > 0) rows.push({ label: tr('tree.effective', 'Effective {field}', { field: String(ctx.title(enc.pct)).toLowerCase(), Field: String(ctx.title(enc.pct)) }), value: RK.format(n.eff, pfmt), bold: true });
+          if (n.children.length) rows.push({ label: tr('tree.subsidiaries', 'Subsidiaries'), value: RK.format(n.descendants, '#,##0') });
+          var foot = n.children.length && o.collapsible !== false ? (collapsed.has(n.id) ? tr('tree.expand', 'Click to expand') : tr('tree.collapse', 'Click to collapse')) : null;
           return C.tip(n.name, rows, foot);
         }
       },

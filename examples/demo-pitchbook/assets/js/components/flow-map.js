@@ -8,6 +8,20 @@
   'use strict';
   var h = RK.util.h, G = RK.geo;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'flowMap.share': '占所示流量比例', 'flowMap.outbound': '流出', 'flowMap.inbound': '流入', 'flowMap.netOut': '净流出',
+      'flowMap.valueCount': '数值（{Count}）'
+    });
+  }
+
   function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
 
   /* ---------------- colour guards (same block in the map components) ---------------- */
@@ -250,7 +264,7 @@
       function flowTip(f) {
         var c = cur, enc = c.enc, rows = [{ color: f.color, label: c.title(enc.value), value: RK.format(f.v, S.fmt), bold: false }];
         if (enc.count) rows.push({ label: c.title(enc.count), value: RK.format(f.n, c.fmtOf(enc.count) || '#,##0') });
-        if (f.share != null) rows.push({ label: 'Share of shown flows', value: RK.format(f.share, '0.0%') });
+        if (f.share != null) rows.push({ label: tr('flowMap.share', 'Share of shown flows'), value: RK.format(f.share, '0.0%') });
         if (enc.color) rows.push({ label: c.title(enc.color), value: f.cat });
         (c.options.tooltip || []).forEach(function (fld) { rows.push({ label: c.title(fld), value: RK.format(f.row[fld], c.fmtOf(fld)) }); });
         return RK.chart.tip(f.from + '  →  ' + f.to, rows);
@@ -258,11 +272,11 @@
       function nodeTip(n) {
         var c = cur, enc = c.enc, cf = c.fmtOf(enc.count) || '#,##0';
         var rows = [
-          { label: 'Outbound', value: RK.format(n.out, S.fmt) + (enc.count ? '  (' + RK.format(n.outN, cf) + ')' : '') },
-          { label: 'Inbound', value: RK.format(n.in, S.fmt) + (enc.count ? '  (' + RK.format(n.inN, cf) + ')' : '') },
-          { label: 'Net outbound', value: RK.format(n.out - n.in, S.fmt), bold: true }
+          { label: tr('flowMap.outbound', 'Outbound'), value: RK.format(n.out, S.fmt) + (enc.count ? '  (' + RK.format(n.outN, cf) + ')' : '') },
+          { label: tr('flowMap.inbound', 'Inbound'), value: RK.format(n.in, S.fmt) + (enc.count ? '  (' + RK.format(n.inN, cf) + ')' : '') },
+          { label: tr('flowMap.netOut', 'Net outbound'), value: RK.format(n.out - n.in, S.fmt), bold: true }
         ];
-        return RK.chart.tip(n.name, rows, enc.count ? 'Value (' + c.title(enc.count).toLowerCase() + ')' : null);
+        return RK.chart.tip(n.name, rows, enc.count ? tr('flowMap.valueCount', 'Value ({count})', { count: c.title(enc.count).toLowerCase(), Count: c.title(enc.count) }) : null);
       }
 
       /** Hover focus: isolate the given flows (and their end nodes). */

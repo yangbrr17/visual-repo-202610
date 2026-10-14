@@ -8,6 +8,19 @@
   'use strict';
   var C = RK.chart, U = RK.util;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'smallMultiples.dateAxis': 'yy"年"m"月"', 'smallMultiples.dateLong': 'yyyy"年"m"月"d"日"', 'smallMultiples.more': '另有 {n} 个未显示'
+    });
+  }
+
   RK.component({
     id: 'small-multiples',
     deps: ['echarts'],
@@ -113,7 +126,7 @@
     var plotH = Math.max(30, cellH - headH - xLabH);
 
     var grids = [], xAxes = [], yAxes = [], series = [], graphic = [];
-    var isTime = d.isTime, dfmt = o.dateFormat || 'mmm yy';
+    var isTime = d.isTime, dfmt = !o.dateFormat || o.dateFormat === 'mmm yy' ? tr('smallMultiples.dateAxis', 'mmm yy') : o.dateFormat;
     facets.forEach(function (f, i) {
       var c = i % cols, r = Math.floor(i / cols);
       var left = (shared ? yLabW : 0) + c * (perColY + plotW + rightPad + gapX) + perColY;
@@ -219,7 +232,7 @@
     }
     if (hidden) {
       graphic.push({ type: 'text', silent: true, left: 0, bottom: 0,
-        style: { text: '+' + hidden + ' more not shown', fill: t.ink3, font: '11px ' + t.fontSans } });
+        style: { text: tr('smallMultiples.more', '+{n} more not shown', { n: hidden }), fill: t.ink3, font: '11px ' + t.fontSans } });
     }
 
     return {
@@ -239,7 +252,7 @@
             var nm = String(d.raw[f]);
             return { color: hl.indexOf(f) >= 0 ? t.accent2 : t.accent, label: nm, value: RK.format(vals[f][k], fmt), bold: hover.indexOf(nm) >= 0 && facets.length > 1 };
           });
-          var head = isTime ? RK.format(xs[k], 'dd mmm yyyy') : xs[k];
+          var head = isTime ? RK.format(xs[k], tr('smallMultiples.dateLong', 'dd mmm yyyy')) : xs[k];
           return C.tip(head, rows);
         }
       },

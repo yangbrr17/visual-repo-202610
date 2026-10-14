@@ -43,7 +43,7 @@
     "filterField": {"type": "string", "default": null, "desc": "Field used for click-to-filter; defaults to encode.color, else encode.from. Shared business dimensions (country, company, sector, region, segment, year…) filter the whole report; other fields (site name, type, from / to…) only this block's dataset — set crossFilterScope to override"},
     "scrollZoom": {"type": "boolean|string", "default": "click", "desc": "Plain mouse-wheel zoom: 'click' (armed after clicking the map, so page scrolling is never hijacked) | true | false. Ctrl/Cmd + wheel or a trackpad pinch always zooms; +/- buttons and drag too"}
   },
-  "interactions": ["Hover a flow to isolate it (tooltip: from -> to, value, deals, share)", "Hover a country to isolate its inbound / outbound flows (tooltip: in, out, net)", "Click a flow or legend category to cross-filter", "Arcs draw in on render; travelling dots show the direction of hovered flows (motion only)", "Zoom / pan", "PNG export"],
+  "interactions": ["Hover a flow to isolate it (tooltip: from -> to, value, deals, share)", "Hover a country to isolate its inbound / outbound flows (tooltip: in, out, net)", "Click a flow or legend category to cross-filter", "Arcs draw in on render; travelling dots show the direction of hovered flows (motion only)", "Ctrl/⌘ + wheel or pinch to zoom; drag to pan; +/− buttons (plain wheel scrolls the page until the map is clicked)", "PNG export"],
   "samples": [
     {"title": "Cross-border M&A by sector — acquirer to target country (USD bn)", "data": "deal_flows", "height": 480, "options": {}},
     {"title": "Top 10 flows — single colour with value labels", "data": "deal_flows", "height": 420, "span": 7,

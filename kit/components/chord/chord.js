@@ -8,6 +8,23 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'chord.reverse': '反向流量', 'chord.outbound': '流出（{field}）', 'chord.inbound': '流入（{field}）', 'chord.netOut': '净流出',
+      'chord.share': '占双向总额比例', 'chord.whoOut': '{who}流出', 'chord.whoIn': '{who}流入', 'chord.ribbonKey': '色带颜色 = {field}',
+      'chord.ribbonKeyGrad': '色带颜色 = {from}至{to}', 'chord.flowsOf': '与{who}之间的流量'
+    });
+  }
+  /** Name of the 'Other' bucket: options.otherLabel, the locale's word when left at the English default. */
+  function otherName(o) { return !o.otherLabel || o.otherLabel === 'Other' ? tr('other', 'Other') : o.otherLabel; }
+
   /** Label width via the shared canvas measure; +7% because the canvas may still measure a fallback face. */
   function measure(text, font) { return C.measure(text, font) * 1.07; }
 
@@ -66,7 +83,7 @@
     all.forEach(function (e) { e.total = e.out + e.inn; });
     var ranked = all.slice().sort(function (a, b) { return b.total - a.total; });
     var keep = new Set((o.top && ranked.length > o.top + 1 ? ranked.slice(0, o.top) : ranked).map(function (e) { return e.name; }));
-    var other = o.otherLabel || 'Other';
+    var other = otherName(o);
     function map(name) { return keep.has(name) ? name : other; }
 
     var nodes = new Map(), links = new Map();
@@ -123,7 +140,7 @@
       rebuildOnResize: true,     // radius and label room are computed in px from the container
       on: {
         click: function (p, c) {
-          if (p.dataType === 'edge' || !p.name || p.name === (c.options.otherLabel || 'Other')) return;
+          if (p.dataType === 'edge' || !p.name || p.name === otherName(c.options)) return;
           selectNode(c, p.name);
         }
       }
@@ -212,19 +229,19 @@
           var d = p.data, rows = [{ label: ctx.title(enc.value), value: RK.format(d.value, fmt), bold: true }];
           if (enc.count && ctx.field(enc.count)) rows.push({ label: ctx.title(enc.count), value: RK.format(d.count, cfmt) });
           var back = m.links.filter(function (l) { return l.source === d.target && l.target === d.source; })[0];
-          rows.push({ label: 'Reverse flow', value: RK.format(back ? back.value : 0, fmt) });
+          rows.push({ label: tr('chord.reverse', 'Reverse flow'), value: RK.format(back ? back.value : 0, fmt) });
           return C.tip(d.source + '  \u2192  ' + d.target, rows);
         }
         var n = m.byName.get(p.name);
         if (!n) return '';
-        var tr = [
-          { color: colorOf[n.name], label: 'Outbound (' + ctx.title(enc.source) + ')', value: RK.format(n.out, fmt) },
-          { label: 'Inbound (' + ctx.title(enc.target) + ')', value: RK.format(n.inn, fmt) },
-          { label: 'Net outflow', value: RK.format(n.out - n.inn, signed(fmt)) },
-          { label: 'Share of two-way total', value: RK.format(share(n), '0.0%'), bold: true }
+        var tipRows = [
+          { color: colorOf[n.name], label: tr('chord.outbound', 'Outbound ({field})', { field: ctx.title(enc.source) }), value: RK.format(n.out, fmt) },
+          { label: tr('chord.inbound', 'Inbound ({field})', { field: ctx.title(enc.target) }), value: RK.format(n.inn, fmt) },
+          { label: tr('chord.netOut', 'Net outflow'), value: RK.format(n.out - n.inn, signed(fmt)) },
+          { label: tr('chord.share', 'Share of two-way total'), value: RK.format(share(n), '0.0%'), bold: true }
         ];
-        if (enc.count && ctx.field(enc.count)) tr.splice(2, 0, { label: ctx.title(enc.count), value: RK.format(n.outN + n.inN, cfmt) });
-        return C.tip(n.name, tr, n.isOther && n.members.length ? n.members.join(', ') : null);
+        if (enc.count && ctx.field(enc.count)) tipRows.splice(2, 0, { label: ctx.title(enc.count), value: RK.format(n.outN + n.inN, cfmt) });
+        return C.tip(n.name, tipRows, n.isOther && n.members.length ? n.members.join(', ') : null);
       }
     };
 
@@ -234,7 +251,7 @@
       if (single && hi.length) {
         // direction key (10px rounded swatches, top-left): which colour is outbound / inbound for the highlight
         var who = hi.join(', '), outCol = baseColor === 'target' ? t.accent : t.accent2, inCol = baseColor === 'target' ? t.accent2 : t.accent;
-        var items = [[outCol, who + ' outbound'], [inCol, who + ' inbound']], kx = 0, kids = [];
+        var items = [[outCol, tr('chord.whoOut', '{who} outbound', { who: who })], [inCol, tr('chord.whoIn', '{who} inbound', { who: who })]], kx = 0, kids = [];
         items.forEach(function (it) {
           kids.push({ type: 'rect', shape: { x: kx, y: 2, width: 10, height: 10, r: 2 }, style: { fill: it[0] } });
           kids.push({ type: 'text', x: kx + 15, y: 7, style: { text: it[1], fill: t.ink2, font: keyFont, verticalAlign: 'middle' } });
@@ -242,10 +259,11 @@
         });
         graphic.push({ type: 'group', id: 'key', left: 0, top: 0, silent: true, children: kids });
       } else {
-        var keyText = 'Ribbon colour = ' + (o.ribbonColor === 'target' ? ctx.title(enc.target) : ctx.title(enc.source)) + (o.ribbonColor === 'gradient' ? ' to ' + ctx.title(enc.target) : '');
+        var keyText = o.ribbonColor === 'gradient' ? tr('chord.ribbonKeyGrad', 'Ribbon colour = {from} to {to}', { from: ctx.title(enc.source), to: ctx.title(enc.target) })
+          : tr('chord.ribbonKey', 'Ribbon colour = {field}', { field: o.ribbonColor === 'target' ? ctx.title(enc.target) : ctx.title(enc.source) });
         var kids2 = [{ type: 'text', x: 0, y: 7, style: { text: keyText, fill: t.ink3, font: keyFont, verticalAlign: 'middle' } }];
         if (hi.length) {
-          var kx2 = measure(keyText, keyFont) + 18, lab = 'Flows to / from ' + hi.join(', ');
+          var kx2 = measure(keyText, keyFont) + 18, lab = tr('chord.flowsOf', 'Flows to / from {who}', { who: hi.join(', ') });
           kids2.push({ type: 'rect', shape: { x: kx2, y: 2, width: 10, height: 10, r: 2 }, style: { fill: t.accent2 } });
           kids2.push({ type: 'text', x: kx2 + 15, y: 7, style: { text: lab, fill: t.ink2, font: keyFont, verticalAlign: 'middle' } });
         }

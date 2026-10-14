@@ -4,7 +4,7 @@
 > **依据**
 > - 主要来源：`research/raw/07-collections.md`（下称 07）。
 > - 补充来源：02（地图）、04（pitchbook）、05（图标）、06（中国生态）、08（AI）、09（架构）各篇笔记。
-> - 现状核对：`research/catalog.json`（239 个库）、`research/landscape.md` §3（FT 覆盖矩阵）、`kit/catalog.json`（53 个组件）、`kit/categories.json`（12 类）、`vendor/vendor.json`、`docs/architecture.md`。
+> - 现状核对：`research/catalog.json`（239 个库）、`research/landscape.md` §3（FT 覆盖矩阵）、`kit/catalog.json`（57 个组件）、`kit/categories.json`（12 类）、`vendor/vendor.json`、`docs/architecture.md`。
 >
 > **口径**
 > - 最近提交日期、条目数、许可都来自 07 在 2026-10-14 的实查：`git clone --depth 1` 取 HEAD 日期，按 README 标题和列表项计数，raw LICENSE 看许可。Star 数是 shields.io 的取整值。本文不另行估算。
@@ -25,7 +25,7 @@
    | **Leaflet Plugins DB** | 地图插件目录 | 已 vendor 2 个插件，下一批的候选也从这里出 |
    | **hal9ai/awesome-dataviz** | 库雷达，用来发现新库 | `research/catalog.json` 的种子；每月 diff 一次 |
 
-2. **现状：我们 53 个组件已覆盖 FT 72 种图型中的 50 种，另有 5 种部分覆盖**（landscape §3）。原先列出的 4 个"合集能直接补上的缺口"里，equalised cartogram 已经补上，还剩 3 个：
+2. **现状：我们 57 个组件已覆盖 FT 72 种图型中的 50 种，另有 5 种部分覆盖**（landscape §3）。原先列出的 4 个"合集能直接补上的缺口"里，equalised cartogram 已经补上，还剩 3 个：
    - Fan chart → `@echarts-x/custom-line-range`。
    - Violin → `@echarts-x/custom-violin`。
    - Surplus/deficit filled line → ECharts 的 area 配方。
@@ -84,7 +84,7 @@
 
 | 合集 | URL | 维护 | 规模 | 许可 | 借什么 | 映射到 ReportKit | Verdict |
 |---|---|---|---|---|---|---|---|
-| **Apache ECharts examples** | https://echarts.apache.org/examples · https://github.com/apache/echarts-examples | ✅ 2026-09-24 · 400★（仓库） | **377 个 2D 示例 + 59 个 GL 示例**，301 个 TS 文件。`src/data/chart-list-data.js` 是机读的，每条有 `id, title, titleCN, category[], difficulty, since`。**28 个示例标为 `since: 6.0.0`** | Apache-2.0 | 直接改写成组件。v6 新能力：axis breaks、intraday breaks、matrix 坐标系、chord、jitter | 36 个 ECharts 组件的 recipe 来源，逐个映射见 §2.3。改写代码合法，保留 NOTICE 即可（`vendor/echarts/NOTICE` 已随包分发） | **adopt** |
+| **Apache ECharts examples** | https://echarts.apache.org/examples · https://github.com/apache/echarts-examples | ✅ 2026-09-24 · 400★（仓库） | **377 个 2D 示例 + 59 个 GL 示例**，301 个 TS 文件。`src/data/chart-list-data.js` 是机读的，每条有 `id, title, titleCN, category[], difficulty, since`。**28 个示例标为 `since: 6.0.0`** | Apache-2.0 | 直接改写成组件。v6 新能力：axis breaks、intraday breaks、matrix 坐标系、chord、jitter | 37 个 ECharts 组件的 recipe 来源，逐个映射见 §2.3。改写代码合法，保留 NOTICE 即可（`vendor/echarts/NOTICE` 已随包分发） | **adopt** |
 | **Vega-Lite examples** | https://vega.github.io/vega-lite/examples/ · 索引在 https://github.com/vega/vega-lite/blob/main/site/_data/examples.json | ✅ 2026-10-08 · 5.5k★ | **203 个画廊条目 / 6 组**，共 633 个 spec 文件；其中 Interactive 32 个 | BSD-3 | 语法级交互模式：刷选、联动、多视图、标注图层 | 我们 `encode` 的通道名尽量和它对齐（roadmap-step2 §5）；将来写 VL→block spec 的导入器 | consider |
 | **Plotly.js gallery** | https://plotly.com/javascript/ | ✅（展示的是 v4.1.x） | 12 节；Financial 节有 waterfall、indicators、candlestick、funnel、带 rangeselector 的时间序列 | MIT | 时间范围按钮（1M/6M/YTD/1Y）、indicator 卡片 | `price-volume`、`candlestick` 的时间范围按钮；`kpi-tiles` | reference（plotly.min.js 有 4.7 MB，不 vendor） |
 | **D3 Graph Gallery**（holtzy） | https://d3-graph-gallery.com · https://github.com/holtzy/D3-graph-gallery | ✅ 2026-08-01 · 855★ | 47 个图族页面、165 个示例 HTML | MIT | 每类图都有短小易读的 D3 片段 | 做 SVG 组件时参考（例如 `waffle`）。**代码是 d3 v4/v6**：`d3.v4.js` 出现 183 次，`d3.v6.js` 126 次 | reference |
@@ -153,7 +153,7 @@
 | Magnitude（12） | `comparison` | `bar`、`lollipop`、`radar`、`bullet`、`parallel`、`marimekko` | 10 / 0 / 2 |
 | Spatial（8） | `geo` 地理空间 | `choropleth`、`bubble-map`、`flow-map`、`geo-heat`、`cluster-map`、`china-tilemap` | 5 / 1 / 2 |
 | Flow（4） | `flow` 流向与关系 | `sankey`、`chord`、`network`、`waterfall` | 4 / 0 / 0 |
-| （FT 没有） | `valuation` · `table` · `timeline` · `layout` · `controls` | `football-field`；5 个表格；`gantt`、`timeline`；`kpi-tiles`、`text-block`；4 个控件 | 这 5 类共 14 个组件（占 53 个的 26%）。其中 `gantt`、`timeline` 同时承接 FT 的 priestley / circles-timeline。完全不在 FT 词表里的组件共 16 个（30%），除这 12 个外还有 `multiple-history`、`small-multiples`、`tree`、`funnel`（landscape §3.3） |
+| （FT 没有） | `valuation` · `table` · `timeline` · `layout` · `controls` | `football-field`、`avp-table`、`sotp`；6 个表格（含 `sources-uses`）；`gantt`、`timeline`；`tombstones`、`kpi-tiles`、`text-block`；4 个控件 | 这 5 类共 18 个组件（占 57 个的 32%）。其中 `gantt`、`timeline` 同时承接 FT 的 priestley / circles-timeline。完全不在 FT 词表里的组件共 20 个（35%），除这 16 个外还有 `multiple-history`、`small-multiples`、`tree`、`funnel`（landscape §3.3） |
 | **合计** | | | **50 ✓ / 5 ◐ / 17 ✗**（72 种） |
 
 **合集能直接补上的 FT 缺口**（按投行价值排序；优先级与 landscape §3.4 一致）：

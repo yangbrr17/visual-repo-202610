@@ -7,6 +7,21 @@
   'use strict';
   var C = RK.chart;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'donut.pctOfTotal': '占比', 'donut.shareOfTotal': '占合计 {pct}', 'donut.items': '{n} 项', 'donut.itemsList': '{n} 项：{list}'
+    });
+  }
+  /** Name of the grouped bucket: options.othersLabel, in the report locale when left at the default 'Others'. */
+  function othersName(o) { return o.othersLabel === 'Others' ? tr('others', 'Others') : o.othersLabel; }
+
   function truncate(s, w, font) {
     var ef = window.echarts && window.echarts.format;
     return ef && ef.truncateText ? ef.truncateText(String(s), w, font, '…') : String(s);
@@ -45,7 +60,7 @@
     }
     if (members.length || catches.length > 1) {
       members = members.concat(catches).sort(bySize);
-      items.push({ name: o.othersLabel, value: members.reduce(function (s, d) { return s + d.value; }, 0), members: members, others: true });
+      items.push({ name: othersName(o), value: members.reduce(function (s, d) { return s + d.value; }, 0), members: members, others: true });
     } else if (catches.length) {
       items.push(RK.util.merge(catches[0], { members: [catches[0]], others: true }));
     }
@@ -76,10 +91,11 @@
    *  the othersLabel and any label starting with "Other(s)" or ending in "other(s)". */
   function isCatchAll(o) {
     var m = o.othersMatch;
-    if (m === false || m == null) return function (n) { return n === o.othersLabel; };
-    if (Array.isArray(m)) return function (n) { return n === o.othersLabel || m.indexOf(n) >= 0; };
+    var own = othersName(o);
+    if (m === false || m == null) return function (n) { return n === o.othersLabel || n === own; };
+    if (Array.isArray(m)) return function (n) { return n === o.othersLabel || n === own || m.indexOf(n) >= 0; };
     var re = m === 'auto' ? /^others?\b|\bothers?$/i : new RegExp(String(m), 'i');
-    return function (n) { return n === o.othersLabel || re.test(n); };
+    return function (n) { return n === o.othersLabel || n === own || re.test(n); };
   }
 
   function dimmed(ctx, d) {
@@ -99,7 +115,7 @@
       var nameW = Math.max.apply(null, m.items.map(function (d) { return C.measure(d.name, fontName); }).concat([C.measure(ctx.title(ctx.enc.label), '600 10px ' + t.fontSans), 40]));
       var valW = showV ? Math.max(56, C.measure(RK.format(m.total, m.fmt), '600 ' + fontNum) + 18) : 0;
       // the % column fits its header and its widest figure (never clipped at narrow spans)
-      var pctW = showP ? Math.max(58, C.measure('% of total', '600 10px ' + t.fontSans) + 8, C.measure(RK.format(1, m.pctFmt), '600 ' + fontNum) + 12) : 0;
+      var pctW = showP ? Math.max(58, C.measure(tr('donut.pctOfTotal', '% of total'), '600 10px ' + t.fontSans) + 8, C.measure(RK.format(1, m.pctFmt), '600 ' + fontNum) + 12) : 0;
       nameW = Math.min(Math.ceil(nameW) + 8, 200);
       var tableW = 18 + nameW + valW + pctW;
       var gap = Math.max(28, Math.min(56, W * 0.05));
@@ -201,7 +217,7 @@
       els.push(val);
       els.push({
         id: 'ctr-lbl', type: 'text', x: L.cx, y: L.cy + vSize / 2 + 5, z: 1, silent: true, invisible: !showLbl,
-        style: { text: String(o.centerLabel || '').toUpperCase(), fill: t.ink3, font: '600 10px ' + t.fontSans, textAlign: 'center', textVerticalAlign: 'middle' }
+        style: { text: String(o.centerLabel === 'Total' ? tr('total', 'Total') : o.centerLabel || '').toUpperCase(), fill: t.ink3, font: '600 10px ' + t.fontSans, textAlign: 'center', textVerticalAlign: 'middle' }
       });
     } else {
       els.push({ id: 'ctr-val', type: 'text', invisible: true, style: { text: '' } }, { id: 'ctr-lbl', type: 'text', invisible: true, style: { text: '' } });
@@ -217,7 +233,7 @@
       };
       els.push(cell('h-name', x, y + 8, truncate(ctx.title(ctx.enc.label), T.nameW + 12, hFont), { style: { fill: t.ink3, font: hFont } }));
       els.push(cell('h-val', xVal, y + 8, T.showV ? truncate(ctx.title(ctx.enc.value), T.valW + T.nameW * 0.5, hFont) : '', { style: { fill: t.ink3, font: hFont, textAlign: 'right' } }));
-      els.push(cell('h-pct', xPct, y + 8, T.showP ? '% of total' : '', { style: { fill: t.ink3, font: hFont, textAlign: 'right' } }));
+      els.push(cell('h-pct', xPct, y + 8, T.showP ? tr('donut.pctOfTotal', '% of total') : '', { style: { fill: t.ink3, font: hFont, textAlign: 'right' } }));
       els.push({ id: 'h-rule', type: 'line', silent: true, shape: { x1: x, y1: y + head - 4, x2: x + T.w, y2: y + head - 4 }, style: { stroke: t.ink3, lineWidth: 1 } });
 
       m.items.forEach(function (d, i) {
@@ -246,7 +262,7 @@
       });
       var fy = y + head + T.rowH * m.items.length + 4;
       els.push({ id: 'f-rule', type: 'line', silent: true, shape: { x1: x, y1: fy, x2: x + T.w, y2: fy }, style: { stroke: t.rule, lineWidth: 1 } });
-      els.push(cell('f-name', xName, fy + 12, 'Total', { style: { fill: t.ink, font: '600 11.5px ' + t.fontSans } }));
+      els.push(cell('f-name', xName, fy + 12, tr('total', 'Total'), { style: { fill: t.ink, font: '600 11.5px ' + t.fontSans } }));
       els.push(cell('f-val', xVal, fy + 12, T.showV ? RK.format(m.total, m.fmt) : '', { style: { fill: t.ink, font: '600 11.5px ' + t.fontNum, textAlign: 'right' } }));
       els.push(cell('f-pct', xPct, fy + 12, T.showP ? RK.format(1, m.pctFmt) : '', { style: { fill: t.ink, font: '600 11.5px ' + t.fontNum, textAlign: 'right' } }));
     }
@@ -263,12 +279,12 @@
         if (!d) return '';
         var rows = [
           { color: d.base, label: ctx.title(ctx.enc.value), value: RK.format(d.value, m.fmt) },
-          { label: '% of total', value: RK.format(d.share, m.pctFmt) }
+          { label: tr('donut.pctOfTotal', '% of total'), value: RK.format(d.share, m.pctFmt) }
         ];
         var foot = null;
         if (d.others && d.members.length > 1) {
           var names = d.members.slice(0, 5).map(function (x) { return x.name; });
-          foot = d.members.length + ' items: ' + names.join(', ') + (d.members.length > 5 ? ', …' : '');
+          foot = tr('donut.itemsList', '{n} items: {list}', { n: d.members.length, list: names.join(', ') + (d.members.length > 5 ? ', …' : '') });
         }
         return C.tip(d.name, rows, foot);
       }
@@ -318,7 +334,7 @@
         if (!d || !L || !L.readout) { readout.classList.remove('is-on'); return; }
         rName.textContent = d.name;
         rVal.textContent = RK.format(d.value, m.fmt);
-        rPct.textContent = RK.format(d.share, m.pctFmt) + ' of total' + (d.others && d.members.length > 1 ? ' · ' + d.members.length + ' items' : '');
+        rPct.textContent = tr('donut.shareOfTotal', '{pct} of total', { pct: RK.format(d.share, m.pctFmt) }) + (d.others && d.members.length > 1 ? ' · ' + tr('donut.items', '{n} items', { n: d.members.length }) : '');
         readout.classList.add('is-on');
       }
 

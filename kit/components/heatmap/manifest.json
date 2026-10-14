@@ -36,7 +36,7 @@
     "cellGap": {"type": "number", "default": 2, "desc": "White rule between cells (px)"},
     "legend": {"type": "boolean", "default": true, "desc": "Colour legend (top-left); hover a value to highlight matching cells"}
   },
-  "interactions": ["Hover tooltip (row · column: value)", "Hover the colour legend to highlight cells in that range", "Optional click a cell to cross-filter its row or column", "Animated transitions when filters change", "PNG / CSV export"],
+  "interactions": ["Hover tooltip (row · column: value)", "Hover the colour legend to highlight cells in that range", "Optional (select: 'x' | 'y'): click a cell to cross-filter on its column or row", "Animated transitions when filters change", "PNG / CSV export"],
   "samples": [
     {"title": "Daily return correlation — 1 year", "data": "corr_matrix", "height": 380, "span": 6,
      "options": {"encode": {"x": "x", "y": "y", "value": "value"}, "triangle": "lower", "diagonal": false,

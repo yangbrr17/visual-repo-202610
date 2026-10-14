@@ -8,6 +8,21 @@
 (function () {
   'use strict';
   var C = RK.chart, util = RK.util;
+
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'line.projected': '预测', 'line.dateLong': 'yyyy"年"m"月"d"日"', 'line.dateMonth': 'yy"年"m"月"', 'line.dateDay': 'm"月"d"日"'
+    });
+  }
+  /** Caption of the estimate band: options.forecastLabel, in the report locale when left at the default 'Projected'. */
+  function forecastText(o) { return o.forecastLabel === 'Projected' ? tr('line.projected', 'Projected') : o.forecastLabel; }
   var FORECAST_RE = /\d\s*[EFBP]$/i;      // "2026E", "FY27F", "2025B", "2028P"
   var DELTA = '+0.0%;-0.0%;0.0%';
 
@@ -451,7 +466,7 @@
     return { values: vals, unit: unit, key: unit + n + ':' + vals[0] + ':' + vals.length };
   }
   function tickLabel(tk) {
-    var f = tk.unit === 'y' ? 'yyyy' : tk.unit === 'm' ? 'mmm-yy' : 'd mmm';
+    var f = tk.unit === 'y' ? 'yyyy' : tk.unit === 'm' ? tr('line.dateMonth', 'mmm-yy') : tr('line.dateDay', 'd mmm');
     return { customValues: tk.values, hideOverlap: true, formatter: function (v) { return RK.format(new Date(v), f); } };
   }
 
@@ -479,7 +494,7 @@
         silent: true,
         itemStyle: { color: RK.theme.alpha(t.ink3, t.dark ? 0.1 : 0.06) },
         label: { show: !!o.forecastLabel, position: 'top', distance: 5 + (capLift || 0), color: t.ink3, fontSize: 10.5, fontStyle: 'italic',
-          formatter: function () { return String(o.forecastLabel || ''); } },
+          formatter: function () { return String(forecastText(o) || ''); } },
         data: [[{ xAxis: from }, { xAxis: to }]]
       };
     }
@@ -572,8 +587,8 @@
     var i0 = idx(ps[0]);
     var xField = ctx.field(ctx.enc.x);
     var title = model.isCat ? (o.xFormat ? RK.format(model.xs[i0], o.xFormat) : model.xs[i0])
-      : RK.format(model.xs[i0], o.xFormat || (xField && xField.format) || (model.isTime ? 'dd mmm yyyy' : 'auto'));
-    if (model.fIdx > 0 && i0 >= model.fIdx) title += '  ·  ' + (o.forecastLabel || 'Projected');
+      : RK.format(model.xs[i0], o.xFormat || (xField && xField.format) || (model.isTime ? tr('line.dateLong', 'dd mmm yyyy') : 'auto'));
+    if (model.fIdx > 0 && i0 >= model.fIdx) title += '  ·  ' + (o.forecastLabel ? forecastText(o) : tr('line.projected', 'Projected'));
     var seen = {}, rows = [], total = 0;
     ps.forEach(function (p) {
       var s = model.byId[p.seriesId];
@@ -585,7 +600,7 @@
       total += v || 0;
       rows.push({ color: s.solid, label: s.name, value: txt, bold: s.hl });
     });
-    if (model.stacked && rows.length > 1) rows.push({ label: 'Total', value: RK.format(total, fmt), bold: true });
+    if (model.stacked && rows.length > 1) rows.push({ label: tr('total', 'Total'), value: RK.format(total, fmt), bold: true });
     var html = C.tip(title, rows);
     // event pin near the hovered x (within ~8px)
     if (pins.length) {
@@ -600,7 +615,7 @@
           extra += '<div class="rk-tip__foot rk-ln-tip-event">' +
             '<b>' + pin.n + '. ' + e(pin.label) + '</b>' +
             (pin.kind ? ' <span class="rk-ln-tip-kind">' + e(pin.kind) + '</span>' : '') +
-            '<br>' + e(RK.format(pin.x, pin.dateFmt || 'dd mmm yyyy')) + (pin.detail ? ' — ' + e(pin.detail) : '') + '</div>';
+            '<br>' + e(RK.format(pin.x, pin.dateFmt || tr('line.dateLong', 'dd mmm yyyy'))) + (pin.detail ? ' — ' + e(pin.detail) : '') + '</div>';
         });
         html = html.slice(0, -6) + extra + '</div>';
       }

@@ -7,6 +7,22 @@
 (function () {
   'use strict';
   var C = RK.chart, U = RK.util;
+
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'combo.projected': '预测', 'combo.estimate': '预测值', 'combo.cagr': '年复合增长率', 'combo.cagrRange': '{range} 年复合增长率',
+      'combo.cagrShort': 'CAGR {value}'
+    });
+  }
+  /** Caption of the estimate band: options.forecastLabel, in the report locale when left at the default 'Projected'. */
+  function forecastText(o) { return o.forecastLabel === 'Projected' ? tr('combo.projected', 'Projected') : o.forecastLabel; }
   // legend glyph for line series: a rule with a dot; the two empty sub-paths keep the 14x14 box square
   var LINE_ICON = 'path://M7,0L7,0Z M7,14L7,14Z M0,6.4L14,6.4L14,7.6L0,7.6Z M9.4,6L9.4,8L8,9.4L6,9.4L4.6,8L4.6,6L6,4.6L8,4.6Z';
 
@@ -182,7 +198,7 @@
       // stack totals sit on an invisible zero-height series, as in the bar component
       if (o.barStack && bars.length > 1 && showBarLabels) {
         series.push({
-          id: 'b-total', name: 'Total', type: 'bar', stack: 'bars', silent: true, yAxisIndex: 0, barMaxWidth: 64,
+          id: 'b-total', name: tr('total', 'Total'), type: 'bar', stack: 'bars', silent: true, yAxisIndex: 0, barMaxWidth: 64,
           itemStyle: { color: 'transparent' }, tooltip: { show: false },
           label: { show: true, position: 'insideBottom', distance: 4, color: t.ink, fontWeight: 600, fontSize: 10.5, fontFamily: t.fontNum,
             formatter: function (p) { return RK.format(pos[p.dataIndex], bfmt); } },
@@ -225,7 +241,7 @@
 
       // estimate band + divider + caption (custom series so it tracks zoom / resize)
       if (fi >= 0 && fi < n) {
-        var caption = o.forecastLabel ? String(o.forecastLabel).toUpperCase() : '';
+        var caption = o.forecastLabel ? String(forecastText(o)).toUpperCase() : '';
         series.push({
           id: 'fc-band', type: 'custom', silent: true, z: 0, clip: false, tooltip: { show: false }, yAxisIndex: 0,
           data: [[fi, 0]],
@@ -250,9 +266,9 @@
           s.values = o.barStack ? (s.field ? bars[s.idx].values : pos) : (bars[s.idx] ? bars[s.idx].values : []);
           s.end = o.barStack ? pos : s.values;
           s.rate = cagrRate(s.values[s.from], s.values[s.to], periodsBetween(cats[s.from], cats[s.to], s.to - s.from));
-          s.text = (s.label || (cagrs.length > 1 ? shortX(cats[s.from]) + '–' + shortX(cats[s.to]) + ' CAGR' : 'CAGR')) + ': ' + RK.format(s.rate, o.cagrFormat);
+          s.text = (s.label || (cagrs.length > 1 ? tr('combo.cagrRange', '{range} CAGR', { range: shortX(cats[s.from]) + '–' + shortX(cats[s.to]) }) : tr('combo.cagr', 'CAGR'))) + tr('colon', ': ') + RK.format(s.rate, o.cagrFormat);
           s.pillW = C.measure(s.text, '600 10.5px ' + t.fontNum) + 20;
-          s.shortText = 'CAGR ' + RK.format(s.rate, o.cagrFormat);          // for brackets narrower than their caption
+          s.shortText = tr('combo.cagrShort', 'CAGR {value}', { value: RK.format(s.rate, o.cagrFormat) });          // for brackets narrower than their caption
           s.shortW = C.measure(s.shortText, '600 10.5px ' + t.fontNum) + 20;
           for (var k = s.from; k <= s.to; k++) level = Math.max(level, tops[k]);
           s.padL = cagrs.some(function (x) { return x !== s && x.to === s.from; }) ? 5 : 0;
@@ -311,11 +327,11 @@
             bars.forEach(function (b, bi) {
               if (shown.indexOf(b.name) >= 0) rows.push({ color: barColor(bi), label: b.name, value: RK.format(b.values[i], bfmt) });
             });
-            if (o.barStack && bars.length > 1) rows.push({ label: 'Total', value: RK.format(pos[i] + neg[i], bfmt), bold: true });
+            if (o.barStack && bars.length > 1) rows.push({ label: tr('total', 'Total'), value: RK.format(pos[i] + neg[i], bfmt), bold: true });
             lines.forEach(function (l, li) {
               if (shown.indexOf(l.name) >= 0) rows.push({ color: lineColor(li), label: l.name, value: RK.format(l.values[i], lfmt) });
             });
-            return C.tip(cats[i], rows, isEst(i) ? (o.forecastLabel || 'Estimate') : null);
+            return C.tip(cats[i], rows, isEst(i) ? (o.forecastLabel ? forecastText(o) : tr('combo.estimate', 'Estimate')) : null);
           }
         },
         xAxis: { type: 'category', data: cats, axisLabel: { interval: 0, hideOverlap: true } },

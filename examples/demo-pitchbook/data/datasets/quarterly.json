@@ -1,0 +1,27 @@
+{
+  "id": "quarterly",
+  "title": "Quarterly results vs. consensus",
+  "schema": {"fields": [
+    {"name": "quarter", "type": "string", "title": "Quarter"},
+    {"name": "date", "type": "date", "title": "Quarter end", "format": "dd mmm yyyy"},
+    {"name": "revenue", "type": "number", "title": "Revenue", "format": "$#,##0.0", "unit": "USD m"},
+    {"name": "ebitda", "type": "number", "title": "EBITDA", "format": "$#,##0.0", "unit": "USD m"},
+    {"name": "ebitda_margin", "type": "number", "title": "EBITDA margin", "format": "0.0%"},
+    {"name": "consensus_revenue", "type": "number", "title": "Consensus revenue", "format": "$#,##0.0", "unit": "USD m"},
+    {"name": "beat_miss_pct", "type": "number", "title": "Beat / (miss) vs. consensus", "format": "+0.0%;-0.0%;0.0%"}
+  ]},
+  "data": [
+    {"quarter": "Q1-24", "date": "2024-03-31", "revenue": 1059.0, "ebitda": 180.2, "ebitda_margin": 0.1702, "consensus_revenue": 1046.4, "beat_miss_pct": 0.012},
+    {"quarter": "Q2-24", "date": "2024-06-30", "revenue": 1125.1, "ebitda": 199.8, "ebitda_margin": 0.1776, "consensus_revenue": 1116.2, "beat_miss_pct": 0.008},
+    {"quarter": "Q3-24", "date": "2024-09-30", "revenue": 1108.1, "ebitda": 201.6, "ebitda_margin": 0.1819, "consensus_revenue": 1082.1, "beat_miss_pct": 0.024},
+    {"quarter": "Q4-24", "date": "2024-12-31", "revenue": 1222.8, "ebitda": 226.6, "ebitda_margin": 0.1853, "consensus_revenue": 1230.2, "beat_miss_pct": -0.006},
+    {"quarter": "Q1-25", "date": "2025-03-31", "revenue": 1151.4, "ebitda": 201.4, "ebitda_margin": 0.1749, "consensus_revenue": 1127.7, "beat_miss_pct": 0.021},
+    {"quarter": "Q2-25", "date": "2025-06-30", "revenue": 1190.7, "ebitda": 220.9, "ebitda_margin": 0.1855, "consensus_revenue": 1228.8, "beat_miss_pct": -0.031},
+    {"quarter": "Q3-25", "date": "2025-09-30", "revenue": 1193.4, "ebitda": 221.9, "ebitda_margin": 0.1859, "consensus_revenue": 1163.2, "beat_miss_pct": 0.026},
+    {"quarter": "Q4-25", "date": "2025-12-31", "revenue": 1314.5, "ebitda": 253.0, "ebitda_margin": 0.1925, "consensus_revenue": 1296.4, "beat_miss_pct": 0.014},
+    {"quarter": "Q1-26", "date": "2026-03-31", "revenue": 1237.5, "ebitda": 228.6, "ebitda_margin": 0.1847, "consensus_revenue": 1215.6, "beat_miss_pct": 0.018},
+    {"quarter": "Q2-26", "date": "2026-06-30", "revenue": 1285.3, "ebitda": 246.7, "ebitda_margin": 0.1919, "consensus_revenue": 1249.1, "beat_miss_pct": 0.029},
+    {"quarter": "Q3-26", "date": "2026-09-30", "revenue": 1271.1, "ebitda": 246.2, "ebitda_margin": 0.1937, "consensus_revenue": 1267.3, "beat_miss_pct": 0.003}
+  ],
+  "meta": {"asOf": "2026-10-10", "notes": ["Quarters of FY24 and FY25 sum to annual figures in financials.", "Q3-26 from the preliminary trading update of 06-Oct-2026 (unaudited).", "Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."], "source": "Helios Industrial filings and management information; ReportKit synthetic data", "unit": "USD m"}
+}

@@ -1,0 +1,22 @@
+{
+  "id": "dcf_live",
+  "title": "凯斯勒DCF（实时）",
+  "schema": {"fields": [
+    {"name": "case", "type": "string", "title": "情形"},
+    {"name": "fcf_26", "type": "number", "title": "自由现金流 2026E", "format": "#,##0.0"},
+    {"name": "fcf_27", "type": "number", "title": "自由现金流 2027E", "format": "#,##0.0"},
+    {"name": "fcf_28", "type": "number", "title": "自由现金流 2028E", "format": "#,##0.0"},
+    {"name": "fcf_29", "type": "number", "title": "自由现金流 2029E", "format": "#,##0.0"},
+    {"name": "fcf_30", "type": "number", "title": "自由现金流 2030E", "format": "#,##0.0"}
+  ]},
+  "data": [
+    {"case": "基准情形", "fcf_26": 4.6, "fcf_27": 5.3, "fcf_28": 6.0, "fcf_29": 6.6, "fcf_30": 7.1}
+  ],
+  "meta": {"source": "北桥资本分析", "unit": "人民币亿元"},
+  "computed": [
+    {"name": "pv_fcf", "formula": "fcf_26 / (1 + @wacc) ^ 1 + fcf_27 / (1 + @wacc) ^ 2 + fcf_28 / (1 + @wacc) ^ 3 + fcf_29 / (1 + @wacc) ^ 4 + fcf_30 / (1 + @wacc) ^ 5", "title": "预测期现金流现值", "format": "#,##0.0"},
+    {"name": "pv_tv", "formula": "fcf_30 * (1 + @tgr) / (@wacc - @tgr) / (1 + @wacc) ^ 5", "title": "终值现值", "format": "#,##0.0"},
+    {"name": "implied_ev", "formula": "pv_fcf + pv_tv", "title": "DCF企业价值", "format": "#,##0.0"},
+    {"name": "vs_offer", "formula": "implied_ev / 93.6 - 1", "title": "较报价", "format": "+0.0%;-0.0%;0.0%"}
+  ]
+}

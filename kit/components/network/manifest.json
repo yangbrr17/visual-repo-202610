@@ -46,7 +46,7 @@
     "crossFilterScope": {"type": "string", "default": "dataset", "desc": "dataset: the selection only filters blocks bound to the same edge dataset ('source' / 'target' are generic names) | global"},
     "filterScope": {"type": "string", "default": null, "desc": "Deprecated alias of crossFilterScope (still honoured when set)"}
   },
-  "interactions": ["Hover a node: adjacency highlight + tooltip (category, size, connections)", "Hover an edge: relationship type and value", "Click a node to pin its neighbourhood and cross-filter", "Ctrl/⌘ + wheel or pinch to zoom (a plain wheel scrolls the page), drag to pan, drag nodes", "Legend toggles categories", "Positions are kept across filter updates", "PNG / CSV export"],
+  "interactions": ["Hover a node: adjacency highlight + tooltip (category, size, connections)", "Hover an edge: relationship type and value", "Click a node to pin its neighbourhood and cross-filter", "Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page and shows a hint); drag nodes", "Legend toggles categories", "Positions are kept across filter updates", "PNG / CSV export"],
   "samples": [
     {"title": "Helios ecosystem — customers, suppliers, competitors and partners (USD m)", "data": "network_edges", "height": 480,
      "options": {"nodesData": "network_nodes", "encode": {"source": "source", "target": "target", "value": "value", "edgeType": "type", "id": "id", "name": "name", "category": "type", "size": "size"},

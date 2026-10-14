@@ -4,6 +4,22 @@
    ========================================================================== */
 @page { size: 13.333in 7.5in; margin: 0; }   /* the builder appends a Letter / A4 @page rule when page_size is set */
 
+/* Paper metrics. The tokens below are viewport-relative (vw) on screen; on paper vw would be the SHEET width (1280px
+   for 16:9, 1056px for Letter) and while the runtime measures for print (html.rk-printing, before the media switch)
+   it is the WINDOW width. Both are pinned to their values in a 1440px window — the canonical 1135px page — so the
+   fit measured at 'beforeprint' (RK.runtime.printFit, data-grid row fit) is exactly the fit on paper, at any window
+   width, and paper shows the layout designed on screen. */
+html.rk-printing {
+  --rk-page-pad-x: 46.08px; --rk-page-pad-y: 37.44px; --rk-fs-title: 27px; --rk-fs-display: 48px;
+  --rk-cover-pad: 72px; --rk-fs-cover-sub: 18.64px; --rk-cover-conf-x: 43.2px; --rk-cover-conf-y: 34.56px; --rk-fs-section-num: 86.4px;
+}
+@media print {
+  :root {
+    --rk-page-pad-x: 46.08px; --rk-page-pad-y: 37.44px; --rk-fs-title: 27px; --rk-fs-display: 48px;
+    --rk-cover-pad: 72px; --rk-fs-cover-sub: 18.64px; --rk-cover-conf-x: 43.2px; --rk-cover-conf-y: 34.56px; --rk-fs-section-num: 86.4px;
+  }
+}
+
 @media print {
   html, body { background: #fff !important; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -31,8 +47,9 @@
   /* the page's "Filtered view" stamp states the filters on paper; per-block "Filtered" badges are screen-only */
   .rk-badge--filtered { display: none !important; }
   .rk-badge--soft { border: 0; padding: 0; height: auto; }
-  /* metric pickers print as the chosen field's name */
-  .rk-block__choices .rk-select { border: 0; background: none; padding: 0; height: auto; box-shadow: none; color: var(--rk-ink-2); font-weight: 600; }
+  /* metric / dimension pickers print as the chosen field's name (label + value, no control chrome) */
+  .rk-block__choices .rk-select { border: 0; background: none; padding: 0; height: auto; max-width: none; box-shadow: none; color: var(--rk-ink-2); font-weight: 600; text-overflow: clip; }
+  .rk-block__choice-wrap { gap: 4px; }
   /* RK.runtime.printFit(): content zoomed to fit its block; whatever still does not fit is clipped at the block */
   .rk-block.is-print-fit > .rk-block__body { overflow: hidden; }
 }

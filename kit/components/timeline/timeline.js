@@ -13,6 +13,20 @@
   var SVGNS = 'http://www.w3.org/2000/svg';
   var DAY = 864e5;
   var SHAPES = ['circle', 'diamond', 'square', 'triangle', 'hexagon'];
+
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'timeline.month': 'yy"年"m"月"', 'timeline.date': 'yy"年"m"月"d"日"',
+      'timeline.dateFull': 'yyyy"年"m"月"d"日"', 'timeline.dateAria': 'yyyy"年"m"月"d"日"', 'timeline.day': 'm"月"d"日"', 'timeline.today': '今天', 'timeline.filterBy': '按{kind}筛选'
+    });
+  }
   var GAP = 10;           // min horizontal gap between labels in a lane
   var STEM = 16;          // leader length from the axis to lane 0
   var LANE_GAP = 8;       // vertical gap between lanes
@@ -61,7 +75,7 @@
   /** Period axis for [lo, hi] at pxPerDay: months, quarters or years. */
   function periods(lo, hi, pxPerDay) {
     var monthPx = pxPerDay * 30.4, months, fmt;
-    if (monthPx >= 64) { months = 1; fmt = function (d) { return RK.format(d, 'mmm yy'); }; }
+    if (monthPx >= 64) { months = 1; fmt = function (d) { return RK.format(d, tr('timeline.month', 'mmm yy')); }; }
     else if (monthPx * 3 >= 46) { months = 3; fmt = function (d) { return 'Q' + RK.format(d, 'q yy'); }; }
     else { months = 12; fmt = function (d) { return RK.format(d, 'yyyy'); }; }
     var out = [];
@@ -187,7 +201,7 @@
         var t = c.theme;
         M.kinds.forEach(function (k) {
           var active = !M.sel.length || o.selectBy !== 'kind' || M.sel.indexOf(k) >= 0;
-          var item = h('button.rk-legend__item.rk-tl__lg', { type: 'button', class: active ? null : 'is-off', title: o.selectBy === 'kind' ? 'Filter by ' + kindName(c, k) : null,
+          var item = h('button.rk-legend__item.rk-tl__lg', { type: 'button', class: active ? null : 'is-off', title: o.selectBy === 'kind' ? tr('timeline.filterBy', 'Filter by {kind}', { kind: kindName(c, k) }) : null,
             // swatch markup carries theme colours only; the kind name is a text node
             html: o.marker === 'number' ? '<i class="rk-legend__swatch" style="background:' + M.colorOf(k) + ';border-radius:50%"></i>' : shapeSVG(M.shapeOf(k), 4.2, M.colorOf(k), t.paper) });
           item.appendChild(h('span', kindName(c, k)));
@@ -224,10 +238,10 @@
           it.ev = ev;
           // content
           it.label.innerHTML = '';
-          it.label.appendChild(h('div.rk-tl__date.rk-num', RK.format(new Date(ev.t), o.dateFormat || 'd mmm yy')));
+          it.label.appendChild(h('div.rk-tl__date.rk-num', RK.format(new Date(ev.t), !o.dateFormat || o.dateFormat === 'd mmm yy' ? tr('timeline.date', 'd mmm yy') : o.dateFormat)));
           it.label.appendChild(h('div.rk-tl__text', ev.label));
           if (showDetail && ev.detail) it.label.appendChild(h('div.rk-tl__detail', ev.detail));
-          it.label.setAttribute('aria-label', RK.format(new Date(ev.t), 'd mmmm yyyy') + ': ' + ev.label + (ev.kind ? ' (' + kindName(c, ev.kind) + ')' : ''));
+          it.label.setAttribute('aria-label', RK.format(new Date(ev.t), tr('timeline.dateAria', 'd mmmm yyyy')) + tr('colon', ': ') + ev.label + (ev.kind ? ' (' + kindName(c, ev.kind) + ')' : ''));
           it.label.classList.toggle('is-dim', ev.dim);
           it.label.classList.toggle('is-hl', ev.hl);
           it.marker.classList.toggle('is-dim', ev.dim);
@@ -372,7 +386,7 @@
         if (todayX != null && todayX >= padX && todayX <= padX + plotW) {
           gridLayer.appendChild(h('div.rk-tl__today', { style: { left: todayX + 'px', top: '0px', height: (plotBottom + 2) + 'px' } }));
           var tl = gridLayer.appendChild(h('div.rk-tl__todaylab', { style: { left: '0px', top: (plotBottom + 3) + 'px' } },
-            (o.todayLabel ? o.todayLabel + ' ' : '') + RK.format(new Date(todayTs), 'd mmm')));
+            (o.todayLabel ? (o.todayLabel === 'Today' ? tr('timeline.today', 'Today') : o.todayLabel) + ' ' : '') + RK.format(new Date(todayTs), tr('timeline.day', 'd mmm'))));
           var tlw = tl.offsetWidth, tlx = Math.max(0, Math.min(W - tlw, todayX - tlw / 2));   // centred under the line, kept inside the block
           tl.style.left = tlx + 'px';
           todayBox = [tlx - 6, tlx + tlw + 6];
@@ -464,7 +478,7 @@
       function show(it) {
         clearTimeout(hideTimer);
         var c = current, ev = it.ev, enc = c.enc;
-        var rows = [{ label: c.title(enc.date), value: RK.format(new Date(ev.t), c.fmtOf(enc.date) || 'dd mmm yyyy') }];
+        var rows = [{ label: c.title(enc.date), value: RK.format(new Date(ev.t), c.fmtOf(enc.date) || tr('timeline.dateFull', 'dd mmm yyyy')) }];
         if (ev.kind) rows.push({ color: ev.color, label: c.title(enc.kind), value: kindName(c, ev.kind) });
         tip.innerHTML = RK.chart.tip(ev.label, rows, ev.detail);
         tip.classList.add('is-on');

@@ -8,6 +8,20 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'bubble.tools': '图表工具', 'bubble.boxSelect': '框选气泡（交叉筛选）', 'bubble.boxZoom': '框选缩放', 'bubble.resetZoomSel': '重置缩放和选择',
+      'bubble.target': '目标公司', 'bubble.size': '{label}（气泡大小）', 'bubble.peers': '可比公司'
+    });
+  }
+
   /* ---------------- scale helpers ---------------- */
   /** Nice linear axis bounds around the data with fractional padding; never crosses zero needlessly. */
   function niceExtent(vals, pad, count) {
@@ -184,7 +198,7 @@
   }
   function toolbar(ctx, inst) {
     var h = util.h, buttons = {};
-    var bar = h('div.rk-xy-tools.rk-noprint', { role: 'toolbar', 'aria-label': 'Chart tools' });
+    var bar = h('div.rk-xy-tools.rk-noprint', { role: 'toolbar', 'aria-label': tr('bubble.tools', 'Chart tools') });
     function mode(m) {
       var next = inst.__rkMode === m ? null : m;
       inst.__rkMode = next;
@@ -197,9 +211,9 @@
       if (key) { buttons[key] = b; b.setAttribute('aria-pressed', 'false'); }
       bar.appendChild(b);
     }
-    if (inst.__rkCanBrush) btn('select', 'Box-select bubbles (cross-filter)', svgIcon('select'), function () { mode('select'); });
-    btn('zoom', 'Box zoom', svgIcon('zoom'), function () { mode('zoom'); });
-    btn(null, 'Reset zoom and selection', RK.ui.icon('reset'), function () {
+    if (inst.__rkCanBrush) btn('select', tr('bubble.boxSelect', 'Box-select bubbles (cross-filter)'), svgIcon('select'), function () { mode('select'); });
+    btn('zoom', tr('bubble.boxZoom', 'Box zoom'), svgIcon('zoom'), function () { mode('zoom'); });
+    btn(null, tr('bubble.resetZoomSel', 'Reset zoom and selection'), RK.ui.icon('reset'), function () {
       inst.dispatchAction({ type: 'dataZoom', dataZoomIndex: 0, start: 0, end: 100 });
       inst.dispatchAction({ type: 'dataZoom', dataZoomIndex: 1, start: 0, end: 100 });
       inst.dispatchAction({ type: 'brush', areas: [] });
@@ -305,9 +319,9 @@
     /* layers: one series per category (legend toggles) + target layer */
     var layers = [];
     if (cType === 'category') groups.forEach(function (g) { layers.push({ id: 'g-' + g, name: String(g), color: catColor(g), match: function (r) { return !isTarget(r) && r[colorF] === g; } }); });
-    else layers.push({ id: 'all', name: o.peerLabel, color: continuous ? null : palette(0), match: function (r) { return !isTarget(r); } });
+    else layers.push({ id: 'all', name: o.peerLabel === 'Peers' ? tr('bubble.peers', 'Peers') : o.peerLabel, color: continuous ? null : palette(0), match: function (r) { return !isTarget(r); } });
     var targetName = null;
-    allRows.some(function (r) { if (isTarget(r)) { targetName = String(r[nameF] == null ? 'Target' : r[nameF]); return true; } return false; });
+    allRows.some(function (r) { if (isTarget(r)) { targetName = String(r[nameF] == null ? tr('bubble.target', 'Target') : r[nameF]); return true; } return false; });
     if (targetName) layers.push({ id: 'target', name: targetName, color: continuous ? null : t.accent2, target: true, match: isTarget });
 
     var points = [];
@@ -510,13 +524,13 @@
         if (!r) return '';
         var title = r[nameF] == null ? '' : String(r[nameF]);
         if (labelF && nameF !== labelF && r[labelF] != null) title += ' (' + r[labelF] + ')';
-        var tr = [];
-        if (colorF) tr.push({ color: continuous ? cScale(r[colorF]) : (isTarget(r) ? t.accent2 : catColor(r[colorF])), label: ctx.title(colorF), value: RK.format(r[colorF], continuous ? cFmt : null) });
-        tr.push({ label: ctx.title(enc.x), value: RK.format(r[enc.x], xFmt) });
-        tr.push({ label: ctx.title(enc.y), value: RK.format(r[enc.y], yFmt) });
-        if (sizeF) tr.push({ label: ctx.title(sizeF) + ' (size)', value: RK.format(r[sizeF], sFmt) });
-        (o.tooltipFields || []).forEach(function (f) { tr.push({ label: ctx.title(f), value: RK.format(r[f], ctx.fmtOf(f)) }); });
-        return C.tip(title, tr, tf ? ctx.title(tf) + ': ' + r[tf] : (isTarget(r) ? 'Target' : null));
+        var tipRows = [];
+        if (colorF) tipRows.push({ color: continuous ? cScale(r[colorF]) : (isTarget(r) ? t.accent2 : catColor(r[colorF])), label: ctx.title(colorF), value: RK.format(r[colorF], continuous ? cFmt : null) });
+        tipRows.push({ label: ctx.title(enc.x), value: RK.format(r[enc.x], xFmt) });
+        tipRows.push({ label: ctx.title(enc.y), value: RK.format(r[enc.y], yFmt) });
+        if (sizeF) tipRows.push({ label: tr('bubble.size', '{label} (size)', { label: ctx.title(sizeF) }), value: RK.format(r[sizeF], sFmt) });
+        (o.tooltipFields || []).forEach(function (f) { tipRows.push({ label: ctx.title(f), value: RK.format(r[f], ctx.fmtOf(f)) }); });
+        return C.tip(title, tipRows, tf ? ctx.title(tf) + ': ' + r[tf] : (isTarget(r) ? tr('bubble.target', 'Target') : null));
       }
     };
     // plain legend wrapping onto extra rows (no scroll paging: a hidden page 2 is lost in print / PDF)

@@ -9,6 +9,20 @@
   'use strict';
   var C = RK.chart, util = RK.util;
   var MINUS = '−';
+
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'waterfall.change': '变动', 'waterfall.pctOf': '占{name}比例', 'waterfall.running': '累计值', 'waterfall.unreconciled': '与桥接累计值的差额',
+      'waterfall.computed': '由桥接计算得出'
+    });
+  }
   var BAR = 0.62;          // bar width as share of the category band (connectors use the same value)
 
   var isNum = util.isNum;
@@ -313,15 +327,15 @@
           if (!s || p.seriesId !== 'bars') return '';
           var rows = [];
           if (s.kind === 'delta') {
-            rows.push({ color: colorOf(s), label: 'Change', value: signed(s.value) });
-            if (o.pctOfStart && first && first.value && s.i > first.i) rows.push({ label: '% of ' + first.label, value: RK.format(s.value == null ? null : s.value / Math.abs(first.value), '+0.0%;' + MINUS + '0.0%;0.0%') });
-            rows.push({ label: 'Running total', value: num(s.end, fmt), bold: true });
+            rows.push({ color: colorOf(s), label: tr('waterfall.change', 'Change'), value: signed(s.value) });
+            if (o.pctOfStart && first && first.value && s.i > first.i) rows.push({ label: tr('waterfall.pctOf', '% of {name}', { name: first.label }), value: RK.format(s.value == null ? null : s.value / Math.abs(first.value), '+0.0%;' + MINUS + '0.0%;0.0%') });
+            rows.push({ label: tr('waterfall.running', 'Running total'), value: num(s.end, fmt), bold: true });
           } else {
-            rows.push({ color: colorOf(s), label: s.kind === 'subtotal' ? 'Subtotal' : 'Total', value: num(s.value, fmt), bold: true });
-            if (s.diff && Math.abs(s.diff) > Math.abs(s.value) * 1e-6) rows.push({ label: 'Unreconciled vs. walk', value: signed(s.diff) });
+            rows.push({ color: colorOf(s), label: s.kind === 'subtotal' ? tr('subtotal', 'Subtotal') : tr('total', 'Total'), value: num(s.value, fmt), bold: true });
+            if (s.diff && Math.abs(s.diff) > Math.abs(s.value) * 1e-6) rows.push({ label: tr('waterfall.unreconciled', 'Unreconciled vs. walk'), value: signed(s.diff) });
           }
           if (s.category != null && s.kind === 'delta') rows.unshift({ label: ctx.title(enc.category), value: s.category });
-          return C.tip(s.label, rows, s.computed ? 'Computed from the walk' : null);
+          return C.tip(s.label, rows, s.computed ? tr('waterfall.computed', 'Computed from the walk') : null);
         }
       },
       xAxis: horiz ? valAxis : catAxis,

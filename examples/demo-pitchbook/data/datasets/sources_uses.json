@@ -1,0 +1,26 @@
+{
+  "id": "sources_uses",
+  "title": "Illustrative LBO sources & uses at $52.00 per share",
+  "schema": {"fields": [
+    {"name": "side", "type": "string", "title": "Side"},
+    {"name": "item", "type": "string", "title": "Item"},
+    {"name": "amount", "type": "number", "title": "Amount", "format": "$#,##0.0", "unit": "USD m"},
+    {"name": "multiple_of_ebitda", "type": "number", "title": "x 2026E EBITDA", "format": "0.0x"},
+    {"name": "pct", "type": "number", "title": "% of total", "format": "0.0%"},
+    {"name": "notes", "type": "string", "title": "Notes"}
+  ]},
+  "data": [
+    {"side": "Sources", "item": "Term Loan B", "amount": 2990.0, "multiple_of_ebitda": 3.0005, "pct": 0.2791, "notes": "7-year senior secured term loan; SOFR + 325 bps, 99.5 OID, 1.0% annual amortisation."},
+    {"side": "Sources", "item": "Senior secured notes", "amount": 995.0, "multiple_of_ebitda": 0.9985, "pct": 0.0929, "notes": null},
+    {"side": "Sources", "item": "Senior unsecured notes", "amount": 995.0, "multiple_of_ebitda": 0.9985, "pct": 0.0929, "notes": null},
+    {"side": "Sources", "item": "Existing cash on balance sheet", "amount": 615.0, "multiple_of_ebitda": 0.6172, "pct": 0.0574, "notes": null},
+    {"side": "Sources", "item": "Management rollover equity", "amount": 250.0, "multiple_of_ebitda": 0.2509, "pct": 0.0233, "notes": null},
+    {"side": "Sources", "item": "Sponsor equity", "amount": 4868.7, "multiple_of_ebitda": 4.8858, "pct": 0.4544, "notes": "Balancing item: Granite Arch Partners Fund VII and co-investors (fictional)."},
+    {"side": "Uses", "item": "Purchase of equity", "amount": 8216.0, "multiple_of_ebitda": 8.2449, "pct": 0.7669, "notes": "158.0m diluted shares at the $52.00 offer price, a 22.4% premium to the 09-Oct-2026 close of $42.50."},
+    {"side": "Uses", "item": "Refinancing of existing debt", "amount": 2105.0, "multiple_of_ebitda": 2.1124, "pct": 0.1965, "notes": "Gross debt at 30-Sep-2026 (senior notes, term loan, RCF drawings and convertible)."},
+    {"side": "Uses", "item": "Transaction fees & expenses", "amount": 143.1, "multiple_of_ebitda": 0.1436, "pct": 0.0134, "notes": null},
+    {"side": "Uses", "item": "Financing fees", "amount": 99.6, "multiple_of_ebitda": 0.0999, "pct": 0.0093, "notes": "2.0% of funded debt; capitalised and amortised over the life of the facilities."},
+    {"side": "Uses", "item": "Cash to balance sheet", "amount": 150.0, "multiple_of_ebitda": 0.1505, "pct": 0.014, "notes": null}
+  ],
+  "meta": {"asOf": "2026-10-10", "notes": ["Multiples of 2026E EBITDA of $996.5m; total sources equal total uses.", "pct = amount / side total.", "Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."], "source": "Project Atlas analysis (synthetic); Helios Industrial management plan", "unit": "USD m"}
+}

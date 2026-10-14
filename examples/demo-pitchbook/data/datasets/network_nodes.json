@@ -1,0 +1,37 @@
+{
+  "id": "network_nodes",
+  "title": "Ecosystem map: nodes",
+  "schema": {"fields": [
+    {"name": "id", "type": "string", "title": "Id"},
+    {"name": "name", "type": "string", "title": "Name"},
+    {"name": "type", "type": "string", "title": "Type"},
+    {"name": "size", "type": "number", "title": "Relationship value", "format": "$#,##0", "unit": "USD m"}
+  ]},
+  "data": [
+    {"id": "helios-industrial", "name": "Helios Industrial", "type": "Target", "size": 4850.0},
+    {"id": "aurelia-motors", "name": "Aurelia Motors", "type": "Customer", "size": 465.3},
+    {"id": "brightline-packaging", "name": "Brightline Packaging", "type": "Customer", "size": 169.7},
+    {"id": "cobalt-aerospace", "name": "Cobalt Aerospace", "type": "Customer", "size": 290.6},
+    {"id": "delmar-foods", "name": "Delmar Foods", "type": "Customer", "size": 75.2},
+    {"id": "everstone-pharma", "name": "Everstone Pharma", "type": "Customer", "size": 346.4},
+    {"id": "fairhaven-semiconductors", "name": "Fairhaven Semiconductors", "type": "Customer", "size": 352.2},
+    {"id": "granton-logistics", "name": "Granton Logistics", "type": "Customer", "size": 492.7},
+    {"id": "hollis-energy", "name": "Hollis Energy", "type": "Customer", "size": 309.9},
+    {"id": "ingram-castings", "name": "Ingram Castings", "type": "Supplier", "size": 182.0},
+    {"id": "jansen-electronics", "name": "Jansen Electronics", "type": "Supplier", "size": 284.9},
+    {"id": "kobold-bearings", "name": "Kobold Bearings", "type": "Supplier", "size": 212.8},
+    {"id": "lorrimer-microchips", "name": "Lorrimer Microchips", "type": "Supplier", "size": 407.7},
+    {"id": "marlow-polymers", "name": "Marlow Polymers", "type": "Supplier", "size": 126.5},
+    {"id": "ostend-steel", "name": "Ostend Steel", "type": "Supplier", "size": 184.9},
+    {"id": "corvane-automation", "name": "Corvane Automation", "type": "Competitor", "size": 1566.6},
+    {"id": "valdris-controls", "name": "Valdris Controls", "type": "Competitor", "size": 1767.5},
+    {"id": "tessaro-robotics", "name": "Tessaro Robotics", "type": "Competitor", "size": 834.0},
+    {"id": "kanemori-systems", "name": "Kanemori Systems", "type": "Competitor", "size": 1582.6},
+    {"id": "norrvik-drives", "name": "Norrvik Drives", "type": "Competitor", "size": 739.5},
+    {"id": "quillon-cloud", "name": "Quillon Cloud", "type": "Partner", "size": 254.6},
+    {"id": "rhodes-systems-integration", "name": "Rhodes Systems Integration", "type": "Partner", "size": 195.3},
+    {"id": "tamsin-institute-of-technology", "name": "Tamsin Institute of Technology", "type": "Partner", "size": 85.7},
+    {"id": "ulric-integrators", "name": "Ulric Integrators", "type": "Partner", "size": 48.0}
+  ],
+  "meta": {"asOf": "2026-10-10", "notes": ["network_nodes.id is referenced by network_edges.source / target.", "size: Helios = FY25A revenue; others = sum of their edge values.", "Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."], "source": "Project Atlas analysis (synthetic); Helios Industrial management plan", "unit": "USD m"}
+}

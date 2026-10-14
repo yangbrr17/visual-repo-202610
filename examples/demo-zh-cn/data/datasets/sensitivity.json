@@ -1,0 +1,37 @@
+{
+  "id": "sensitivity",
+  "title": "DCF敏感性分析：企业价值",
+  "schema": {"fields": [
+    {"name": "wacc", "type": "number", "title": "WACC", "format": "0.0%"},
+    {"name": "tgr", "type": "number", "title": "永续增长率", "format": "0.0%"},
+    {"name": "value", "type": "number", "title": "企业价值", "format": "#,##0.0", "unit": "人民币亿元"}
+  ]},
+  "data": [
+    {"wacc": 0.075, "tgr": 0.01, "value": 100.4},
+    {"wacc": 0.075, "tgr": 0.015, "value": 107.2},
+    {"wacc": 0.075, "tgr": 0.02, "value": 115.3},
+    {"wacc": 0.075, "tgr": 0.025, "value": 125.0},
+    {"wacc": 0.075, "tgr": 0.03, "value": 136.8},
+    {"wacc": 0.08, "tgr": 0.01, "value": 93.0},
+    {"wacc": 0.08, "tgr": 0.015, "value": 98.7},
+    {"wacc": 0.08, "tgr": 0.02, "value": 105.4},
+    {"wacc": 0.08, "tgr": 0.025, "value": 113.3},
+    {"wacc": 0.08, "tgr": 0.03, "value": 122.8},
+    {"wacc": 0.085, "tgr": 0.01, "value": 86.5},
+    {"wacc": 0.085, "tgr": 0.015, "value": 91.4},
+    {"wacc": 0.085, "tgr": 0.02, "value": 97.0},
+    {"wacc": 0.085, "tgr": 0.025, "value": 103.6},
+    {"wacc": 0.085, "tgr": 0.03, "value": 111.4},
+    {"wacc": 0.09, "tgr": 0.01, "value": 80.9},
+    {"wacc": 0.09, "tgr": 0.015, "value": 85.1},
+    {"wacc": 0.09, "tgr": 0.02, "value": 89.8},
+    {"wacc": 0.09, "tgr": 0.025, "value": 95.4},
+    {"wacc": 0.09, "tgr": 0.03, "value": 101.8},
+    {"wacc": 0.095, "tgr": 0.01, "value": 75.9},
+    {"wacc": 0.095, "tgr": 0.015, "value": 79.5},
+    {"wacc": 0.095, "tgr": 0.02, "value": 83.6},
+    {"wacc": 0.095, "tgr": 0.025, "value": 88.3},
+    {"wacc": 0.095, "tgr": 0.03, "value": 93.8}
+  ],
+  "meta": {"notes": ["2026E–2030E 无杠杆自由现金流，年末折现；终值采用戈登增长模型。"], "source": "北桥资本分析", "unit": "人民币亿元"}
+}

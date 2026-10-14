@@ -1,0 +1,49 @@
+{
+  "id": "buyers",
+  "title": "Potential acquirers: assessment inputs",
+  "schema": {
+    "fields": [
+      {"name": "buyer", "type": "string", "title": "Buyer"},
+      {"name": "ticker", "type": "string", "title": "Ticker"},
+      {"name": "type", "type": "string", "title": "Buyer type"},
+      {"name": "hq", "type": "string", "title": "Headquarters"},
+      {"name": "synergies", "type": "number", "title": "Run-rate synergies", "format": "$#,##0\"m\"", "unit": "USD m"},
+      {"name": "standalone", "type": "number", "title": "Ability to pay, no synergies", "format": "$#,##0.00", "unit": "USD per share"},
+      {"name": "fit", "type": "number", "title": "Strategic fit", "format": "0"},
+      {"name": "regulatory", "type": "number", "title": "Regulatory risk", "format": "0"},
+      {"name": "certainty", "type": "number", "title": "Deal certainty", "format": "0"},
+      {"name": "comment", "type": "string", "title": "Comment"}
+    ]
+  },
+  "data": [
+    {"buyer": "Kanemori Systems", "ticker": "KNMR", "type": "Strategic", "hq": "Japan", "synergies": 160, "standalone": 48.5, "fit": 5, "regulatory": 3, "certainty": 2,
+     "comment": "Best product fit; still integrating Tarrant Automation ($8.3bn, pending)."},
+    {"buyer": "Valdris Controls", "ticker": "VLDS", "type": "Strategic", "hq": "Switzerland", "synergies": 150, "standalone": 48.0, "fit": 5, "regulatory": 4, "certainty": 3,
+     "comment": "Largest European overlap; Phase II EU review likely."},
+    {"buyer": "Corvane Automation", "ticker": "CRVA", "type": "Strategic", "hq": "Germany", "synergies": 140, "standalone": 47.5, "fit": 4, "regulatory": 4, "certainty": 2,
+     "comment": "Smaller than Helios: a share-heavy merger rather than a cash bid."},
+    {"buyer": "Tessaro Robotics", "ticker": "TSRO", "type": "Strategic", "hq": "United States", "synergies": 120, "standalone": 49.5, "fit": 4, "regulatory": 3, "certainty": 4,
+     "comment": "Strongest balance sheet among US strategics; HSR second request possible."},
+    {"buyer": "Norrvik Drives", "ticker": "NRVK", "type": "Strategic", "hq": "Sweden", "synergies": 95, "standalone": 48.0, "fit": 3, "regulatory": 2, "certainty": 4,
+     "comment": "Motion-control adjacency; limited overlap in automation."},
+    {"buyer": "Orbisant Software", "ticker": "ORBT", "type": "Strategic", "hq": "United Kingdom", "synergies": 55, "standalone": 50.5, "fit": 3, "regulatory": 1, "certainty": 3,
+     "comment": "Values Sensors and Software at a software multiple; hardware a non-core fit."},
+    {"buyer": "Quintar Sensing", "ticker": "QNTR", "type": "Strategic", "hq": "Canada", "synergies": 45, "standalone": 49.0, "fit": 2, "regulatory": 1, "certainty": 3,
+     "comment": "Interested in Sensors & Instrumentation only; carve-out alternative."},
+    {"buyer": "Granite Arch Partners", "ticker": null, "type": "Financial sponsor", "hq": "United States", "synergies": 120, "standalone": 46.4, "fit": 3, "regulatory": 2, "certainty": 5,
+     "comment": "Current bidder; platform synergies with portfolio companies Pellston Automation and Brightwell Motion."},
+    {"buyer": "Bluefield Capital Partners", "ticker": null, "type": "Financial sponsor", "hq": "United States", "synergies": 20, "standalone": 45.8, "fit": 2, "regulatory": 1, "certainty": 4,
+     "comment": "Owns Sefton Industrial Software (acquired Mar-2026)."},
+    {"buyer": "Ashgrove Equity", "ticker": null, "type": "Financial sponsor", "hq": "United Kingdom", "synergies": 10, "standalone": 45.2, "fit": 2, "regulatory": 1, "certainty": 3,
+     "comment": "Mid-market sponsor; would need a club deal for an equity cheque of this size."}
+  ],
+  "meta": {
+    "source": "Northbridge Capital analysis",
+    "notes": [
+      "Ability to pay without synergies: strategics = DCF at the buyer's cost of capital; sponsors = LBO at a 20% IRR and 5.0x leverage.",
+      "Scores 1 (low) to 5 (high); regulatory risk 5 = highest risk.",
+      "Illustrative: all companies, banks and investors are fictional."
+    ],
+    "asOf": "2026-10-10"
+  }
+}

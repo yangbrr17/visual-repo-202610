@@ -1,0 +1,27 @@
+{
+  "id": "target_tree",
+  "title": "凯斯勒收入构成（2025A）",
+  "schema": {"fields": [
+    {"name": "id", "type": "string", "title": "编号"},
+    {"name": "parent", "type": "string", "title": "上级"},
+    {"name": "name", "type": "string", "title": "业务"},
+    {"name": "value", "type": "number", "title": "2025A收入", "format": "#,##0.0", "unit": "人民币亿元"},
+    {"name": "growth", "type": "number", "title": "同比增速", "format": "0.0%"}
+  ]},
+  "data": [
+    {"id": "root", "parent": "", "name": "凯斯勒", "value": null, "growth": null},
+    {"id": "伺服驱动器", "parent": "root", "name": "伺服驱动器", "value": null, "growth": null},
+    {"id": "精密电机", "parent": "root", "name": "精密电机", "value": null, "growth": null},
+    {"id": "运动控制系统", "parent": "root", "name": "运动控制系统", "value": null, "growth": null},
+    {"id": "售后服务", "parent": "root", "name": "售后服务", "value": null, "growth": null},
+    {"id": "高端伺服驱动", "parent": "伺服驱动器", "name": "高端伺服驱动", "value": 14.1, "growth": 0.092},
+    {"id": "通用伺服驱动", "parent": "伺服驱动器", "name": "通用伺服驱动", "value": 8.3, "growth": 0.041},
+    {"id": "直驱力矩电机", "parent": "精密电机", "name": "直驱力矩电机", "value": 9.6, "growth": 0.124},
+    {"id": "伺服电机", "parent": "精密电机", "name": "伺服电机", "value": 7.2, "growth": 0.052},
+    {"id": "多轴控制器", "parent": "运动控制系统", "name": "多轴控制器", "value": 6.5, "growth": 0.108},
+    {"id": "软件与授权", "parent": "运动控制系统", "name": "软件与授权", "value": 4.7, "growth": 0.183},
+    {"id": "备件", "parent": "售后服务", "name": "备件", "value": 3.6, "growth": 0.031},
+    {"id": "维保与改造", "parent": "售后服务", "name": "维保与改造", "value": 2.2, "growth": 0.071}
+  ],
+  "meta": {"source": "凯斯勒管理层预测（示例）", "unit": "人民币亿元"}
+}

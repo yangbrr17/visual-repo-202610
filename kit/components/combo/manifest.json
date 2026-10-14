@@ -33,7 +33,7 @@
     "legend": {"type": "boolean", "default": true, "desc": "Top-left legend (shown when there is more than one series)"},
     "zoom": {"type": "boolean", "default": false, "desc": "Enable dataZoom on the period axis: slider + drag, Ctrl/Cmd + wheel or pinch (options.wheelZoom: true for the plain wheel)"}
   },
-  "interactions": ["Axis tooltip with every bar and line value (estimate periods flagged)", "Click a bar to cross-filter on the period", "Legend toggle", "Animated transitions on filter changes", "Optional zoom (slider, drag, Ctrl/Cmd + wheel or pinch)", "PNG / CSV export"],
+  "interactions": ["Axis tooltip with every bar and line value (estimate periods flagged)", "Click a bar to cross-filter on the period", "Legend toggle", "Animated transitions on filter changes", "Optional zoom (zoom: true): slider; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)", "PNG / CSV export"],
   "samples": [
     {"title": "Revenue and EBITDA margin, 2019A–2028E", "data": "financials", "height": 340,
      "options": {"encode": {"x": "year", "bars": ["revenue"], "line": ["ebitda_margin"]}, "format": "$#,##0", "cagr": "split"}},

@@ -8,6 +8,24 @@
   'use strict';
   var h = RK.util.h, G = RK.geo;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'clusterMap.points': '点数', 'clusterMap.totalOf': '{Field}合计', 'clusterMap.count': '{n} 个{noun}', 'clusterMap.zoomHint': '点击放大',
+      'clusterMap.keySum': '聚合：{Field}合计', 'clusterMap.keyCount': '聚合：{noun}数量'
+    });
+  }
+  /** 'Market cap' -> 'market cap' for running text ('Total market cap'); acronyms and CJK titles are kept. */
+  function lower(s) { return String(s).replace(/^[A-Z](?=[a-z])/, function (ch) { return ch.toLowerCase(); }); }
+  /** The marks' noun for running text (the zh pack's '个点' carries its own measure word, which the templates add). */
+  function nounOf(S) { return String(S.noun || tr('points', 'points')).replace(/^\u4e2a/, ''); }
+
   function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
 
   /* ---------------- colour guards (same block in the map components) ---------------- */
@@ -135,11 +153,11 @@
       group.on('clustermouseover', function (e) {
         var ms = e.layer.getAllChildMarkers(), parts = partsOf(ms), c = cur, enc = c.enc;
         var rows = parts.map(function (p) {
-          return { color: p.color, label: enc.color ? String(p.key) : 'Points', value: String(p.n) + (enc.value ? '  ·  ' + RK.format(p.v, S.fmt) : '') };
+          return { color: p.color, label: enc.color ? String(p.key) : tr('clusterMap.points', 'Points'), value: String(p.n) + (enc.value ? '  ·  ' + RK.format(p.v, S.fmt) : '') };
         });
-        if (enc.value) rows.push({ label: 'Total ' + c.title(enc.value).replace(/^[A-Z](?=[a-z])/, function (ch) { return ch.toLowerCase(); }), value: RK.format(parts.reduce(function (s, p) { return s + p.v; }, 0), S.fmt), bold: true });
+        if (enc.value) rows.push({ label: tr('clusterMap.totalOf', 'Total {field}', { field: lower(c.title(enc.value)), Field: c.title(enc.value) }), value: RK.format(parts.reduce(function (s, p) { return s + p.v; }, 0), S.fmt), bold: true });
         var sz = e.layer.options.icon && e.layer.options.icon.options.iconSize ? e.layer.options.icon.options.iconSize[1] : 30;
-        e.layer.bindTooltip(RK.chart.tip(ms.length + ' ' + (S.noun || 'points'), rows, 'Click to zoom in'), { direction: 'top', offset: [0, -sz / 2], opacity: 1 }).openTooltip();
+        e.layer.bindTooltip(RK.chart.tip(tr('clusterMap.count', '{n} {noun}', { n: ms.length, noun: nounOf(S) }), rows, tr('clusterMap.zoomHint', 'Click to zoom in')), { direction: 'top', offset: [0, -sz / 2], opacity: 1 }).openTooltip();
       });
       group.on('clustermouseout', function (e) { e.layer.unbindTooltip(); });
 
@@ -186,7 +204,8 @@
               selected: cur.selected(cur.enc.color), onClick: o.crossFilter !== false ? function (v) { G.select(cur, cur.enc.color, v); } : null
             })));
           }
-          var key = o.clusterValue === 'sum' && cur.enc.value ? 'Cluster: total ' + G.fieldTitle(cur, cur.enc.value).replace(/^[A-Z](?=[a-z])/, function (ch) { return ch.toLowerCase(); }) : 'Cluster: number of ' + S.noun;
+          var key = o.clusterValue === 'sum' && cur.enc.value ? tr('clusterMap.keySum', 'Cluster: total {field}', { field: lower(G.fieldTitle(cur, cur.enc.value)), Field: G.fieldTitle(cur, cur.enc.value) })
+            : tr('clusterMap.keyCount', 'Cluster: number of {noun}', { noun: nounOf(S) });
           secs.push(h('div.rk-geo-leg__sec', h('div.rk-geo-leg__item', h('i.rk-cluster__key', { html: clusterSVG(20, [], 1, '', t) }), h('span', key))));
           legend.set(h('div.rk-geo-leg', secs));
         } else legend.set(null);

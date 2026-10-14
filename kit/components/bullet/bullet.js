@@ -10,6 +10,21 @@
   var C = RK.chart, util = RK.util;
   var MINUS = '−';
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'bullet.ofTarget': '{range}（占目标）', 'bullet.band': '区间 {n}', 'bullet.target': '目标', 'bullet.actual': '实际', 'bullet.vs': '较{Name}',
+      'bullet.meets': '达到目标', 'bullet.misses': '未达目标', 'bullet.variance': '差异', 'bullet.variancePct': '差异 %',
+      'bullet.bandTip': '区间：{band}'
+    });
+  }
+
   var isNum = util.isNum;
   function signed(v, fmt) {
     if (!isNum(v)) return RK.format(v, fmt);
@@ -138,12 +153,13 @@
     var bandNames = (o.bandLabels && o.bandLabels.length === nBands) ? o.bandLabels.slice() : (function () {
       var th = bandFields.length ? bandFields.map(function (f) { return ctx.title(f); }) : (o.bands || []).slice().sort(function (a, b) { return a - b; });
       var f = function (v) { return typeof v === 'string' ? v : o.bandMode === 'absolute' ? RK.format(v, baseFmt) : RK.format(v, '0%'); };
-      var suffix = !bandFields.length && o.bandMode !== 'absolute' ? ' of target' : '';
-      if (th.length + 1 !== nBands) return shades.map(function (_, i) { return 'Band ' + (i + 1); });
+      var ofTarget = !bandFields.length && o.bandMode !== 'absolute';
+      var sfx = function (s) { return ofTarget ? tr('bullet.ofTarget', '{range} of target', { range: s }) : s; };
+      if (th.length + 1 !== nBands) return shades.map(function (_, i) { return tr('bullet.band', 'Band {n}', { n: i + 1 }); });
       return shades.map(function (_, i) {
-        if (i === 0) return '< ' + f(th[0]) + suffix;
-        if (i === th.length) return '> ' + f(th[i - 1]) + suffix;
-        return f(th[i - 1]) + '–' + f(th[i]) + suffix;
+        if (i === 0) return sfx('< ' + f(th[0]));
+        if (i === th.length) return sfx('> ' + f(th[i - 1]));
+        return sfx(f(th[i - 1]) + '–' + f(th[i]));
       });
     })();
 
@@ -190,7 +206,7 @@
     });
 
     // target tick
-    var targetName = o.targetLabel || (hasTarget ? ctx.title(enc.target) : (o.target === 'median' ? 'Median' : o.target === 'mean' ? 'Mean' : 'Target'));
+    var targetName = o.targetLabel || (hasTarget ? ctx.title(enc.target) : (o.target === 'median' ? tr('median', 'Median') : o.target === 'mean' ? tr('mean', 'Mean') : tr('bullet.target', 'Target')));
     series.push({
       id: 'target', name: targetName, type: 'custom', yAxisIndex: 0, z: 4,
       itemStyle: { color: t.ink },
@@ -211,7 +227,7 @@
     var vText = function (d) { return num(d.value, d.fmt); };
     var dText = function (d) { return o.variance === 'abs' ? absVar(d.varAbs, d.fmt) : signed(d.varPct, '0.0%'); };
     var numFont = '11px ' + t.fontNum, headFont = '10.5px ' + t.fontSans;
-    var vHead = o.valueTitle || 'Actual', dHead = o.varianceTitle || ('vs. ' + targetName.toLowerCase());
+    var vHead = o.valueTitle || tr('bullet.actual', 'Actual'), dHead = o.varianceTitle || tr('bullet.vs', 'vs. {name}', { name: targetName.toLowerCase(), Name: targetName });
     var vW = 0, dW = 0;
     items.forEach(function (d) { vW = Math.max(vW, C.measure(vText(d), numFont)); dW = Math.max(dW, C.measure(dText(d), '600 ' + numFont)); });
     vW = Math.ceil(Math.max(vW, C.measure(vHead, headFont))) + 4;
@@ -266,7 +282,7 @@
     var legendData = bandNames.map(function (n, i) { return { name: n, itemStyle: { color: shades[i] } }; });
     if (o.colorByTarget) {
       // two swatches explain the pos / neg bar colours; they map to empty series
-      var okName = o.metLabel || 'Meets target', koName = o.missLabel || 'Misses target';
+      var okName = o.metLabel || tr('bullet.meets', 'Meets target'), koName = o.missLabel || tr('bullet.misses', 'Misses target');
       series.push({ id: 'lg-ok', name: okName, type: 'bar', data: [], itemStyle: { color: t.pos } },
         { id: 'lg-ko', name: koName, type: 'bar', data: [], itemStyle: { color: t.neg } });
       legendData.push({ name: okName, itemStyle: { color: t.pos } }, { name: koName, itemStyle: { color: t.neg } });
@@ -284,15 +300,15 @@
           if (!d || (p.seriesId !== 'actual' && p.seriesId !== 'target')) return '';
           var band = null;
           if (d.value != null) { var bi = 0; while (bi < d.thr.length && d.value >= d.thr[bi]) bi++; band = bandNames[bi]; }
-          var tr = [
+          var tipRows = [
             { color: barColor(d), label: actualName, value: num(d.value, d.fmt), bold: true },
             { color: t.ink, label: targetName, value: num(d.target, d.fmt) }
           ];
           if (d.target != null) {
-            tr.push({ label: 'Variance', value: absVar(d.varAbs, d.fmt) });
-            if (!isPct(d.fmt)) tr.push({ label: 'Variance %', value: signed(d.varPct, '0.0%') });   // relative % of a % is noise
+            tipRows.push({ label: tr('bullet.variance', 'Variance'), value: absVar(d.varAbs, d.fmt) });
+            if (!isPct(d.fmt)) tipRows.push({ label: tr('bullet.variancePct', 'Variance %'), value: signed(d.varPct, '0.0%') });   // relative % of a % is noise
           }
-          return C.tip(d.label, tr, band ? 'Band: ' + band : null);
+          return C.tip(d.label, tipRows, band ? tr('bullet.bandTip', 'Band: {band}', { band: band }) : null);
         }
       },
       xAxis: valAxis,

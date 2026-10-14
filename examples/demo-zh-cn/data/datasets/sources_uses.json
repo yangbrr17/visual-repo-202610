@@ -1,0 +1,20 @@
+{
+  "id": "sources_uses",
+  "title": "资金来源与运用",
+  "schema": {"fields": [
+    {"name": "side", "type": "string", "title": "类别"},
+    {"name": "item", "type": "string", "title": "项目"},
+    {"name": "amount", "type": "number", "title": "金额", "format": "#,##0.0", "unit": "人民币亿元"},
+    {"name": "notes", "type": "string", "title": "说明"}
+  ]},
+  "data": [
+    {"side": "资金来源", "item": "自有资金", "amount": 28.0, "notes": "华辰智能账面现金（2026年6月30日：50.2亿元）"},
+    {"side": "资金来源", "item": "并购贷款", "amount": 40.0, "notes": "境内银团，7年期，利率3.8%（LPR+30bp），以标的股权质押"},
+    {"side": "资金来源", "item": "A股定向增发", "amount": 30.0, "notes": "发行价不低于定价基准日前20个交易日均价的80%"},
+    {"side": "资金运用", "item": "股权收购对价", "amount": 81.9, "notes": "企业价值 93.6 亿元扣除净债务及类债务项目"},
+    {"side": "资金运用", "item": "偿还标的有息负债", "amount": 12.9, "notes": "交割时偿还凯斯勒现有银行借款"},
+    {"side": "资金运用", "item": "交易费用及税费", "amount": 2.2, "notes": "财务顾问、法律、审计及印花税等"},
+    {"side": "资金运用", "item": "补充营运资金", "amount": 1.0, "notes": null}
+  ],
+  "meta": {"source": "北桥资本分析", "unit": "人民币亿元"}
+}

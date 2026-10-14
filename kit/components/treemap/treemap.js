@@ -9,6 +9,20 @@
   'use strict';
   var C = RK.chart;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'treemap.level': '矩形树图层级', 'treemap.goUp': '点击标题返回上一级', 'treemap.zoomIn': '点击分组放大', 'treemap.drill': '点击下钻',
+      'treemap.vsAvg': '{field}（较加权平均）', 'treemap.pctTotal': '占合计比例', 'treemap.pctOf': '占{name}比例'
+    });
+  }
+
   /**
    * Build a tree: [{id, name, value, metric, field, children[]}] + the single root's name (if any).
    * Parent values are always the sum of their children so the areas add up exactly.
@@ -112,7 +126,7 @@
       legend: true             // colour scale legend (metric mode)
     },
     render: function (ctx) {
-      var state = { ctx: ctx, tree: null, view: [], inst: null, nav: RK.util.h('nav.rk-treemap__crumbs', { 'aria-label': 'Treemap level' }) };
+      var state = { ctx: ctx, tree: null, view: [], inst: null, nav: RK.util.h('nav.rk-treemap__crumbs', { 'aria-label': tr('treemap.level', 'Treemap level') }) };
       var base = C(function (c, inst) { state.ctx = c; state.inst = inst; return build(c, inst, state); }, {
         on: { click: function (p) { click(p, state); } }
       })(ctx);
@@ -179,7 +193,7 @@
     var ctx = state.ctx, o = ctx.options, nav = state.nav, h = RK.util.h;
     nav.innerHTML = '';
     if (o.drill === false) return;
-    var items = [{ id: null, name: o.rootName || state.tree.rootName || 'Total' }].concat(state.view.map(function (id) {
+    var items = [{ id: null, name: o.rootName || state.tree.rootName || tr('total', 'Total') }].concat(state.view.map(function (id) {
       var ch = chainOf(state.tree.roots, id);
       return { id: id, name: ch.length ? ch[ch.length - 1].name : id };
     }));
@@ -191,7 +205,7 @@
         : h('button.rk-treemap__crumb', { type: 'button', on: { click: function () { zoom(state, it.id); } } }, it.name));
     });
     var deep = state.tree.roots.some(function (n) { return n.children.length; });
-    var hint = items.length > 1 ? 'Click the header to go up' : (deep ? 'Click a group to zoom in' : '');
+    var hint = items.length > 1 ? tr('treemap.goUp', 'Click the header to go up') : (deep ? tr('treemap.zoomIn', 'Click a group to zoom in') : '');
     // the hint is optional: only when it fits next to the crumbs (they share the row with the colour legend)
     var room = parseFloat(nav.style.maxWidth) || Infinity, used = 0;
     items.forEach(function (it, i) { used += C.measure(it.name, '600 11px ' + ctx.theme.fontSans) + (i ? 20 : 0); });
@@ -347,7 +361,7 @@
     for (var d = 2; d <= maxDepth; d++) levels.push({ itemStyle: { borderWidth: d < maxDepth ? 1 : 0, gapWidth: 1, borderColor: t.paper }, upperLabel: { show: d < maxDepth, height: 18 } });
 
     var series = {
-      id: 'tm', type: 'treemap', name: o.rootName || tree.rootName || 'Total',
+      id: 'tm', type: 'treemap', name: o.rootName || tree.rootName || tr('total', 'Total'),
       left: 0, right: 0, top: top, bottom: 0,
       roam: false, nodeClick: false, squareRatio: 0.5 * (1 + Math.sqrt(5)),
       leafDepth: null, visibleMin: 0, childrenVisibleMin: 0,
@@ -382,7 +396,7 @@
     var graphic = [];
     var W = inst.getWidth(), navLeft = 0;
     if (showLegend) {
-      var lab = ctx.title(enc.color) + (o.colorMid === 'avg' ? ' vs. weighted avg.' : '');
+      var lab = o.colorMid === 'avg' ? tr('treemap.vsAvg', '{field} vs. weighted avg.', { field: ctx.title(enc.color) }) : ctx.title(enc.color);
       var labW = C.measure(lab, '11px ' + t.fontSans), lw = Math.min(150, W * 0.22), lx = Math.ceil(labW + 10);
       var stops = (t.div || []).map(function (c, i, a) { return { offset: i / (a.length - 1), color: c }; });
       var tick = function (x, v, align) {
@@ -407,11 +421,11 @@
           var parentVal = p.treePathInfo && p.treePathInfo.length > 2 ? p.treePathInfo[p.treePathInfo.length - 2].value : total;
           var rows = [
             { color: d.itemStyle && d.itemStyle.color, label: ctx.title(enc.value), value: RK.format(d.value, fmt), bold: true },
-            { label: '% of total', value: RK.format(total ? d.value / total : null, '0.0%') }
+            { label: tr('treemap.pctTotal', '% of total'), value: RK.format(total ? d.value / total : null, '0.0%') }
           ];
-          if (trail.length > 1) rows.push({ label: '% of ' + trail[trail.length - 2], value: RK.format(parentVal ? d.value / parentVal : null, '0.0%') });
+          if (trail.length > 1) rows.push({ label: tr('treemap.pctOf', '% of {name}', { name: trail[trail.length - 2] }), value: RK.format(parentVal ? d.value / parentVal : null, '0.0%') });
           if (enc.color && d.metric != null) rows.push({ label: ctx.title(enc.color), value: RK.format(d.metric, mfmt) });
-          return C.tip(trail.join(' › ') || d.name, rows, d.children && d.children.length && o.drill ? 'Click to drill down' : null);
+          return C.tip(trail.join(' › ') || d.name, rows, d.children && d.children.length && o.drill ? tr('treemap.drill', 'Click to drill down') : null);
         }
       },
       graphic: graphic,

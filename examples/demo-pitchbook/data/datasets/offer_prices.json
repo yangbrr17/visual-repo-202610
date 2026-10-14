@@ -1,0 +1,19 @@
+{
+  "id": "offer_prices",
+  "title": "Offer price levels for the analysis at various prices",
+  "schema": {"fields": [
+    {"name": "price", "type": "number", "title": "Price per share", "format": "$#,##0.00", "unit": "USD"},
+    {"name": "label", "type": "string", "title": "Label"},
+    {"name": "kind", "type": "string", "title": "Kind"},
+    {"name": "date", "type": "date", "title": "Received", "format": "dd mmm yyyy"}
+  ]},
+  "data": [
+    {"price": 42.5, "label": "Current", "kind": "current", "date": "2026-10-09"},
+    {"price": 45.0, "label": null, "kind": "level", "date": null},
+    {"price": 47.0, "label": "Initial proposal", "kind": "proposal", "date": "2026-08-12"},
+    {"price": 49.5, "label": "Revised proposal", "kind": "proposal", "date": "2026-09-15"},
+    {"price": 52.0, "label": "Final proposal", "kind": "offer", "date": "2026-10-06"},
+    {"price": 55.0, "label": null, "kind": "level", "date": null}
+  ],
+  "meta": {"asOf": "2026-10-10", "notes": ["Reference prices: current $42.50 (09-Oct-2026 close), 30-day VWAP $42.53, 52-week closing high $47.14, unaffected $39.30 (17-Jun-2026, the last close before press reports of sponsor interest).", "kind: current = current share price; proposal = proposal received; offer = final proposal; level = illustrative price level.", "Illustrative: all companies, banks and investors are fictional."], "source": "Project Atlas analysis (synthetic); Helios Industrial management plan", "unit": "USD per share"}
+}

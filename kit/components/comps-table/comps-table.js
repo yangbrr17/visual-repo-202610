@@ -10,6 +10,19 @@
   'use strict';
   var util = RK.util, h = util.h;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'compsTable.high': '最高值', 'compsTable.low': '最低值', 'compsTable.overall': '整体{Stat}'
+    });
+  }
+
   var STATS = {
     mean: { fn: 'avg', label: 'Mean' },
     median: { fn: 'median', label: 'Median' },
@@ -17,6 +30,11 @@
     low: { fn: 'min', label: 'Low' }
   };
   STATS.average = STATS.mean; STATS.max = STATS.high; STATS.min = STATS.low;
+  /** Statistic row label in the report locale. */
+  function statLabel(s) {
+    var fn = STATS[s].fn;
+    return fn === 'avg' ? tr('mean', 'Mean') : fn === 'median' ? tr('median', 'Median') : fn === 'max' ? tr('compsTable.high', 'High') : tr('compsTable.low', 'Low');
+  }
 
   function truthy(v) { return v === true || v === 1 || v === 'true' || v === 'Y' || v === 'yes'; }
   // generic field names (link tables, bridges...) cross-filter only this dataset (house rule: scoped selections)
@@ -201,12 +219,12 @@
     if (o.pinTarget === 'top') pinned.forEach(function (r) { out.push(dataSpec(r)); });
     if (o.groupBy) {
       util.groupBy(rest, function (r) { return r[o.groupBy]; }).forEach(function (g, name) {
-        out.push({ kind: 'section', key: 's:' + name, label: name == null || name === '' ? 'Other' : name });
+        out.push({ kind: 'section', key: 's:' + name, label: name == null || name === '' ? tr('other', 'Other') : name });
         sortRows(g, sort, cols).forEach(function (r) { out.push(dataSpec(r)); });
         if (scope === 'group' || scope === 'both') {
           var pool = statPool(g);
           gStats.forEach(function (s, i) {
-            out.push({ kind: 'stat', key: 'g:' + name + ':' + s, stat: s, rows: pool, sub: true, first: i === 0, label: STATS[s].label });
+            out.push({ kind: 'stat', key: 'g:' + name + ':' + s, stat: s, rows: pool, sub: true, first: i === 0, label: statLabel(s) });
           });
         }
       });
@@ -216,8 +234,8 @@
     if (scope === 'overall' || scope === 'both') {
       var all = statPool(rows);
       stats.forEach(function (s, i) {
-        var lab = STATS[s].label;
-        out.push({ kind: 'stat', key: 'o:' + s, stat: s, rows: all, first: i === 0, foot: true, label: scope === 'both' ? 'Overall ' + lab.toLowerCase() : lab });
+        var lab = statLabel(s);
+        out.push({ kind: 'stat', key: 'o:' + s, stat: s, rows: all, first: i === 0, foot: true, label: scope === 'both' ? tr('compsTable.overall', 'Overall {stat}', { stat: lab.toLowerCase(), Stat: lab }) : lab });
       });
     }
     if (o.pinTarget === 'bottom') pinned.forEach(function (r) { var d = dataSpec(r); d.pinnedBottom = d.foot = true; out.push(d); });

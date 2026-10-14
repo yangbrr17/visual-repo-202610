@@ -34,7 +34,7 @@
     "wheelZoom": {"type": "boolean", "default": null, "desc": "With zoom: true = zoom on the plain mouse wheel; null = plain wheel scrolls the report, Ctrl/Cmd + wheel zooms"},
     "legend": {"type": "boolean", "default": true, "desc": "Show the legend when colorBy is a field"}
   },
-  "interactions": ["Hover a dot: value, delta to group median, rank in group", "Hover a row: n, quartiles, mean", "Click a dot to cross-filter by label; click a row to cross-filter by group (generic field names such as target / type / category stay scoped to this dataset)", "Non-selected dots dimmed", "Legend toggle (colorBy field)", "Optional zoom with live re-layout", "Dots fan out from the group median on entry", "PNG / CSV export"],
+  "interactions": ["Hover a dot: value, delta to group median, rank in group", "Hover a row: n, quartiles, mean", "Click a dot to cross-filter by label; click a row to cross-filter by group (generic field names such as target / type / category stay scoped to this dataset)", "Non-selected dots dimmed", "Legend toggle (colorBy field)", "Optional zoom (zoom: true) with live re-layout: slider; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)", "Dots fan out from the group median on entry", "PNG / CSV export"],
   "samples": [
     {"title": "EV / EBITDA 2025E by sector", "data": "peers", "height": 300,
      "options": {"encode": {"label": "company", "value": "ev_ebitda_25e", "group": "sector"}, "overall": true, "labels": "extremes", "sortGroups": "desc"}},

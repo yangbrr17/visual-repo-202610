@@ -37,7 +37,7 @@
     "filterField": {"type": "string", "default": null, "desc": "Field used for click-to-filter; defaults to encode.label. Shared business dimensions (country, company, sector, region, segment, year…) filter the whole report; other fields (site name, type, from / to…) only this block's dataset — set crossFilterScope to override"},
     "scrollZoom": {"type": "boolean|string", "default": "click", "desc": "Plain mouse-wheel zoom: 'click' (armed after clicking the map, so page scrolling is never hijacked) | true | false. Ctrl/Cmd + wheel or a trackpad pinch always zooms; +/- buttons and drag too"}
   },
-  "interactions": ["Hover tooltip", "Click a bubble to cross-filter (others dim)", "Click a legend category to filter by it", "Zoom / pan; labels re-place on zoom", "Grow-in animation, smooth radius transitions on filter", "PNG export"],
+  "interactions": ["Hover tooltip", "Click a bubble to cross-filter (others dim)", "Click a legend category to filter by it", "Ctrl/⌘ + wheel or pinch to zoom; drag to pan; +/− buttons (plain wheel scrolls the page until the map is clicked); labels re-place on zoom", "Grow-in animation, smooth radius transitions on filter", "PNG export"],
   "samples": [
     {"title": "Global footprint — sites by floor area", "data": "assets_locations", "height": 460,
      "options": {"encode": {"lat": "lat", "lon": "lon", "size": "capacity", "color": "type", "label": "name"}, "labels": 6, "sizeRange": [3, 21], "tooltip": ["city", "country", "utilization", "opened"]}},

@@ -24,33 +24,46 @@ found automatically; otherwise set `REPORTKIT_HOME=/path/to/repo` or pass `kit=.
 
 ## 快速开始 / Quick start
 
+在仓库根目录可直接运行（实际项目里把 `peers` / `kpis` 换成 SQL / pandas 的结果）：
+
 ```python
+import json
 from reportkit import Report
+
+# 实际项目：df_comps = pd.read_sql(...)；这里读 kit 自带的示例数据（records 列表）
+peers = json.load(open("kit/samples/datasets/peers.json", encoding="utf-8"))["data"]
+kpis = json.load(open("kit/samples/datasets/kpis.json", encoding="utf-8"))["data"]
 
 r = Report("Project Atlas", subtitle="Discussion materials", client="Board of Directors",
            date="2026-10-14", firm="Northbridge Partners", theme="navy")
 
-# 数据集：DataFrame | list[dict] | dict[str, list] | .csv/.json/.parquet 路径 | 契约格式 JSON
-r.dataset("comps", df_comps, title="Trading comparables",
+# 数据集：DataFrame | list[dict] | dict[str, list] | .csv/.json/.parquet/.xlsx 路径 | 契约格式 JSON
+r.dataset("comps", peers, title="Trading comparables",
           source="FactSet, company filings; market data as of 10-Oct-2026", unit="USD m",
           fields={"ev_ebitda_25e": {"title": "EV/EBITDA 2025E", "format": "0.0x"},
                   "mkt_cap": {"title": "Market cap", "format": "$#,##0"}},
           computed=[{"name": "ebitda_margin", "formula": "ebitda_25e / revenue_25e", "format": "0.0%"}])
+r.dataset("kpis", kpis, title="Key performance indicators", source="Company filings")
 r.param("wacc", 0.09, min=0.07, max=0.11, step=0.0025, format="0.0%", title="WACC")   # @wacc in formulas
 
-r.topbar_block("filter-bar", data="comps", options={"fields": ["sector", "region"]})  # 全局筛选
+r.topbar_block("filter-bar", data="comps", options={"filters": [               # 全局筛选
+    {"field": "sector", "type": "multi", "label": "Sector"},
+    {"field": "region", "type": "multi", "label": "Region"}]})
 
 r.cover()                                   # 封面（标题/客户/日期/保密声明）
 r.section("Valuation")                      # 章节页（自动编号 01, 02 …）
-p = r.page("Peers trade at a median 9.5x EBITDA",          # action title
+p = r.page("Peers trade at a median {{comps: median(ev_ebitda_25e) | 0.0x}} EBITDA",   # action title（模板，随筛选重算）
            kicker="Trading comparables", subtitle="USD m unless otherwise stated",
            notes="Excludes outliers > 40x")
 p.block("bar", data="comps", title="EV / EBITDA 2025E", span=7, height=380,
         encode={"x": "company", "y": "ev_ebitda_25e"}, options={"sort": "desc", "avgLine": True})
-p.block("kpi-tiles", data="kpis", span=5)
+p.block("kpi-tiles", data="kpis", span=5, height="auto")
 
 out = r.build("out/atlas")                  # -> out/atlas/index.html
 ```
+
+`Report(title, subtitle=, client=, date=, theme="navy", confidentiality="Strictly private & confidential", locale="en-US",
+firm=, page_size="16:9" | "letter" | "a4", updown=None | "us" | "cn")`。
 
 ### 数据规范化 / Normalisation
 
@@ -88,30 +101,78 @@ Field types are inferred and merged with `fields=` overrides.
 Page and block titles can hold placeholders evaluated live against the **currently filtered** rows:
 
 ```python
-r.page("Core peers trade at a median {{peers: median(ev_ebitda_25e) | 0.0x}} 2025E EBITDA "
-       "vs. {{peers: avg(ev_ebitda_25e) | 0.0x}} on average",
-       kicker="Trading comparables", subtitle="{{peers: count()}} companies · USD m")
-r.page("DCF value at {{@wacc | 0.00%}} WACC: {{dcf_live: implied_price | $#,##0.00}} per share")
-p.block("bar", data="peers", title="EV / EBITDA 2025E ({{peers: count()}} peers shown)")
+t = r.page("Core peers trade at a median {{comps: median(ev_ebitda_25e) | 0.0x}} 2025E EBITDA "
+           "vs. {{comps: avg(ev_ebitda_25e) | 0.0x}} on average",
+           kicker="Peer multiples", subtitle="{{comps: count()}} companies · DCF at {{@wacc | 0.00%}} WACC")
+t.block("bar", data="comps", title="EV / EBITDA 2025E ({{comps: count()}} peers shown)", span=7,
+        encode={"x": "company", "y": "ev_ebitda_25e"}, options={"orientation": "horizontal", "sort": "desc"})
 ```
 
 - 语法 / syntax: `{{<dataset>: <RK 公式> | <格式码>}}`；只用 `@param` 时可省略数据集：`{{@wacc | 0.0%}}`。
   聚合（`median / avg / sum / count / min / max / pctl …`）作用于筛选后的全部行；普通字段 / 行表达式取筛选后的第一行。
   `|` 之后是 Excel 风格格式码（可省略）；`||` 是“或”运算符，不是分隔符。
-- 构建器输出 `data-rk-template="原模板"`，元素文字是把占位符换成 `…` 的版本（运行时启动后立即替换）。
+- 格式码省略时：参数用自己的 `format`，聚合沿用所读字段的格式（`median(x)` 继承 `x`），`count()` 为 `#,##0`。
+- 页面标题里不写数据集时，默认用本页第一个绑定数据的模块的数据集；模块标题默认用该模块的数据集（及其实际显示的行）。
+  `filters=False` 的页面上读取未筛选数据。
+- 构建器输出 `data-rk-template="原模板"`，元素文字是把占位符换成 `…` 的版本（运行时启动后立即替换；无 JS 预览时
+  显示它，页面 id 也由它生成）。运行时无法求值的占位符显示 `…` 并 `console.warn` 一次。
 - 校验：数据集不存在、字段不存在（可用字段名、标题或 computed 字段）、`@param` 未定义、引用字段却没写数据集、
   `{{ }}` 不配对、公式非法——都会列入 `ReportValidationError`。
 
 ### 语言与涨跌色 / Locale & up/down colours
 
 ```python
-r = Report("项目 Atlas", locale="zh-CN", updown="cn")   # 红涨绿跌；"us" = 绿涨红跌（默认）
+r_zh = Report("项目 Atlas", date="2026-10-14", locale="zh-CN", updown="cn",   # 红涨绿跌；"us" = 绿涨红跌（默认）
+              confidentiality="严格保密")                                       # 保密声明默认是英文，中文报告请显式传入
 ```
 
 - `locale` → `<html lang>` 与 `<meta name="rk:locale">`：运行时界面文字（工具栏、查看数据、导出、筛选提示……）、
   页脚 来源 / 注、封面日期（2026年10月14日）、紧凑单位（`zh-CN` 用 亿 / 万）随之切换。
-- `updown="cn"` → `<html data-rk-updown="cn">`：所有组件的正 / 负颜色互换（瀑布图、偏差条、涨跌幅着色等）。
+- `updown="cn"` → `<html data-rk-updown="cn">`：所有组件的正 / 负颜色互换（瀑布图、偏差条、K 线、涨跌幅着色等），换主题后仍然有效。
 - 命令行可临时覆盖：`python -m reportkit build spec.json out --locale zh-CN`。
+- 组件或页面自己的界面文字：`RK.i18n.add('zh-CN', {'myKey': '…'})` + `RK.i18n.t('myKey', 'English fallback')`
+  （`docs/architecture.md` §7.5）。
+
+### 客户自建指标 / Client metrics (browser side)
+
+客户在 `query-console` 里“添加为指标”的公式（`ev / ebitda_26e`）会成为数据集的 computed 字段，出现在所有 `*computed` 下拉框中，
+并保存在**客户本机浏览器的 localStorage**：键 `rk:metrics:<报告标题>|<报告日期>|<构建日期>`（按报告隔离——`file://` 打开的
+多份报告共享同一存储源）。重新打开同一份报告时自动恢复；不再能编译的公式跳过，与真实列同名的不覆盖该列。
+删除：控制台“我的指标”中的 ×，或 `localStorage.removeItem(RK.data.storageKey('metrics'))`。构建器不参与这一过程——
+同一份报告重新构建（构建日期不变）后，客户的指标仍然有效；想让某个指标对所有人可见，请把它写进 `r.dataset(..., computed=[...])`。
+
+### 模块级开关 / Block-level options (any component)
+
+| option | 作用 / effect |
+|---|---|
+| `filters: False` | 本模块忽略全局筛选与交叉选择（`page(..., filters=False)` 对整页生效） |
+| `ignoreFilters: ["region"]` | 忽略指定 key 的筛选 |
+| `where: "is_target or mkt_cap > 5000"` | 本模块的行级预筛选（RK 公式） |
+| `choices` / `choiceLabels` | 标题栏指标 / 维度下拉框（见上） |
+| `selectionFallback: False` | 默认情况下，若本模块**仅因其他模块的点选**而无数据，会忽略这些点选并提示 “Selection not in this view”；设为 False 则保持空白 |
+| `badges: False` | 隐藏标题栏的 “Filtered” / “Selection not in this view” 徽标 |
+| `printFit: False` | 打印时不对溢出内容做缩放适配（默认：溢出的表格等按 CSS zoom 缩小到模块内，最小 0.55） |
+| `crossFilterScope: "dataset"` | 点选只筛选同一数据集（默认按字段名跨数据集联动；`name`、`label`、`value` 等通用字段名默认只筛同一数据集） |
+| `tools: False` | 隐藏模块工具栏（查看数据 / CSV / PNG / 放大） |
+
+### 数据 API 模式 / Data API
+
+```python
+r.build("out/atlas-api", data_source="api", api="https://data.example-bank.com/api/reports/atlas/")
+```
+
+页面运行时请求 `GET {api}manifest` 与 `GET {api}datasets/<id>`，返回与 `data/manifest.json`、`data/datasets/<id>.json`
+完全相同的 JSON（`data/` 仍会写出，可直接作为 API 的静态内容）。鉴权：`<html data-rk-autoboot="false">` +
+`RK.boot({token})` → `Authorization: Bearer …`；其他来源：`RK.data.adapter(name, fn)`。参考服务端与改造步骤见
+`docs/pipeline-guide.md` §9。
+
+### 第三方库与底图 / Vendor libraries & basemaps
+
+- 只打包用到的组件所依赖的 vendor 包；组件 manifest 的 `optionDeps` 让某些选项值追加依赖：
+  `choropleth` / `bubble-map` 的 `options={"basemap": "world-50m"}` → 额外打包 `geo-world-50m`（1:50m Natural Earth，
+  含新加坡、香港、澳门、巴林、马耳他、开曼等，约 0.75 MB）；默认 `world-110m` 底图约 0.1 MB。
+- `vendor/vendor.json` 记录每个包的 npm `integrity`（sha512）和每个分发文件的 sha256：
+  `python3 tools/vendor.py --check`（离线校验，`tools/check.sh` 第一步）；有意替换文件后 `python3 tools/vendor.py --rehash [id]`。
 
 ### 校验 / Validation
 
@@ -137,6 +198,7 @@ out/atlas/
   data/manifest.json          report meta + dataset index + params
   data/datasets/<id>.json     one file per dataset (one row per line → reviewable diffs)
   data/bundle.js              RK.data.preload({...}) for file://
+  data/<slug>.xlsx            excel=True only
 ```
 
 `clean=True`（默认）只删除上一次构建生成的 `index.html / assets / data`；若目录中这些名字不是 ReportKit
@@ -152,7 +214,7 @@ path = r.build("out/Atlas_Board_14Oct.html", single_file=True)   # 指定文件�
 
 一个自包含的 `.html`：CSS（字体以 base64 `data:` URI 内嵌）、第三方库 CSS/JS（图片同样内嵌）、`reportkit.js`、
 用到的组件和数据 bundle 全部内联；双击即可离线打开（`file://`），**不发出任何网络请求**，适合邮件附件 / 数据室上传
-（不会出现“解压后才能打开”的问题）。内联脚本已转义 `</script>`、`<!--` 和 U+2028/2029。演示报告约 3.4 MB。
+（不会出现“解压后才能打开”的问题）。内联脚本已转义 `</script>`、`<!--` 和 U+2028/2029。示例 pitchbook 约 3–4 MB。
 `data_source="api"` 也可以与单文件同用（页面从 API 取数，不内嵌数据）。目标文件已存在且不是 ReportKit 生成的会拒绝覆盖。
 
 One self-contained HTML file (fonts / images as `data:` URIs, every script inlined and escaped); opens from
@@ -184,11 +246,13 @@ Excel 日期）、冻结表头、筛选按钮、列宽、横向打印 + 页脚�
     "comps": {"path": "comps.csv", "source": "FactSet", "fields": {"ev_ebitda": {"format": "0.0x"}}},
     "kpis":  {"data": [{"label": "Revenue", "value": 1234}]}
   },
-  "topbar": [{"component": "filter-bar", "data": "comps", "options": {"fields": ["sector"]}}],
+  "topbar": [{"component": "filter-bar", "data": "comps",
+              "options": {"filters": [{"field": "sector", "type": "multi", "label": "Sector"}]}}],
   "pages": [
     {"kind": "cover", "title": "Project Atlas"},
     {"title": "Peers trade at {{comps: median(ev_ebitda) | 0.0x}}", "kicker": "Comps", "blocks": [
-      {"component": "bar", "data": "comps", "span": 7, "height": 360, "encode": {"x": "company", "y": "ev_ebitda"}}
+      {"component": "bar", "data": "comps", "span": 7, "height": 360, "encode": {"x": "company", "y": "ev_ebitda"},
+       "options": {"choices": {"y": ["ev_ebitda", "*computed"]}}}
     ]},
     {"title": "Whole market (unfiltered)", "filters": false, "blocks": []}
   ]

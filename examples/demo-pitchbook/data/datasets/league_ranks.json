@@ -1,0 +1,36 @@
+{
+  "id": "league_ranks",
+  "title": "M&A adviser league table rank, prior year vs. LTM",
+  "schema": {"fields": [
+    {"name": "period", "type": "string", "title": "Period"},
+    {"name": "bank", "type": "string", "title": "Adviser"},
+    {"name": "rank", "type": "number", "title": "Rank", "format": "0"}
+  ]},
+  "data": [
+    {"period": "FY2025", "bank": "Northbridge Capital", "rank": 2},
+    {"period": "FY2025", "bank": "Harborline Partners", "rank": 1},
+    {"period": "FY2025", "bank": "Ashcombe & Co.", "rank": 4},
+    {"period": "FY2025", "bank": "Sterling Vale Securities", "rank": 3},
+    {"period": "FY2025", "bank": "Kingsgate Advisory", "rank": 7},
+    {"period": "FY2025", "bank": "Thornbury Brothers", "rank": 5},
+    {"period": "FY2025", "bank": "Calder Rowe", "rank": 6},
+    {"period": "FY2025", "bank": "Eastwick Mercantile", "rank": 10},
+    {"period": "FY2025", "bank": "Lindqvist Bank", "rank": 8},
+    {"period": "FY2025", "bank": "Oriel Bay Capital", "rank": 12},
+    {"period": "FY2025", "bank": "Montclair Hayes", "rank": 9},
+    {"period": "FY2025", "bank": "Redwood Arch Securities", "rank": 11},
+    {"period": "LTM Sep-26", "bank": "Northbridge Capital", "rank": 1},
+    {"period": "LTM Sep-26", "bank": "Harborline Partners", "rank": 2},
+    {"period": "LTM Sep-26", "bank": "Ashcombe & Co.", "rank": 3},
+    {"period": "LTM Sep-26", "bank": "Sterling Vale Securities", "rank": 4},
+    {"period": "LTM Sep-26", "bank": "Kingsgate Advisory", "rank": 5},
+    {"period": "LTM Sep-26", "bank": "Thornbury Brothers", "rank": 6},
+    {"period": "LTM Sep-26", "bank": "Calder Rowe", "rank": 7},
+    {"period": "LTM Sep-26", "bank": "Eastwick Mercantile", "rank": 8},
+    {"period": "LTM Sep-26", "bank": "Lindqvist Bank", "rank": 9},
+    {"period": "LTM Sep-26", "bank": "Oriel Bay Capital", "rank": 10},
+    {"period": "LTM Sep-26", "bank": "Montclair Hayes", "rank": 11},
+    {"period": "LTM Sep-26", "bank": "Redwood Arch Securities", "rank": 12}
+  ],
+  "meta": {"source": "Mergermarket league table LTM Sep-2026"}
+}

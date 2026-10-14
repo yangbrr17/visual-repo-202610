@@ -1,7 +1,8 @@
 # ReportKit 可视化技术版图调研报告（Landscape）
 
 > **日期** 2026-10-14 · **读者** 投行客户报告产品负责人 · **范围** 离线、数据分离、可交互、pitchbook 级（GS/JPM 质感）的报告套件
-> **依据** `research/raw/01–09-*.md`（细节笔记）与 `*.json`（结构化结论）、`research/catalog.json`（去重后 239 个库）、`vendor/vendor.json`、`kit/build.json`、`kit/components/*/manifest.json`（53 个组件）、`docs/architecture.md`。
+> **依据** `research/raw/01–09-*.md`（细节笔记）与 `*.json`（结构化结论）、`research/catalog.json`（去重后 239 个库）、`vendor/vendor.json`、`kit/build.json`、`kit/components/*/manifest.json`（57 个组件）、`docs/architecture.md`。
+> **复核** 2026-10-14 按 Step 1 第一阶段补齐项（单文件 HTML、Excel 导出、vendor 完整性哈希、Letter / A4、1:50m 底图、i18n、红涨绿跌）更新了 §0 的现状与"未完成项"；调研结论本身未变。
 > **约定**
 > - 版本、许可、star、体积都取自调研笔记。笔记的口径是：2026-10-14 实查 npm registry，看 jsDelivr 上的 dist 列表，自己跑 `gzip -9` 测体积，star 取自 ecosyste.ms 或 shields.io。本文不另行估算。
 > - `file://` 指双击 `index.html` 打开。符号含义：✓ 已实测可用；✗ 已实测失败；◐ 部分可用或有条件；— 未测或不适用。
@@ -11,19 +12,20 @@
 
 ## 0. 一页结论
 
-**一句话：** 我们以三个 permissive 许可的 classic-script 引擎为主，即 **Apache ECharts 6.1.0 + Leaflet 1.9.4 + Tabulator 6.6.1**，另加自研、零依赖的公式 / 查询 / 版式表格 / 动效层。产出是一个双击即开（`file://`）、数据与版式分离、打印为矢量的报告文件夹。53 个组件完整覆盖 FT Visual Vocabulary 72 种图型中的 50 种，另有 5 种部分覆盖（§3）。
+**一句话：** 我们以三个 permissive 许可的 classic-script 引擎为主，即 **Apache ECharts 6.1.0 + Leaflet 1.9.4 + Tabulator 6.6.1**，另加自研、零依赖的公式 / 查询 / 版式表格 / 动效层。产出是一个双击即开（`file://`）、数据与版式分离、打印为矢量的报告文件夹（也可输出单个自包含 HTML 与 Excel 底稿）。57 个组件完整覆盖 FT Visual Vocabulary 72 种图型中的 50 种，另有 5 种部分覆盖（§3）。
 
 ### 0.1 推荐技术栈（与 `vendor/vendor.json` 逐项一致）
 
 | 角色 | 库（npm 包） | 版本 | 许可 | 为什么 |
 |---|---|---|---|---|
-| 主图表引擎（36/53 个组件） | Apache ECharts（`echarts`） | 6.1.0 | Apache-2.0（随附 NOTICE、LICENSE-d3） | 只有它同时满足四点：许可 permissive、由 ASF 治理、一个 classic script（full UMD，1095 KB min / 359 KB gz）就能覆盖几乎全部 IB 图型、SVG renderer 打印出来是矢量且文字可选中。v6 新增的 axis break、matrix 坐标系、chord、beeswarm 和运行时 `setTheme()` 都已在 `file://` 下验证（01 §0、§5.1） |
+| 主图表引擎（37/57 个组件） | Apache ECharts（`echarts`） | 6.1.0 | Apache-2.0（随附 NOTICE、LICENSE-d3） | 只有它同时满足四点：许可 permissive、由 ASF 治理、一个 classic script（full UMD，1095 KB min / 359 KB gz）就能覆盖几乎全部 IB 图型、SVG renderer 打印出来是矢量且文字可选中。v6 新增的 axis break、matrix 坐标系、chord、beeswarm 和运行时 `setTheme()` 都已在 `file://` 下验证（01 §0、§5.1） |
 | 交互地图（5 个 Leaflet 组件；geo 类第 6 个组件 `china-tilemap` 用 ECharts） | Leaflet（`leaflet`） | 1.9.4 | BSD-2-Clause | 147.6 KB raw / 42.4 KB gz，SVG 输出打印为矢量。2.0 目前只有 `2.0.0-alpha.1`，且 1.x 插件在 2.0 上会失效（02 §3） |
 | 点聚合 | `leaflet.markercluster` | 1.5.3 | MIT | 密集点位的标准方案，8.7 KB gz。没有瓦片层时，必须给地图设 `maxZoom`（02 §4） |
 | 密度热力 | `leaflet.heat` | 0.2.0 | BSD-2-Clause（npm 的 license 字段缺失，以 LICENSE 文件为准） | 2.1 KB gz。强度按 `1/2^(maxZoom−zoom)` 缩放，kit 的 `geo-heat` 已处理（02 §7.5） |
 | TopoJSON 解码 | `topojson-client` | 3.1.0 | ISC | 2.6 KB gz，用来解码离线底图；`mesh()` 可以只画内部边界（02 §4） |
 | 离线世界底图（数据） | `world-atlas` | 2.0.2 | ISC（数据来自 Natural Earth，public domain） | 110m 版 108 KB raw / 38 KB gz。仓库已归档，数据停在 NE 4.1.0，计划升级（§2.2） |
 | 底图的 classic-script 包装 | `geo-world`（由 `tools/build_geo.py` 从 world-atlas 2.0.2 生成） | world-atlas 2.0.2 | 同上 | `file://` 下不能 fetch JSON，所以底图必须写成 `RK.geo.register('world-110m', …)` 形式的脚本（02 §1、09 §1） |
+| 高精度底图（按需打包） | `geo-world-50m`（同上，countries-50m） | world-atlas 2.0.2 | 同上 | 756 KB；含 110m 缺失的新加坡、香港、澳门、巴林、马耳他、开曼、百慕大等。只有 block 设了 `basemap: "world-50m"` 时，builder 才通过组件 manifest 的 `optionDeps` 打包它 |
 | 交互数据网格（`data-grid`） | Tabulator（`tabulator-tables`） | 6.6.1 | MIT | MIT 许可、UMD 构建、DOM 渲染（可打印、可复制、可访问），约 103 KB gz。支持冻结列、多级表头、groupBy、CSV 下载（03 §4.1） |
 | 正文 / UI / 数字字体 | Inter（`@fontsource/inter`） | 5.3.0 | OFL-1.1（无 Reserved Font Name） | 保留了 `tnum`，所以 `tabular-nums` 仍生效。字体放在 `kit/fonts/` 子目录，符合 `file://` 的字体加载规则（05 §6） |
 | 标题衬线字体 | Source Serif 4（`@fontsource/source-serif-4`） | 5.3.1 | OFL-1.1（RFN 为 "Source"，自行子集化后不能沿用原名） | 用于精品投行风格的 action title（04 §3.3、05 §6.4） |
@@ -49,8 +51,8 @@
 3. **打印优先。**
    - 默认用 ECharts SVG renderer（`kit/core/rk.chart.js`）。canvas 图在 PDF 里是约 104 ppi 的位图，SVG 图保持矢量（01 §5.1.4、09 §8）。
    - 标题、单位、来源、脚注写在 HTML 里，不画进 canvas。
-   - 页面固定为 16:9、13.333 × 7.5 in，Chromium 实测输出恰好 960 × 540 pt 的 PDF 页（09 §0.7）。
-   - ⚠ 04 的一手证据显示，美国投行实际用 **US Letter 11 × 8.5 in**，见下方"未完成项"。
+   - 页面默认 16:9、13.333 × 7.5 in，Chromium 实测输出恰好 960 × 540 pt 的 PDF 页（09 §0.7）。
+   - 04 的一手证据显示，美国投行实际用 **US Letter 11 × 8.5 in**；kit 已提供 `Report(page_size="letter" | "a4")` 报告级选项。
 4. **表格分三层：**
    - 自研 DOM 表格承担印刷级的 comps、sensitivity、league 和 pivot 表；
    - Tabulator 承担大型交互明细表；
@@ -64,7 +66,7 @@
 8. **供应链纪律：**
    - `vendor.json` 只写精确版本，`tools/vendor.py` 用 `npm pack` 拉包（不执行安装脚本），每个 dist 旁边保留上游 LICENSE。
    - 升级前重新查许可：ApexCharts 在一个 minor 版本里从 MIT 变成了专有许可。
-   - 需要补完整性哈希：AntV 的 npm 命名空间在 2026-05-19 被投毒（01 §9.6、06 §2）。
+   - 完整性哈希已补上：`vendor.json` 记录 npm tarball `integrity`（sha512）和每个分发文件的 sha256，`tools/vendor.py --check` 离线校验（AntV 的 npm 命名空间在 2026-05-19 被投毒，01 §9.6、06 §2）。
 
 ### 0.3 红旗清单（许可、合规、离线、安全）
 
@@ -79,7 +81,7 @@
 | 7 | **中国地图的审图号合规** | 依据地图管理条例（2015）和地图审核管理规定（2017，2019 修订），公开展示的中国地图需要审图号。自然资源部的标准地图只能原样使用；放大、缩小、裁剪都要重新送审。DataV.GeoAtlas 的数据注明"仅供学习和交流使用"（数据来自高德）。GADM 禁止商用和再分发。微软已停止向中国 Excel 用户提供地图图表 | 面向中国境内受众的交付物：用经审定或授权的底图，或者用 tile-grid 省份方块图（不画边界，需包含台湾、香港、澳门；kit 已有 `china-tilemap`，34 个省级方块含台港澳）。在法务流程中签字确认；底图 manifest 标注 `prc_reviewed:false`（**待实现**） | [中国日报](https://cn.chinadaily.com.cn/a/202308/28/WS64ec4ceba3109d7585e4b1e1.html)，[DataV](https://help.aliyun.com/zh/datav/datav-7-0/user-guide/datav-geoatlas-widgets/)，[GADM](https://gadm.org/license.html)，[Microsoft](https://support.microsoft.com/en-us/Support/known-issues/excel-2d-map-charts-and-3d-maps-are-suspended-for-china)，02 §6.3 |
 | 8 | **AntV L7 会主动外连** | L7 2.29.1 默认从 `gw.alipayobjects.com` 拉 logo。在拦截网络的离线测试里，它是唯一一个发出外部请求的引擎（1 次）。设 `logoVisible:false` 后为 0。它的中国底图（高德、腾讯、百度）还需要在线 key | avoid 或 reference。机密数据场景不能有任何外连 | 02 §2（p7），06 §14 |
 | 9 | **ESM/WASM 库在 `file://` 下跑不起来** | 实测失败的有：MapLibre GL JS 6.x（6.0.0 起 ESM-only，最后一个 UMD 是 5.24.0）、Perspective 5.6.0（ESM，经 `import.meta.url` 加载 WASM）、Vizzu 0.18.0、Web Awesome 3.14.0、dotlottie-web 0.81.0、Paged.js（用 `<link>` 引入 CSS 时）。另有 ESM-only、需要预打包成 IIFE 的：Unovis、TanStack Table v9、Flint。Leaflet 2.0 alpha 上 1.x 插件会坏 | 默认包只收 classic UMD/IIFE。确需 ESM 库时，在 vendor 阶段用 esbuild 打成 IIFE；WASM 只能走 base64 + `data:` URL 的配方（08 §5.5） | [MapLibre CHANGELOG](https://github.com/maplibre/maplibre-gl-js/blob/main/CHANGELOG.md)，01 §3，03 §3，05 §1，09 §0.8 |
-| 10 | **AntV npm 供应链投毒** | 2026-05-19，"Mini Shai-Hulud" 蠕虫劫持了账号 `atool`，在 317–324 个 `@antv/*` 包以及 `echarts-for-react`、`size-sensor`、`timeago.js` 下发布了 600 多个恶意版本。恶意版本号都高于真实最新版（例如 g2 5.5.8/5.6.8，而真实最新版是 5.4.8），任何 `^` 范围都会把它们拉进来。截至调研时这些版本已返回 404 | 只写精确版本，只用 `npm pack`；在 `vendor.json` 里记录 sha512/sha256 并由 `--check` 校验（**待实现**）；不在持有凭据的机器上 `npm install` AntV 包 | [Snyk](https://security.snyk.io/antv-supply-chain-compromise-may-2026)，[StepSecurity](https://www.stepsecurity.io/blog/shai-hulud-here-we-go-again-mass-npm-supply-chain-attack-hits-the-antv-ecosystem)，06 §2 |
+| 10 | **AntV npm 供应链投毒** | 2026-05-19，"Mini Shai-Hulud" 蠕虫劫持了账号 `atool`，在 317–324 个 `@antv/*` 包以及 `echarts-for-react`、`size-sensor`、`timeago.js` 下发布了 600 多个恶意版本。恶意版本号都高于真实最新版（例如 g2 5.5.8/5.6.8，而真实最新版是 5.4.8），任何 `^` 范围都会把它们拉进来。截至调研时这些版本已返回 404 | 只写精确版本，只用 `npm pack --ignore-scripts`；在 `vendor.json` 里记录 sha512/sha256 并由 `--check` 校验（**已实现**）；不在持有凭据的机器上 `npm install` AntV 包 | [Snyk](https://security.snyk.io/antv-supply-chain-compromise-may-2026)，[StepSecurity](https://www.stepsecurity.io/blog/shai-hulud-here-we-go-again-mass-npm-supply-chain-attack-hits-the-antv-ecosystem)，06 §2 |
 | 11 | **会执行代码的引擎** | `expr-eval` ≤2.0.2 有 CVE-2025-12735（RCE，CVSS 9.8）。AlaSQL 4.20.0 的双反引号语法可以执行任意 JS（实测改写了全局变量）。Arquero、AlaSQL、filtrex 都靠 `new Function`，在严格 CSP 下失效 | 不让 LLM 生成的、共享链接带来的或用户输入的 SQL/公式进入这些引擎；保持自研 `RK.expr` | [CVE-2025-12735](https://cvefeed.io/vuln/detail/CVE-2025-12735)，08 §0.2、§0.5 |
 | 12 | **Copyleft 和非标准许可** | HyperFormula（GPL-3.0）、simple-datatables（LGPL-3.0）、leaflet.minichart（GPL-2.0+）、world-geojson（GPL-3.0）、typed.js（已改为 GPL-3.0）、DataEase / SQLBot（GPL-3.0 / 改版 GPLv3）、Vivliostyle 和 Metabase（AGPL）、Leaflet.VectorGrid（Beerware）、WebDataRocks（专有 EULA）、Handsontable（专有） | avoid。交付物里只放 MIT / BSD / Apache / ISC 许可的代码和 OFL 字体 | 02 §4，03 §2，05 §0，06 §3，09 §0.8 |
 | 13 | **在线瓦片与 ODbL 数据** | OSM 瓦片服务禁止离线使用和批量预取，商业访问可能随时被收回。CARTO 底图商用需要 Enterprise 许可。Protomaps 底图属于 ODbL Produced Work，必须保留 OSM 署名 | 默认不用任何在线瓦片，只用 Natural Earth 矢量底图 | [OSM tile policy](https://operations.osmfoundation.org/policies/tiles/)，[CARTO](https://docs.carto.com/faqs/carto-basemaps)，02 §6.1 |
@@ -87,18 +89,18 @@
 
 ### 0.4 未完成项（产品负责人现在就应知道）
 
-1. **页面尺寸。** kit 只有 16:9（`kit/styles/print.css` 中 `@page{size:13.333in 7.5in}`）。但 GS、Morgan Stanley、Evercore 在 EDGAR 上的实际页面都是 **US Letter 横向 11 × 8.5 in**，Rothschild 是 4:3，样本里没有一家用 16:9（04 §0.1）。建议把 Letter（1056 × 816 CSS px）和 A4 横向做成报告级选项。
-2. **底图缺少金融中心。** 运行时的反子午线条纹问题已修复。但 world-atlas 110m 里没有新加坡、香港、澳门、巴林、马耳他、开曼、百慕大（02 §6.2）。建议升级到 Natural Earth 5.1.2 10m 简化版（约 109 KB / 36 KB gz）。
-3. **引擎审计的补丁已合入（2026-10-14 复核）。** `research/engine-audit.md` 列出的 36 个缺陷（其中 2 个高危）已全部修复：`node tests/js/engine-audit.test.js` 现为 **164/164 通过**，36/36 个缺陷 ID 都有回归测试；`engine.test.js` 542/542、`core.test.js` 67/67、`formula-doc.test.js` 165/165。对客户影响最大的 F1 已修：`RK.format(10.35,'0.0x')` 现在输出 "10.4x"，与 Excel 一致。仍需跟进：Q9 的自引用检查还没移植到 `py/reportkit/validate.py`；组件和 `rk.geo.js` 里还有 31 处 `toFixed`，应改用 `RK.format.fixed`（见 engine-audit.md 的 Resolution 节）。
-4. **测试没有覆盖 `file://`。** `tools/smoke.cjs` 通过本地 http server 加载页面。09 要求 CI 直接测试 `file://`，并在 Firefox 中把 `security.fileuri.strict_origin_policy` 恢复为 `true`。
-5. **组件目录文件已同步（原"过期"问题已解决）。** git 里的 `kit/catalog.json` 和 `docs/component-catalog.md` 现在都是 53 个组件、12 类，与 53 个 manifest 一致；`tools/check.sh` 每次都会运行 `python3 tools/build_catalog.py --strict` 重新生成。
-6. **尚未实现的项：**
-   - styled XLSX 导出（write-excel-file）；
-   - 严格的 meta CSP；
-   - vendor 完整性哈希；
-   - `--single-file` 单文件模式；
-   - Playwright 批量导出 PDF；
-   - 每个 dataset 单独的 `.js` 懒加载文件。
+1. ~~**页面尺寸。**~~ 已解决：GS、Morgan Stanley、Evercore 在 EDGAR 上的实际页面都是 **US Letter 横向 11 × 8.5 in**，Rothschild 是 4:3，样本里没有一家用 16:9（04 §0.1）。kit 默认仍为 16:9，`Report(page_size="letter" | "a4")` 切换为 Letter / A4 横向（`<html data-rk-page-size>` + builder 追加的 `@page` 规则）。
+2. **底图。** 运行时的反子午线条纹问题已修复；world-atlas 110m 里没有的新加坡、香港、澳门、巴林、马耳他、开曼、百慕大（02 §6.2）现在可以用 `basemap: "world-50m"`（同一 world-atlas 2.0.2 的 1:50m 版，756 KB，按需打包）显示，`choropleth` 对仍无多边形但带经纬度的行画成同色阶的小圆点。仍可考虑：数据停在 Natural Earth 4.1.0，升级到 NE 5.1.2（10m 简化版约 109 KB / 36 KB gz）。
+3. **引擎审计的补丁已合入（2026-10-14 复核）。** `research/engine-audit.md` 列出的 36 个缺陷（其中 2 个高危）已全部修复：`node tests/js/engine-audit.test.js` 现为 **164/164 通过**，36/36 个缺陷 ID 都有回归测试；`engine.test.js` 542/542、`core.test.js` 67/67、`formula-doc.test.js` 165/165、`runtime-api.test.js` 53/53。对客户影响最大的 F1 已修：`RK.format(10.35,'0.0x')` 现在输出 "10.4x"，与 Excel 一致。Q9 的自引用检查已移植到 `py/reportkit/validate.py`。仍需跟进：组件和 `rk.geo.js` 里仍有若干 `toFixed`，应改用 `RK.format.fixed`（见 engine-audit.md 的 Resolution 节）。
+4. **`file://` 测试已部分覆盖。** `tests/e2e/demo.cjs` 从 `file://` 打开示例报告（筛选、滑块、查询联动、打印 PDF），`tests/e2e/gallery.cjs` 以 `file://` 和 http 两种方式爬遍 gallery 路由，`tests/py/test_delivery.py` 用 Chromium 从 `file://` 打开单文件报告并断言除 `data:` URI 外零网络请求。`tools/smoke.cjs` 仍走本地 http server；Firefox（`security.fileuri.strict_origin_policy=true`）尚未进入测试。
+5. **组件目录文件已同步。** git 里的 `kit/catalog.json` 和 `docs/component-catalog.md` 都是 57 个组件、12 类，与 57 个 manifest 一致；`tools/check.sh` 每次都会运行 `python3 tools/build_catalog.py --strict` 重新生成。
+6. **已实现 / 尚未实现：**
+   - ✅ styled Excel 导出：由 Python builder 用 openpyxl 生成（`excel=True`，每个 dataset 一个工作表、数字格式沿用字段格式码），不在浏览器端；
+   - ✅ vendor 完整性哈希（`tools/vendor.py --check` / `--rehash`）；
+   - ✅ 单文件模式（`single_file=True` / `--single-file`，零网络请求）；
+   - ⬜ 严格的 meta CSP；
+   - 🟡 Playwright 导出 PDF：`node tests/e2e/demo.cjs --pdf` 可导出示例报告，builder 本身还没有 `pdf=True`；
+   - ⬜ 每个 dataset 单独的 `.js` 懒加载文件。
 
    相关研究分别见 03 §9、08 §0.13、06 §2、09 §9。
 
@@ -326,7 +328,7 @@
 
 | 主题 | 惯例（来自实证） | kit 现状 |
 |---|---|---|
-| 页面 | US Letter 横向 11 × 8.5 in（宽高比 1.294）；Rothschild 为 4:3；没有一家用 16:9 | 只有 16:9。**需要补 Letter / A4 选项** |
+| 页面 | US Letter 横向 11 × 8.5 in（宽高比 1.294）；Rothschild 为 4:3；没有一家用 16:9 | 默认 16:9；Letter / A4 横向已作为报告级选项提供（`page_size`） |
 | 页面解剖 | section tracker → 一句话 action title → 单位行 "($ in millions, except per share data)" → navy 横幅式图表标题 → 图 / 表加评论侧栏 → 编号脚注 → "Source:" 行（含数据截至日期）→ 机密 / 草稿章 → 页码 | `rk-page__kicker / title / subtitle / foot（source / conf / num）` 已有 |
 | 配色 | navy 主色 + steel-blue 对比色 + 灰 + 1 个点缀色；标的公司用强调色表示，**不给每家公司一种颜色**；offer / current price 用红色或 claret 虚线 | 4 套主题：navy / bronze / slate，外加 ink（深色演示模式，打印时强制恢复纸面样式） |
 | 数字格式 | 各家 house style 不同：GS 写 `$ 44.71`、`7.6 x`、`(0.9)%`，其他家写 `$2.27`、`7.9x`、`(32%)`。负数一律加括号；n.m. 不进均值和中位数；n.a. 和 – 要区分；只有首行和合计行带单位 | `RK.format` 支持格式码；**house-style 预设和 `unitOn` 尚未实现** |
@@ -365,10 +367,10 @@
 | Noto Sans SC | 5.3.1 | OFL-1.1 | adopt（**builder 子集化尚未实现**） | 单个字重约 3.4 MB，必须按报告内容子集化 |
 
 **以后要回头看的：**
-1. 页面尺寸增加 Letter 和 A4 选项。
+1. ~~页面尺寸增加 Letter 和 A4 选项~~：已实现（`Report(page_size="letter" | "a4")`）。
 2. `RK.format` 支持 house-style 预设：`currencySpace`、`multSpace`、`pctParen`、`unitOn`。
 3. 把装饰插件化：差值箭头、callout、字母事件标注、全局 `roundToTotal`。
-4. 新增 AVP 表、premiums-paid 组件、financial-summary 表。
+4. 新增 AVP 表（✅ `avp-table`）、premiums-paid 组件、financial-summary 表。
 5. `multiple-history` 增加 "% of time in range" 分桶表。
 6. 不复制任何银行的 logo 或精确品牌色（04 §13.14）。
 
@@ -468,12 +470,12 @@
 
 **我们采用了什么：**
 - 只用 ECharts，不引入任何 AntV 或 VisActor 运行时依赖。
-- `candlestick` 的涨跌色取主题的 `--pos`/`--neg`（西式），不用 ECharts 默认的红涨绿跌（`#eb5454` / `#47b262`）。
+- `candlestick` 的涨跌色取主题的 `--pos`/`--neg`（西式），不用 ECharts 默认的红涨绿跌（`#eb5454` / `#47b262`）；中国客户用 `Report(updown="cn")` 对调。
 - `china-tilemap`：中国省级 tile-grid 方块图，作为中国地图的合规替代方案（见 `research/china-ecosystem.md` §9.3）。
 
 **以后要回头看的：**
-1. 增加 `convention: 'western' | 'cn'` token，切换 K 线、瀑布图、涨跌颜色。
-2. 支持中文 万 / 亿 紧凑格式（`Intl.NumberFormat('zh-CN',{notation:'compact'})`）。
+1. ~~增加 `convention: 'western' | 'cn'` token~~：已实现为 `<html data-rk-updown="cn">`（builder `Report(updown="cn")`），运行时对调 `--rk-pos` / `--rk-neg`，K 线、瀑布图、涨跌颜色随之切换。
+2. ~~支持中文 万 / 亿 紧凑格式~~：已实现，`locale="zh-CN"` 时 `RK.format` 的 `auto` 用 亿 / 万（自研，不依赖 `Intl` compact）；运行时界面文字也有 zh-CN 包（`RK.i18n`）。
 3. text-block 支持 T8 风格的行内实体（vendor T8 0.3.1，或自研约 150 行）。
 4. 给 S2 / VTable 做透视原型时，只用投毒清理后的版本，并核对哈希。
 
@@ -565,11 +567,12 @@
 **我们采用了什么：**
 - `RK.expr` 和 `RK.query`。
 - `RK.store` 的交叉筛选：`view(ds,{exclude:source})`，组件不被自己的筛选过滤。
-- `query-console`：Builder 加查询编辑器、自动出图、"Add as metric"。
+- `query-console`：Builder 加查询编辑器、自动出图、"Add as metric"；自建指标按报告持久化在浏览器（`rk:metrics:<reportKey>`），"My metrics" 可删除。
+- block `choices`：标题栏的指标 / 维度下拉框，`*computed` 包含客户自建指标。
 - `param-slider`：What-if 参数 `@wacc`、`@tgr`，相关计算字段实时重算。
 
 **以后要回头看的：**
-1. ~~合入 `research/engine-audit.md` 的 36 个补丁~~：已完成，回归测试 164/164 通过，F1 取整已与 Excel 一致。剩余跟进：Q9 自引用检查移植到 Python validator；组件里的 `toFixed` 改用 `RK.format.fixed`。
+1. ~~合入 `research/engine-audit.md` 的 36 个补丁~~：已完成，回归测试 164/164 通过，F1 取整已与 Excel 一致；Q9 自引用检查已移植到 Python validator。剩余跟进：组件里的 `toFixed` 改用 `RK.format.fixed`。
 2. 给 `RK.expr` 加函数注册表，并接入 Formula.js。
 3. 内部存储改为列式 + bitset。08 估计 1M 行可从约 0.7 s 降到 0.15–0.25 s，这比引入 DuckDB 更划算。
 4. 由 builder 输出严格 CSP，并为每个 vendor 库加 CSP smoke 测试。
@@ -601,13 +604,13 @@
 2. **打印：**
    - 1280 × 720 CSS px = 13.333 × 7.5 in = PowerPoint 16:9；`@page{size:13.333in 7.5in;margin:0}` 输出恰好 960 × 540 pt。
    - 页面 margin box 只有 Chrome/Edge 131+ 支持（[Chrome blog](https://developer.chrome.com/blog/print-margins)），所以页脚和页码要放在 DOM 里。
-   - 屏幕上缩放用 `transform: scale()`。**不要用 CSS `zoom`**，会让 ECharts 命中错误的柱子。
+   - 屏幕上缩放用 `transform: scale()`。**不要用 CSS `zoom`**，会让 ECharts 命中错误的柱子（打印没有指针交互，kit 的 Letter / A4 打印页和 printFit 用 `zoom` 不受影响）。
 3. **Python 序列化陷阱：**
    - `json.dumps(NaN)` 会输出非法 JSON，要写 `allow_nan=False`，并把 NaN 映射为 null 加标记。
    - pandas 3 的 `to_json` 必须写 `date_format='iso'`。
    - 只有日期的字符串被解析为 UTC，带时间的字符串被解析为本地时间，可能错开一天。
 4. **交付：** HTML 附件常被邮件网关按 HTML smuggling 拦截（[来源](https://www.securityscientist.net/blog/12-questions-and-answers-about-html-smuggling-evasion-technique/)）。默认交付方式应该是"zip 文件夹 + PDF"，通过 data room 发送。
-5. **Chrome 的 `file://` localStorage：** 所有本地页面共用一个桶，键名要带 `rk:<report.id>:<revision>:` 前缀。
+5. **Chrome 的 `file://` localStorage：** 所有本地页面共用一个桶，键名要带报告标识前缀。kit 已实现为 `rk:<kind>:<标题|日期|构建日期>`（`RK.data.storageKey()`）。
 
 **我们采用了什么：** `docs/architecture.md` 已经落地。
 - 报告文件夹分为 `index.html`（只有版式和绑定）、`assets/`（只带用到的组件和 vendor）、`data/manifest.json`、`data/datasets/<id>.json`、`data/bundle.js`。
@@ -615,12 +618,13 @@
 - `bundle.js` 超过 1,000,000 字符时改用 `JSON.parse`。
 - 16:9 固定页面，SVG 图表，页脚在 DOM 里。
 - 契约版本是 `"reportkit": "0.1"`。
+- 单文件模式（`single_file=True`）：CSS、字体、vendor、运行时、组件与数据全部内联；HTML 附件可能被邮件网关拦截（上面第 4 点），所以文件夹 zip 与单文件两种形式都保留。
 
 **以后要回头看的：**
 1. 每个 dataset 一个 `.js` 文件，按页懒加载（09 §0.2）；同时提供 `orient:'columns'`。
 2. 契约向 Frictionless v2 对齐，加入 `unit`、`role`、`aggregate`、带标签的 `missingValues`，以及 cell flags 到脚注的链接。
 3. 加 `$schema` + `specVersion`，Python 和 JS 两侧都要有迁移链；dataset 加 `hash`。
-4. `--single-file` 模式。
+4. ~~`--single-file` 模式~~：已实现（`build(single_file=True)` / CLI `--single-file`）。
 5. builder 用 Playwright 导出 PDF（`prefer_css_page_size`、outline、tagged）。
 6. CI 增加 `file://` 和 Firefox 严格模式的测试。
 
@@ -629,7 +633,7 @@
 ## 3. 组件覆盖矩阵：FT Visual Vocabulary × ReportKit 组件
 
 **数据口径：**
-- 组件取自 53 个 `kit/components/*/manifest.json`。`tools/build_catalog.py` 会把它们汇编成 `kit/catalog.json`（git 里的版本已同步，53 个组件）。
+- 组件取自 57 个 `kit/components/*/manifest.json`。`tools/build_catalog.py` 会把它们汇编成 `kit/catalog.json`（git 里的版本已同步，57 个组件）。
 - FT 图型取自 07 附录 A（`chartTypes.csv`，共 72 行，跨类重复的图型分别计数）。
 - 状态：✓ 有组件直接支持；◐ 可以用现有组件近似；✗ 缺失。
 
@@ -727,22 +731,22 @@
 
 ### 3.3 FT 词表之外的组件
 
-53 个组件中，37 个已出现在上表里（`timeline`、`cluster-map` 只算部分覆盖）。另外 16 个（30%）是投行特有或报告骨架类组件，FT 词表里没有对应图型。04 §11 也指出，football field、sensitivity grid、AVP、league table 是 FT 没有单独命名的 IB 图型。
+57 个组件中，37 个已出现在上表里（`timeline`、`cluster-map` 只算部分覆盖）。另外 20 个（35%）是投行特有或报告骨架类组件，FT 词表里没有对应图型。04 §11 也指出，football field、sensitivity grid、AVP、league table 是 FT 没有单独命名的 IB 图型。
 
 | kit 类别 | 组件 |
 |---|---|
-| 估值 | `football-field` |
+| 估值 | `football-field`、`avp-table`（不同报价下的估值分析）、`sotp`（分部加总估值） |
 | 时间趋势（IB 专用） | `multiple-history`、`small-multiples` |
-| 表格 | `comps-table`、`sensitivity-table`、`pivot-table`、`league-table`、`data-grid` |
+| 表格 | `comps-table`、`sensitivity-table`、`pivot-table`、`league-table`、`data-grid`、`sources-uses`（资金来源与运用） |
 | 流向与关系 | `tree`（股权 / 法人结构）、`funnel` |
-| 版式与叙事 | `kpi-tiles`、`text-block` |
+| 版式与叙事 | `kpi-tiles`、`text-block`、`tombstones`（交易业绩墓碑卡） |
 | 控件与查询 | `filter-bar`、`param-slider`、`scenario-switch`、`query-console` |
 
 ### 3.4 缺口优先级（结合 04 的 IB 需求）
 
 | 优先级 | 缺口 | 建议实现 | 依据 |
 |---|---|---|---|
-| P0 | AVP 表（Analysis at Various Prices） | DOM 表 + `RK.expr` 实时重算；滑块可以新增价格列 | 04 §8.8 |
+| ~~P0~~ ✅ | AVP 表（Analysis at Various Prices） | 已实现：`avp-table`（DOM 表 + 实时重算） | 04 §8.8 |
 | P0 | Premiums paid（分位数柱 + 隐含价 chips） | ECharts bar；样本可交叉筛选 | 04 §8.9 |
 | P0 | 财务摘要表（A/E 分隔、growth / margin 行、CAGR） | 扩展 `pivot-table` 或新增 DOM 表 | 04 §8.11 |
 | P1 | Fan chart / 区间带 | vendor `@echarts-x/custom-line-range` | 01 §8，06 §15.1 |
@@ -788,8 +792,9 @@ Step 2 指本地部署的 LLM、可导入的 skills、客户自定义指标与�
 **现有机制：**
 - `vendor/vendor.json` 是唯一的事实来源：每个包写精确版本、许可、上游仓库、用途，以及从 tarball 中保留哪些文件。
 - `python3 tools/vendor.py [id]` 对每个包执行 `npm pack <pkg>@<version>`（不执行生命周期脚本），解包后只复制清单列出的 dist 和 LICENSE/NOTICE，再重新生成 `vendor/LICENSES.md`。
-- `python3 tools/vendor.py --check` 离线检查所有文件是否存在，`tools/check.sh` 的第一步就是它。
-- `geo-world` 是本地生成的条目（`"local": true`），由 `python3 tools/build_geo.py` 从 world-atlas 重新包装。
+- `python3 tools/vendor.py --check` 离线检查所有文件是否存在、sha256 是否与 `vendor.json` 记录一致，`tools/check.sh` 的第一步就是它；有意替换文件后用 `--rehash [id]` 重新记录。重新获取时 tarball 的 `integrity`（sha512）与记录不符即报错。
+- `geo-world`、`geo-world-50m` 是本地生成的条目（`"local": true`），由 `python3 tools/build_geo.py` 从 world-atlas 重新包装。
+- 组件 manifest 的 `optionDeps` 让某个选项值追加 vendor 依赖（例如 `basemap: "world-50m"` → `geo-world-50m`），builder 只在用到时打包。
 - Python builder 只把报告实际用到的组件所依赖的 vendor 复制到 `assets/vendor/`，每份报告冻结自己的副本（09 §0.6，参照 Plotly 的 `include_plotlyjs='directory'`）。
 
 **升级流程（每次升级任何 vendor 都要走一遍）：**
@@ -803,12 +808,12 @@ Step 2 指本地部署的 LLM、可导入的 skills、客户自定义指标与�
 
 | # | 能力 | 原因 | 来源 |
 |---|---|---|---|
-| 1 | 在 `vendor.json` 里记录 `integrity`（npm `dist.integrity` sha512）和每个文件的 sha256，由 `--check` 校验 | AntV 投毒事件 | 06 §2、§15.4 |
+| ~~1~~ ✅ | 在 `vendor.json` 里记录 `integrity`（npm `dist.integrity` sha512）和每个文件的 sha256，由 `--check` 校验——已实现 | AntV 投毒事件 | 06 §2、§15.4 |
 | 2 | 增加 `"url"` 来源类型 | SheetJS CE 只在 cdn.sheetjs.com 发布 | 03 §9.2 |
 | 3 | 增加 `"build"` 类型：在 vendor 阶段用 esbuild 把 ESM 打成 IIFE | 用于 Motion mini（4.4 KB）、NumberFlow、Flint | 05 §2.11 |
-| 4 | 在 CI 里加真正的 `file://` smoke 测试（Chromium 加 Firefox，并设 `strict_origin_policy=true`）和拦截网络的离线审计 | 现在的 smoke 测试走 http server，测不出 `file://` 下的失败 | 02 §2，09 §0 |
+| 4 | 在 CI 里加 Firefox 的 `file://` 测试（`strict_origin_policy=true`）和全组件的拦截网络离线审计 | Chromium 的 `file://` 已由 e2e 与单文件测试覆盖；`tools/smoke.cjs` 仍走 http server | 02 §2，09 §0 |
 | 5 | 对每个 vendor 库跑严格 CSP smoke 测试 | 新库如果用 `new Function`，严格 CSP 会失效 | 08 §11.5 |
-| 6 | 自动重新生成 `kit/catalog.json`，并检查它与 manifest 一致 | 重新生成已有：`tools/check.sh` 每次运行 `build_catalog.py --strict`（目前 53/53 一致）。还缺一步：在 CI 里用 `git diff --exit-code` 检查生成文件是否已提交 | §0.4 |
+| 6 | 自动重新生成 `kit/catalog.json`，并检查它与 manifest 一致 | 重新生成已有：`tools/check.sh` 每次运行 `build_catalog.py --strict`（目前 57/57 一致）。还缺一步：在 CI 里用 `git diff --exit-code` 检查生成文件是否已提交 | §0.4 |
 
 **观察清单：**
 

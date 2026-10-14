@@ -4,7 +4,8 @@
 > **依据**
 > - 主要来源：`research/raw/06-china-xhs.md`（下称 06）。
 > - 补充来源：02（地图合规）、07（合集与 AI 新秀）、08（AI 与 Step 2）。
-> - 现状核对：`vendor/vendor.json`、`kit/catalog.json`（53 个组件）、`docs/design-system.md`、`docs/roadmap-step2.md`、`research/landscape.md` §2.6。
+> - 现状核对：`vendor/vendor.json`、`kit/catalog.json`（57 个组件）、`docs/design-system.md`、`docs/roadmap-step2.md`、`research/landscape.md` §2.6。
+> - 2026-10-14 复核：Step 1 第一阶段已实现 vendor 完整性哈希、zh-CN 界面与 万 / 亿、红涨绿跌（`updown="cn"`），下文相应状态已更新。
 >
 > **口径**
 > - 版本、许可、体积、日期都在 2026-10-14 实查。方法：`npm view`、jsDelivr 数据 API、下载 UMD 后本地 `gzip -9`、读 raw LICENSE、shields.io。标 *（未核实）* 的除外。
@@ -17,15 +18,15 @@
 
 | # | 决策 | 一句话理由 |
 |---|---|---|
-| 1 | **只用 ECharts 6.1.0 一个引擎，不引入 AntV G2 / VisActor VChart 运行时** | 中国生态的大屏模板、低代码 BI 和 pyecharts 都建在 ECharts 上。kit 的 53 个组件里已有 36 个用 ECharts。G2（320 KB gz）和 VChart（617 KB gz）与它功能重叠 |
+| 1 | **只用 ECharts 6.1.0 一个引擎，不引入 AntV G2 / VisActor VChart 运行时** | 中国生态的大屏模板、低代码 BI 和 pyecharts 都建在 ECharts 上。kit 的 57 个组件里已有 37 个用 ECharts。G2（320 KB gz）和 VChart（617 KB gz）与它功能重叠 |
 | 2 | **vendor 官方 `@echarts-x/custom-bar-range`、`custom-line-range`、`custom-violin`** | Apache-2.0，每个约 2 KB（min 1.8–2.2 KB，见 §2.2），是 `file://` 可用的 classic script。分别补上 football field 的正规区间编码、fan chart / 区间带、violin。**目前尚未 vendor** |
 | 3 | **透视表是中国库唯一能补能力的地方：AntV S2 或 VisActor VTable，懒加载** | 带小计的交叉表是投行刚需。只用 2026-05-19 投毒事件清理后的版本，并核对哈希 |
 | 4 | **AI 出图走"AI 只做填空题"** | LLM 只输出一个经 schema 校验的最小意图 spec，样式由确定性编译器负责。VMind 已停更；GPT-Vis、VSeed、T8 只借设计，不当依赖；**云端渲染一律禁止**（mcp-server-chart、chart-visualization 技能、echarts-mcp） |
-| 5 | **供应链：AntV npm 命名空间在 2026-05-19 被投毒** | 300 多个包、600 多个恶意版本。我们的 `tools/vendor.py` 用 `npm pack`，不跑 install 脚本，方向是对的；但 `vendor.json` **还没有 integrity 哈希** |
+| 5 | **供应链：AntV npm 命名空间在 2026-05-19 被投毒** | 300 多个包、600 多个恶意版本。我们的 `tools/vendor.py` 用 `npm pack --ignore-scripts`，不跑 install 脚本；`vendor.json` 已记录 tarball `integrity`（sha512）和逐文件 sha256，`--check` 离线校验 ✓ |
 | 6 | **大屏审美不适合投行客户报告** | 深色背景、霓虹、发光、毛玻璃、3D、飞线、水球、词云、1920 × 1080 等比缩放都不用。可以借鉴的：克制的 count-up、跨图联动、叙事布局、标注体系、主题 token |
 | 7 | **小红书本身无法访问** | 需要登录和签名请求头，搜索引擎也不收录。"中文设计师推荐什么"是从掘金、微信（经搜狗）、CSDN 和知乎标题、官方设计指南三角推断出来的（§1） |
 | 8 | **中国地图：不用 DataV.GeoAtlas，面向中国受众时用 tile-grid 方格图或原样使用标准地图** | GeoAtlas 声明"仅供学习和交流使用"。按 PRC 规定，公开展示的地图需要审图号，标准地图哪怕只做裁剪或缩放也要重新送审。`china-tilemap` 组件已进 kit（manifest 和 `china_provinces` 样例数据已在 catalog 中），合规表述仍待法务确认（§9.3） |
-| 9 | **中文交付物的细节靠 token 和配置切换，不改组件** | 红涨绿跌：做一个对调 `--rk-pos` / `--rk-neg` 的主题变体。万 / 亿：改 `RK.format.config.compactUnits`。中文字体：builder 对 Noto Sans SC 做子集化 |
+| 9 | **中文交付物的细节靠 token 和配置切换，不改组件** | 已实现：`Report(locale="zh-CN", updown="cn")` → 中文界面文字（`RK.i18n` zh-CN 包）、万 / 亿 紧凑单位、中文日期、红涨绿跌（运行时对调 `--rk-pos` / `--rk-neg`，四套主题通用）。还没做：中文字体由 builder 对 Noto Sans SC 子集化 |
 
 ---
 
@@ -52,7 +53,7 @@
 
 ## 2. ECharts 生态（Baidu → Apache）
 
-**现状：** kit vendor 了 `echarts@6.1.0`（Apache-2.0，随附 NOTICE 和 LICENSE-d3），53 个组件里有 36 个基于它。06 在 ECharts 生态里没有发现投行刚需它覆盖不了的情况。
+**现状：** kit vendor 了 `echarts@6.1.0`（Apache-2.0，随附 NOTICE 和 LICENSE-d3），57 个组件里有 37 个基于它。06 在 ECharts 生态里没有发现投行刚需它覆盖不了的情况。
 
 ### 2.1 ECharts 6.x 对投行有用的能力
 
@@ -72,7 +73,7 @@
 | 轴标签默认防溢出、防重叠（`grid.outerBoundsMode`） | 长公司名 | 已受益 |
 | 6.1 修复 `lines` series tooltip 的 **XSS** | tooltip 显示用户提供的名称时 | 已在 6.1.0 ✓ |
 
-**坑：ECharts K 线默认红涨绿跌**（`#eb5454` / `#47b262`，中国惯例）。kit 的 `candlestick` 和 `price-volume` 已改为读取主题的 `t.pos` / `t.neg`，即西方惯例（`docs/design-system.md` §3.2 第 6 条）。
+**坑：ECharts K 线默认红涨绿跌**（`#eb5454` / `#47b262`，中国惯例）。kit 的 `candlestick` 和 `price-volume` 已改为读取主题的 `t.pos` / `t.neg`，默认西方惯例；中国客户用 `Report(updown="cn")` 统一切换为红涨绿跌（`docs/design-system.md` §3.2 第 6 条）。
 
 ### 2.2 官方 custom series `@echarts-x/*`（adopt）
 
@@ -318,7 +319,7 @@
 | **断轴** | ⚠️ | 必须显示断轴标记并加注释；否则用对数轴或拆成两个面板 | `waterfall` 的 `axisBreak` ◐ |
 | **带小计的透视表**（S2 / VTable） | ✅ | 板块财务、交叉表 | 自研 `pivot-table` ◐；重度需求时用 S2 / VTable |
 | **"竞速"动画、player** | ⚠️ 可选 | 只能作为时间序列上手动点击的"播放"控件，绝不自动播放 | `bubble` 的 `timeField` 播放 ◐ |
-| **红涨绿跌** | ⚠️ 看地区 | 默认西方惯例，按客户地区切换 | 组件读 `--rk-pos` / `--rk-neg` ✓；中国主题变体还没建 ◐ |
+| **红涨绿跌** | ⚠️ 看地区 | 默认西方惯例，按客户地区切换 | 组件读 `--rk-pos` / `--rk-neg` ✓；`updown="cn"` 一键切换 ✓ |
 
 ---
 
@@ -412,8 +413,8 @@
 | 规则 | 现状 |
 |---|---|
 | 只用精确版本，不用 `^` | ✓ `vendor/vendor.json` 全部是精确版本 |
-| 用 `npm pack` 取 tarball，不跑生命周期脚本 | ✓ `tools/vendor.py` 用 `npm pack` 下载，再用 `tarfile` 解压（`filter="data"`），不执行 install 钩子 |
-| 记录 `dist.integrity`（sha512），并逐文件记 sha256；`vendor.py --check` 时校验 | ✗ 目前 `--check` 只检查文件是否存在。**建议 P1 补上** |
+| 用 `npm pack` 取 tarball，不跑生命周期脚本 | ✓ `tools/vendor.py` 用 `npm pack --ignore-scripts` 下载，再用 `tarfile` 解压（`filter="data"`），不执行 install 钩子 |
+| 记录 `dist.integrity`（sha512），并逐文件记 sha256；`vendor.py --check` 时校验 | ✓ 已实现：`--check` 校验每个文件的 sha256，`--rehash` 重新记录；重新获取时 integrity 不符即报错 |
 | 不在存有云凭据的开发机上 `npm install` 任何 `@antv/*` 包 | 流程约定，写进 `vendor/LICENSES.md` 或 SECURITY 说明 |
 | 如果要 vendor S2 或 T8，只用投毒窗口之前或清理之后发布的版本，并和 jsDelivr 的哈希比对 | 引入时执行 |
 
@@ -425,8 +426,9 @@
 |---|---|---|
 | **中文字体** | Noto Sans SC / 思源黑体（**OFL-1.1**）。完整 CJK 字体每个字重约 8–16 MB，所以由 builder 用 `fonttools pyftsubset` 按报告实际用字做子集化，或者用 GB2312 一级 3500 字的子集（约 1–2 MB）。标题用衬线体时选 Noto Serif SC（OFL） | 目前回退到系统字体（PingFang、YaHei），子集化是 P3（`docs/design-system.md` §2.1 和 §10 第 8 项） |
 | 避免的字体 | 霞鹜文楷、得意黑（OFL，但太花哨）；阿里巴巴普惠体、HarmonyOS Sans、MiSans、OPPO Sans（厂商自定义许可，需要法务审核）；仓耳今楷（**仅限个人使用**） | 不用 |
-| **万 / 亿** | 中文财报常用"亿元"，西方投行用 mm / bn。同一份报告只用一套。`Intl.NumberFormat('zh-CN', {notation:'compact'})` 可以输出万 / 亿 | `RK.format.config.compactUnits` 可以改成 `[[1e8,'亿'],[1e4,'万']]` 🟡。建议加一个随 `report.locale` 切换的预设 |
-| **红涨绿跌** | 默认西方惯例；中国客户用主题变体对调 `--rk-pos` 和 `--rk-neg`，组件不用改 | 组件已经读 token ✓；中国变体主题还没建 |
+| **万 / 亿** | 中文财报常用"亿元"，西方投行用 mm / bn。同一份报告只用一套。`Intl.NumberFormat('zh-CN', {notation:'compact'})` 可以输出万 / 亿 | ✓ `Report(locale="zh-CN")` 时 `auto` 自动用 亿 / 万（`1.5e9` → `15亿`）；页面自定义的 `RK.format.config.compactUnits` 不被覆盖 |
+| **红涨绿跌** | 默认西方惯例；中国客户对调 `--rk-pos` 和 `--rk-neg`，组件不用改 | ✓ `Report(updown="cn")` → `<html data-rk-updown="cn">`，换主题后仍有效；不需要单独的主题变体 |
+| **界面文字** | 工具栏、筛选提示、导出、查询控制台等全部中文化 | ✓ `RK.i18n` 内置 zh-CN 包；组件可 `RK.i18n.add('zh-CN', {...})` 补充。保密声明需在 `Report(confidentiality=…)` 中写中文 |
 | 日期 | `yyyy"年"m"月"d"日"` | ✓ |
 
 ---
@@ -439,9 +441,9 @@
 | **P0** | 中国境内交付物的地图一律走 §9.4 的决策表；上线前由合规签字 | 流程 | §9.1 |
 | **P1** | `china-tilemap`：manifest（category `geo`）和 `china_provinces` 样例已进 catalog ✓。还没做的：manifest 加 `refs.ft: "Spatial:equalised-cartogram"`；文件头、manifest 的 `summary_zh` / `best_for` 里"无需审图号"的说法改成"设计意图，须合规确认" | `kit/components/china-tilemap/` | §9.3 |
 | **P1** | vendor `@echarts-x/custom-bar-range` 1.2.1、`custom-line-range` 1.1.1、`custom-violin` 1.1.1。`football-field` 改用 bar-range；`line` 加 `band`（fan chart）；`boxplot` 或 `beeswarm` 加 violin 变体 | `vendor/vendor.json`、对应组件 | §2.2 |
-| **P1** | `vendor.json` 增加 `integrity`（npm `dist.integrity`）和逐文件 sha256，`vendor.py --check` 校验；在 `vendor/LICENSES.md` 记下 AntV 事件和"只 pack、不 install"的约定 | `tools/vendor.py` | §10 |
+| ~~P1~~ ✅ | `vendor.json` 增加 `integrity`（npm `dist.integrity`）和逐文件 sha256，`vendor.py --check` 校验——已实现。仍可做：在 `vendor/LICENSES.md` 记下 AntV 事件和"只 pack、不 install"的约定 | `tools/vendor.py` | §10 |
 | **P1** | 底图 manifest 增加合规元数据（`worldview`、`prc_reviewed`、`审图号`），审图号自动渲染到脚注；builder 在 zh-CN 报告用了未审底图时发出警告 | `kit/core/rk.geo.js`、`py/reportkit` | §9.4 |
-| **P2** | 中国客户变体：做一个对调 `--rk-pos` / `--rk-neg` 的主题；给 `RK.format` 加 `zh-CN` 紧凑单位预设（万 / 亿），随 `report.locale` 切换 | `kit/styles/themes/`、`kit/core/rk.format.js` | §11 |
+| ~~P2~~ ✅ | 中国客户变体：对调 `--rk-pos` / `--rk-neg`（实现为 `updown="cn"`，不是单独主题）；`zh-CN` 紧凑单位（万 / 亿）随 `report.locale` 切换——均已实现 | `kit/core/rk.theme.js`、`kit/core/rk.format.js` | §11 |
 | **P2** | `text-block` 支持 T8 式行内实体：`metric_value`、`delta_value`、`ratio`、`trend` 等约 10 种类型，带正负着色和数据溯源。优先自研约 150 行；如果 vendor T8 0.3.1，必须核对哈希 | `kit/components/text-block/` | §3、§6.3 |
 | **P2** | Step 2 的 block spec 对齐 VSeed 的 `dimensions` / `measures`（加 `role` 和 `parentId`）；chart lint 合并飞书规则、AVA 思路和 data-to-viz caveat | `docs/roadmap-step2.md` §4.6 | §6.3、§7.4 |
 | **P3** | 透视需求出现时，用同一份数据给 S2 2.7.2 和 VTable 1.26.8 各做一个原型，懒加载，比较体积、打印效果和小计能力 | 新组件 `pivot-pro` | §3、§4 |

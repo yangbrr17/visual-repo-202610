@@ -9,6 +9,24 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'histogram.p25': '第 25 百分位', 'histogram.p75': '第 75 百分位', 'histogram.target': '目标公司', 'histogram.targetValue': '目标 {value}',
+      'histogram.count': '数量', 'histogram.share': '占总数比例', 'histogram.shareObs': '样本占比', 'histogram.numObs': '样本数量', 'histogram.excluded': '（已剔除 {n} 个无数据项）'
+    });
+  }
+  /** Statistic marker label in the report locale. */
+  function statName(s) {
+    return s === 'median' ? tr('median', 'Median') : s === 'mean' ? tr('mean', 'Mean') : s === 'p25' ? tr('histogram.p25', '25th pct.') : tr('histogram.p75', '75th pct.');
+  }
+
   /* ---------------- stats ---------------- */
   function quantile(sorted, p) {
     if (!sorted.length) return null;
@@ -118,7 +136,7 @@
       /* target */
       var tRow = rows.filter(isTarget)[0] || null;
       var tVal = o.targetValue != null ? o.targetValue : (tRow ? tRow[enc.value] : null);
-      var tText = o.targetLabel || ((tRow && labelF && o.targetValue == null ? tRow[labelF] + ' ' : 'Target ') + RK.format(tVal, fmt));
+      var tText = o.targetLabel || ((tRow && labelF && o.targetValue == null ? tRow[labelF] + ' ' + RK.format(tVal, fmt) : tr('histogram.targetValue', 'Target {value}', { value: RK.format(tVal, fmt) })));
       var isRef = o.targetValue != null;   // an explicit value (offer, price) is a reference line, not the subject
       var tBin = util.isNum(tVal) && !isRef ? Math.min(k - 1, Math.max(0, Math.floor((tVal - start) / w + 1e-9))) : -1;
       if (util.isNum(tVal) && (tVal < start || tVal > start + k * w)) tBin = -1;
@@ -161,7 +179,7 @@
 
       /* reference lines: stats in the lower label row (alternating sides), target in the upper row */
       var statLines = (o.stats || []).filter(function (s) { return STAT[s]; }).map(function (s) {
-        return { key: s, label: STAT[s].label, v: STAT[s].fn(sorted) };
+        return { key: s, label: statName(s), v: STAT[s].fn(sorted) };
       }).sort(function (a, b) { return a.v - b.v; });
       // statistics: ink-3 [4, 3] 1px, 10.5px italic labels, one decimal more than the axis format so a median
       // and a mean never print as the same number; labels alternate sides of their line (first one ends at it)
@@ -214,7 +232,7 @@
       var graphic = [];
       if (o.showN) {
         graphic.push({ type: 'text', right: 4, top: 0, silent: true,
-          style: { text: 'n = ' + n + (missing ? '  (' + missing + ' n.a. excluded)' : ''), fill: t.ink3, font: '10.5px ' + t.fontNum, align: 'right' } });
+          style: { text: 'n = ' + n + (missing ? '  ' + tr('histogram.excluded', '({n} n.a. excluded)', { n: missing }) : ''), fill: t.ink3, font: '10.5px ' + t.fontNum, align: 'right' } });
       }
 
       return {
@@ -227,14 +245,14 @@
             if (p.seriesId === 'rug') {
               var r = p.data.row, title = r[nameF] == null ? '' : String(r[nameF]);
               if (labelF && nameF !== labelF) title += ' (' + r[labelF] + ')';
-              return C.tip(title, [{ label: ctx.title(enc.value), value: RK.format(r[enc.value], fmt), bold: true }], isTarget(r) ? 'Target' : null);
+              return C.tip(title, [{ label: ctx.title(enc.value), value: RK.format(r[enc.value], fmt), bold: true }], isTarget(r) ? tr('histogram.target', 'Target') : null);
             }
             if (p.seriesId !== 'bins') return '';
             var b = bins[p.dataIndex], names = b.rows.map(function (r) { return labelF ? r[labelF] : null; }).filter(Boolean);
             var last = b.i === k - 1;
             return C.tip(RK.format(b.x0, fmt) + ' – ' + (last ? '' : '<') + RK.format(b.x1, fmt), [
-              { label: 'Count', value: String(b.rows.length), bold: true },
-              { label: 'Share of total', value: RK.format(b.rows.length / n, '0.0%') }
+              { label: tr('histogram.count', 'Count'), value: String(b.rows.length), bold: true },
+              { label: tr('histogram.share', 'Share of total'), value: RK.format(b.rows.length / n, '0.0%') }
             ], names.length ? names.slice(0, 10).join(', ') + (names.length > 10 ? ' …' : '') : null);
           }
         },
@@ -248,7 +266,7 @@
         },
         yAxis: {
           type: 'value', min: 0, max: function (e) { return Math.max(e.max, maxY) * 1.12; }, minInterval: pct ? null : 1,
-          name: pct ? 'Share of observations' : 'Number of observations', nameLocation: 'middle', nameGap: 34,
+          name: pct ? tr('histogram.shareObs', 'Share of observations') : tr('histogram.numObs', 'Number of observations'), nameLocation: 'middle', nameGap: 34,
           axisLabel: { formatter: function (v) { return RK.format(v, yFmt); }, showMaxLabel: false },
           splitLine: { show: true, lineStyle: { color: t.grid } }
         },

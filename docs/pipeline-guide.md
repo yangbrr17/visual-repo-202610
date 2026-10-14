@@ -531,10 +531,14 @@ print(html_file)                         # out/delivery/project-demo.html  (+ ou
 - **筛选提示**：有全局筛选或图表选中时，受影响页面的页脚自动出现 “Filtered view: Region = Europe · …”，
   打印成 PDF 也保留——客户转发截图时不会被误读成全量数据。
 - **不受筛选影响的页**：`r.page("Whole-market context", filters=False)`（`data-rk-filters="off"`），该页图表始终显示全量数据，也不显示筛选提示。
-- **中文客户**：`Report(..., locale="zh-CN", updown="cn")`——界面文字、来源 / 注、日期（2026年10月14日）、
-  紧凑单位（亿 / 万）切换为中文，`updown="cn"` 红涨绿跌（默认 `"us"` 绿涨红跌）。
+- **中文客户**：`Report(..., locale="zh-CN", updown="cn", confidentiality="严格保密")`——界面文字、来源 / 注、日期（2026年10月14日）、
+  紧凑单位（亿 / 万）切换为中文，`updown="cn"` 红涨绿跌（默认 `"us"` 绿涨红跌）。保密声明默认是英文，需显式传入中文。
 - **客户自选指标**：`options={"choices": {"y": ["ev_ebitda_ntm", "pe_ntm", "*computed"]}}` 在模块标题栏放一个下拉框；
-  客户在 query-console 里“添加为指标”的自定义公式会出现在 `*computed` 中，并保存在本机浏览器（按报告区分）。
+  客户在 query-console 里“添加为指标”的自定义公式会出现在 `*computed` 中，并保存在客户本机浏览器的 localStorage
+  （键 `rk:metrics:<报告标题>|<日期>|<构建日期>`，按报告区分；在控制台“我的指标”中删除）。重新构建同一份报告（标题、日期不变）
+  后这些指标仍然有效；希望所有读者都看到的指标，请写进 `r.dataset(..., computed=[...])`。
+- **交叉选择不会“点空”页面**：某个模块若仅因其他图表的点选而无数据，会忽略这些点选并提示 “Selection not in this view”
+  （模块 `options={"selectionFallback": False}` 关闭；`"badges": False` 隐藏徽标）。
 - **file:// vs http(s)**：
 
 | 打开方式 | 数据从哪来 | 说明 |
@@ -546,11 +550,12 @@ print(html_file)                         # out/delivery/project-demo.html  (+ ou
 
 - **浏览器冒烟测试**：`node tools/smoke.cjs --page examples/sql-pipeline-report/index.html`（console error 即失败，截图到 `tests/screens/`）。
   更严格的检查是在页面里滚动一遍后断言 `RK.blocks().every(b => b.state === 'rendered')`——示例报告就是这样验证的（`rendered` 之外还有 `idle` 未滚动到、`empty` 筛选后无数据、`error` 渲染失败）。
-- **打印 / PDF**：右上角 Print / PDF，每页一张 16:9。
+- **打印 / PDF**：右上角 Print / PDF，每页一张 16:9（`Report(page_size="letter" | "a4")` 改为 Letter / A4 横向）。
+  内容溢出模块的宽表 / 长表在打印时自动缩小适配（最小 0.55 倍；模块 `options={"printFit": False}` 关闭），缩到下限仍放不下的要拆页。
 
 ---
 
-## 9. 切换到数据 API（未来）
+## 9. 切换到数据 API
 
 页面不变，只换数据来源。前端约定（`kit/core/rk.data.js`）：
 
@@ -559,7 +564,19 @@ GET {rk:api}manifest            -> 与 data/manifest.json 相同的 JSON
 GET {rk:api}datasets/{id}       -> 与 data/datasets/<id>.json 相同的 JSON
 ```
 
-改动只有两处：
+**构建时直接选择 API 模式**（推荐）：
+
+```python
+api_out = r.build("out/project-demo-api", data_source="api",
+                  api="http://127.0.0.1:8765/api/reports/project-demo/")
+print([line.strip() for line in (api_out / "index.html").read_text(encoding="utf-8").splitlines()
+       if 'name="rk:api"' in line or 'name="rk:data-source"' in line])
+```
+
+`index.html` 不再引用 `data/bundle.js`，并带上 `rk:data-source` / `rk:api` 两行 meta；`data/` 仍会写出，可直接作为 API 的静态内容。
+也可以与 `single_file=True` 同用（一个 html，数据从 API 取）。
+
+**转换一个已经构建好的文件夹**（不重新跑 pipeline 时）——改动只有两处：
 
 1. **删除 `<script src="data/bundle.js"></script>`**——preload 的 bundle 优先级最高，留着它 API 永远不会被调用；
 2. 在 `<head>` 加两行 meta：
@@ -585,7 +602,7 @@ def to_api_mode(folder, api_base):
                         f'  <meta name="rk:api" content="{api_base}">')
     html.write_text(text, encoding="utf-8")
 
-api_copy = Path("out/project-demo-api")
+api_copy = Path("out/project-demo-converted")
 shutil.rmtree(api_copy, ignore_errors=True)
 shutil.copytree(out, api_copy, ignore=shutil.ignore_patterns("data"))   # 页面不再带数据
 to_api_mode(api_copy, "http://127.0.0.1:8765/api/reports/project-demo/")
@@ -666,3 +683,5 @@ python3 api_server.py out/project-demo/data &       # 启动 API
 - [ ] 浏览器打开无 console error，所有 block `rendered`；打印预览每页 16:9
 - [ ] zip 后在另一台机器解压、双击验证；或交付单文件（`single_file=True`）并在断网环境双击验证
 - [ ] 需要给客户底稿时加 `excel=True`，用 Excel 打开检查格式（倍数 `x`、百分比、日期）
+- [ ] 筛选到一个子集（如 Europe）后：action title 的数字、图表、页脚 “Filtered view” 一致；不该被筛选的页设了 `filters=False`
+- [ ] 中文客户：`locale="zh-CN"`、中文 `confidentiality`、需要时 `updown="cn"`；打印预览中宽表没有被裁掉

@@ -9,6 +9,20 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'scatter.tools': '图表工具', 'scatter.boxSelect': '框选数据点（交叉筛选）', 'scatter.boxZoom': '框选缩放', 'scatter.resetZoomSel': '重置缩放和选择',
+      'scatter.target': '目标公司', 'scatter.peers': '可比公司', 'scatter.linearFit': '线性拟合'
+    });
+  }
+
   /* ---------------- small stats helpers ---------------- */
   function mean(a) { return a.length ? a.reduce(function (s, v) { return s + v; }, 0) / a.length : null; }
   function median(a) {
@@ -173,7 +187,7 @@
 
   function toolbar(ctx, inst) {
     var h = util.h, buttons = {};
-    var bar = h('div.rk-xy-tools.rk-noprint', { role: 'toolbar', 'aria-label': 'Chart tools' });
+    var bar = h('div.rk-xy-tools.rk-noprint', { role: 'toolbar', 'aria-label': tr('scatter.tools', 'Chart tools') });
     function mode(m) {
       var next = inst.__rkMode === m ? null : m;
       inst.__rkMode = next;
@@ -186,9 +200,9 @@
       if (key) { buttons[key] = b; b.setAttribute('aria-pressed', 'false'); }
       bar.appendChild(b);
     }
-    if (inst.__rkCanBrush) btn('select', 'Box-select points (cross-filter)', svgIcon('select'), function () { mode('select'); });
-    btn('zoom', 'Box zoom', svgIcon('zoom'), function () { mode('zoom'); });
-    btn(null, 'Reset zoom and selection', RK.ui.icon('reset'), function () {
+    if (inst.__rkCanBrush) btn('select', tr('scatter.boxSelect', 'Box-select points (cross-filter)'), svgIcon('select'), function () { mode('select'); });
+    btn('zoom', tr('scatter.boxZoom', 'Box zoom'), svgIcon('zoom'), function () { mode('zoom'); });
+    btn(null, tr('scatter.resetZoomSel', 'Reset zoom and selection'), RK.ui.icon('reset'), function () {
       inst.dispatchAction({ type: 'dataZoom', dataZoomIndex: 0, start: 0, end: 100 });
       inst.dispatchAction({ type: 'dataZoom', dataZoomIndex: 1, start: 0, end: 100 });
       inst.dispatchAction({ type: 'brush', areas: [] });
@@ -255,7 +269,7 @@
     var q = null;
     if (o.quadrants === 'median' || o.quadrants === 'mean') {
       var fn = o.quadrants === 'median' ? median : mean;
-      q = { x: fn(stats.x), y: fn(stats.y), label: o.quadrants === 'median' ? 'Median' : 'Mean' };
+      q = { x: fn(stats.x), y: fn(stats.y), label: o.quadrants === 'median' ? tr('median', 'Median') : tr('mean', 'Mean') };
     } else if (util.isObj(o.quadrants)) {
       q = { x: o.quadrants.x, y: o.quadrants.y, label: o.quadrants.label || '' };
     }
@@ -287,10 +301,10 @@
         if (list.length) layers.push({ id: 'g-' + g, name: String(g), color: palette(g), rows: list });
       });
     } else if (peers.length) {
-      layers.push({ id: 'peers', name: o.peerLabel, color: RK.theme.palette({ n: 1 })[0], rows: peers });
+      layers.push({ id: 'peers', name: o.peerLabel === 'Peers' ? tr('scatter.peers', 'Peers') : o.peerLabel, color: RK.theme.palette({ n: 1 })[0], rows: peers });
     }
     targets.forEach(function (r, i) {
-      layers.push({ id: 'target-' + i, name: String(r[nameF] == null ? 'Target' : r[nameF]), color: t.accent2, rows: [r], target: true });
+      layers.push({ id: 'target-' + i, name: String(r[nameF] == null ? tr('scatter.target', 'Target') : r[nameF]), color: t.accent2, rows: [r], target: true });
     });
     var series = [];
     layers.forEach(function (L) {
@@ -363,7 +377,7 @@
     if (fit) {
       var fx = util.extent(xs), pad = (fx[1] - fx[0]) * 0.04;
       var x0 = Math.max(xe.min, fx[0] - pad), x1 = Math.min(xe.max, fx[1] + pad);
-      fitName = (o.equation ? 'y = ' + coef(fit.b) + 'x ' + (fit.a < 0 ? '− ' : '+ ') + coef(Math.abs(fit.a)) + ', ' : 'Linear fit, ') + 'R² = ' + RK.format(fit.r2, '0.00');
+      fitName = (o.equation ? 'y = ' + coef(fit.b) + 'x ' + (fit.a < 0 ? '− ' : '+ ') + coef(Math.abs(fit.a)) + ', ' : tr('scatter.linearFit', 'Linear fit') + ', ') + 'R² = ' + RK.format(fit.r2, '0.00');
       refSegs.push({ x0: x0, y0: fit.a + fit.b * x0, x1: x1, y1: fit.a + fit.b * x1 });
     }
     series.unshift({
@@ -410,13 +424,13 @@
           if (!r) return '';
           var title = r[nameF] == null ? '' : String(r[nameF]);
           if (labelF && nameF !== labelF && r[labelF] != null) title += ' (' + r[labelF] + ')';
-          var tr = [
+          var tipRows = [
             { label: ctx.title(enc.x), value: RK.format(r[enc.x], xFmt) },
             { label: ctx.title(enc.y), value: RK.format(r[enc.y], yFmt) }
           ];
-          (o.tooltipFields || []).forEach(function (f) { tr.push({ label: ctx.title(f), value: RK.format(r[f], ctx.fmtOf(f)) }); });
-          if (colorF) tr.unshift({ color: isTarget(r) ? t.accent2 : palette(r[colorF]), label: ctx.title(colorF), value: r[colorF] });
-          return C.tip(title, tr, isTarget(r) ? 'Target' : null);
+          (o.tooltipFields || []).forEach(function (f) { tipRows.push({ label: ctx.title(f), value: RK.format(r[f], ctx.fmtOf(f)) }); });
+          if (colorF) tipRows.unshift({ color: isTarget(r) ? t.accent2 : palette(r[colorF]), label: ctx.title(colorF), value: r[colorF] });
+          return C.tip(title, tipRows, isTarget(r) ? tr('scatter.target', 'Target') : null);
         }
       },
       xAxis: {

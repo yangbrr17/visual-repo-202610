@@ -9,6 +9,19 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'bump.changeVs': '较{period}的排名变化', 'bump.dateMonth': 'yy"年"m"月"'
+    });
+  }
+
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
 
   /** Greedy word wrap to `width` px (period headers that would run into their neighbours). */
@@ -89,7 +102,7 @@
       var hasValues = entities.some(function (e) { return val[e].some(util.isNum); });
       var labelsX = (o.xLabels && o.xLabels.length === periods.length ? o.xLabels : periods).map(function (p) {
         var f = !wideFields && ctx.field(enc.x);
-        return f && f.type === 'date' ? RK.format(p, f.format || 'mmm yy') : String(p);
+        return f && f.type === 'date' ? RK.format(p, f.format || tr('bump.dateMonth', 'mmm yy')) : String(p);
       });
 
       var allRanks = [];
@@ -211,7 +224,7 @@
             return C.tip(labelsX[j], list.map(function (e) {
               var v = hasValues && util.isNum(val[e][j]) ? RK.format(val[e][j], fmt) : '';
               return { color: colorOf(e), label: '#' + rank[e][j] + '  ' + e, value: v + change(e, j), bold: isHL(e) };
-            }), j > 0 ? 'Change vs. ' + labelsX[j - 1] : null);
+            }), j > 0 ? tr('bump.changeVs', 'Change vs. {period}', { period: labelsX[j - 1] }) : null);
           }
         },
         xAxis: {

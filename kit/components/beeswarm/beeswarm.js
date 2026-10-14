@@ -8,6 +8,22 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'beeswarm.overallMedian': '整体中位数 {value}', 'beeswarm.distribution': '分布', 'beeswarm.nMissing': '（+{n} 个无数据）',
+      'beeswarm.medShort': '中位数 {value}', 'beeswarm.observations': '样本数', 'beeswarm.maximum': '最大值', 'beeswarm.p75': '第 75 百分位',
+      'beeswarm.p25': '第 25 百分位', 'beeswarm.minimum': '最小值', 'beeswarm.vsMedian': '较组内中位数', 'beeswarm.rank': '组内排名',
+      'beeswarm.rankOf': '第 {rank} / {n}'
+    });
+  }
+
   /* ---------- helpers ---------- */
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
 
@@ -185,7 +201,7 @@
       // reference lines: zero line, overall median (statistic: ink-3 dashed 1px), user lines (--rk-ref dashed 1.2px)
       var lines = [];
       if (axMin < 0 && axMax > 0) lines.push({ v: 0, label: '', color: t.axis, type: 'solid', width: 1 });
-      if (o.overall && overall) lines.push({ v: overall.median, label: 'Overall median ' + num(overall.median, fmt), color: t.ink3, type: [4, 3], width: 1 });
+      if (o.overall && overall) lines.push({ v: overall.median, label: tr('beeswarm.overallMedian', 'Overall median {value}', { value: num(overall.median, fmt) }), color: t.ink3, type: [4, 3], width: 1 });
       (o.refLines || []).forEach(function (r) { lines.push({ v: r.value, label: r.label || num(r.value, fmt), color: r.color || t.ref, type: r.type || [4, 3], width: 1.2, ref: true }); });
 
       /* ---------- swarm layout (pixel space, cached per coordinate system state) ---------- */
@@ -292,7 +308,7 @@
 
       /* ---------- series ---------- */
       var bandSeries = {
-        id: 'band', name: 'Distribution', type: 'custom', z: 1, clip: true,
+        id: 'band', name: tr('beeswarm.distribution', 'Distribution'), type: 'custom', z: 1, clip: true,
         encode: { x: 0, y: 1 },
         data: groups.map(function (g) { var s = gStats[g], gi = gIndex[g]; return { name: String(g), value: horiz ? [s.median, gi] : [gi, s.median] }; }),
         renderItem: function (params, api) {
@@ -324,7 +340,7 @@
       };
 
       var medianSeries = o.median ? {
-        id: 'median', name: 'Median', type: 'custom', z: 2, silent: true, clip: true,
+        id: 'median', name: tr('median', 'Median'), type: 'custom', z: 2, silent: true, clip: true,
         encode: { x: 0, y: 1 }, tooltip: { show: false },
         data: groups.map(function (g) { var s = gStats[g], gi = gIndex[g]; return horiz ? [s.median, gi] : [gi, s.median]; }),
         renderItem: function (params, api) {
@@ -414,7 +430,7 @@
         formatter: function (val, i) {
           var g = axisGroups[i], s = gStats[g];
           if (!s) return '';
-          var sub = 'n = ' + s.n + (gMissing[g] ? ' (+' + gMissing[g] + ' n.a.)' : '') + (o.median ? '  ·  Med. ' + RK.format(s.median, fmt) : '');
+          var sub = 'n = ' + s.n + (gMissing[g] ? ' ' + tr('beeswarm.nMissing', '(+{n} n.a.)', { n: gMissing[g] }) : '') + (o.median ? '  ·  ' + tr('beeswarm.medShort', 'Med. {value}', { value: RK.format(s.median, fmt) }) : '');
           return '{n|' + C.richSafe(g) + '}\n{s|' + C.richSafe(sub) + '}';
         },
         rich: {
@@ -476,13 +492,13 @@
             if (p.seriesId === 'band') {
               var g = groups[p.dataIndex], s = gStats[g];
               return C.tip(String(g), [
-                { label: 'Observations', value: String(s.n) + (gMissing[g] ? ' (+' + gMissing[g] + ' n.a.)' : '') },
-                { label: 'Maximum', value: RK.format(s.max, fmt) },
-                { label: '75th percentile', value: RK.format(s.q3, fmt) },
-                { label: 'Median', value: RK.format(s.median, fmt), bold: true },
-                { label: '25th percentile', value: RK.format(s.q1, fmt) },
-                { label: 'Minimum', value: RK.format(s.min, fmt) },
-                { label: 'Mean', value: RK.format(s.mean, fmt) }
+                { label: tr('beeswarm.observations', 'Observations'), value: String(s.n) + (gMissing[g] ? ' ' + tr('beeswarm.nMissing', '(+{n} n.a.)', { n: gMissing[g] }) : '') },
+                { label: tr('beeswarm.maximum', 'Maximum'), value: RK.format(s.max, fmt) },
+                { label: tr('beeswarm.p75', '75th percentile'), value: RK.format(s.q3, fmt) },
+                { label: tr('median', 'Median'), value: RK.format(s.median, fmt), bold: true },
+                { label: tr('beeswarm.p25', '25th percentile'), value: RK.format(s.q1, fmt) },
+                { label: tr('beeswarm.minimum', 'Minimum'), value: RK.format(s.min, fmt) },
+                { label: tr('mean', 'Mean'), value: RK.format(s.mean, fmt) }
               ]);
             }
             var i = p.value && p.value[2], r = rows[i];
@@ -490,15 +506,15 @@
             var g2 = groupOf(r), s2 = gStats[g2];
             var peersIn = rows.filter(function (x) { return groupOf(x) === g2; }).map(function (x) { return x[vf]; }).sort(function (a, b) { return b - a; });
             var diff = r[vf] - s2.median;
-            var tr = [
+            var tipRows = [
               gf ? { label: ctx.title(gf), value: String(g2) } : null,
               { color: isHL(r) ? t.accent2 : colorOf(r), label: ctx.title(vf), value: RK.format(r[vf], fmt), bold: true },
-              { label: 'vs. group median', value: (diff > 0 ? '+' : diff < 0 ? '-' : '') + RK.format(Math.abs(diff), fmt) },
-              { label: 'Rank in group', value: (peersIn.indexOf(r[vf]) + 1) + ' of ' + peersIn.length }
+              { label: tr('beeswarm.vsMedian', 'vs. group median'), value: (diff > 0 ? '+' : diff < 0 ? '-' : '') + RK.format(Math.abs(diff), fmt) },
+              { label: tr('beeswarm.rank', 'Rank in group'), value: tr('beeswarm.rankOf', '{rank} of {n}', { rank: peersIn.indexOf(r[vf]) + 1, n: peersIn.length }) }
             ];
-            if (enc.size) tr.push({ label: ctx.title(enc.size), value: RK.format(r[enc.size], ctx.fmtOf(enc.size) || 'auto') });
-            if (colorField) tr.splice(1, 0, { label: ctx.title(colorField), value: String(r[colorField]) });
-            return C.tip(String(r[lf]), tr);
+            if (enc.size) tipRows.push({ label: ctx.title(enc.size), value: RK.format(r[enc.size], ctx.fmtOf(enc.size) || 'auto') });
+            if (colorField) tipRows.splice(1, 0, { label: ctx.title(colorField), value: String(r[colorField]) });
+            return C.tip(String(r[lf]), tipRows);
           }
         },
         xAxis: horiz ? valAxis : catAxis,

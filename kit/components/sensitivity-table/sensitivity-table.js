@@ -9,6 +9,22 @@
   'use strict';
   var util = RK.util, h = util.h;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'sensitivityTable.value': '数值', 'sensitivityTable.delta': 'Δ 较基准', 'sensitivityTable.pct': '% 较基准',
+      'sensitivityTable.mode': '显示方式', 'sensitivityTable.vsBase': '较基准', 'sensitivityTable.pctVsBase': '较基准 %',
+      'sensitivityTable.baseCase': '基准情形', 'sensitivityTable.setBase': '点击设为基准情形',
+      'sensitivityTable.caption': '基准情形：{row}，{col} = {value}'
+    });
+  }
+
   var MODES = [['value', 'Value'], ['delta', 'Δ vs base'], ['pct', '% vs base']];
 
   /** Format sections of a code (split on ';' outside quotes). */
@@ -123,7 +139,7 @@
       var root = h('div.rk-sens');
       var bar = h('div.rk-sens__bar');
       var caption = h('div.rk-sens__caption');
-      var seg = h('div.rk-seg.rk-sens__seg.rk-noprint', { role: 'group', 'aria-label': 'Display mode' });
+      var seg = h('div.rk-seg.rk-sens__seg.rk-noprint', { role: 'group', 'aria-label': tr('sensitivityTable.mode', 'Display mode') });
       var table = h('table.rk-table.rk-sens__table');
       var tip = RK.ui.tip();
       bar.appendChild(caption);
@@ -133,7 +149,7 @@
       ctx.el.appendChild(root);
 
       MODES.forEach(function (m) {
-        seg.appendChild(h('button', { type: 'button', dataset: { mode: m[0] }, 'aria-pressed': 'false' }, m[1]));
+        seg.appendChild(h('button', { type: 'button', dataset: { mode: m[0] }, 'aria-pressed': 'false' }, tr('sensitivityTable.' + m[0], m[1])));
       });
 
       /* ---------------- base case ---------------- */
@@ -207,8 +223,9 @@
         var prev = lastVals;
         lastVals = next;
         state.g = g; state.b = b; state.bv = bv; state.F = F;
-        caption.textContent = o.caption === false ? '' : 'Base case: ' + (o.rowTitle || cur.title(enc.row)) + ' ' + RK.format(g.rows[b.i], F.row) +
-          ', ' + (o.colTitle || cur.title(enc.col)) + ' ' + RK.format(g.cols[b.j], F.col) + ' = ' + RK.format(bv, F.value);
+        caption.textContent = o.caption === false ? '' : tr('sensitivityTable.caption', 'Base case: {row}, {col} = {value}', {
+          row: (o.rowTitle || cur.title(enc.row)) + ' ' + RK.format(g.rows[b.i], F.row),
+          col: (o.colTitle || cur.title(enc.col)) + ' ' + RK.format(g.cols[b.j], F.col), value: RK.format(bv, F.value) });
         Array.prototype.forEach.call(seg.children, function (btn) {
           var on = btn.dataset.mode === mode;
           btn.classList.toggle('is-on', on);
@@ -306,12 +323,12 @@
         var isBase = p.i === state.b.i && p.j === state.b.j;
         var rows = [{ label: cur.title(enc.value), value: RK.format(p.v, F.value), bold: true }];
         if (!isBase && util.isNum(p.v) && util.isNum(bv)) {
-          rows.push({ label: 'vs base', value: RK.format(p.v - bv, F.delta) });
-          rows.push({ label: '% vs base', value: RK.format(bv ? p.v / bv - 1 : NaN, F.pct) });
+          rows.push({ label: tr('sensitivityTable.vsBase', 'vs base'), value: RK.format(p.v - bv, F.delta) });
+          rows.push({ label: tr('sensitivityTable.pctVsBase', '% vs base'), value: RK.format(bv ? p.v / bv - 1 : NaN, F.pct) });
         }
         tip.show(RK.chart.tip((o.rowTitle || cur.title(enc.row)) + ' ' + RK.format(p.row, F.row) + '  ·  ' +
           (o.colTitle || cur.title(enc.col)) + ' ' + RK.format(p.col, F.col), rows,
-          isBase ? 'Base case' : (o.rebase !== false ? 'Click to set as base case' : null)), td);
+          isBase ? tr('sensitivityTable.baseCase', 'Base case') : (o.rebase !== false ? tr('sensitivityTable.setBase', 'Click to set as base case') : null)), td);
       }
       function onOver(e) {
         var td = e.target.closest('td.rk-sens__cell');

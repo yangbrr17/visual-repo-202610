@@ -10,6 +10,14 @@
   'use strict';
   var h = RK.util.h;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+
   // name -> tone used for the small status dot (overridable with options.tones)
   var TONES = [[/up|bull|high|best|strong|accel|optimis/i, 'pos'], [/down|bear|low|worst|stress|weak|reces|pessim/i, 'neg']];
   function autoTone(v) {
@@ -56,7 +64,7 @@
       if (o.metric && o.metric.label) labelText = (labelText ? labelText + ' · ' : '') + o.metric.label;
       if (labelText) root.appendChild(h('span.rk-ss__label', { id: labelId }, String(labelText)));
 
-      var track = h('div.rk-ss__track', { role: 'radiogroup', 'aria-labelledby': labelText ? labelId : null, 'aria-label': labelText ? null : 'Scenario' });
+      var track = h('div.rk-ss__track', { role: 'radiogroup', 'aria-labelledby': labelText ? labelId : null, 'aria-label': labelText ? null : tr('scenario', 'Scenario') });
       var thumb = h('span.rk-ss__thumb', { 'aria-hidden': 'true' });
       track.appendChild(thumb);
       var buttons = values.map(function (v, i) {

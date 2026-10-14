@@ -9,6 +9,23 @@
   var C = RK.chart, util = RK.util;
   var MINUS = '−';
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'divergingBar.baseline': '基准', 'divergingBar.difference': '差异'
+    });
+  }
+  /** Name of the zero line: options.baselineLabel, else the statistic in the report locale. */
+  function baseName(o) {
+    return o.baselineLabel || (o.baseline === 'median' ? tr('median', 'Median') : o.baseline === 'mean' ? tr('mean', 'Mean') : tr('divergingBar.baseline', 'Baseline'));
+  }
+
   var isNum = util.isNum;
   /** Signed label: formats that already carry a '+' are used as-is, otherwise +/− is prefixed. */
   function signed(v, fmt) {
@@ -141,7 +158,7 @@
       });
     }
 
-    var baseText = C.richSafe((o.baselineLabel || (o.baseline === 'median' ? 'Median' : o.baseline === 'mean' ? 'Mean' : 'Baseline')) + (base !== 0 ? ' ' + num(base, fmt) : ''));
+    var baseText = C.richSafe((baseName(o)) + (base !== 0 ? ' ' + num(base, fmt) : ''));
     var zeroLine = {
       // precision 10: reference lines sit at value − baseline exactly (the default rounds to 2 decimals)
       silent: true, symbol: ['none', 'none'], animation: false, precision: 10,
@@ -228,12 +245,12 @@
         formatter: function (p) {
           var d = items[p.dataIndex];
           if (!d || p.seriesId !== 'bars') return '';
-          var tr = [{ color: colorOf(d), label: ctx.title(enc.value), value: num(d.raw, fmt), bold: base === 0 }];
+          var tipRows = [{ color: colorOf(d), label: ctx.title(enc.value), value: num(d.raw, fmt), bold: base === 0 }];
           if (base !== 0) {
-            tr.push({ label: o.baselineLabel || (o.baseline === 'median' ? 'Median' : o.baseline === 'mean' ? 'Mean' : 'Baseline'), value: num(base, fmt) });
-            tr.push({ label: 'Difference', value: delta(d.v), bold: true });
+            tipRows.push({ label: baseName(o), value: num(base, fmt) });
+            tipRows.push({ label: tr('divergingBar.difference', 'Difference'), value: delta(d.v), bold: true });
           }
-          return C.tip(d.label, tr);
+          return C.tip(d.label, tipRows);
         }
       },
       xAxis: horiz ? valAxis : catAxis,

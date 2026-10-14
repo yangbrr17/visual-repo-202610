@@ -33,7 +33,7 @@
     "zoom": {"type": "boolean", "default": true, "desc": "Slider, drag, Ctrl/Cmd + wheel or pinch zoom shared by both panels (options.wheelZoom: true for the plain wheel); the price axis re-fits to the visible candles"},
     "legend": {"type": "boolean", "default": true, "desc": "Legend top-left (moving averages and volume)"}
   },
-  "interactions": ["Crosshair tooltip: OHLC, change vs. prior close, volume, MAs", "Hover near a pin to read the event", "Slider, drag, Ctrl/Cmd + wheel or pinch zoom shared by candles and volume (plain wheel scrolls the page)", "1M / 3M / 6M / YTD / 1Y / All range buttons", "Legend toggles MAs / volume", "PNG / CSV export"],
+  "interactions": ["Crosshair tooltip: OHLC, change vs. prior close, volume, MAs", "Hover near a pin to read the event", "Zoom shared by candles and volume: slider; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)", "Range buttons (1M / 3M / 6M / YTD / 1Y / 2Y / 5Y / All, as the history allows)", "Legend toggles MAs / volume", "PNG / CSV export"],
   "samples": [
     {"title": "Helios Industrial daily OHLC — last 6 months (USD)", "data": "price_ohlc", "height": 420,
      "options": {"eventsData": "price_events"}},

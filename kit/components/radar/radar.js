@@ -8,9 +8,22 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'radar.peers': '可比公司', 'radar.peerMedian': '可比公司中位数', 'radar.diffNote': '（ ）内为与可比公司中位数的差异'
+    });
+  }
+
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
   var DASH_ICON = 'path://M0,0h3v1.6H0z M3.5,0h3v1.6h-3z M7,0h3v1.6H7z';   // dashed legend swatch for the median
-  var PEERS = 'Peers', MEDIAN = 'Peer median', NAME_GAP = 12;
+  var NAME_GAP = 12;
   /** Value text with a true minus sign. */
   function num(v, f) { return RK.format(v, f).replace(/^-/, '\u2212'); }
   function isPct(f) {
@@ -146,8 +159,8 @@
     // legend: target(s) first, then peers (one 'Peers' entry when they are muted — identical grey swatches say
     // nothing), then the median
     var mutedCol = RK.theme.mix(t.ink3, t.paper, 0.25);
-    var peerEntries = muted ? (peers.length ? [{ name: PEERS, itemStyle: { color: mutedCol } }] : []) : peers.map(String);
-    var legendData = targets.map(String).concat(peerEntries, hasMed ? [{ name: MEDIAN, icon: DASH_ICON, itemStyle: { color: t.ink3 } }] : []);
+    var peerEntries = muted ? (peers.length ? [{ name: tr('radar.peers', 'Peers'), itemStyle: { color: mutedCol } }] : []) : peers.map(String);
+    var legendData = targets.map(String).concat(peerEntries, hasMed ? [{ name: tr('radar.peerMedian', 'Peer median'), icon: DASH_ICON, itemStyle: { color: t.ink3 } }] : []);
     var legendNames = legendData.map(function (d) { return typeof d === 'string' ? d : d.name; });
 
     /* ---------- layout: the legend column sits next to the radar and the pair is centred in the block ---------- */
@@ -169,7 +182,7 @@
     var series = [];
     if (peerData.length) {
       series.push({
-        id: 'peers', name: PEERS, type: 'radar', z: 2,
+        id: 'peers', name: tr('radar.peers', 'Peers'), type: 'radar', z: 2,
         lineStyle: { color: mutedCol }, itemStyle: { color: mutedCol },
         emphasis: { focus: 'self', lineStyle: { width: 3 } },
         blur: { lineStyle: { opacity: 0.15 }, itemStyle: { opacity: 0.15 }, areaStyle: { opacity: 0.04 }, label: { show: false } },
@@ -178,10 +191,10 @@
     }
     if (hasMed) {
       series.push({
-        id: 'median', name: MEDIAN, type: 'radar', z: 3, silent: false,
+        id: 'median', name: tr('radar.peerMedian', 'Peer median'), type: 'radar', z: 3, silent: false,
         lineStyle: { color: t.ink3, width: 1.5, type: [4, 3] }, itemStyle: { color: t.ink3 },
         emphasis: { focus: 'self' }, blur: { lineStyle: { opacity: 0.3 } },
-        data: [{ name: MEDIAN, value: med, symbol: 'none', lineStyle: { color: t.ink3, width: 1.5, type: [4, 3] }, itemStyle: { color: t.ink3 }, areaStyle: { opacity: 0 }, label: { show: false } }]
+        data: [{ name: tr('radar.peerMedian', 'Peer median'), value: med, symbol: 'none', lineStyle: { color: t.ink3, width: 1.5, type: [4, 3] }, itemStyle: { color: t.ink3 }, areaStyle: { opacity: 0 }, label: { show: false } }]
       });
     }
     if (targetData.length) {
@@ -203,13 +216,13 @@
         formatter: function (p) {
           var n = p.name, vals = p.value || [];
           var isMed = p.seriesId === 'median';
-          var tr = indicator.map(function (ind, j) {
+          var tipRows = indicator.map(function (ind, j) {
             var v = vals[j], d = util.isNum(v) && util.isNum(med[j]) && !isMed ? v - med[j] : null;
             // differences of percentages are percentage points
             var dtxt = d == null ? '' : '  (' + (d > 0 ? '+' : d < 0 ? '\u2212' : '\u00b1') + (isPct(fmts[j]) ? RK.format(Math.abs(d) * 100, ppCode(fmts[j])) : RK.format(Math.abs(d), fmts[j])) + ')';
             return { label: ind.name, value: num(v, fmts[j]) + dtxt };
           });
-          return C.tip(n, tr, isMed || !peers.length ? null : '( ) difference vs. peer median');
+          return C.tip(n, tipRows, isMed || !peers.length ? null : tr('radar.diffNote', '( ) difference vs. peer median'));
         }
       },
       radar: {

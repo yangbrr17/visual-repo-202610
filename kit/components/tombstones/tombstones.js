@@ -11,6 +11,21 @@
   'use strict';
   var util = RK.util, h = util.h;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'tombstones.ipo': '首次公开发行', 'tombstones.financing': '为其收购以下公司提供融资', 'tombstones.merged': '已与以下公司合并',
+      'tombstones.acquiredBy': '已出售予', 'tombstones.acquired': '已收购', 'tombstones.facets': '筛选交易业绩',
+      'tombstones.dateMonth': 'yyyy"年"m"月"', 'tombstones.dateFull': 'yyyy"年"m"月"d"日"'
+    });
+  }
+
   /**
    * Deal type -> which party leads the card and the phrase that joins it to the other one
    * (first match wins; options.wording[type] overrides). solo: phrase when there is no counterparty.
@@ -24,6 +39,12 @@
     { test: /buy|acqui|purchase|take.?private|tender/i, lead: 'acquirer', verb: 'has acquired', party: 'target', solo: null }
   ];
   var DEFAULT_WORDING = WORDING[4];
+  // built-in phrases in the report locale (custom options.wording text is shown as given)
+  var PHRASE_KEYS = {
+    'Initial public offering': 'ipo', 'financing for its acquisition of': 'financing', 'has merged with': 'merged',
+    'has been acquired by': 'acquiredBy', 'has acquired': 'acquired'
+  };
+  function phrase(s) { return s && Object.prototype.hasOwnProperty.call(PHRASE_KEYS, s) ? tr('tombstones.' + PHRASE_KEYS[s], s) : s; }
 
   // words that never make a monogram letter ("Ashcombe & Co." -> "AS", "Bluefield Capital Partners" -> "BC")
   var STOP = /^(&|\+|and|of|the|de|la|le|du|und|et|y|co\.?|inc\.?|corp\.?|ltd\.?|llc|plc|ag|sa|se|nv|bv|spa|s\.?p\.?a\.?|gmbh|kk|holdings?|group)$/i;
@@ -62,7 +83,7 @@
     var lead = w.lead ? r[enc[w.lead]] : null, party = w.party ? r[enc[w.party]] : null;
     if (lead == null || lead === '') { lead = party; party = null; }
     if (lead == null || lead === '') lead = r[enc.target] || r[enc.acquirer] || '';
-    return { lead: String(lead), party: party == null || party === '' ? null : String(party), verb: party ? w.verb : null, solo: party ? null : w.solo };
+    return { lead: String(lead), party: party == null || party === '' ? null : String(party), verb: party ? phrase(w.verb) : null, solo: party ? null : phrase(w.solo) };
   }
 
   RK.component({
@@ -94,7 +115,7 @@
     render: function (ctx) {
       var cur = ctx, first = true, tip = null, facetEls = [];
       ctx.el.classList.add('is-auto');
-      var facetsBar = h('div.rk-tomb__facets.rk-noprint', { role: 'toolbar', 'aria-label': 'Filter credentials' });
+      var facetsBar = h('div.rk-tomb__facets.rk-noprint', { role: 'toolbar', 'aria-label': tr('tombstones.facets', 'Filter credentials') });
       var grid = h('div.rk-tomb__grid', { role: 'list' });
       var root = h('div.rk-tomb', facetsBar, grid);
       ctx.el.appendChild(root);
@@ -156,10 +177,10 @@
         function isHl(n) { return n != null && hl.indexOf(String(n).toLowerCase()) >= 0; }
         var hot = isHl(d.lead) || isHl(d.party);
         var vf = o.format || c.fmtOf(enc.value) || '$#,##0.0"bn"';
-        var df = o.dateFormat || c.fmtOf(enc.date) || 'mmmm yyyy';
+        var df = o.dateFormat || c.fmtOf(enc.date) || tr('tombstones.dateMonth', 'mmmm yyyy');
         var value = r[enc.value];
         var valueText = (value == null || value === '') && o.missingValue != null ? o.missingValue : RK.format(value, vf);
-        var dateText = r[enc.date] == null ? RK.format(null) : RK.format(r[enc.date], RK.format.isDateCode(df) ? df : 'mmmm yyyy');
+        var dateText = r[enc.date] == null ? RK.format(null) : RK.format(r[enc.date], RK.format.isDateCode(df) ? df : tr('tombstones.dateMonth', 'mmmm yyyy'));
         var logos = o.monogram ? h('div.rk-tomb__logos', tile(d.lead, true, isHl(d.lead), c), d.party ? tile(d.party, false, isHl(d.party), c) : null) : null;
         var desc = enc.description && r[enc.description] != null && r[enc.description] !== '' ? String(r[enc.description]) : null;   // text child, never a props bag
         var el = h('article.rk-tomb__card', {
@@ -202,7 +223,7 @@
           facetEls = facetEls.concat(chips);
           facetsBar.appendChild(h('div.rk-tomb__facet', h('span.rk-tomb__flabel', c.title(f)), chips));
         });
-        var clear = h('button.rk-tomb__clear', { type: 'button', hidden: true }, 'Clear');
+        var clear = h('button.rk-tomb__clear', { type: 'button', hidden: true }, tr('clear', 'Clear'));
         clear._rkClear = true;
         facetsBar.appendChild(clear);
         styleFacets(c);
@@ -277,7 +298,7 @@
         var vf = c.options.format || c.fmtOf(enc.value) || '$#,##0.0"bn"';
         var rows = [
           { label: c.title(enc.value), value: (r[enc.value] == null && c.options.missingValue != null) ? c.options.missingValue : RK.format(r[enc.value], vf) },
-          { label: c.title(enc.date), value: RK.format(r[enc.date], 'dd mmm yyyy') }
+          { label: c.title(enc.date), value: RK.format(r[enc.date], tr('tombstones.dateFull', 'dd mmm yyyy')) }
         ];
         [enc.sector, enc.region, enc.role].forEach(function (f) { if (f && c.dataset.has(f) && r[f] != null) rows.push({ label: c.title(f), value: r[f] }); });
         // the deal type is the card's kicker; the tooltip leads with the parties

@@ -7,6 +7,21 @@
   'use strict';
   var C = RK.chart, U = RK.util;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'multipleHistory.avgN': '{n}年均值', 'multipleHistory.avg': '均值', 'multipleHistory.premium': '溢价 /（折价）',
+      'multipleHistory.vsAvg': '较{name}', 'multipleHistory.average': '均值', 'multipleHistory.dateAxis': 'yy"年"m"月"',
+      'multipleHistory.dateLong': 'yyyy"年"m"月"d"日"'
+    });
+  }
+
   RK.component({
     id: 'multiple-history',
     deps: ['echarts'],
@@ -42,7 +57,7 @@
       var st = stats(inWin.map(function (r) { return r[yf]; }));
       var cst = cf ? stats(inWin.map(function (r) { return r[cf]; })) : null;
       var k = Math.max(0, Math.min(2, o.sigma | 0));
-      var avgName = o.lookback ? o.lookback + 'Y avg' : 'Avg';
+      var avgName = o.lookback ? tr('multipleHistory.avgN', '{n}Y avg', { n: o.lookback }) : tr('multipleHistory.avg', 'Avg');
 
       // value axis: data + bands, padded to a nice step
       var vals = ys.map(function (p) { return p[1]; }).concat(cs ? cs.map(function (p) { return p[1]; }) : []);
@@ -178,7 +193,7 @@
         });
       }
 
-      var dfmt = o.dateFormat || 'mmm yy';
+      var dfmt = !o.dateFormat || o.dateFormat === 'mmm yy' ? tr('multipleHistory.dateAxis', 'mmm yy') : o.dateFormat;
       var slider = o.zoom !== false && o.zoomSlider !== false && !ctx.print;
       return {
         legend: C.legend(ctx, { show: o.legend !== false && !!cs,
@@ -193,15 +208,15 @@
             var i = ps[0].dataIndex, r = rows[i];
             if (!r) return '';
             var v = r[yf], c = cf ? r[cf] : null;
-            var tr = [{ color: yColor, label: ctx.title(yf), value: RK.format(v, fmt), bold: false }];
-            if (cf) tr.push({ color: cColor, label: ctx.title(cf), value: RK.format(c, fmt) });
+            var tipRows = [{ color: yColor, label: ctx.title(yf), value: RK.format(v, fmt), bold: false }];
+            if (cf) tipRows.push({ color: cColor, label: ctx.title(cf), value: RK.format(c, fmt) });
             if (cf && o.premium !== false) {
-              tr.push({ label: 'Premium / (discount)', value: U.isNum(v) && U.isNum(c) && c ? RK.format(v / c - 1, '+0.0%;(0.0%);0.0%') : RK.format(null) });
+              tipRows.push({ label: tr('multipleHistory.premium', 'Premium / (discount)'), value: U.isNum(v) && U.isNum(c) && c ? RK.format(v / c - 1, '+0.0%;(0.0%);0.0%') : RK.format(null) });
             }
             if (st && U.isNum(v)) {
-              tr.push({ label: 'vs. ' + (o.lookback ? avgName : 'average'), value: RK.format(v - st.mean, signed(fmt)) + (st.sd ? '  (' + RK.format((v - st.mean) / st.sd, '+0.0;−0.0;0.0') + 'σ)' : '') });
+              tipRows.push({ label: tr('multipleHistory.vsAvg', 'vs. {name}', { name: o.lookback ? avgName : tr('multipleHistory.average', 'average') }), value: RK.format(v - st.mean, signed(fmt)) + (st.sd ? '  (' + RK.format((v - st.mean) / st.sd, '+0.0;−0.0;0.0') + 'σ)' : '') });
             }
-            return C.tip(RK.format(r[xf], 'dd mmm yyyy'), tr);
+            return C.tip(RK.format(r[xf], tr('multipleHistory.dateLong', 'dd mmm yyyy')), tipRows);
           }
         },
         xAxis: {

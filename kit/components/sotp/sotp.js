@@ -11,6 +11,30 @@
 (function () {
   'use strict';
   var C = RK.chart, util = RK.util, isNum = util.isNum;
+
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'sotp.netDebtLabel': '减：净债务', 'sotp.evLabel': '企业价值', 'sotp.equityLabel': '股权价值', 'sotp.lowLabel': '低倍数',
+      'sotp.highLabel': '至高倍数区间', 'sotp.perShareTitle': '每股价值', 'sotp.current': '现价', 'sotp.selectedOnly': '仅含所选分部（{n} / {total}）',
+      'sotp.impliedBasis': '隐含{metric} {range}', 'sotp.implied': '隐含 {range}', 'sotp.shares': '完全稀释股数 {shares} 百万股',
+      'sotp.low': '{mult}（低）', 'sotp.high': '{mult}（高）', 'sotp.shareOfEv': '占企业价值比例', 'sotp.perShare': '每股价值', 'sotp.lowV': '低值',
+      'sotp.highV': '高值', 'sotp.mid': '中值', 'sotp.impliedMetric': '隐含{metric}', 'sotp.multiple': '倍数', 'sotp.vsCurrent': '较现价 {price}'
+    });
+  }
+  // default labels (options left at their English defaults follow the report locale; custom labels are kept)
+  var LABELS = {
+    netDebtLabel: 'Less: net debt', evLabel: 'Enterprise value', equityLabel: 'Equity value', lowLabel: 'Low multiple',
+    highLabel: 'Range to high multiple', perShareTitle: 'Per share'
+  };
+  /** Option label o[k], translated when it is the English default. */
+  function lab(o, k) { var v = o[k]; return v === LABELS[k] ? tr('sotp.' + k, v) : v; }
   var BAR = 0.56;            // bar thickness as share of the row band (connectors and rules use the same value)
   var BAR_MAX = 30;          // px cap on bar thickness
   var LIGHT = 0.6;           // tint of the low -> high range extension (mix with paper)
@@ -101,12 +125,12 @@
       s.end = run; s.hiEnd = s.start + (isNum(hi) ? hi : 0);
       steps.push(s);
     });
-    var ev = { kind: 'total', key: 'ev', label: o.evLabel, lo: evLo, hi: evHi, start: 0, end: evLo, hiEnd: evHi, color: t.accent };
+    var ev = { kind: 'total', key: 'ev', label: lab(o, 'evLabel'), lo: evLo, hi: evHi, start: 0, end: evLo, hiEnd: evHi, color: t.accent };
     var dedColor = RK.theme.mix(t.neutral, t.ink3, 0.45);   // deductions: a darker grey than the range tints
     steps.push(ev);
     var deds = [];
     var nd = val(o.netDebt);
-    if (nd != null) deds.push({ label: o.netDebtLabel, value: nd, note: o.netDebtNote });
+    if (nd != null) deds.push({ label: lab(o, 'netDebtLabel'), value: nd, note: o.netDebtNote });
     (o.deductions || []).forEach(function (d) { if (d) deds.push({ label: d.label, value: val(d.value), note: d.note }); });
     var eqLo = evLo, eqHi = evHi;
     deds.forEach(function (d) {
@@ -115,7 +139,7 @@
         start: run, end: run - (v || 0), hiEnd: run - (v || 0), color: dedColor });
       if (v != null) { run -= v; eqLo -= v; eqHi -= v; }
     });
-    if (deds.length) steps.push({ kind: 'total', key: 'equity', label: o.equityLabel, lo: eqLo, hi: eqHi, start: 0, end: eqLo, hiEnd: eqHi, color: t.accent });
+    if (deds.length) steps.push({ kind: 'total', key: 'equity', label: lab(o, 'equityLabel'), lo: eqLo, hi: eqHi, start: 0, end: eqLo, hiEnd: eqHi, color: t.accent });
     steps.forEach(function (s, i) { s.i = i; s.pieces = pieces(s); });
 
     var shares = val(o.shares);
@@ -186,13 +210,13 @@
         return (name ? name + ' ' : '') + RK.format(r[enc.metric], metFmt) + ' × ' + mult;
       }
       // a cross-filter elsewhere narrowed the segments: the totals are partial, the group multiple does not apply
-      if (s.key === 'ev' && partial) return 'Selected segments only (' + ctx.rows.length + ' of ' + ctx.allRows.length + ')';
+      if (s.key === 'ev' && partial) return tr('sotp.selectedOnly', 'Selected segments only ({n} of {total})', { n: ctx.rows.length, total: ctx.allRows.length });
       if (s.key === 'ev' && M.evMetric && isNum(M.evMetric.value) && M.evMetric.value > 0) {
-        return 'Implied ' + range(s.lo / M.evMetric.value, s.hi / M.evMetric.value, mFmtCalc) + ' ' + (M.evMetric.label || '');
+        return tr('sotp.impliedBasis', 'Implied {range} {metric}', { range: range(s.lo / M.evMetric.value, s.hi / M.evMetric.value, mFmtCalc), metric: M.evMetric.label || '' }).trim();
       }
       if (s.key === 'equity') {
         if (o.equityNote != null) return o.equityNote;
-        return M.shares != null ? RK.format(M.shares, '#,##0.0') + 'm diluted shares' : '';
+        return M.shares != null ? tr('sotp.shares', '{shares}m diluted shares', { shares: RK.format(M.shares, '#,##0.0') }) : '';
       }
       if (s.kind === 'deduct') return s.note || '';
       return '';
@@ -209,8 +233,8 @@
         var r = s.row, mult = isNum(r[enc.low]) && isNum(r[enc.high]) && r[enc.low] !== r[enc.high]
           ? RK.format(r[enc.low], mFmt) + EN + RK.format(r[enc.high], mFmt) : RK.format(isNum(r[enc.low]) ? r[enc.low] : r[enc.high], mFmt);
         out.push(RK.format(r[enc.metric], metFmt) + ' × ' + mult, mult);
-      } else if (s.key === 'ev' && M.evMetric && /^Implied /.test(full)) {
-        out.push('Implied ' + range(s.lo / M.evMetric.value, s.hi / M.evMetric.value, mFmtCalc));
+      } else if (s.key === 'ev' && !partial && M.evMetric && isNum(M.evMetric.value) && M.evMetric.value > 0) {
+        out.push(tr('sotp.implied', 'Implied {range}', { range: range(s.lo / M.evMetric.value, s.hi / M.evMetric.value, mFmtCalc) }));
       } else {
         var parts = full.split(/(?:,|;)\s+/);
         for (var k = parts.length - 1; k > 0; k--) out.push(parts.slice(0, k).join(', ') + ' …');
@@ -240,7 +264,7 @@
     });
     var rightW = 0;
     if (showPS) steps.forEach(function (s) { rightW = Math.max(rightW, C.measure(perShare(s), s.kind === 'total' ? '600 11px ' + t.fontNum : fontV)); });
-    rightW = Math.max(rightW, showPS ? C.measure(o.perShareTitle || '', '600 10px ' + t.fontSans) : 0);
+    rightW = Math.max(rightW, showPS ? C.measure(lab(o, 'perShareTitle') || '', '600 10px ' + t.fontSans) : 0);
     rightW = Math.ceil(rightW);
     // explicit layout (containLabel ignores the right-aligned per-share column): label column | plot | per-share column
     var gridL = 4 + leftW + 10, gridR = showPS ? rightW + 18 : 16;
@@ -270,7 +294,7 @@
 
     // ---- reference lines (current price x shares) with labels above the plot, spread apart ----
     var refFont = '600 11px ' + t.fontSans, x0 = gridL;
-    var refTexts = M.refs.map(function (r) { return r.label || (o.refLabel || 'Current') + ' ' + RK.format(r.price, psFmt); });
+    var refTexts = M.refs.map(function (r) { return r.label || (o.refLabel || tr('sotp.current', 'Current')) + ' ' + RK.format(r.price, psFmt); });
     var gap = Math.max.apply(null, refTexts.map(function (s) { return C.measure(s, refFont); }).concat([0])) + 12;
     var rxs = M.refs.map(function (r) { return x0 + (r.value - axMin) / (axMax - axMin) * plotW; });
     var spread = C.spreadLabels(rxs, gap, gap / 2, W - gap / 2);
@@ -347,7 +371,7 @@
     });
 
     // legend: what solid vs. light means (empty series carry the swatches)
-    var keyLow = o.lowLabel, keyHigh = o.highLabel;
+    var keyLow = lab(o, 'lowLabel'), keyHigh = lab(o, 'highLabel');
     if (showLegend) {
       series.push({ id: 'key-lo', name: keyLow, type: 'bar', data: [], itemStyle: { color: t.accent } });
       series.push({ id: 'key-hi', name: keyHigh, type: 'bar', data: [], itemStyle: { color: totalLight } });
@@ -390,7 +414,7 @@
       legend: C.legend(ctx, { show: showLegend, data: showLegend ? [keyLow, keyHigh] : [], selectedMode: false }),
       // per-share column heading, right-aligned over the column (level with the reference-line captions)
       graphic: showPS && o.perShareTitle ? [{ type: 'text', id: 'ps-title', right: 4, top: top - 18, silent: true,
-        style: { text: o.perShareTitle, fill: t.ink3, font: '600 10px ' + t.fontSans, textAlign: 'right' } }] : [],
+        style: { text: lab(o, 'perShareTitle'), fill: t.ink3, font: '600 10px ' + t.fontSans, textAlign: 'right' } }] : [],
       grid: { left: gridL, right: gridR, top: top, bottom: o.valueAxis ? 24 : 4, containLabel: false },
       tooltip: {
         trigger: 'item',
@@ -416,27 +440,27 @@
       if (s.kind === 'part') {
         var r = s.row, name = (enc.metricName && r[enc.metricName]) || ctx.title(enc.metric);
         rows.push({ color: s.color, label: name, value: RK.format(r[enc.metric], metFmt) });
-        rows.push({ label: '× ' + RK.format(r[enc.low], mFmt) + ' (low)', value: RK.format(s.lo, fmt) });
-        rows.push({ label: '× ' + RK.format(r[enc.high], mFmt) + ' (high)', value: RK.format(s.hi, fmt) });
+        rows.push({ label: '× ' + tr('sotp.low', '{mult} (low)', { mult: RK.format(r[enc.low], mFmt) }), value: RK.format(s.lo, fmt) });
+        rows.push({ label: '× ' + tr('sotp.high', '{mult} (high)', { mult: RK.format(r[enc.high], mFmt) }), value: RK.format(s.hi, fmt) });
         if (isNum(s.lo) && M.ev.lo && M.ev.hi) {
-          rows.push({ label: 'Share of EV', value: RK.format(((s.lo / M.ev.lo) + (s.hi / M.ev.hi)) / 2, '0.0%') });
+          rows.push({ label: tr('sotp.shareOfEv', 'Share of EV'), value: RK.format(((s.lo / M.ev.lo) + (s.hi / M.ev.hi)) / 2, '0.0%') });
         }
-        if (showPS) rows.push({ label: 'Per share', value: perShare(s), bold: true });
+        if (showPS) rows.push({ label: tr('sotp.perShare', 'Per share'), value: perShare(s), bold: true });
         foot = [enc.method ? r[enc.method] : null, enc.note ? r[enc.note] : null].filter(Boolean).join(' · ') || null;
       } else if (s.kind === 'deduct') {
         rows.push({ color: s.color, label: s.label, value: RK.format(s.lo, fmt), bold: true });
-        if (showPS) rows.push({ label: 'Per share', value: perShare(s) });
+        if (showPS) rows.push({ label: tr('sotp.perShare', 'Per share'), value: perShare(s) });
         foot = s.note || null;
       } else {
-        rows.push({ color: t.accent, label: 'Low', value: RK.format(s.lo, fmt) });
-        rows.push({ color: totalLight, label: 'High', value: RK.format(s.hi, fmt) });
-        rows.push({ label: 'Midpoint', value: RK.format((s.lo + s.hi) / 2, fmt) });
+        rows.push({ color: t.accent, label: tr('sotp.lowV', 'Low'), value: RK.format(s.lo, fmt) });
+        rows.push({ color: totalLight, label: tr('sotp.highV', 'High'), value: RK.format(s.hi, fmt) });
+        rows.push({ label: tr('sotp.mid', 'Midpoint'), value: RK.format((s.lo + s.hi) / 2, fmt) });
         if (s.key === 'ev' && !partial && M.evMetric && isNum(M.evMetric.value) && M.evMetric.value > 0) {
-          rows.push({ label: 'Implied ' + (M.evMetric.label || 'multiple'), value: range(s.lo / M.evMetric.value, s.hi / M.evMetric.value, mFmtCalc) });
+          rows.push({ label: tr('sotp.impliedMetric', 'Implied {metric}', { metric: M.evMetric.label || tr('sotp.multiple', 'multiple') }), value: range(s.lo / M.evMetric.value, s.hi / M.evMetric.value, mFmtCalc) });
         }
-        if (showPS) rows.push({ label: 'Per share', value: perShare(s), bold: true });
+        if (showPS) rows.push({ label: tr('sotp.perShare', 'Per share'), value: perShare(s), bold: true });
         if (s.key === 'equity' && showPS && M.refPrice) {
-          rows.push({ label: 'vs. current ' + RK.format(M.refPrice, psFmt), value: range(s.lo / M.shares / M.refPrice - 1, s.hi / M.shares / M.refPrice - 1, '+0.0%;(0.0%);0.0%') });
+          rows.push({ label: tr('sotp.vsCurrent', 'vs. current {price}', { price: RK.format(M.refPrice, psFmt) }), value: range(s.lo / M.shares / M.refPrice - 1, s.hi / M.shares / M.refPrice - 1, '+0.0%;(0.0%);0.0%') });
         }
       }
       return C.tip(s.label, rows, foot);

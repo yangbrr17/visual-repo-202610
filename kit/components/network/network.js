@@ -9,6 +9,22 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'network.hint': '{key} + 滚轮或双指缩放 · 拖动平移', 'network.size': '规模', 'network.lineWidth': '线宽：{field}', 'network.category': '类别',
+      'network.connections': '连接数', 'network.linked': '关联{Field}'
+    });
+  }
+  /** Category of nodes without one. */
+  function otherCat() { return tr('other', 'Other'); }
+
   /** Label width via the shared canvas measure; +7% because the canvas may still measure a fallback face. */
   function measure(text, font) { return C.measure(text, font) * 1.07; }
 
@@ -46,7 +62,7 @@
           position: 'absolute', right: '8px', bottom: '8px', padding: '3px 8px', 'pointer-events': 'none',
           font: '11px ' + ctx.theme.fontSans, color: 'var(--rk-ink-2)', background: 'var(--rk-tooltip-bg)',
           border: '1px solid var(--rk-rule)', 'border-radius': '4px', opacity: '0', transition: 'opacity 160ms'
-        } }, (/Mac|iP/.test(navigator.platform) ? '\u2318' : 'Ctrl') + ' + scroll to zoom \u00b7 drag to pan');
+        } }, tr('network.hint', '{key} + wheel or pinch to zoom \u00b7 drag to pan', { key: /Mac|iP/.test(navigator.platform) ? '\u2318' : 'Ctrl' }));
         root.appendChild(hint);
       }
       hint.style.opacity = '1';
@@ -348,22 +364,22 @@
     var m = model(ctx);
     var fmt = o.format || ctx.fmtOf(enc.value) || 'auto';
     var sizeFmt = (m.nodeDs && enc.size && m.nodeDs.field(enc.size) && m.nodeDs.field(enc.size).format) || fmt;
-    var sizeTitle = (m.nodeDs && enc.size && m.nodeDs.field(enc.size) && m.nodeDs.field(enc.size).title) || 'Size';
+    var sizeTitle = (m.nodeDs && enc.size && m.nodeDs.field(enc.size) && m.nodeDs.field(enc.size).title) || tr('network.size', 'Size');
     var hi = o.highlight == null ? [] : [].concat(o.highlight).map(String);
     function isHi(n) { return hi.indexOf(n.id) >= 0 || hi.indexOf(n.name) >= 0; }
 
     // categories (legend) — a category made only of highlighted nodes takes accent2
-    var cats = util.unique(m.nodes.map(function (n) { return n.category || 'Other'; }));
+    var cats = util.unique(m.nodes.map(function (n) { return n.category || otherCat(); }));
     var pal = RK.theme.palette({ n: cats.length });   // categorical, kept clear of accent2 (the highlight)
     var pi = 0, catColor = {};
     cats.forEach(function (c) {
-      var members = m.nodes.filter(function (n) { return (n.category || 'Other') === c; });
+      var members = m.nodes.filter(function (n) { return (n.category || otherCat()) === c; });
       var custom = tokenColor(t, (o.categoryColors || {})[c]);
       if (custom) catColor[c] = custom;
       else if (hi.length && members.length && members.every(isHi)) catColor[c] = t.accent2;
       else catColor[c] = pal[pi++];
     });
-    function colorOf(n) { return isHi(n) ? t.accent2 : catColor[n.category || 'Other']; }
+    function colorOf(n) { return isHi(n) ? t.accent2 : catColor[n.category || otherCat()]; }
 
     // scales
     var sizes = m.nodes.map(function (n) { return n.size; });
@@ -402,7 +418,7 @@
     var mode = o.layout === 'circular' ? 'circular' : (o.layout === 'physics' ? 'physics' : 'force');
     var W = ctx.el.clientWidth || 800, H = ctx.el.clientHeight || 420;
     var ordered = m.nodes.slice().sort(function (a, b) {
-      return (cats.indexOf(a.category || 'Other') - cats.indexOf(b.category || 'Other')) || (b.size - a.size);
+      return (cats.indexOf(a.category || otherCat()) - cats.indexOf(b.category || otherCat())) || (b.size - a.size);
     });
     var idx = new Map(ordered.map(function (n, i) { return [n.id, i]; }));
     var his = ordered.filter(isHi);
@@ -423,7 +439,7 @@
       var usedTypes = util.unique(m.edges.map(function (e) { return e.type; }));
       dash.forEach(function (ty) { if (usedTypes.indexOf(ty) >= 0) keyItems.push({ kind: 'dash', label: String(ty) }); });
       var vf = ctx.field(enc.value) || {};
-      if (vx[1] > vx[0]) keyItems.push({ kind: 'width', label: 'Line width: ' + ctx.title(enc.value) + (vf.unit ? ' (' + vf.unit + ')' : ''), lo: RK.format(vx[0], fmt), hi: RK.format(vx[1], fmt) });
+      if (vx[1] > vx[0]) keyItems.push({ kind: 'width', label: tr('network.lineWidth', 'Line width: {field}', { field: ctx.title(enc.value) + (vf.unit ? ' (' + vf.unit + ')' : '') }), lo: RK.format(vx[0], fmt), hi: RK.format(vx[1], fmt) });
     }
     var keyW = keyItems.reduce(function (sw, it) {
       return sw + (it.kind === 'dash' ? 22 + measure(it.label, legFont) : measure(it.label, legFont) + 8 + 18 + 4 + measure(it.lo, legFont) + 10 + 18 + 4 + measure(it.hi, legFont)) + 16;
@@ -504,7 +520,7 @@
       else lab.position = i === hub ? 'bottom' : (right ? 'right' : 'left');
       var d = {
         id: n.id, name: n.name, rkId: n.id,
-        category: cats.indexOf(n.category || 'Other'),
+        category: cats.indexOf(n.category || otherCat()),
         value: n.size,
         symbolSize: sizesPx[i],
         itemStyle: { color: c, borderColor: t.paper, borderWidth: 1.2, opacity: dim ? 0.2 : 1 },
@@ -589,12 +605,12 @@
           }
           var nd = m.byId.get(p.data && p.data.rkId);
           if (!nd) return '';
-          var tr = [];
-          if (nd.category) tr.push({ color: colorOf(nd), label: (m.nodeDs && m.nodeDs.field(enc.category) && m.nodeDs.field(enc.category).title) || 'Category', value: nd.category });
-          tr.push({ label: sizeTitle, value: RK.format(nd.size, sizeFmt), bold: true });
-          tr.push({ label: 'Connections', value: RK.format(nd.degree, '#,##0') });
-          if (nd.weight) tr.push({ label: 'Linked ' + String(ctx.title(enc.value)).toLowerCase(), value: RK.format(nd.weight, fmt) });
-          return C.tip(nd.name, tr);
+          var tipRows = [];
+          if (nd.category) tipRows.push({ color: colorOf(nd), label: (m.nodeDs && m.nodeDs.field(enc.category) && m.nodeDs.field(enc.category).title) || tr('network.category', 'Category'), value: nd.category });
+          tipRows.push({ label: sizeTitle, value: RK.format(nd.size, sizeFmt), bold: true });
+          tipRows.push({ label: tr('network.connections', 'Connections'), value: RK.format(nd.degree, '#,##0') });
+          if (nd.weight) tipRows.push({ label: tr('network.linked', 'Linked {field}', { field: String(ctx.title(enc.value)).toLowerCase(), Field: String(ctx.title(enc.value)) }), value: RK.format(nd.weight, fmt) });
+          return C.tip(nd.name, tipRows);
         }
       },
       series: [{

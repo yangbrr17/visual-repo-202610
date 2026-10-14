@@ -1,0 +1,15 @@
+{
+  "id": "sotp_mix",
+  "title": "SOTP enterprise value by segment (mid-point)",
+  "schema": {"fields": [
+    {"name": "segment", "type": "string", "title": "Segment"},
+    {"name": "ev_mid", "type": "number", "title": "Enterprise value (mid-point)", "format": "$#,##0", "unit": "USD m"}
+  ]},
+  "data": [
+    {"segment": "Factory Automation", "ev_mid": 3165.4},
+    {"segment": "Motion Control", "ev_mid": 1713.0},
+    {"segment": "Sensors & Instrumentation", "ev_mid": 2536.9},
+    {"segment": "Software & Services", "ev_mid": 2357.5}
+  ],
+  "meta": {"notes": ["Mid-point of the low and high multiples; unallocated corporate costs excluded."], "source": "Northbridge Capital analysis", "unit": "USD m"}
+}

@@ -1,0 +1,23 @@
+{
+  "id": "target_fin",
+  "title": "凯斯勒财务概览",
+  "schema": {"fields": [
+    {"name": "year", "type": "string", "title": "年度"},
+    {"name": "revenue", "type": "number", "title": "营业收入", "format": "#,##0.0", "unit": "人民币亿元"},
+    {"name": "ebitda", "type": "number", "title": "EBITDA", "format": "#,##0.0", "unit": "人民币亿元"},
+    {"name": "ebitda_margin", "type": "number", "title": "EBITDA利润率", "format": "0.0%"},
+    {"name": "net_income", "type": "number", "title": "净利润", "format": "#,##0.0", "unit": "人民币亿元"},
+    {"name": "overseas_share", "type": "number", "title": "中国以外收入占比", "format": "0%"}
+  ]},
+  "data": [
+    {"year": "2021A", "revenue": 42.6, "ebitda": 5.62, "ebitda_margin": 0.132, "net_income": 2.92, "overseas_share": 0.9},
+    {"year": "2022A", "revenue": 46.1, "ebitda": 6.36, "ebitda_margin": 0.138, "net_income": 3.36, "overseas_share": 0.896},
+    {"year": "2023A", "revenue": 49.8, "ebitda": 7.02, "ebitda_margin": 0.141, "net_income": 3.73, "overseas_share": 0.892},
+    {"year": "2024A", "revenue": 52.9, "ebitda": 7.72, "ebitda_margin": 0.146, "net_income": 4.15, "overseas_share": 0.888},
+    {"year": "2025A", "revenue": 56.2, "ebitda": 8.43, "ebitda_margin": 0.15, "net_income": 4.56, "overseas_share": 0.884},
+    {"year": "2026E", "revenue": 60.4, "ebitda": 9.3, "ebitda_margin": 0.154, "net_income": 5.07, "overseas_share": 0.88},
+    {"year": "2027E", "revenue": 65.1, "ebitda": 10.29, "ebitda_margin": 0.158, "net_income": 5.65, "overseas_share": 0.876},
+    {"year": "2028E", "revenue": 70.2, "ebitda": 11.44, "ebitda_margin": 0.163, "net_income": 6.34, "overseas_share": 0.872}
+  ],
+  "meta": {"notes": ["按欧元兑人民币 7.80 折算。"], "source": "凯斯勒管理层预测（示例）", "unit": "人民币亿元"}
+}

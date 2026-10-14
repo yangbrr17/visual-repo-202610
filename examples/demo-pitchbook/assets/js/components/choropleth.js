@@ -1,12 +1,58 @@
 /*!
  * RK component: choropleth — countries shaded by a value on the offline Natural Earth basemap.
- * Rows join to world-110m features by ISO 3166-1 numeric id (encode.id, e.g. "840"), falling
- * back to the country name. Sequential or diverging colour, continuous or classed (nice-rounded
- * quantile / equal-interval breaks), value labels on the top N countries, click to cross-filter.
+ * Rows join to world-110m (or options.basemap 'world-50m') features by ISO 3166-1 numeric id (encode.id,
+ * e.g. "840"), ISO alpha-3 or the country name. Sequential or diverging colour, continuous or classed
+ * (nice-rounded quantile / equal-interval breaks), value labels on the top N countries, click to cross-filter.
+ * Rows with no polygon in the basemap (Singapore, Hong Kong, Monaco ... on world-110m) but with lat / lon
+ * (encode.lat / encode.lon) are drawn as small circles in the same colour scale, noted in the legend.
  */
 (function () {
   'use strict';
   var h = RK.util.h, G = RK.geo;
+
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', { 'choropleth.points': '以圆点表示', 'choropleth.noData': '无数据', 'choropleth.noValue': 'n.a.（无数值）', 'choropleth.rank': '排名', 'choropleth.rankOf': '第 {rank} / {n}', 'choropleth.records': '记录数' });
+  }
+
+  /* ---------------- basemap on demand (same block in choropleth and bubble-map) ----------------
+   * A report ships the basemap a block asks for (manifest optionDeps: basemap 'world-50m' -> vendor geo-world-50m).
+   * Hosts that load only the manifest deps (dev harness, an older build) get it on demand: the script sits next to
+   * world-110m.js (vendor/geo-world/world-110m.js -> vendor/geo-world-50m/world-50m.js). Until it arrives, or when
+   * it cannot be found, the block draws on world-110m and says so in the console.
+   */
+  var GEO_LOADS = window.__RK_GEO_LOADS || (window.__RK_GEO_LOADS = {});
+  function loadBasemap(name) {
+    if (GEO_LOADS[name]) return GEO_LOADS[name];
+    var base = [].filter.call(document.scripts, function (sc) { return /(^|\/)geo-world\/world-110m\.js(\?|#|$)/.test(sc.getAttribute('src') || ''); })[0];
+    if (!base || !/^world-[\w-]+$/.test(name)) return (GEO_LOADS[name] = Promise.reject(new Error('no script location for basemap "' + name + '"')));
+    var src = base.getAttribute('src').replace(/geo-world\/world-110m\.js.*$/, 'geo-' + name + '/' + name + '.js');
+    return (GEO_LOADS[name] = new Promise(function (resolve, reject) {
+      var sc = document.createElement('script');
+      sc.src = src;
+      sc.onload = function () { if (G.has(name)) resolve(name); else reject(new Error(src + ' did not register "' + name + '"')); };
+      sc.onerror = function () { reject(new Error('could not load ' + src)); };
+      document.head.appendChild(sc);
+    }));
+  }
+  /** Basemap to draw now: the requested one when registered, else world-110m while (or instead of) loading it. */
+  function basemapFor(ctx) {
+    var want = ctx.options.basemap || 'world-110m';
+    if (G.has(want)) return want;
+    var blk = ctx.block && ctx.block.rkBlock;
+    loadBasemap(want).then(function () {
+      if (blk && blk.state === 'rendered') blk.rerender();
+    }, function (e) {
+      if (!GEO_LOADS[want].warned) { GEO_LOADS[want].warned = true; console.warn('[RK] ' + ctx.component + ': basemap "' + want + '" is not loaded (' + e.message + '); drawing world-110m. Add vendor "geo-' + want + '" to the report.'); }
+    });
+    return 'world-110m';
+  }
 
   function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
 
@@ -151,6 +197,11 @@
   /** ISO 3166-1 alpha-3 -> numeric for every world-110m country, so ISO3 keys join too. */
   var ISO3 = {};
   ('FJI242 TZA834 ESH732 CAN124 USA840 KAZ398 UZB860 PNG598 IDN360 ARG032 CHL152 COD180 SOM706 KEN404 SDN729 TCD148 HTI332 DOM214 RUS643 BHS044 FLK238 NOR578 GRL304 ATF260 TLS626 ZAF710 LSO426 MEX484 URY858 BRA076 BOL068 PER604 COL170 PAN591 CRI188 NIC558 HND340 SLV222 GTM320 BLZ084 VEN862 GUY328 SUR740 FRA250 ECU218 PRI630 JAM388 CUB192 ZWE716 BWA072 NAM516 SEN686 MLI466 MRT478 BEN204 NER562 NGA566 CMR120 TGO768 GHA288 CIV384 GIN324 GNB624 LBR430 SLE694 BFA854 CAF140 COG178 GAB266 GNQ226 ZMB894 MWI454 MOZ508 SWZ748 AGO024 BDI108 ISR376 LBN422 MDG450 PSE275 GMB270 TUN788 DZA012 JOR400 ARE784 QAT634 KWT414 IRQ368 OMN512 VUT548 KHM116 THA764 LAO418 MMR104 VNM704 PRK408 KOR410 MNG496 IND356 BGD050 BTN064 NPL524 PAK586 AFG004 TJK762 KGZ417 TKM795 IRN364 SYR760 ARM051 SWE752 BLR112 UKR804 POL616 AUT040 HUN348 MDA498 ROU642 LTU440 LVA428 EST233 DEU276 BGR100 GRC300 TUR792 ALB008 HRV191 CHE756 LUX442 BEL056 NLD528 PRT620 ESP724 IRL372 NCL540 SLB090 NZL554 AUS036 LKA144 CHN156 TWN158 ITA380 DNK208 GBR826 ISL352 AZE031 GEO268 PHL608 MYS458 BRN096 SVN705 FIN246 SVK703 CZE203 ERI232 JPN392 PRY600 YEM887 SAU682 ATA010 CYP196 MAR504 EGY818 LBY434 ETH231 DJI262 UGA800 RWA646 BIH070 MKD807 SRB688 MNE499 TTO780 SSD728').split(' ').forEach(function (x) { ISO3[x.slice(0, 3)] = x.slice(3); });
+  // territories and micro-states that only world-50m draws (on world-110m they fall back to points)
+  ('SGP702 HKG344 MAC446 BHR048 MLT470 MCO492 LIE438 AND020 SMR674 VAT336 MUS480 MDV462 BRB052 BMU060 CYM136 VGB092 TCA796 MSR500 ' +
+   'JEY832 GGY831 IMN833 TON776 SYC690 STP678 WSM882 VCT670 LCA662 KNA659 PLW585 NIU570 COK184 ABW533 CUW531 NRU520 KIR296 GRD308 ' +
+   'SPM666 WLF876 MAF663 BLM652 PYF258 ALA248 DMA212 FRO234 COM174 CPV132 HMD334 NFK574 ATG028 SXM534 FSM583 MHL584 MNP580 VIR850 ' +
+   'GUM316 ASM016 SGS239 IOT086 SHN654 PCN612 AIA660 GIB292 MYT175 REU638 GLP312 MTQ474 GUF254').split(' ').forEach(function (x) { ISO3[x.slice(0, 3)] = x.slice(3); });
   /** Common report spellings -> basemap ids / names. */
   var ALIAS = {
     'united states': '840', 'usa': '840', 'us': '840', 'u.s.': '840', 'uk': '826', 'great britain': '826', 'czech republic': '203',
@@ -158,7 +209,10 @@
     'dr congo': '180', 'republic of the congo': '178', 'ivory coast': '384', "cote d'ivoire": '384', 'dominican republic': '214',
     'bosnia and herzegovina': '070', 'north macedonia': '807', 'eswatini': '748', 'swaziland': '748', 'central african republic': '140',
     'equatorial guinea': '226', 'solomon islands': '090', 'falkland islands': '238', 'western sahara': '732', 'south sudan': '728',
-    'viet nam': '704', 'turkiye': '792', 'türkiye': '792', 'lao pdr': '418', 'iran, islamic republic of': '364', 'xkx': 'kosovo'
+    'viet nam': '704', 'turkiye': '792', 'türkiye': '792', 'lao pdr': '418', 'iran, islamic republic of': '364', 'xkx': 'kosovo',
+    'hong kong sar': '344', 'hong kong, china': '344', 'macau': '446', 'macao sar': '446', 'cape verde': '132', 'vatican city': '336',
+    'holy see': '336', 'sao tome and principe': '678', 'são tomé and príncipe': '678', 'micronesia': '583', 'curacao': '531',
+    'united states of america': '840', 'south korea': '410', 'north korea': '408', 'taiwan': '158', 'russia': '643'
   };
 
   /** Polygons covering >= 20% of a feature's largest polygon (drops far-flung islands / the antimeridian sliver). */
@@ -261,8 +315,10 @@
     id: 'choropleth',
     deps: ['leaflet', 'topojson-client', 'geo-world'],
     defaults: {
-      encode: { id: 'iso_num', value: 'value', label: 'country' },
-      basemap: 'world-110m',
+      encode: { id: 'iso_num', value: 'value', label: 'country', lat: 'lat', lon: 'lon' },
+      basemap: 'world-110m',      // world-110m | world-50m (finer coastlines, micro-states; the report ships vendor geo-world-50m)
+      points: true,               // rows with no polygon in the basemap but with lat / lon: small circles in the same colour scale
+      aggregate: null,            // several rows per country: null = first row wins | sum | avg | median | min | max | count
       scale: 'sequential',        // sequential | diverging
       mid: 0,                     // diverging midpoint (e.g. 0 for growth, or a peer average)
       bins: 5,                    // number of classes; 0 / null = continuous ramp (diverging rounds to an even count)
@@ -280,17 +336,28 @@
     },
     render: function (ctx) {
       var L = window.L, t = ctx.theme, cur = ctx;
-      var view = G.view(ctx, { cls: 'rk-choro' }), map = view.map;
-      var fc = G.features(ctx.options.basemap || 'world-110m');
+      var basemap = basemapFor(ctx);
+      var view = G.view(ctx, { cls: 'rk-choro', basemap: basemap }), map = view.map;
+      var fc = G.features(basemap);
       var byId = {}, byName = {};
+      /** Rough size (bbox area of the outer rings): two features can share an id (world-50m: Australia and Ashmore and Cartier Is. are both "036") — the larger wins. */
+      function sizeOf(f) {
+        var g = f.geometry, polys = !g ? [] : g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+        var bb = [180, 90, -180, -90];
+        polys.forEach(function (pl) { pl[0].forEach(function (c) { bb[0] = Math.min(bb[0], c[0]); bb[1] = Math.min(bb[1], c[1]); bb[2] = Math.max(bb[2], c[0]); bb[3] = Math.max(bb[3], c[1]); }); });
+        return bb[2] > bb[0] ? (bb[2] - bb[0]) * (bb[3] - bb[1]) : 0;
+      }
       fc.features.forEach(function (f) {
-        if (f.id != null) byId[f.id] = f;
+        if (f.id != null && (!byId[f.id] || sizeOf(f) > sizeOf(byId[f.id]))) byId[f.id] = f;
         if (f.properties.name) byName[String(f.properties.name).toLowerCase()] = f;
       });
       function fid(f) { return f.id != null ? f.id : 'n:' + f.properties.name; }
-      var layers = {}, recs = {}, S = null, timer = null;
+      var layers = {}, marks = {}, recs = {}, S = null, timer = null;
       map.options.zoomSnap = 0;   // fit the data exactly (a 0.25 zoom snap leaves up to a fifth of the block empty)
       var area = L.geoJSON(null, { onEachFeature: wire }).addTo(map);
+      // territories without a polygon: circles in their own pane, above the countries (hover bringToFront never covers them)
+      if (!map.getPane('rk-choro-pts')) map.createPane('rk-choro-pts').style.zIndex = 450;
+      var dots = L.layerGroup().addTo(map);
       var legend = view.legend();
       var hatch = hatchPattern();
 
@@ -356,17 +423,40 @@
         return byName[lk] || (al ? byId[al] || byName[al] : null) || null;
       }
       function featureOf(r, enc) { return lookup(r[enc.id]) || (enc.label ? lookup(r[enc.label]) : null); }
+      /** [lat, lon] of a row the basemap has no polygon for (micro-states, territories), else null. */
+      function pointOf(r, c) {
+        if (c.options.points === false) return null;
+        var lat = num(r[c.enc.lat || 'lat']), lon = num(r[c.enc.lon || 'lon']);
+        return lat != null && lon != null && Math.abs(lat) <= 90 && Math.abs(lon) <= 180 ? [lat, lon] : null;
+      }
+      function nameOf(rec) { return (cur.enc.label && rec.row[cur.enc.label]) || (rec.f ? rec.f.properties.name : rec.row[cur.enc.id]); }
+
+      function aggOf(c) { var a = c.options.aggregate; return a && RK.expr.agg[a] ? RK.expr.agg[a] : null; }
+      /** Rows -> one record per country (polygon) or territory (point): the first row, or options.aggregate over them. */
+      function collect(rows, c) {
+        var enc = c.enc, out = {}, list = [], agg = aggOf(c);
+        rows.forEach(function (r) {
+          var f = featureOf(r, enc), key, ll = null;
+          if (f) key = fid(f);
+          else {
+            ll = pointOf(r, c);
+            if (!ll) return;
+            key = 'p:' + String(r[enc.id] != null && r[enc.id] !== '' ? r[enc.id] : r[enc.label]).toLowerCase();
+          }
+          var rec = out[key];
+          if (!rec) list.push(rec = out[key] = { f: f, id: key, row: r, rows: [], ll: ll, point: !f });
+          rec.rows.push(r);
+        });
+        list.forEach(function (rec) { rec.v = agg ? num(agg(rec.rows.map(function (r) { return r[enc.value]; }))) : num(rec.row[enc.value]); });
+        return { out: out, list: list };
+      }
 
       function derive(c) {
-        var enc = c.enc, o = c.options, out = {}, list = [];
-        c.rows.forEach(function (r) {
-          var f = featureOf(r, enc);
-          if (!f || out[fid(f)]) return;                  // one row per country: first wins
-          list.push(out[fid(f)] = { f: f, id: fid(f), row: r, v: num(r[enc.value]) });
-        });
+        var enc = c.enc, o = c.options, got = collect(c.rows, c), out = got.out, list = got.list;
         var fmt = o.format || c.fmtOf(enc.value) || 'auto';
         var shown = list.map(function (x) { return x.v; }).filter(function (v) { return v != null; });
-        var vals = G.domainRows(c).filter(function (r) { return featureOf(r, enc); }).map(function (r) { return num(r[enc.value]); }).filter(function (v) { return v != null; });
+        // colour domain over the unfiltered rows: classes stay put while filters change
+        var vals = collect(G.domainRows(c), c).list.map(function (x) { return x.v; }).filter(function (v) { return v != null; });
         var ranked = list.filter(function (x) { return x.v != null; }).sort(function (a, b) { return b.v - a.v; });
         ranked.forEach(function (x, i) { x.rank = i + 1; });
         return { recs: out, list: list, ranked: ranked, fmt: fmt, scale: buildScale(c, vals.length ? vals : shown, shown, fmt), n: ranked.length };
@@ -384,9 +474,43 @@
       function tipOf(rec) {
         var c = cur, enc = c.enc, r = rec.row;
         var rows = [{ color: rec.v == null ? null : S.scale.color(rec.v), label: c.title(enc.value), value: RK.format(rec.v, S.fmt) }];
-        if (rec.v != null) rows.push({ label: 'Rank', value: rec.rank + ' of ' + S.n });
-        (c.options.tooltip || []).forEach(function (f) { rows.push({ label: c.title(f), value: RK.format(r[f], c.fmtOf(f)) }); });
-        return RK.chart.tip((enc.label && r[enc.label]) || rec.f.properties.name, rows);
+        if (rec.v != null) rows.push({ label: tr('choropleth.rank', 'Rank'), value: tr('choropleth.rankOf', '{rank} of {n}', { rank: rec.rank, n: S.n }) });
+        var agg = aggOf(c), many = agg && rec.rows.length > 1;
+        if (many) rows.push({ label: tr('choropleth.records', 'Records'), value: String(rec.rows.length) });
+        (c.options.tooltip || []).forEach(function (f) {
+          // aggregated: numbers use the same aggregate, text lists its distinct values
+          var v = r[f];
+          if (many) {
+            var all = rec.rows.map(function (x) { return x[f]; });
+            v = all.some(function (x) { return typeof x === 'number'; }) ? agg(all) : RK.util.unique(all.filter(function (x) { return x != null && x !== ''; }));
+            if (Array.isArray(v)) v = v.length > 3 ? v.slice(0, 3).join(', ') + ' +' + (v.length - 3) : v.join(', ');
+          }
+          rows.push({ label: c.title(f), value: RK.format(v, c.fmtOf(f)) });
+        });
+        return RK.chart.tip(nameOf(rec), rows);
+      }
+
+      /* ---------------- territories as points ---------------- */
+      function dotRadius() { return Math.max(4.5, Math.min(6.5, map.getSize().x / 150)); }
+      function dotStyle(rec) {
+        var ff = filterField(cur), sel = cur.selected(ff), on = !sel.length || sel.indexOf(rec.row[ff]) >= 0;
+        var fill = rec.v == null ? (t.mapLand || t.surface2) : S.scale.color(rec.v);
+        return {
+          radius: dotRadius(), fillColor: fill, fillOpacity: on ? 1 : 0.22,
+          // a darker rim of its own colour keeps even the palest class legible as a dot on land or sea; selection ring = ink
+          color: sel.length && on ? t.ink : RK.theme.mix(fill, t.ink, t.dark ? 0.25 : 0.45),
+          weight: sel.length && on ? 1.6 : 1, opacity: on ? 1 : 0.4
+        };
+      }
+      map.on('resize', function () { var r = dotRadius(); Object.keys(marks).forEach(function (id) { marks[id].setRadius(r); }); });
+      function addDot(rec) {
+        var m = L.circleMarker(rec.ll, L.Util.extend({ pane: 'rk-choro-pts', className: 'rk-choro__pt' }, dotStyle(rec)));
+        m.bindTooltip(function () { return recs[rec.id] ? tipOf(recs[rec.id]) : ''; }, { direction: 'top', offset: [0, -6], opacity: 1 });
+        m.on('mouseover', function () { m.setStyle({ weight: 2, color: t.ink }); });
+        m.on('mouseout', function () { if (recs[rec.id]) m.setStyle(dotStyle(recs[rec.id])); });
+        m.on('click', function () { var ff = filterField(cur); if (recs[rec.id]) G.select(cur, ff, recs[rec.id].row[ff]); });
+        dots.addLayer(m);
+        return m;
       }
 
       function wire(f, layer) {
@@ -406,7 +530,13 @@
         recs = S.recs;
         // remove countries that left the data, add newcomers, restyle the rest (CSS transitions the fill)
         Object.keys(layers).forEach(function (id) { if (!recs[id]) { area.removeLayer(layers[id]); delete layers[id]; } });
+        Object.keys(marks).forEach(function (id) { if (!recs[id]) { dots.removeLayer(marks[id]); delete marks[id]; } });
         S.list.forEach(function (rec, i) {
+          if (rec.point) {
+            if (!marks[rec.id]) marks[rec.id] = addDot(rec);
+            else { marks[rec.id].setLatLng(rec.ll); marks[rec.id].setStyle(dotStyle(rec)); }
+            return;
+          }
           if (!layers[rec.id]) {
             area.addData(rec.f);
             var el = layers[rec.id].getElement();
@@ -428,24 +558,30 @@
         // value callouts on the top N: on the country when it is large enough, else beside it with a leader line,
         // where they cover the fewest other data countries
         labels.set((n ? S.ranked : []).map(function (rec) {
-          var name = (enc.label && rec.row[enc.label]) || rec.f.properties.name;
+          var name = nameOf(rec);
           return {
-            latlng: G.centroid(rec.f) || [0, 0], id: rec.id, prio: Math.abs(rec.v - mid), center: true, cls: 'rk-choro__label',
+            latlng: rec.point ? rec.ll : G.centroid(rec.f) || [0, 0], id: rec.id, prio: Math.abs(rec.v - mid), center: !rec.point, r: rec.point ? dotRadius() + 1 : 0,
+            cls: 'rk-choro__label',
             html: '<b>' + RK.util.escapeHTML(name) + '</b><span>' + RK.util.escapeHTML(RK.format(rec.v, S.fmt)) + '</span>'
           };
         }), n);
         if (o.legend !== false) {
           var hasNull = S.list.some(function (x) { return x.v == null; });
+          var asPts = S.list.filter(function (x) { return x.point; });
           legend.set(h('div.rk-geo-leg',
             G.legendSection(o.legendTitle || G.fieldTitle(cur, enc.value), S.scale.legend),
-            h('div.rk-geo-leg__item.rk-geo-leg__nodata', h('i.rk-geo-leg__sw', { style: { background: t.mapLand || t.surface2, 'box-shadow': 'inset 0 0 0 0.5px ' + RK.theme.mix(t.mapLand || t.surface2, t.ink, 0.25) } }), h('span', 'No data')),
-            hasNull ? h('div.rk-geo-leg__item.rk-geo-leg__nodata', h('i.rk-geo-leg__sw.rk-choro__hatch'), h('span', 'n.a. (no value)')) : null));
+            h('div.rk-geo-leg__item.rk-geo-leg__nodata', h('i.rk-geo-leg__sw', { style: { background: t.mapLand || t.surface2, 'box-shadow': 'inset 0 0 0 0.5px ' + RK.theme.mix(t.mapLand || t.surface2, t.ink, 0.25) } }), h('span', tr('choropleth.noData', 'No data'))),
+            hasNull ? h('div.rk-geo-leg__item.rk-geo-leg__nodata', h('i.rk-geo-leg__sw.rk-choro__hatch'), h('span', tr('choropleth.noValue', 'n.a. (no value)'))) : null,
+            // micro-states / territories the basemap has no polygon for
+            asPts.length ? h('div.rk-geo-leg__item.rk-geo-leg__nodata.rk-choro__ptnote', { title: asPts.map(nameOf).join(', ') },
+              h('i.rk-choro__ptsw', { 'aria-hidden': 'true' }), h('span', tr('choropleth.points', 'shown as points'))) : null));
         } else legend.set(null);
         if (first) {
           var pts = [];
-          S.list.forEach(function (x) { pts = pts.concat(mainBounds(x.f)); });
+          S.list.forEach(function (x) { pts = pts.concat(x.point ? [x.ll] : mainBounds(x.f)); });
           // the legend must not cover any data country: test its outline vertices, not just the centroids
-          var edge = pts.filter(function (p, i) { return i % 3 === 0; }).map(function (p) { return { ll: p, r: 0 }; });
+          var edge = pts.filter(function (p, i) { return i % 3 === 0; }).map(function (p) { return { ll: p, r: 0 }; })
+            .concat(S.list.filter(function (x) { return x.point; }).map(function (x) { return { ll: x.ll, r: dotRadius() + 2 }; }));
           // 'data': every data country whole (Tierra del Fuego, northern Scandinavia), polar extremes still clamped
           var tgt = o.fit === 'data' && pts.length ? clampFit(pts) : G.fitTarget(o.fit, pts);
           view.fit(tgt, 12, function () { return edge; });

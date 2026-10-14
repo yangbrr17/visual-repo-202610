@@ -6,6 +6,19 @@
 (function () {
   'use strict';
   var C = RK.chart, U = RK.util;
+
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'slope.change': '变动', 'slope.changePct': '变动 %', 'slope.medianOf': '所示 {n} 项的中位数'
+    });
+  }
   var MAX_SLOPE_W = 460;   // the slope area is capped and centred: steep angles read better than flat ones
 
   RK.component({
@@ -37,7 +50,7 @@
       var catColor = RK.theme.categoricalSafe(U.unique(items.map(function (it) { return it.group != null ? it.group : it.label; })));
 
       if (o.median) {
-        items = items.concat([{ label: 'Median', a: median(items.map(function (it) { return it.a; })), b: median(items.map(function (it) { return it.b; })), median: true }]);
+        items = items.concat([{ label: tr('median', 'Median'), a: median(items.map(function (it) { return it.a; })), b: median(items.map(function (it) { return it.b; })), median: true }]);
       }
       // red / green direction colours always come with a sign: a ▲ / ▼ token with the size of the move
       var showDelta = o.delta === true || (o.delta === 'auto' && o.colorBy === 'direction' && !o.change);
@@ -243,10 +256,10 @@
               { label: String(heads[1]), value: RK.format(it.b, fmt) }
             ];
             if (U.isNum(it.a) && U.isNum(it.b)) {
-              rows.push({ label: 'Change', value: RK.format(it.b - it.a, signed(fmt)), bold: true });
-              if (it.a && !o.inverse) rows.push({ label: '% change', value: RK.format(it.b / it.a - 1, '+0.0%;−0.0%;0.0%') });
+              rows.push({ label: tr('slope.change', 'Change'), value: RK.format(it.b - it.a, signed(fmt)), bold: true });
+              if (it.a && !o.inverse) rows.push({ label: tr('slope.changePct', '% change'), value: RK.format(it.b / it.a - 1, '+0.0%;−0.0%;0.0%') });
             }
-            return C.tip(it.label, rows, it.median ? 'Median of the ' + (items.length - 1) + ' items shown' : (it.group != null ? String(it.group) : null));
+            return C.tip(it.label, rows, it.median ? tr('slope.medianOf', 'Median of the {n} items shown', { n: items.length - 1 }) : (it.group != null ? String(it.group) : null));
           }
         },
         xAxis: {
@@ -261,7 +274,7 @@
     }, {
       rebuildOnResize: true,     // label columns and truncation depend on the width
       select: function (p, ctx) {
-        return p.seriesId === 'slope' && p.name && p.name !== 'Median' ? { field: ctx.enc.label, value: p.name } : null;
+        return p.seriesId === 'slope' && p.name && p.name !== tr('median', 'Median') ? { field: ctx.enc.label, value: p.name } : null;
       }
     })
   });

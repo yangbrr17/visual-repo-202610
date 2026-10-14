@@ -9,6 +9,25 @@
 (function () {
   'use strict';
   var util = RK.util, h = util.h;
+
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'pivotTable.pctRow': '占行合计比例', 'pivotTable.pctCol': '占列合计比例', 'pivotTable.pctTotal': '占总计比例', 'pivotTable.agg.avg': '平均值',
+      'pivotTable.agg.median': '中位数', 'pivotTable.agg.min': '最小值', 'pivotTable.agg.max': '最大值', 'pivotTable.agg.count': '计数',
+      'pivotTable.agg.countd': '去重计数', 'pivotTable.agg.stdev': '标准差', 'pivotTable.agg.first': '首个值', 'pivotTable.agg.last': '末个值',
+      'pivotTable.numRecords': '记录数', 'pivotTable.countOf': '{field}{agg}', 'pivotTable.aggOf': '{field}{agg}',
+      'pivotTable.cagr': '年复合增长率', 'pivotTable.value': '数值', 'pivotTable.collapse': '收起 {label}', 'pivotTable.expand': '展开 {label}',
+      'pivotTable.records': '记录', 'pivotTable.pctOf': '占{name}比例', 'pivotTable.pctOfTotal': '占合计比例', 'pivotTable.pctOfRow': '占行比例',
+      'pivotTable.nRecord': '{n} 条记录', 'pivotTable.nRecords': '{n} 条记录'
+    });
+  }
   // generic field names (link tables, bridges...) cross-filter only this dataset (house rule: scoped selections)
   var GENERIC = /^(type|kind|source|target|step|stage|metric|status|name|label|key|id|category|group|series)$/i;
 
@@ -19,6 +38,14 @@
     pctTotal: '% of grand total'
   };
   var AGG_LABEL = { sum: '', avg: 'Average', mean: 'Average', average: 'Average', median: 'Median', min: 'Minimum', max: 'Maximum', count: 'Count', countd: 'Distinct count', stdev: 'Std. dev.', first: 'First', last: 'Last' };
+  var AGG_KEY = { avg: 'avg', mean: 'avg', average: 'avg', median: 'median', min: 'min', max: 'max', count: 'count', countd: 'countd', stdev: 'stdev', first: 'first', last: 'last' };
+  /** Aggregate name in the report locale ('' for sum; unknown aggregates are shown as given). */
+  function aggLabel(agg) {
+    if (AGG_LABEL[agg] == null) return agg;
+    return AGG_KEY[agg] ? tr('pivotTable.agg.' + AGG_KEY[agg], AGG_LABEL[agg]) : AGG_LABEL[agg];
+  }
+  /** '% of row total' ... in the report locale. */
+  function showLabel(k) { return tr('pivotTable.' + k, SHOW[k]); }
 
   function cmp(a, b) {
     if (a == null) return 1;
@@ -216,12 +243,12 @@
       }
 
       function measureLabel(m) {
-        var o = m.o, a = AGG_LABEL[o.agg] != null ? AGG_LABEL[o.agg] : o.agg, s;
+        var o = m.o, a = aggLabel(o.agg), s;
         if (o.valueTitle) s = o.valueTitle;
-        else if (!m.val) s = 'Number of records';
-        else if (o.agg === 'count' || o.agg === 'countd') s = a + ' of ' + m.val.title;
-        else s = a ? a + ' ' + m.val.title : m.val.title;
-        return m.pct ? s + ' — ' + SHOW[o.show] : s;
+        else if (!m.val) s = tr('pivotTable.numRecords', 'Number of records');
+        else if (o.agg === 'count' || o.agg === 'countd') s = tr('pivotTable.countOf', '{agg} of {field}', { agg: a, field: m.val.title });
+        else s = a ? tr('pivotTable.aggOf', '{agg} {field}', { agg: a, field: m.val.title }) : m.val.title;
+        return m.pct ? s + ' — ' + showLabel(o.show) : s;
       }
 
       /* ---------------- header ---------------- */
@@ -233,7 +260,7 @@
         var extra = [];
         if (o.totalCol) extra.push(h('th.is-num.rk-pivot__tot', { rowspan: hasCols ? 2 : null, scope: 'col' }, totalLabel(o)));
         if (o.cagr && hasCols && m.ckeys.length > 1) {
-          extra.push(h('th.is-num.rk-pivot__cagr', { rowspan: 2, scope: 'col' }, 'CAGR', h('span.rk-pivot__sub',
+          extra.push(h('th.is-num.rk-pivot__cagr', { rowspan: 2, scope: 'col' }, tr('pivotTable.cagr', 'CAGR'), h('span.rk-pivot__sub',
             label(m.col, m.ckeys[0]) + '–' + label(m.col, m.ckeys[m.ckeys.length - 1]))));
         }
         thead.innerHTML = '';
@@ -242,7 +269,7 @@
           var th = h('th.is-num.rk-pivot__ch', {
             scope: 'col',
             class: (m.col && m.col.field && cur.options.crossFilter !== false ? 'is-clickable ' : '') + (sel.indexOf(k) >= 0 ? 'is-selected' : (sel.length ? 'is-dim' : ''))
-          }, hasCols ? label(m.col, k) : (m.val ? m.val.title : 'Value'));
+          }, hasCols ? label(m.col, k) : (m.val ? m.val.title : tr('pivotTable.value', 'Value')));
           th._rkCol = k;
           return th;
         });
@@ -254,7 +281,7 @@
         }
       }
 
-      function totalLabel(o) { return o.agg === 'sum' || o.agg === 'count' || o.agg === 'countd' ? 'Total' : 'All'; }
+      function totalLabel(o) { return o.agg === 'sum' || o.agg === 'count' || o.agg === 'countd' ? tr('total', 'Total') : tr('all', 'All'); }
 
       /* ---------------- body ---------------- */
       function drawBody(m, animate) {
@@ -324,25 +351,25 @@
             var open = !collapsed.has(k.key);
             var lab = h('td.rk-pivot__label.is-sticky', { style: { 'padding-left': (8 + k.level * 16) + 'px' } },
               group && o.collapsible !== false
-                ? h('button.rk-pivot__tg', { type: 'button', 'aria-expanded': String(open), 'aria-label': (open ? 'Collapse ' : 'Expand ') + label(k.dim, k.value) })
+                ? h('button.rk-pivot__tg', { type: 'button', 'aria-expanded': String(open), 'aria-label': tr(open ? 'pivotTable.collapse' : 'pivotTable.expand', open ? 'Collapse {label}' : 'Expand {label}', { label: label(k.dim, k.value) }) })
                 : (group ? null : (depth > 1 ? h('span.rk-pivot__tg-sp') : null)),
               h('span.rk-pivot__name', { class: k.dim.field && o.crossFilter !== false ? 'is-clickable' : null }, label(k.dim, k.value)));
-            var tr = h('tr', {
+            var rowEl = h('tr', {
               class: [group ? 'is-group' : 'is-leaf', 'is-l' + k.level, hiddenBy(k) ? 'is-hidden' : '',
                 anySel ? (onPath(k) ? 'is-selected' : 'is-dim') : ''].join(' ')
             }, lab, valueCells(k, !group));
-            tr._rkNode = k;
-            tr.dataset.key = k.key;
-            if (first && cur.motion) { tr.classList.add('is-in'); tr.style.setProperty('--rk-i', Math.min(idx, 40)); }
+            rowEl._rkNode = k;
+            rowEl.dataset.key = k.key;
+            if (first && cur.motion) { rowEl.classList.add('is-in'); rowEl.style.setProperty('--rk-i', Math.min(idx, 40)); }
             idx++;
-            tbody.appendChild(tr);
+            tbody.appendChild(rowEl);
             walk(k);
           });
         })(m.tree);
 
         if (o.totalRow) {
-          var tr = h('tr.is-stat.is-stat-first.rk-pivot__total', h('td.rk-pivot__label.is-sticky', totalLabel(o)), valueCells(m.tree, false));
-          tfoot.appendChild(tr);
+          var rowEl = h('tr.is-stat.is-stat-first.rk-pivot__total', h('td.rk-pivot__label.is-sticky', totalLabel(o)), valueCells(m.tree, false));
+          tfoot.appendChild(rowEl);
         }
 
         // write numbers (tweened from the previous render when motion is on)
@@ -405,13 +432,13 @@
         for (var p = n; p && p.level >= 0; p = p.parent) path.unshift(label(p.dim, p.value));
         var title = (path.length ? path.join(' › ') : totalLabel(m.o)) + (m.col ? '  ·  ' + (ck === '\u0002' ? totalLabel(m.o) : label(m.col, ck)) : '');
         var raw = ck === '\u0002' ? m.total(n) : m.cell(n, ck);
-        var rows = [{ label: m.val ? m.val.title : 'Records', value: RK.format(raw, m.vfmt), bold: true }];
+        var rows = [{ label: m.val ? m.val.title : tr('pivotTable.records', 'Records'), value: RK.format(raw, m.vfmt), bold: true }];
         var colTot = ck === '\u0002' ? m.total(m.tree) : m.cell(m.tree, ck);
-        if (n.level >= 0 && util.isNum(raw) && colTot) rows.push({ label: '% of ' + (m.col && ck !== '\u0002' ? label(m.col, ck) : 'total'), value: RK.format(raw / colTot, '0.0%') });
+        if (n.level >= 0 && util.isNum(raw) && colTot) rows.push({ label: m.col && ck !== '\u0002' ? tr('pivotTable.pctOf', '% of {name}', { name: label(m.col, ck) }) : tr('pivotTable.pctOfTotal', '% of total'), value: RK.format(raw / colTot, '0.0%') });
         var rowTot = m.total(n);
-        if (m.col && ck !== '\u0002' && util.isNum(raw) && rowTot && (m.o.agg === 'sum' || m.o.agg === 'count')) rows.push({ label: '% of row', value: RK.format(raw / rowTot, '0.0%') });
+        if (m.col && ck !== '\u0002' && util.isNum(raw) && rowTot && (m.o.agg === 'sum' || m.o.agg === 'count')) rows.push({ label: tr('pivotTable.pctOfRow', '% of row'), value: RK.format(raw / rowTot, '0.0%') });
         var cnt = ck === '\u0002' ? n.n : (n.cells.get(ck) || []).length;
-        tip.show(RK.chart.tip(title, rows, cnt + (cnt === 1 ? ' record' : ' records')), td);
+        tip.show(RK.chart.tip(title, rows, tr(cnt === 1 ? 'pivotTable.nRecord' : 'pivotTable.nRecords', cnt === 1 ? '{n} record' : '{n} records', { n: cnt })), td);
       }
       table.addEventListener('click', onClick);
       table.addEventListener('mouseover', onOver);

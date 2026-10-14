@@ -1,0 +1,17 @@
+{
+  "id": "ev_bridge",
+  "title": "企业价值至股权价值",
+  "schema": {"fields": [
+    {"name": "step", "type": "string", "title": "项目"},
+    {"name": "value", "type": "number", "title": "金额", "format": "#,##0.0;(#,##0.0)", "unit": "人民币亿元"},
+    {"name": "kind", "type": "string", "title": "类型"}
+  ]},
+  "data": [
+    {"step": "企业价值（报价）", "value": 93.6, "kind": "total"},
+    {"step": "减：有息负债", "value": -12.9, "kind": "delta"},
+    {"step": "加：现金", "value": 3.6, "kind": "delta"},
+    {"step": "减：养老金负债", "value": -2.4, "kind": "delta"},
+    {"step": "股权价值", "value": 81.9, "kind": "total"}
+  ],
+  "meta": {"source": "北桥资本分析；凯斯勒2026年6月30日资产负债表（示例）", "unit": "人民币亿元"}
+}

@@ -8,6 +8,19 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'parallel.peers': '可比公司', 'parallel.peerMedian': '可比公司中位数'
+    });
+  }
+
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
   var DASH_ICON = 'path://M0,0h3v1.6H0z M3.5,0h3v1.6h-3z M7,0h3v1.6H7z';   // dashed legend swatch for the median line
 
@@ -180,7 +193,7 @@
     var series = cats.map(function (c) {
       var i = allCats.indexOf(c), color = cf ? pal[i] : peerColor;
       return {
-        id: 'p-' + i, name: cf ? String(c) : 'Peers', type: 'parallel', smooth: o.smooth ? 0.2 : false,
+        id: 'p-' + i, name: cf ? String(c) : tr('parallel.peers', 'Peers'), type: 'parallel', smooth: o.smooth ? 0.2 : false,
         lineStyle: util.merge({ color: color }, lineBase),
         itemStyle: { color: color },
         emphasis: { lineStyle: { width: 2.5, opacity: 1 } },
@@ -201,12 +214,12 @@
         return a.length ? RK.expr.quantile(a, 0.5) : null;
       });
       series.push({
-        id: 'median', name: 'Peer median', type: 'parallel', smooth: o.smooth ? 0.2 : false, z: 3,
+        id: 'median', name: tr('parallel.peerMedian', 'Peer median'), type: 'parallel', smooth: o.smooth ? 0.2 : false, z: 3,
         lineStyle: { color: t.ink3, width: 1.6, type: [4, 3], opacity: 0.9 },
         itemStyle: { color: t.ink3 },
         emphasis: { lineStyle: { width: 2.2, opacity: 1 } },
         inactiveOpacity: 0.9, activeOpacity: 0.9,
-        data: [{ name: 'Peer median', value: med }]
+        data: [{ name: tr('parallel.peerMedian', 'Peer median'), value: med }]
       });
     }
     if (targets.length) {
@@ -230,7 +243,7 @@
     var nameLines = Math.max.apply(null, names.map(function (n) { return n.length; }).concat([1]));
     var showLegend = o.legend !== false;
     var legendNames = series.filter(function (s) { return s.id !== 'median'; }).map(function (s) { return s.name; })
-      .concat(o.median && peers.length > 2 ? ['Peer median'] : []);
+      .concat(o.median && peers.length > 2 ? [tr('parallel.peerMedian', 'Peer median')] : []);
     var lRows = showLegend ? legendRows(legendNames, W, '11px ' + t.fontSans) : 0;
     var top = (showLegend ? 25 * lRows + 4 : 0) + 13 * nameLines + 28;
 
@@ -273,18 +286,18 @@
       // plain, wrapping legend (never scroll paging in report output)
       legend: C.legend(ctx, {
         show: showLegend, type: 'plain',
-        data: legendNames.map(function (n) { return n === 'Peer median' ? { name: n, icon: DASH_ICON } : n; })
+        data: legendNames.map(function (n) { return n === tr('parallel.peerMedian', 'Peer median') ? { name: n, icon: DASH_ICON } : n; })
       }),
       tooltip: {
         trigger: 'item', confine: true,
         formatter: function (p) {
           var r = rows.filter(function (x) { return String(x[lf]) === p.name; })[0];
-          var tr = dims.map(function (d, i) {
+          var tipRows = dims.map(function (d, i) {
             var v = p.value ? p.value[i] : null;
-            return { label: d.title, value: d.type === 'category' ? (v == null ? 'n.a.' : String(v)) : num(v, fmts[i]) };
+            return { label: d.title, value: d.type === 'category' ? (v == null ? RK.format(null) : String(v)) : num(v, fmts[i]) };
           });
-          if (r && cf) tr.unshift({ color: p.color, label: ctx.title(cf), value: String(r[cf]) });
-          return C.tip(p.name, tr);
+          if (r && cf) tipRows.unshift({ color: p.color, label: ctx.title(cf), value: String(r[cf]) });
+          return C.tip(p.name, tipRows);
         }
       },
       parallel: {

@@ -32,7 +32,7 @@
     "values": {"type": "boolean", "default": true, "desc": "Several stacked waffles (encode.facet): each segment's share (swatch + figure) under its waffle"},
     "maxSize": {"type": "number", "default": 280, "desc": "Maximum side of one waffle (px)"}
   },
-  "interactions": ["Squares fill in sequence when the block scrolls into view", "Hover a square or legend row: that category stays in focus, tooltip with value / share / squares", "Click to cross-filter ('Others' toggles all of its members)", "Colours cross-fade and numbers count when filters change", "PNG / SVG export"],
+  "interactions": ["Squares fill in sequence when the block scrolls into view", "Hover a square or legend row: that category stays in focus, tooltip with value / share / squares", "Click to cross-filter ('Others' toggles all of its members)", "Colours cross-fade and numbers count when filters change", "PNG / CSV export"],
   "samples": [
     {"title": "Shareholder structure by investor type (% of shares outstanding)", "data": "ownership", "height": 280, "span": 7,
      "options": {"encode": {"label": "type", "value": "pct"}}},

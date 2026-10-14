@@ -34,7 +34,7 @@
     "zoom": {"type": "boolean", "default": true, "desc": "Slider, drag, Ctrl/Cmd + wheel or pinch zoom shared by both panels (options.wheelZoom: true for the plain wheel); value axes re-fit to the window"},
     "legend": {"type": "boolean", "default": true, "desc": "Legend top-left"}
   },
-  "interactions": ["Crosshair tooltip: date, close, 1-day and period change, volume, MAs", "Hover near a pin to read the event", "Slider, drag, Ctrl/Cmd + wheel or pinch zoom shared by price and volume (plain wheel scrolls the page)", "1M / 3M / 6M / YTD / 1Y / All range buttons", "Legend toggles MAs / VWAP / volume", "PNG / CSV export"],
+  "interactions": ["Crosshair tooltip: date, close, 1-day and period change, volume, MAs", "Hover near a pin to read the event", "Zoom shared by price and volume: slider; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)", "Range buttons (1M / 3M / 6M / YTD / 1Y / 2Y / 5Y / All, as the history allows)", "Legend toggles MAs / VWAP / volume", "PNG / CSV export"],
   "samples": [
     {"title": "Helios Industrial share price and volume (USD)", "data": "price_ohlc", "height": 420,
      "options": {"eventsData": "price_events", "refLines": [{"value": 52.0, "label": "Indicative offer $52.00"}]}},

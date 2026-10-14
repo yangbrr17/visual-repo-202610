@@ -1,0 +1,23 @@
+{
+  "id": "kpis",
+  "title": "关键指标",
+  "schema": {"fields": [
+    {"name": "id", "type": "string", "title": "编号"},
+    {"name": "label", "type": "string", "title": "指标"},
+    {"name": "value", "type": "number", "title": "数值"},
+    {"name": "format", "type": "string", "title": "格式"},
+    {"name": "delta", "type": "number", "title": "变化"},
+    {"name": "delta_format", "type": "string", "title": "变化格式"},
+    {"name": "period", "type": "string", "title": "说明"},
+    {"name": "good", "type": "string", "title": "有利方向"}
+  ]},
+  "data": [
+    {"id": "ev", "label": "企业价值（人民币）", "value": 9360000000.0, "format": "auto", "delta": null, "delta_format": null, "period": "12.0亿欧元 × 7.80", "good": "up"},
+    {"id": "mult", "label": "EV/EBITDA 2026E", "value": 10.062784897221983, "format": "0.0x", "delta": null, "delta_format": null, "period": "2025A：11.1x", "good": "down"},
+    {"id": "eps", "label": "2027E每股收益增厚", "value": 0.06810194778284284, "format": "+0.0%;-0.0%;0.0%", "delta": 3.802333474863917, "delta_format": "+0.0\"个百分点\"", "period": "至2029E", "good": "up"},
+    {"id": "overseas", "label": "备考海外收入占比", "value": 0.3057708161582852, "format": "0%", "delta": 17.91613740981994, "delta_format": "+0\"个百分点\"", "period": "较交易前", "good": "up"},
+    {"id": "synergy", "label": "年化协同效应（税前）", "value": 320000000.0, "format": "auto", "delta": null, "delta_format": null, "period": "2029E全面实现", "good": "up"},
+    {"id": "lev", "label": "交易后净杠杆", "value": 1.146274607525542, "format": "0.0x", "delta": null, "delta_format": null, "period": "净债务 / 2025A EBITDA", "good": "down"}
+  ],
+  "meta": {"source": "北桥资本分析"}
+}

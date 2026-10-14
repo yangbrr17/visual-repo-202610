@@ -8,6 +8,19 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'lollipop.ref': '参考值', 'lollipop.change': '变动', 'lollipop.vs': '较{Name}'
+    });
+  }
+
   var isNum = util.isNum;
   function stat(name, a) { return RK.expr.agg[name](a.filter(isNum)); }   // median / mean of finite values
 
@@ -107,7 +120,7 @@
     // ---- reference statistic ----
     var statRows = o.refExcludeHighlight ? v1.filter(function (_, i) { return !hi[i]; }) : v1;
     var ref = o.refLine === 'median' || o.refLine === 'mean' ? stat(o.refLine, statRows) : isNum(o.refLine) ? o.refLine : null;
-    var refName = o.refLabel || (o.refLine === 'median' ? 'Median' : o.refLine === 'mean' ? 'Mean' : 'Ref.');
+    var refName = o.refLabel || (o.refLine === 'median' ? tr('median', 'Median') : o.refLine === 'mean' ? tr('mean', 'Mean') : tr('lollipop.ref', 'Ref.'));
 
     // ---- end-label text and the vertical band width (labels wider than a band turn 90°) ----
     var numFont = '11px ' + t.fontNum;
@@ -302,15 +315,15 @@
         formatter: function (p) {
           var i = p.dataIndex, r = rows[i];
           if (!r || (p.seriesId !== 'dot' && p.seriesId !== 'dot2')) return '';
-          var tr = [{ color: colors[i], label: ctx.title(enc.value), value: num(v1[i], fmt), bold: p.seriesId === 'dot' }];
+          var tipRows = [{ color: colors[i], label: ctx.title(enc.value), value: num(v1[i], fmt), bold: p.seriesId === 'dot' }];
           // differences of two percentages are percentage points ('+2.1pp'), not relative changes
           if (has2) {
-            tr.push({ label: ctx.title(enc.value2), value: num(v2[i], fmt), bold: p.seriesId === 'dot2' });
-            if (v1[i] != null && v2[i] != null) tr.push({ label: 'Change', value: pctFmt ? ppDiff(v2[i] - v1[i], fmt) : pct(v1[i] ? v2[i] / v1[i] - 1 : NaN) });
+            tipRows.push({ label: ctx.title(enc.value2), value: num(v2[i], fmt), bold: p.seriesId === 'dot2' });
+            if (v1[i] != null && v2[i] != null) tipRows.push({ label: tr('lollipop.change', 'Change'), value: pctFmt ? ppDiff(v2[i] - v1[i], fmt) : pct(v1[i] ? v2[i] / v1[i] - 1 : NaN) });
           }
-          if (ref != null && v1[i] != null && (pctFmt || (ref > 0 && v1[i] > 0))) tr.push({ label: 'vs. ' + refName.toLowerCase(), value: pctFmt ? ppDiff(v1[i] - ref, fmt) : pct(v1[i] / ref - 1) });
-          if (enc.group) tr.unshift({ label: ctx.title(enc.group), value: r[enc.group] });
-          return C.tip(labels[i], tr);
+          if (ref != null && v1[i] != null && (pctFmt || (ref > 0 && v1[i] > 0))) tipRows.push({ label: tr('lollipop.vs', 'vs. {name}', { name: refName.toLowerCase(), Name: refName }), value: pctFmt ? ppDiff(v1[i] - ref, fmt) : pct(v1[i] / ref - 1) });
+          if (enc.group) tipRows.unshift({ label: ctx.title(enc.group), value: r[enc.group] });
+          return C.tip(labels[i], tipRows);
         }
       },
       xAxis: horiz ? valAxis : catAxis,

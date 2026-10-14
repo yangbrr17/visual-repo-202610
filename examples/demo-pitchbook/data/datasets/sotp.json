@@ -1,0 +1,22 @@
+{
+  "id": "sotp",
+  "title": "Sum-of-the-parts valuation",
+  "schema": {"fields": [
+    {"name": "segment", "type": "string", "title": "Segment"},
+    {"name": "metric_name", "type": "string", "title": "Metric"},
+    {"name": "metric_value", "type": "number", "title": "Metric value", "format": "$#,##0.0;($#,##0.0)", "unit": "USD m"},
+    {"name": "multiple_low", "type": "number", "title": "Multiple (low)", "format": "0.0x"},
+    {"name": "multiple_high", "type": "number", "title": "Multiple (high)", "format": "0.0x"},
+    {"name": "method", "type": "string", "title": "Method"},
+    {"name": "ebitda", "type": "number", "title": "EBITDA 2026E", "format": "$#,##0.0;($#,##0.0)", "unit": "USD m"},
+    {"name": "note", "type": "string", "title": "Basis"}
+  ]},
+  "data": [
+    {"segment": "Factory Automation", "metric_name": "EBITDA 2026E", "metric_value": 372.4, "multiple_low": 8.0, "multiple_high": 9.0, "method": "EV / EBITDA 2026E", "ebitda": 372.4, "note": "Industrial Automation peers: 9.4x–10.0x EV / EBITDA 2026E (interquartile), median 9.5x"},
+    {"segment": "Motion Control", "metric_name": "EBITDA 2026E", "metric_value": 228.4, "multiple_low": 7.0, "multiple_high": 8.0, "method": "EV / EBITDA 2026E", "ebitda": 228.4, "note": "Motion & Power Control peers: 7.3x–9.0x EV / EBITDA 2026E (interquartile), median 8.8x"},
+    {"segment": "Sensors & Instrumentation", "metric_name": "EBITDA 2026E", "metric_value": 247.5, "multiple_low": 9.5, "multiple_high": 11.0, "method": "EV / EBITDA 2026E", "ebitda": 247.5, "note": "Industrial Software & Sensors peers: 12.5x–14.0x EV / EBITDA 2026E (interquartile), median 13.1x; discount for hardware mix"},
+    {"segment": "Software & Services", "metric_name": "Revenue 2026E", "metric_value": 820.0, "multiple_low": 2.5, "multiple_high": 3.25, "method": "EV / Revenue 2026E", "ebitda": 209.9, "note": "Industrial Software & Sensors peers: 3.4x–4.3x EV / Revenue 2026E (interquartile), median 3.5x; discount for scale"},
+    {"segment": "Unallocated corporate costs", "metric_name": "Corporate costs 2026E", "metric_value": -61.7, "multiple_low": 8.5, "multiple_high": 10.0, "method": "EV / EBITDA 2026E", "ebitda": -61.7, "note": "Capitalised at the blended segment multiple"}
+  ],
+  "meta": {"asOf": "2026-10-10", "notes": ["Segment EBITDA plus unallocated corporate costs = FY26E group EBITDA ($996.5m); Software & Services valued on revenue.", "Implied EV $8,455m–$9,949m (8.5x–10.0x EBITDA 2026E); less net debt $1,490m and other adjustments $145m = equity $6,820m–$8,314m, $43.16–$52.62 per share on 158.0m diluted shares.", "Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."], "source": "Project Atlas analysis (synthetic); Helios Industrial management plan", "unit": "USD m"}
+}

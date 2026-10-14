@@ -65,12 +65,18 @@ top 5                                          ← 前 N 行 / first N rows
 |---|---|---|
 | 派生字段 / Computed fields | dataset JSON `"computed": [{"name": "ebitda_margin", "formula": "ebitda / revenue", "format": "0.0%"}]`；Python：`r.dataset(..., computed=[...])` | 行公式，可用 `@参数`，参数变化时实时重算 / row formula, may use `@params`, recomputed live |
 | 查询控制台 / Query console | `RK.query('median(ev_ebitda_25e) by sector from peers')`（`query-console` 组件） | 完整查询语言（§10）/ full query language |
+| 客户自建指标 / Client metrics | `query-console` 的“添加为指标 / Add as metric”；`ds.addComputed({name, formula, format, user: true})` | 行公式；保存在客户本机浏览器（按报告），重开报告自动恢复 / row formula, saved per report in the browser and restored on reopen |
+| 标题模板 / Title templates | 页面与模块标题：`{{peers: median(ev_ebitda_25e) \| 0.0x}}`、`{{@wacc \| 0.0%}}`（`docs/architecture.md` §7.1） | 聚合在筛选后的行上求值，行公式取第一行 / aggregates over the filtered rows, row formulas read the first row |
 | 筛选 / Filters | `RK.store.setFilter('cheap', {op: 'expr', expr: 'ev_ebitda_25e < 10'})`，`RK.data.view(id, {where: '…'})` | 条件（行公式）/ condition |
 | 文本占位符 / Text placeholders | `text-block`：`{{median(ev_ebitda_25e)\|0.0x}}`、`{{@wacc\|0.0%}}` | 行或聚合公式 + 格式码 / row or aggregate + format |
 | 开发者 API / Developer API | `RK.expr.compile(src, {fields})`、`RK.expr.evaluate(src, row)`、`RK.expr.check(src)` | — |
 
 Python 构建器在 `build()` 时会检查公式引用的字段与 `@参数` 是否存在，错误一次性列出。
 The Python builder validates field and `@param` references of computed formulas at build time and lists every problem at once.
+
+客户自建指标与派生字段遵守同样的规则；保存的指标若在报告更新后不再能编译（字段被删除等）会被跳过，不会报错；与数据中真实列同名时不会覆盖该列。
+Client metrics follow the same rules; a saved metric that no longer compiles after the report is updated is skipped, and
+it never overrides a real column of the same name.
 
 派生字段**不能引用自身**：`x = x * (1 + @g)` 每次拖动滑块都会在上一次结果上累乘，因此报错
 `Computed field "x" cannot reference itself — give the result a new name`；多个派生字段之间也不能循环引用
@@ -613,6 +619,8 @@ count() as "Deals", sum(ev) as "Total EV", median(ev_ebitda) as "Median EV/EBITD
   拼错的预设名（`usd_mn`）按 General 显示。General (no format): grouped integers from 10,000, else up to 2 decimals,
   3 significant digits below 0.01; a mistyped preset name renders as General.
 - **日期**：无效日期（`2026-13-45`、`2026-02-30`）原样显示，不会顺延到下个月。Invalid dates are shown unchanged, never rolled over.
+- **中文报告的紧凑单位**：`locale="zh-CN"` 的报告里 `auto` 使用 万 / 亿（`1.5e9` → `15亿`，`25000` → `2.5万`），下表按英文环境验证。
+  In zh-CN reports `auto` uses 万 / 亿 (`1.5e9` → `15亿`); the table below is verified in English.
 
 <!-- verify:format -->
 | 值 / Value | 格式码 / Code | 显示 / Output |

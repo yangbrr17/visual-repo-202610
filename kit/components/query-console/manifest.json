@@ -107,7 +107,7 @@
   },
   "interactions": [
     "Builder: pick aggregation / field / group-by / filter / sort / top N — runs as you edit",
-    "Query editor: syntax highlighting, autocomplete (Tab / Enter), live validation with line / column and wavy underline, Ctrl/Cmd+Enter",
+    "Query editor: syntax highlighting, autocomplete (Tab / Enter), live validation with line / column and wavy underline, Ctrl/⌘ + Enter runs",
     "Reference panel: click a field, @parameter or function to insert at the caret",
     "Sortable result columns; chart follows the table order",
     "Results respect global filters and re-run when filters or @parameters change",

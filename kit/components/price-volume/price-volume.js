@@ -11,6 +11,32 @@
   var DAY = 864e5;
   var RANGES = [['1m', '1M'], ['3m', '3M'], ['6m', '6M'], ['ytd', 'YTD'], ['1y', '1Y'], ['2y', '2Y'], ['5y', '5Y'], ['all', 'All']];
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'priceVolume.r1m': '近1月', 'priceVolume.r3m': '近3月', 'priceVolume.r6m': '近6月', 'priceVolume.rytd': '今年以来',
+      'priceVolume.r1y': '近1年', 'priceVolume.r2y': '近2年', 'priceVolume.r5y': '近5年', 'priceVolume.ma': '{n}日均线',
+      'priceVolume.vwap': '{n}日成交量加权均价', 'priceVolume.close': '收盘价', 'priceVolume.volume': '成交量',
+      'priceVolume.range52': '52周区间 {low} – {high}', 'priceVolume.high52': '52周最高 {value}', 'priceVolume.low52': '52周最低 {value}',
+      'priceVolume.change1d': '日涨跌幅', 'priceVolume.since': '自{date}以来', 'priceVolume.dateRange': '日期范围',
+      'priceVolume.dateLong': 'yyyy"年"m"月"d"日"', 'priceVolume.dateShort': 'yy"年"m"月"d"日"', 'priceVolume.dateMonth': 'yy"年"m"月"',
+      'priceVolume.dateDay': 'm"月"d"日"'
+    });
+  }
+  /** Range button text in the report locale. */
+  function rangeText(r) { return r[0] === 'all' ? tr('all', r[1]) : tr('priceVolume.r' + r[0], r[1]); }
+  /** Built-in date codes (field formats win where a field has one) in the report locale. */
+  function dateCode(kind) {
+    return kind === 'month' ? tr('priceVolume.dateMonth', 'mmm-yy') : kind === 'day' ? tr('priceVolume.dateDay', 'd mmm')
+      : kind === 'short' ? tr('priceVolume.dateShort', 'dd mmm yy') : tr('priceVolume.dateLong', 'dd mmm yyyy');
+  }
+
   RK.component({
     id: 'price-volume',
     deps: ['echarts'],
@@ -97,12 +123,12 @@
     var n = rows.length;
 
     var mas = (o.ma || []).filter(function (d) { return util.isNum(d) && d > 1 && d < n; }).map(function (d) {
-      return { key: 'ma' + d, name: d + '-day MA', days: d, values: sma(close, d) };
+      return { key: 'ma' + d, name: tr('priceVolume.ma', '{n}-day MA', { n: d }), days: d, values: sma(close, d) };
     });
     var vw = null;
     if (o.vwap && vol.length) {
       var vd = o.vwap === true ? 20 : +o.vwap;
-      vw = { key: 'vwap', name: vd + '-day VWAP', days: vd, values: rollingVwap(close, hi, lo, vol, vd) };
+      vw = { key: 'vwap', name: tr('priceVolume.vwap', '{n}-day VWAP', { n: vd }), days: vd, values: rollingVwap(close, hi, lo, vol, vd) };
     }
 
     // 52-week high / low over the last 364 days
@@ -282,7 +308,7 @@
 
     // price
     series.push({
-      id: 'price', name: ctx.title(ctx.enc.close) || 'Close', type: 'line', xAxisIndex: 0, yAxisIndex: 0,
+      id: 'price', name: ctx.title(ctx.enc.close) || tr('priceVolume.close', 'Close'), type: 'line', xAxisIndex: 0, yAxisIndex: 0,
       showSymbol: false, symbol: 'circle', symbolSize: 6, z: 4,
       lineStyle: { color: priceColor, width: 1.75 }, itemStyle: { color: priceColor, borderColor: t.paper, borderWidth: 1.5 },
       areaStyle: o.area ? { color: RK.theme.alpha(priceColor, t.dark ? 0.16 : 0.08), origin: 'start' } : undefined,
@@ -304,7 +330,7 @@
     if (m.r52 && o.range52w && o.range52w !== 'band') series.push(rangeLabelSeries(ctx, m, pins, state));
     if (hasVol) {
       series.push({
-        id: 'volume', name: ctx.title(ctx.enc.volume) || 'Volume', type: 'bar', xAxisIndex: 1, yAxisIndex: 1,
+        id: 'volume', name: ctx.title(ctx.enc.volume) || tr('priceVolume.volume', 'Volume'), type: 'bar', xAxisIndex: 1, yAxisIndex: 1,
         barMaxWidth: 8, barMinWidth: 1, barCategoryGap: '30%', large: m.n > 600,
         itemStyle: { color: RK.theme.alpha(t.ink3, t.dark ? 0.55 : 0.42) },
         emphasis: { itemStyle: { color: RK.theme.alpha(priceColor, 0.7) } },
@@ -314,13 +340,13 @@
     }
 
     var legendData = [series[0].name].concat(m.mas.map(function (s) { return s.name; }), m.vwap ? [m.vwap.name] : [],
-      hasVol ? [ctx.title(ctx.enc.volume) || 'Volume'] : []);
+      hasVol ? [ctx.title(ctx.enc.volume) || tr('priceVolume.volume', 'Volume')] : []);
 
     var xBase = {
       type: 'time', min: 'dataMin', max: 'dataMax', splitLine: { show: false },
       axisLine: { show: true, lineStyle: { color: t.axis } },
       axisTick: { show: true, length: 3, lineStyle: { color: t.axis }, customValues: tk.values },
-      axisPointer: { label: { formatter: function (p) { return RK.format(new Date(p.value), 'dd mmm yyyy'); } } }
+      axisPointer: { label: { formatter: function (p) { return RK.format(new Date(p.value), dateCode()); } } }
     };
     // core zoom (Ctrl/Cmd + wheel or pinch, drag to pan, slider unless printing) shared by both panels
     var z = state.zoom, link = { xAxisIndex: [0, 1], start: z.start, end: z.end };
@@ -383,7 +409,7 @@
     if (m.r52 && o.range52w === 'band') {
       area = { silent: true, itemStyle: { color: RK.theme.alpha(t.accent3 || t.accent, t.dark ? 0.12 : 0.07) },
         label: { show: true, position: 'insideTopLeft', color: t.ink3, fontSize: 10.5,
-          formatter: textFn('52-week range ' + RK.format(m.r52.low, fmt) + ' – ' + RK.format(m.r52.high, fmt)) },
+          formatter: textFn(tr('priceVolume.range52', '52-week range {low} – {high}', { low: RK.format(m.r52.low, fmt), high: RK.format(m.r52.high, fmt) })) },
         data: [[{ xAxis: m.r52.from, yAxis: m.r52.low }, { xAxis: m.r52.to, yAxis: m.r52.high }]] };
     } else if (m.r52 && o.range52w) {
       // 52-week high / low are context, not change and not a reference price: neutral ink-3 dotted lines
@@ -492,8 +518,8 @@
     var o = ctx.options, t = ctx.theme, fmt = m.fmt, font = '10.5px ' + t.fontNum;
     var chip = RK.theme.alpha(t.paper, 0.85);
     var items = [
-      { v: m.r52.high, text: '52-wk high ' + RK.format(m.r52.high, fmt), sides: [-1, 1], fromLeft: true },
-      { v: m.r52.low, text: '52-wk low ' + RK.format(m.r52.low, fmt), sides: [1, -1], fromLeft: false }
+      { v: m.r52.high, text: tr('priceVolume.high52', '52-wk high {value}', { value: RK.format(m.r52.high, fmt) }), sides: [-1, 1], fromLeft: true },
+      { v: m.r52.low, text: tr('priceVolume.low52', '52-wk low {value}', { value: RK.format(m.r52.low, fmt) }), sides: [1, -1], fromLeft: false }
     ];
     function hit(r, b) { return r.x < b.x + b.w && b.x < r.x + r.w && r.y < b.y + b.h && b.y < r.y + r.h; }
     return {
@@ -577,15 +603,15 @@
     if (!p0 || m.close[p0.value[2]] == null) return '';
     var i = p0.value[2];
     var c = m.close[i], prev = i > 0 ? m.close[i - 1] : null;
-    var rows = [{ color: t.accent, label: ctx.title(ctx.enc.close) || 'Close', value: RK.format(c, fmt), bold: true }];
-    rows.push({ label: 'Change (1 day)', value: prev ? RK.format(c / prev - 1, DELTA) : 'n.a.' });
+    var rows = [{ color: t.accent, label: ctx.title(ctx.enc.close) || tr('priceVolume.close', 'Close'), value: RK.format(c, fmt), bold: true }];
+    rows.push({ label: tr('priceVolume.change1d', 'Change (1 day)'), value: prev ? RK.format(c / prev - 1, DELTA) : RK.format(null, DELTA) });
     var first = state.axes && state.axes.first;
-    if (first != null && first >= 0 && first < i) rows.push({ label: 'Since ' + RK.format(m.xs[first], 'dd mmm yy'), value: RK.format(c / m.close[first] - 1, DELTA) });
-    if (m.vol.length) rows.push({ color: RK.theme.alpha(t.ink3, 0.6), label: ctx.title(ctx.enc.volume) || 'Volume', value: RK.format(m.vol[i], m.vfmt) });
+    if (first != null && first >= 0 && first < i) rows.push({ label: tr('priceVolume.since', 'Since {date}', { date: RK.format(m.xs[first], dateCode('short')) }), value: RK.format(c / m.close[first] - 1, DELTA) });
+    if (m.vol.length) rows.push({ color: RK.theme.alpha(t.ink3, 0.6), label: ctx.title(ctx.enc.volume) || tr('priceVolume.volume', 'Volume'), value: RK.format(m.vol[i], m.vfmt) });
     m.mas.concat(m.vwap ? [m.vwap] : []).forEach(function (s) {
       if (shown(state, s.name)) rows.push({ color: s.color, label: s.name, value: RK.format(s.values[i], fmt) });
     });
-    var html = C.tip(RK.format(m.xs[i], (ctx.field(ctx.enc.x) || {}).format || 'dd mmm yyyy'), rows);
+    var html = C.tip(RK.format(m.xs[i], (ctx.field(ctx.enc.x) || {}).format || dateCode()), rows);
     var pins = state.pins || [];
     if (pins.length) {
       var px = inst.convertToPixel({ xAxisIndex: 0 }, m.xv[i]);
@@ -599,7 +625,7 @@
     var e = util.escapeHTML;
     return '<div class="rk-tip__foot rk-pv-tip-event">' +
       '<b>' + pin.n + '. ' + e(pin.label) + '</b>' + (pin.kind ? ' <span class="rk-pv-tip-kind">' + e(pin.kind) + '</span>' : '') +
-      '<br>' + e(RK.format(pin.x, pin.dateFmt || 'dd mmm yyyy')) + (pin.detail ? ' — ' + e(pin.detail) : '') + '</div>';
+      '<br>' + e(RK.format(pin.x, pin.dateFmt || dateCode())) + (pin.detail ? ' — ' + e(pin.detail) : '') + '</div>';
   }
 
   /* ------------------------------------------------------------------ *
@@ -623,11 +649,11 @@
     var keepNarrow = w < 340 ? ['3m', '1y', 'all'] : w < 480 ? ['1m', '3m', '6m', '1y', 'all'] : null;
     if (keepNarrow && !keys) items = items.filter(function (r) { return keepNarrow.indexOf(r[0]) >= 0; });
     var btns = {};
-    var bar = h('div.rk-seg.rk-pv-range.rk-noprint', { role: 'group', 'aria-label': 'Date range' }, items.map(function (r) {
+    var bar = h('div.rk-seg.rk-pv-range.rk-noprint', { role: 'group', 'aria-label': tr('priceVolume.dateRange', 'Date range') }, items.map(function (r) {
       var b = h('button', { type: 'button', 'aria-pressed': 'false', on: { click: function () {
         var z = zoomFor(state.model, r[0]);
         inst.dispatchAction({ type: 'dataZoom', start: z.start, end: z.end });
-      } } }, r[1]);
+      } } }, rangeText(r));
       btns[r[0]] = b;
       return b;
     }));
@@ -679,7 +705,7 @@
     return { values: vals, unit: unit, key: unit + n + ':' + vals[0] + ':' + vals.length };
   }
   function tickLabel(tk) {
-    var f = tk.unit === 'y' ? 'yyyy' : tk.unit === 'm' ? 'mmm-yy' : 'd mmm';
+    var f = tk.unit === 'y' ? 'yyyy' : tk.unit === 'm' ? dateCode('month') : dateCode('day');
     return { customValues: tk.values, hideOverlap: true, formatter: function (v) { return RK.format(new Date(v), f); } };
   }
 })();

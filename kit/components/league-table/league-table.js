@@ -8,6 +8,20 @@
 (function () {
   'use strict';
   var util = RK.util, h = util.h;
+
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'leagueTable.new': '新进', 'leagueTable.unchanged': '排名较上期不变', 'leagueTable.prior': '上期排名 {rank}', 'leagueTable.rank': '排名',
+      'leagueTable.changeTitle': '较上期排名变化', 'leagueTable.ranks': '第 {from}–{to} 名', 'leagueTable.rankN': '第 {n} 名'
+    });
+  }
   // generic field names (link tables, bridges...) cross-filter only this dataset (house rule: scoped selections)
   var GENERIC = /^(type|kind|source|target|step|stage|metric|status|name|label|key|id|category|group|series)$/i;
   var CCY = { '$': 'USD', '€': 'EUR', '£': 'GBP', '¥': 'JPY' };
@@ -77,10 +91,10 @@
       function changeCell(d) {
         var p = cur.enc.prior ? d.r[cur.enc.prior] : undefined;
         if (p === undefined) return h('td.rk-league__chg');
-        if (p == null || !util.isNum(p)) return h('td.rk-league__chg.is-new', 'New');
+        if (p == null || !util.isNum(p)) return h('td.rk-league__chg.is-new', tr('leagueTable.new', 'New'));
         var delta = p - d.rank;
-        if (!delta) return h('td.rk-league__chg.is-flat', { title: 'Unchanged vs prior rank' }, '–');
-        return h('td.rk-league__chg', { class: delta > 0 ? 'is-up' : 'is-down', title: 'Prior rank ' + p },
+        if (!delta) return h('td.rk-league__chg.is-flat', { title: tr('leagueTable.unchanged', 'Unchanged vs prior rank') }, '–');
+        return h('td.rk-league__chg', { class: delta > 0 ? 'is-up' : 'is-down', title: tr('leagueTable.prior', 'Prior rank {rank}', { rank: p }) },
           h('span.rk-league__arr', { 'aria-hidden': 'true' }, delta > 0 ? '▲' : '▼'), String(Math.abs(delta)));
       }
 
@@ -103,8 +117,8 @@
         var showChg = o.showChange !== false && has(enc.prior);
         thead.innerHTML = '';
         thead.appendChild(h('tr',
-          h('th.rk-league__rank.is-num', { scope: 'col' }, T.rank || 'Rank'),
-          showChg ? h('th.rk-league__chg', { scope: 'col', title: 'Change vs prior rank' }, T.change || '+/–') : null,
+          h('th.rk-league__rank.is-num', { scope: 'col' }, T.rank || tr('leagueTable.rank', 'Rank')),
+          showChg ? h('th.rk-league__chg', { scope: 'col', title: tr('leagueTable.changeTitle', 'Change vs prior rank') }, T.change || '+/–') : null,
           h('th.rk-league__name', { scope: 'col' }, T.name || cur.title(enc.name)),
           th('value', 'rk-league__bar', vTitle),
           has(enc.share) ? th('share', 'is-num rk-league__share', T.share || cur.title(enc.share)) : null,
@@ -134,7 +148,7 @@
               if (to == null || to >= from) {
                 var gap = h('tr.rk-league__gap', { 'aria-hidden': 'true' },
                   h('td', { colspan: nCols }, h('span.rk-league__dots', '⋯'),
-                    to == null ? '' : (to > from ? 'ranks ' + from + '–' + to : 'rank ' + from)));
+                    to == null ? '' : (to > from ? tr('leagueTable.ranks', 'ranks {from}–{to}', { from: from, to: to }) : tr('leagueTable.rankN', 'rank {n}', { n: from }))));
                 gap.dataset.key = 'gap';
                 tbody.appendChild(gap);
               }

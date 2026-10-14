@@ -35,7 +35,7 @@
     "legend": {"type": "boolean", "default": true, "desc": "Entity-type key, top-left"},
     "format": {"type": "string", "default": null, "desc": "Ownership format; defaults to the pct field's format"}
   },
-  "interactions": ["Hover an entity: country, type, parent, direct and effective (look-through) ownership", "Click an entity or its '+n' badge to collapse / expand (animated re-layout)", "Ctrl/⌘ + wheel or pinch to zoom (a plain wheel scrolls the page), drag to pan", "Re-lays out on resize", "PNG / CSV export"],
+  "interactions": ["Hover an entity: country, type, parent, direct and effective (look-through) ownership", "Click an entity or its '+n' badge to collapse / expand (animated re-layout)", "Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page and shows a hint)", "Re-lays out on resize", "PNG / CSV export"],
   "samples": [
     {"title": "Simplified legal entity structure — Helios Industrial", "data": "org_structure", "height": 440,
      "options": {"encode": {"id": "id", "parent": "parent", "name": "name", "country": "country", "pct": "ownership_pct", "category": "entity_type"},

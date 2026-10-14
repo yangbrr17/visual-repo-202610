@@ -8,23 +8,26 @@
 - **HTML / CSS / JS / DATA 严格分离**；数据独立成文件，将来可替换为数据 API。
 - **离线可用**：双击 `index.html`（`file://`）即可打开；不依赖 CDN；所有脚本是 classic script（非 ES module）。
 - 视觉质感对标 GS / JPM pitchbook：16:9 页面、action title、footnote / source、克制的配色和动效。
-- 交互：缩放（dataZoom / 地图缩放）、全局筛选 + 交叉筛选、参数 what-if、客户自定义指标与查询。
+- 交互：缩放（dataZoom / 地图缩放）、全局筛选 + 交叉筛选、指标 / 维度切换、参数 what-if、客户自定义指标与查询。
+- 交付变体：文件夹（默认）、单文件 HTML、Excel 底稿、数据 API 模式（§3.1）；界面语言与涨跌色随报告切换（§7.5）。
 
 ## 2. 仓库结构
 
 ```
 kit/                      前端框架（源码，唯一事实来源）
-  core/                   rk.core / rk.format / rk.expr / rk.data / rk.theme / rk.chart / rk.motion / rk.runtime
+  core/                   rk.core（含 RK.i18n）/ rk.format / rk.expr / rk.data / rk.theme / rk.chart / rk.geo / rk.motion / rk.runtime
+                          （kit/build.json 定义拼接顺序）
   styles/                 tokens.css, base.css, layout.css, components.css, print.css, themes/*.css
-  components/<id>/        <id>.js  (+ <id>.css)  + manifest.json      ← 每个组件一个目录
-  samples/datasets/       gallery 与 demo 共用的示例数据（数据契约格式）
-vendor/                   第三方库 dist 构建（npm 固定版本 + LICENSE），由 tools/vendor.py 生成
+  components/<id>/        <id>.js  (+ <id>.css)  + manifest.json      ← 每个组件一个目录（57 个）
+  categories.json         12 个类别（显示顺序）；catalog.json 由 tools/build_catalog.py 从全部 manifest 生成
+  samples/datasets/       gallery 与 demo 共用的示例数据（数据契约格式，41 个，由 tools/make_sample_data.py 生成）
+vendor/                   第三方库 dist 构建（npm 固定版本 + LICENSE + sha256），由 tools/vendor.py 生成与校验
 gallery/                  组件网站（分门别类展示、说明、可交互 demo）
-py/reportkit/             Python 构建器：DataFrame/records → 报告文件夹
-examples/                 生成好的示例报告
-research/                 调研报告（landscape.md, catalog.json, raw/*.md）
-tools/                    vendor.py, build_catalog.py, smoke.mjs ...
-tests/                    js (node) + py (pytest) + 浏览器冒烟测试
+py/reportkit/             Python 构建器：DataFrame/records → 报告文件夹 / 单文件 HTML / Excel
+examples/                 生成好的示例报告（demo-pitchbook、demo-zh-cn、sql-pipeline-report）
+research/                 调研报告（landscape.md, catalog.json, raw/*.md, engine-audit.md）
+tools/                    vendor.py, build_catalog.py, build_geo.py, make_sample_data.py, smoke.cjs, thumbs.cjs, check.sh
+tests/                    js（node）+ py（unittest）+ e2e（Playwright：示例报告与 gallery）
 ```
 
 ## 3. 报告输出文件夹（builder 产物）
@@ -46,6 +49,18 @@ tests/                    js (node) + py (pytest) + 浏览器冒烟测试
 
 数据加载顺序：`bundle.js` 已加载 → 直接用；否则 http(s) 下 fetch `data/manifest.json` + `datasets/*.json`；
 `<meta name="rk:data-source" content="api">` + `<meta name="rk:api" content="https://…/">` → 调用数据 API（同样的 JSON 形状）。
+
+### 3.1 交付变体（builder 选项）
+
+| 选项 | 产物 | 说明 |
+|---|---|---|
+| 默认 | 上面的文件夹 | `data_source="bundle"`：`index.html` 引用 `data/bundle.js`，双击 `file://` 可用 |
+| `data_source="http"` | 同一文件夹，不引用 `bundle.js`，`<meta name="rk:data-source" content="http">` | 只能经 web 服务器打开；`data/*.json` 可单独替换 |
+| `data_source="api", api="https://…/"` | 同一文件夹（`data/` 照常写出，可作为 API 的静态内容），`index.html` 带 `rk:data-source=api` + `rk:api` | 运行时 `GET {api}manifest`、`GET {api}datasets/<id>`；带 token 见 §7 `RK.boot` |
+| `single_file=True` | `<out>/<slug>.html`（或直接给 `….html`） | 所有 `<link>` / `<script src>` 换成内联 `<style data-rk-inline="href">` / `<script data-rk-inline="src">`；CSS 中的字体与图片转成 `data:` URI；不能与 `data_source="http"` 同用 |
+| `excel=True` | `data/<slug>.xlsx`（单文件模式：与 html 同目录） | 需要 openpyxl；每个 dataset 一个工作表，数字格式由字段格式码换算；顶栏出现 `<a data-rk-download="excel">` 下载按钮 |
+
+命令行等价：`python -m reportkit build spec.json out [--single-file] [--excel] [--locale zh-CN]`。
 
 ## 4. 数据契约
 
@@ -83,11 +98,15 @@ tests/                    js (node) + py (pytest) + 浏览器冒烟测试
 {
   "reportkit": "0.1",
   "report": {"title": "Project Atlas", "subtitle": "Discussion materials", "client": "Board of Directors",
-             "date": "2026-10-14", "confidentiality": "Strictly private & confidential", "locale": "en-US"},
+             "date": "2026-10-14", "confidentiality": "Strictly private & confidential", "locale": "en-US",
+             "firm": "Northbridge Capital", "theme": "navy", "page_size": "letter", "updown": "cn"},
   "datasets": {"comps": {"path": "datasets/comps.json", "title": "Trading comparables", "rows": 18}},
   "params": {"wacc": {"value": 0.09, "min": 0.07, "max": 0.11, "step": 0.0025, "format": "0.0%", "title": "WACC"}}
 }
 ```
+
+`report` 中值为空的键不写出；`page_size` 仅在非 16:9 时出现，`updown` 仅在显式设置时出现。
+`report.title` + `report.date` + `<meta name="rk:built">` 组成 `RK.data.reportKey()`，用于浏览器存储的命名空间（§7.4）。
 
 ### 4.3 Bundle — `data/bundle.js`
 
@@ -139,7 +158,18 @@ RK.data.preload({"manifest": {...}, "datasets": {"comps": {...}, ...}});
 - `data-rk="<component id>"`：挂载点；`data-rk-data="<dataset id>"`：绑定数据集（UI 组件可省略）。
 - options：`data-rk-options='{"…"}'` 属性或子元素 `<script type="application/json" data-rk-options>`（推荐）。
 - `--rk-span`：12 栅格列宽（默认 12）；`--rk-h`：图表高度。
-- 页面结构固定 16:9（打印 13.333in × 7.5in），屏幕上可自适应。
+- 页面结构固定 16:9（打印 13.333in × 7.5in），屏幕上可自适应；`<html data-rk-page-size="letter" | "a4">` 改为 Letter / A4 横向
+  （builder `Report(page_size=…)` 同时追加对应的 `@page` 规则）。
+
+其他属性与 meta（builder 输出，手写 HTML 时可选）：
+
+| 位置 | 属性 / meta | 作用 |
+|---|---|---|
+| `<html>` | `lang`、`data-rk-theme`、`data-rk-updown="cn"`、`data-rk-page-size`、`data-rk-autoboot="false"` | 语言、主题、红涨绿跌（§7.5）、页面尺寸、关闭自动启动（之后手动 `RK.boot(cfg)`） |
+| `<head>` | `rk:locale`、`rk:data`、`rk:data-source`、`rk:api`、`rk:themes`、`rk:version`、`rk:built`、`generator=ReportKit` | 界面语言（优先于 `lang`）、数据位置与模式、主题下拉列表、kit 版本、构建日期（参与 reportKey）；`generator` 让 builder 识别自己写过的文件 |
+| 页面 / block 标题 | `data-rk-template="…{{…}}…"` | 标题模板（§7.1），元素文字为回退文本 |
+| `section.rk-page` | `data-rk-filters="off"` | 本页忽略全局筛选与交叉选择（§7.2） |
+| `section.rk-page` | `data-rk-page="…"`、`class="rk-page--cover" / "rk-page--section"` | 导航标题、封面 / 章节页 |
 
 ## 6. 组件契约
 
@@ -170,9 +200,14 @@ RK.component({
 | `field(name)` / `title(name)` / `fmtOf(name)` | 字段定义 / 标题 / 格式 |
 | `format(v, spec)` | `RK.format` |
 | `theme` | 当前主题 token（`cat[]`, `seq[]`, `div[]`, `ink`, `accent` …） |
-| `select(field, value)` | 交叉筛选：切换本组件发起的 `in` 过滤 |
+| `select(field, value, opt?)` | 交叉筛选：切换本组件发起的 `in` 过滤；`opt.scope: 'global' \| 'dataset'`（默认取 `options.crossFilterScope`，通用字段名默认 `dataset`） |
+| `setSelection(field, values, opt?)` / `clearSelection()` | 整体替换 / 清除本组件的选择（刷选、框选） |
 | `selected(field)` | 本组件当前选中值数组（用于高亮） |
+| `ignoredSelections` | 因会使本组件为空而被忽略的其他组件选择的 key（§7.2） |
+| `data(id)` / `view(id, opts)` | 读取其他数据集（`view` 默认排除本组件自己的选择，并遵守本页 / 本组件的 filters 开关） |
 | `store` | `RK.store`（filters / params / state） |
+| `emit(type, payload)` | 在 `RK.bus` 上发事件（自动带 `block` id） |
+| `id` / `component` | block id、组件 id |
 | `print` | 是否处于打印渲染 |
 | `motion` | 是否允许动画（prefers-reduced-motion / 打印时为 false） |
 
@@ -200,12 +235,17 @@ RK.component({
     "format":   {"type": "string", "default": null, "desc": "Value format; defaults to the low field's format"}
   },
   "interactions": ["hover tooltip", "click to highlight", "PNG / CSV export"],
+  "optionDeps": {"basemap": {"world-50m": ["geo-world-50m"]}},
   "samples": [
     {"title": "Equity value per share", "data": "valuation_ranges", "height": 340,
      "options": {"encode": {"label": "method", "low": "low", "high": "high"}, "refLines": [{"value": 42.5, "label": "Current $42.50"}]}}
   ]
 }
 ```
+
+`optionDeps`（I6，可选；上例取自 `choropleth`）：`{"<option>": {"<value>": ["<vendor id>", …]}}`。builder 计算依赖时，block 上该选项的值（未设置时取 manifest
+`options.<option>.default`；点号路径指向嵌套选项；数组值逐个匹配；布尔 / 数字按 JSON 拼写 `"true"` / `"2"`）命中的 vendor 包会被追加打包。
+校验器会报出 `optionDeps` 中不存在的 vendor id。目前 `choropleth`、`bubble-map` 用它在 `basemap: "world-50m"` 时打包 `geo-world-50m`。
 
 类别（`category`）：`layout` 版式与叙事 · `controls` 交互控件 · `valuation` 估值 · `trend` 时间趋势 ·
 `comparison` 规模与排名 · `composition` 结构占比 · `bridge` 偏差与桥接 · `distribution` 相关与分布 ·
@@ -214,7 +254,9 @@ RK.component({
 ## 7. 运行时 API（摘要）
 
 ```js
-RK.boot()                                   // 自动：加载数据 → 主题 → 挂载所有 [data-rk] → 导航/动效/打印
+RK.boot(cfg?)                               // 自动：加载数据 → 主题 → 挂载所有 [data-rk] → 导航/动效/打印
+                                            // cfg: {token, api, source, base, bundle, theme, ignoreSavedTheme, progress, root, force}
+RK.data.adapter('name', cfg => Promise.resolve({manifest, datasets}))   // 自定义数据源；<meta name="rk:data-source" content="name">
 RK.mount(el, {component, data, options})    // 命令式挂载（gallery 使用）
 RK.data.get(id) / RK.data.view(id, opts) / RK.data.put(json)
 RK.store.setFilter(key, {field, op:'in'|'between'|'search'|'expr', ...}) / setParam(name, v) / subscribe(fn)
@@ -318,3 +360,30 @@ RK.runtime.printFit()     // -> [{id, zoom, clipped, box:[w,h], content:[w,h]}]�
 RK.runtime.printUnfit()   // 恢复（afterprint 自动调用）
 // block options.printFit: false 跳过某个 block
 ```
+
+注意：屏幕上的缩放仍禁止使用 CSS `zoom`（ECharts 命中位置会错）；打印时没有指针交互，所以 `print.css`（Letter / A4 页面）与 printFit 使用 `zoom`。
+
+### 7.7 通用 block options（运行时处理，对任何组件生效）
+
+| option | 默认 | 作用 |
+|---|---|---|
+| `encode` | manifest 默认 | 通道 → 字段 |
+| `filters` | `true` | `false`：忽略全局筛选与交叉选择（整页用 `data-rk-filters="off"`） |
+| `ignoreFilters` | — | 忽略指定 key 的筛选（字符串或数组） |
+| `where` | — | 本 block 的行级预筛选（RK.expr 行公式，可用 `@param`） |
+| `choices` / `choiceLabels` | — | 标题栏指标 / 维度下拉框（§7.3） |
+| `selectionFallback` | `true` | `false`：不忽略导致本 block 为空的其他 block 选择（§7.2） |
+| `badges` | `true` | `false`：不显示 Filtered / Selection 徽标 |
+| `crossFilterScope` | 按字段 | `ctx.select` 的默认范围：`'global'`（所有含该字段的数据集）或 `'dataset'` |
+| `printFit` | `true` | `false`：打印时不缩放（§7.6） |
+| `tools` | `true` | `false`：不显示工具栏（View data / CSV / PNG / Expand） |
+| `aria` | 开启 | （ECharts 组件）`false` 关闭 ECharts aria 自动描述 |
+
+### 7.8 第三方库完整性（I6）
+
+`vendor/vendor.json` 是唯一事实来源：每个包写精确版本、许可、上游仓库、保留哪些文件，并记录 `integrity`（npm tarball 的
+sha512，`local` 生成的包没有）与 `sha256`（每个分发文件）。`python3 tools/vendor.py --check` 离线校验所有文件存在且哈希一致
+（`tools/check.sh` 第一步）；`--rehash [id]` 在有意替换文件后重新记录；`python3 tools/vendor.py <id>` 用
+`npm pack --ignore-scripts` 重新获取，tarball integrity 与记录不符时报错。当前 11 个条目：9 个库 / 数据包
+（echarts、leaflet、leaflet-markercluster、leaflet-heat、topojson-client、world-atlas、tabulator、geo-world、geo-world-50m）
++ 2 套字体（Inter、Source Serif 4，输出到 `kit/fonts/`）。

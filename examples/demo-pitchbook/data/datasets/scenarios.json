@@ -1,0 +1,32 @@
+{
+  "id": "scenarios",
+  "title": "Management plan scenarios",
+  "schema": {"fields": [
+    {"name": "scenario", "type": "string", "title": "Scenario"},
+    {"name": "year", "type": "string", "title": "Year"},
+    {"name": "revenue", "type": "number", "title": "Revenue", "format": "$#,##0.0", "unit": "USD m"},
+    {"name": "ebitda", "type": "number", "title": "EBITDA", "format": "$#,##0.0", "unit": "USD m"},
+    {"name": "fcf", "type": "number", "title": "Unlevered free cash flow", "format": "$#,##0.0", "unit": "USD m"}
+  ]},
+  "data": [
+    {"scenario": "Base", "year": "2025A", "revenue": 4850.0, "ebitda": 897.2, "fcf": 438.1},
+    {"scenario": "Base", "year": "2026E", "revenue": 5190.0, "ebitda": 996.5, "fcf": 498.6},
+    {"scenario": "Base", "year": "2027E", "revenue": 5560.0, "ebitda": 1089.8, "fcf": 550.1},
+    {"scenario": "Base", "year": "2028E", "revenue": 5940.0, "ebitda": 1188.0, "fcf": 607.6},
+    {"scenario": "Base", "year": "2029E", "revenue": 6314.2, "ebitda": 1281.8, "fcf": 664.3},
+    {"scenario": "Base", "year": "2030E", "revenue": 6680.4, "ebitda": 1369.5, "fcf": 717.0},
+    {"scenario": "Upside", "year": "2025A", "revenue": 4850.0, "ebitda": 897.2, "fcf": 438.1},
+    {"scenario": "Upside", "year": "2026E", "revenue": 5262.7, "ebitda": 1031.5, "fcf": 511.9},
+    {"scenario": "Upside", "year": "2027E", "revenue": 5743.2, "ebitda": 1171.6, "fcf": 588.8},
+    {"scenario": "Upside", "year": "2028E", "revenue": 6279.0, "ebitda": 1324.9, "fcf": 675.3},
+    {"scenario": "Upside", "year": "2029E", "revenue": 6831.6, "ebitda": 1475.6, "fcf": 764.6},
+    {"scenario": "Upside", "year": "2030E", "revenue": 7398.6, "ebitda": 1627.7, "fcf": 854.7},
+    {"scenario": "Downside", "year": "2025A", "revenue": 4850.0, "ebitda": 897.2, "fcf": 438.1},
+    {"scenario": "Downside", "year": "2026E", "revenue": 5020.2, "ebitda": 923.7, "fcf": 474.5},
+    {"scenario": "Downside", "year": "2027E", "revenue": 5177.3, "ebitda": 947.4, "fcf": 487.9},
+    {"scenario": "Downside", "year": "2028E", "revenue": 5349.7, "ebitda": 984.3, "fcf": 506.8},
+    {"scenario": "Downside", "year": "2029E", "revenue": 5526.2, "ebitda": 1022.3, "fcf": 527.9},
+    {"scenario": "Downside", "year": "2030E", "revenue": 5680.9, "ebitda": 1051.0, "fcf": 546.4}
+  ],
+  "meta": {"asOf": "2026-10-10", "notes": ["Base case 2025A–2028E matches financials; DCF and LBO use Base case 2026E–2030E.", "Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."], "source": "Project Atlas analysis (synthetic); Helios Industrial management plan", "unit": "USD m"}
+}

@@ -104,10 +104,25 @@
 /* tooltips / popups rendered by Tabulator into <body> */
 .tabulator-tooltip { background: var(--rk-tooltip-bg); color: var(--rk-tooltip-ink); border: 1px solid var(--rk-rule); border-radius: 4px; font-family: var(--rk-font-sans); box-shadow: 0 6px 18px rgba(15, 23, 42, .14); }
 
-/* print: Tabulator swaps in a plain HTML table (printAsHtml) */
-.rk-dgrid .tabulator-print-table { width: 100%; font-size: 10.5px; color: var(--rk-ink); font-variant-numeric: tabular-nums; }
-.rk-dgrid .tabulator-print-table th { text-align: left; font-weight: 600; color: var(--rk-ink-2); border-bottom: 1.5px solid var(--rk-accent); padding: 3px 6px; }
-.rk-dgrid .tabulator-print-table td { padding: 2px 6px; border-bottom: 1px solid var(--rk-grid); }
+/* print (ctx.print): a static .rk-table replaces the virtual grid — same columns / order, the rows that fit the
+   block + "… n more rows". Sized identically in screen and print media: the runtime measures it at beforeprint. */
+.rk-dgrid-print { position: relative; }
+.rk-dgrid-print__table { width: 100%; font-size: 10.5px; line-height: 1.3; }
+.rk-dgrid-print__table th, .rk-dgrid-print__table td { padding: 3px 6px; }
+.rk-dgrid-print__table thead th { font-size: 10.5px; white-space: normal; line-height: 1.2; vertical-align: bottom; }
+.rk-dgrid-print__table thead tr.rk-table__group th { border-bottom: 0; padding-bottom: 0; color: var(--rk-ink-2); font-size: 10.5px; text-transform: none; letter-spacing: 0; text-align: left; }
+.rk-dgrid-print__table thead tr.rk-table__group th[rowspan] { border-bottom: 1.5px solid var(--rk-accent); padding-bottom: 3px; }
+.rk-dgrid-print__table thead tr.rk-table__group th[rowspan].is-num { text-align: right; }
+.rk-dgrid-print__table thead tr.rk-table__group th.rk-dgrid-print__grp { text-align: center; }
+.rk-dgrid-print__grp > span { display: block; padding-bottom: 2px; border-bottom: 1px solid var(--rk-rule); color: var(--rk-accent); font-size: var(--rk-fs-xs); text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+.rk-dgrid-print__table tbody tr:hover td { background: none; }
+.rk-dgrid-print__table tr.is-target td:first-child { box-shadow: inset 3px 0 0 var(--rk-accent-2); }
+.rk-dgrid-print__table tr.is-selected td { font-weight: 600; }
+.rk-dgrid-print__table tr.is-selected td:first-child { box-shadow: inset 3px 0 0 var(--rk-accent); }
+.rk-dgrid-print__t { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rk-dgrid-print.is-compact .rk-dgrid-print__table, .rk-dgrid-print.is-compact .rk-dgrid-print__table thead th { font-size: 9.5px; }
+.rk-dgrid-print.is-compact .rk-dgrid-print__table th, .rk-dgrid-print.is-compact .rk-dgrid-print__table td { padding: 2px 4px; }
+.rk-dgrid-print__more { margin: 5px 0 0; font-size: var(--rk-fs-xs); line-height: 1.35; color: var(--rk-ink-3); }
 
 /* entry */
 .rk-dgrid.is-in .tabulator-tableholder { animation: rk-dgrid-in 480ms var(--rk-ease) both; }

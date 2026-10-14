@@ -13,6 +13,36 @@
   var util = RK.util, h = util.h, isNum = util.isNum;
   var EPS = 1e-6;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'avpTable.premiumTitle': '较以下价格的溢价 /（折价）：', 'avpTable.priceLabel': '每股价格', 'avpTable.equityLabel': '隐含股权价值',
+      'avpTable.netDebtLabel': '加：净债务', 'avpTable.netCashLabel': '减：净现金', 'avpTable.evLabel': '隐含企业价值',
+      'avpTable.currentLabel': '现价', 'avpTable.offerLabel': '要约价', 'avpTable.units': '百万美元（每股数据除外）',
+      'avpTable.offerPrice': '要约价格', 'avpTable.lowerOffer': '降低要约价格', 'avpTable.raiseOffer': '提高要约价格',
+      'avpTable.premiumTo': '较{Ref}（{price}）溢价 {pct}', 'avpTable.discountTo': '较{Ref}（{price}）折价 {pct}',
+      'avpTable.noteShares': '{equity}基于 {shares} 百万股完全稀释股数', 'avpTable.noteNetDebt': '；{Ev}包含净债务 {amount} 百万',
+      'avpTable.noteNetCash': '；{Ev}包含净现金 {amount} 百万', 'avpTable.note': '注：',
+      'avpTable.setOffer': '将 {price} 设为要约价格', 'avpTable.premium': '溢价', 'avpTable.discount': '折价',
+      'avpTable.dilutedShares': '× 完全稀释股数（百万股）', 'avpTable.plusNetDebt': '+ 净债务', 'avpTable.lessNetCash': '− 净现金',
+      'avpTable.multiple': '= 倍数', 'avpTable.clickHint': '点击价格将其设为要约价格'
+    });
+  }
+  // default labels (options left at their English defaults follow the report locale; custom labels are kept)
+  var LABELS = {
+    premiumTitle: 'Premium / (discount) to:', priceLabel: 'Price per share', equityLabel: 'Implied equity value',
+    netDebtLabel: 'Plus: net debt', netCashLabel: 'Less: net cash', evLabel: 'Implied enterprise value',
+    currentLabel: 'Current', offerLabel: 'Offer', units: 'USD m, except per-share data'
+  };
+  /** Option label o[k], translated when it is the English default. */
+  function lab(o, k) { var v = o[k]; return v === LABELS[k] ? tr('avpTable.' + k, v) : v; }
+
   /* ---------------- @param binding ---------------- */
   function paramName(v) { return typeof v === 'string' && /^@[A-Za-z_]\w*$/.test(v) ? v.slice(1) : null; }
 
@@ -87,7 +117,7 @@
     cols.forEach(function (c) {
       c.isCurrent = near(c.price, current);
       c.isOffer = near(c.price, offer);
-      if (!c.tag) c.tag = c.isOffer ? o.offerLabel : c.isCurrent ? o.currentLabel : null;
+      if (!c.tag) c.tag = c.isOffer ? lab(o, 'offerLabel') : c.isCurrent ? lab(o, 'currentLabel') : null;
       // a moving offer that is not one of the levels keeps one identity, so its figures tween instead of rebuilding
       c.key = c.isOffer && c.inserted ? 'offer' : 'p' + c.price.toFixed(4);
     });
@@ -107,9 +137,9 @@
 
     sections.forEach(function (sec) {
       if (sec === 'premiums') {
-        var refs = o.references && o.references.length ? o.references : (isNum(current) ? [{ label: o.currentLabel, value: current }] : []);
+        var refs = o.references && o.references.length ? o.references : (isNum(current) ? [{ label: lab(o, 'currentLabel'), value: current }] : []);
         if (!refs.length) return;
-        rows.push({ type: 'section', key: 'sec:prem', label: o.premiumTitle });
+        rows.push({ type: 'section', key: 'sec:prem', label: lab(o, 'premiumTitle') });
         refs.forEach(function (r, i) {
           var rv = val(r.value);
           rows.push({ type: 'premium', key: 'prem:' + i, label: r.label, indent: true, basis: rv, basisFmt: pf, fmt: o.premiumFormat, sign: true,
@@ -118,11 +148,11 @@
         });
       } else if (sec === 'value') {
         if (!isNum(shares)) return;
-        rows.push({ type: 'value', key: 'equity', label: o.equityLabel, fmt: vf, strong: true, sep: rows.length > 0, fn: equity });
+        rows.push({ type: 'value', key: 'equity', label: lab(o, 'equityLabel'), fmt: vf, strong: true, sep: rows.length > 0, fn: equity });
         if (o.showBridge !== false) {
-          rows.push({ type: 'value', key: 'netdebt', label: netDebt < 0 ? o.netCashLabel : o.netDebtLabel, fmt: vf, muted: true, indent: true,
+          rows.push({ type: 'value', key: 'netdebt', label: netDebt < 0 ? lab(o, 'netCashLabel') : lab(o, 'netDebtLabel'), fmt: vf, muted: true, indent: true,
             fn: function () { return netDebt < 0 ? -netDebt : netDebt; } });
-          rows.push({ type: 'value', key: 'ev', label: o.evLabel, fmt: vf, total: true, fn: ev });
+          rows.push({ type: 'value', key: 'ev', label: lab(o, 'evLabel'), fmt: vf, total: true, fn: ev });
         }
       } else if (sec === 'metrics') {
         var group = null;
@@ -215,10 +245,10 @@
       // offer stepper
       var stepVal = h('span.rk-avp__stepval.rk-num');
       var stepPrem = h('span.rk-avp__steprem.rk-num');
-      var minus = h('button.rk-btn.rk-avp__stepbtn', { type: 'button', 'aria-label': 'Lower offer price', text: '−' });
-      var plus = h('button.rk-btn.rk-avp__stepbtn', { type: 'button', 'aria-label': 'Raise offer price', text: '+' });
+      var minus = h('button.rk-btn.rk-avp__stepbtn', { type: 'button', 'aria-label': tr('avpTable.lowerOffer', 'Lower offer price'), text: '−' });
+      var plus = h('button.rk-btn.rk-avp__stepbtn', { type: 'button', 'aria-label': tr('avpTable.raiseOffer', 'Raise offer price'), text: '+' });
       bar.appendChild(stepPrem);
-      bar.appendChild(h('div.rk-avp__stepper', h('span.rk-ctl__label', 'Offer price'), minus, stepVal, plus));
+      bar.appendChild(h('div.rk-avp__stepper', h('span.rk-ctl__label', tr('avpTable.offerPrice', 'Offer price')), minus, stepVal, plus));
 
       /* ---------------- offer changes ---------------- */
       function offerParam() { return paramName(cur.options.offer); }
@@ -259,19 +289,20 @@
         if (showStep) {
           stepVal.textContent = RK.format(m.offer, o.priceFormat);
           var pc = isNum(m.current) && m.current > 0 ? m.offer / m.current - 1 : null;
-          stepPrem.textContent = pc == null ? '' : RK.format(Math.abs(pc), '0.0%') + (pc < 0 ? ' discount' : ' premium') + ' to ' +
-            String(o.currentLabel || 'current').toLowerCase() + ' (' + RK.format(m.current, o.priceFormat) + ')';
+          stepPrem.textContent = pc == null ? '' : tr(pc < 0 ? 'avpTable.discountTo' : 'avpTable.premiumTo', pc < 0 ? '{pct} discount to {ref} ({price})' : '{pct} premium to {ref} ({price})',
+            { pct: RK.format(Math.abs(pc), '0.0%'), ref: String(lab(o, 'currentLabel') || 'current').toLowerCase(), Ref: String(lab(o, 'currentLabel') || ''), price: RK.format(m.current, o.priceFormat) });
         }
         notesEl.innerHTML = '';
         var lines = [];
         if (o.autoNotes !== false && isNum(m.shares)) {
-          lines.push(o.equityLabel + ' based on ' + RK.format(m.shares, '#,##0.0') + 'm diluted shares' +
-            (o.showBridge !== false ? '; ' + o.evLabel.charAt(0).toLowerCase() + o.evLabel.slice(1) + ' includes ' +
-              (m.netDebt < 0 ? 'net cash of ' : 'net debt of ') + RK.format(Math.abs(m.netDebt), o.valueFormat) + 'm' : '') + '.');
+          var evl = lab(o, 'evLabel');
+          lines.push(tr('avpTable.noteShares', '{equity} based on {shares}m diluted shares', { equity: lab(o, 'equityLabel'), shares: RK.format(m.shares, '#,##0.0') }) +
+            (o.showBridge !== false ? tr(m.netDebt < 0 ? 'avpTable.noteNetCash' : 'avpTable.noteNetDebt', m.netDebt < 0 ? '; {ev} includes net cash of {amount}m' : '; {ev} includes net debt of {amount}m',
+              { ev: evl.charAt(0).toLowerCase() + evl.slice(1), Ev: evl, amount: RK.format(Math.abs(m.netDebt), o.valueFormat) }) : '') + (RK.i18n && RK.i18n.lang() === 'zh' ? '。' : '.'));
         }
         m.notes.forEach(function (n, i) { lines.push('(' + (i + 1) + ') ' + n); });
         (o.footnotes || []).forEach(function (n) { if (n) lines.push(n); });
-        lines.forEach(function (l, i) { notesEl.appendChild(h('p', (i === 0 && o.autoNotes !== false && isNum(m.shares) ? 'Note: ' : '') + l)); });
+        lines.forEach(function (l, i) { notesEl.appendChild(h('p', (i === 0 && o.autoNotes !== false && isNum(m.shares) ? tr('avpTable.note', 'Note: ') : '') + l)); });
         notesEl.style.display = lines.length ? '' : 'none';
         edges();
       }
@@ -286,8 +317,8 @@
         table.style.minWidth = (260 + n * 74) + 'px';
         var cg = h('colgroup', h('col.rk-avp__c-label'), h('col.rk-avp__c-basis'));
         m.cols.forEach(function () { cg.appendChild(h('col')); });
-        var tags = h('tr.rk-avp__tags', h('th.rk-avp__units', { colspan: 2, scope: 'col' }, o.units || ''));
-        var prices = h('tr.rk-avp__prices', h('th.rk-avp__pxlabel', { colspan: 2, scope: 'row' }, o.priceLabel));
+        var tags = h('tr.rk-avp__tags', h('th.rk-avp__units', { colspan: 2, scope: 'col' }, lab(o, 'units') || ''));
+        var prices = h('tr.rk-avp__prices', h('th.rk-avp__pxlabel', { colspan: 2, scope: 'row' }, lab(o, 'priceLabel')));
         var enter = prev && prev.cols.map(function (c) { return c.key; });
         m.cols.forEach(function (c, j) {
           var isNew = enter && enter.indexOf(c.key) < 0;
@@ -295,28 +326,28 @@
           tags.appendChild(h('th.rk-avp__tag.is-num', { class: cls.trim() || null, scope: 'col' },
             c.tag ? h('span.rk-avp__pill', { class: 'rk-avp__pill--' + (c.isOffer ? 'offer' : c.isCurrent ? 'current' : c.kind === 'offer' ? 'proposal' : c.kind || 'level') }, c.tag) : null));
           var th = h('th.rk-avp__px.is-num', { class: cls.trim() || null, scope: 'col', dataset: { col: j } }, RK.format(c.price, o.priceFormat));
-          if (o.clickToOffer !== false) { th.classList.add('is-click'); th.setAttribute('title', 'Set ' + RK.format(c.price, o.priceFormat) + ' as the offer price'); th.tabIndex = 0; }
+          if (o.clickToOffer !== false) { th.classList.add('is-click'); th.setAttribute('title', tr('avpTable.setOffer', 'Set {price} as the offer price', { price: RK.format(c.price, o.priceFormat) })); th.tabIndex = 0; }
           heads.push(th);
           prices.appendChild(th);
         });
         var thead = h('thead', tags, prices), tbody = h('tbody');
         m.rows.forEach(function (r, i) {
-          var tr = h('tr', { class: 'rk-avp__row is-' + r.type + (r.total ? ' is-total' : '') + (r.strong ? ' is-strong' : '') + (r.sep ? ' is-sep' : '') + (r.muted ? ' is-muted' : ''), style: { '--rk-i': i } });
+          var rowEl = h('tr', { class: 'rk-avp__row is-' + r.type + (r.total ? ' is-total' : '') + (r.strong ? ' is-strong' : '') + (r.sep ? ' is-sep' : '') + (r.muted ? ' is-muted' : ''), style: { '--rk-i': i } });
           var label = h('td.rk-avp__label', { class: r.indent ? 'is-indent' : null }, r.label, r.note ? h('sup.rk-avp__fn', '(' + r.note + ')') : null);
           if (r.type === 'section') {
             label.setAttribute('colspan', 2);
-            tr.appendChild(label);
+            rowEl.appendChild(label);
           } else {
-            tr.appendChild(label);
-            tr.appendChild(h('td.rk-avp__basis.is-num', r.basis != null ? RK.format(r.basis, r.basisFmt) : ''));
+            rowEl.appendChild(label);
+            rowEl.appendChild(h('td.rk-avp__basis.is-num', r.basis != null ? RK.format(r.basis, r.basisFmt) : ''));
           }
           m.cols.forEach(function (c, j) {
             var isNew = enter && enter.indexOf(c.key) < 0;
             var td = h('td.is-num', { class: (colClass(c) + (isNew ? ' is-enter' : '')).trim() || null, dataset: { col: j, row: i } });
-            tr.appendChild(td);
+            rowEl.appendChild(td);
             if (r.type !== 'section') cells[r.key + '|' + c.key] = { td: td, v: null };
           });
-          tbody.appendChild(tr);
+          tbody.appendChild(rowEl);
         });
         table.appendChild(cg);
         table.appendChild(thead);
@@ -336,7 +367,7 @@
           var th = heads[j];
           if (!th) return;
           var from = prev && prev.cols[j] ? prev.cols[j].price : null;
-          if (o.clickToOffer !== false) th.setAttribute('title', 'Set ' + RK.format(c.price, o.priceFormat) + ' as the offer price');
+          if (o.clickToOffer !== false) th.setAttribute('title', tr('avpTable.setOffer', 'Set {price} as the offer price', { price: RK.format(c.price, o.priceFormat) }));
           jobs.push({ td: th, from: from, to: c.price, fmt: o.priceFormat });
         });
         m.rows.forEach(function (r, i) {
@@ -384,28 +415,28 @@
         var px = RK.format(c.price, pf), rows = [];
         var eq = isNum(m.shares) ? c.price * m.shares : null;
         if (r.type === 'premium') {
-          rows.push({ label: 'Offer price', value: px });
+          rows.push({ label: tr('avpTable.offerPrice', 'Offer price'), value: px });
           rows.push({ label: r.label, value: RK.format(r.ref, pf) });
-          rows.push({ label: v != null && v < 0 ? 'Discount' : 'Premium', value: RK.format(v, r.fmt), bold: true });
+          rows.push({ label: v != null && v < 0 ? tr('avpTable.discount', 'Discount') : tr('avpTable.premium', 'Premium'), value: RK.format(v, r.fmt), bold: true });
         } else if (r.key === 'equity') {
-          rows.push({ label: 'Offer price', value: px });
-          rows.push({ label: '× Diluted shares (m)', value: RK.format(m.shares, '#,##0.0') });
-          rows.push({ label: '= ' + o.equityLabel, value: RK.format(v, vf), bold: true });
+          rows.push({ label: tr('avpTable.offerPrice', 'Offer price'), value: px });
+          rows.push({ label: tr('avpTable.dilutedShares', '× Diluted shares (m)'), value: RK.format(m.shares, '#,##0.0') });
+          rows.push({ label: '= ' + lab(o, 'equityLabel'), value: RK.format(v, vf), bold: true });
         } else if (r.key === 'ev') {
-          rows.push({ label: o.equityLabel, value: RK.format(eq, vf) });
-          rows.push({ label: m.netDebt < 0 ? '− Net cash' : '+ Net debt', value: RK.format(Math.abs(m.netDebt), vf) });
-          rows.push({ label: '= ' + o.evLabel, value: RK.format(v, vf), bold: true });
+          rows.push({ label: lab(o, 'equityLabel'), value: RK.format(eq, vf) });
+          rows.push({ label: m.netDebt < 0 ? tr('avpTable.lessNetCash', '− Net cash') : tr('avpTable.plusNetDebt', '+ Net debt'), value: RK.format(Math.abs(m.netDebt), vf) });
+          rows.push({ label: '= ' + lab(o, 'evLabel'), value: RK.format(v, vf), bold: true });
         } else if (r.key === 'netdebt') {
           rows.push({ label: r.label, value: RK.format(v, vf), bold: true });
         } else if (r.type === 'multiple') {
           var num = r.kind === 'equity' ? eq : r.kind === 'price' ? c.price : (eq == null ? null : eq + m.netDebt);
-          var numLabel = r.kind === 'equity' ? o.equityLabel : r.kind === 'price' ? 'Offer price' : o.evLabel;
+          var numLabel = r.kind === 'equity' ? lab(o, 'equityLabel') : r.kind === 'price' ? tr('avpTable.offerPrice', 'Offer price') : lab(o, 'evLabel');
           rows.push({ label: numLabel, value: RK.format(num, r.kind === 'price' ? pf : vf) });
           rows.push({ label: '÷ ' + ((r.metric && r.metric.name) || r.label), value: RK.format(r.basis, r.basisFmt) });
-          rows.push({ label: '= Multiple', value: RK.format(v, r.fmt), bold: true });
+          rows.push({ label: tr('avpTable.multiple', '= Multiple'), value: RK.format(v, r.fmt), bold: true });
         }
         var title = px + (c.tag ? ' · ' + c.tag : '');
-        return RK.chart.tip(title, rows, c.isOffer && !c.isCurrent ? null : (o.clickToOffer !== false ? 'Click the price to make it the offer' : null));
+        return RK.chart.tip(title, rows, c.isOffer && !c.isCurrent ? null : (o.clickToOffer !== false ? tr('avpTable.clickHint', 'Click the price to make it the offer') : null));
       }
       function onOver(e) {
         var td = e.target.closest('td[data-col], th[data-col]');

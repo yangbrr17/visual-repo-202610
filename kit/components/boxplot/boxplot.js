@@ -8,6 +8,22 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'boxplot.overallMedian': '整体中位数', 'boxplot.overallMean': '整体均值', 'boxplot.observations': '样本数', 'boxplot.maximum': '最大值',
+      'boxplot.minimum': '最小值', 'boxplot.upperWhisker': '上须', 'boxplot.lowerWhisker': '下须', 'boxplot.upperQuartile': '上四分位数',
+      'boxplot.lowerQuartile': '下四分位数', 'boxplot.target': '目标公司', 'boxplot.whiskers': '须线为 1.5 × 四分位距（{iqr}）',
+      'boxplot.outlier': '离群值（超出须线）'
+    });
+  }
+
   /* ---------------- stats ---------------- */
   /** Quantile with linear interpolation between closest ranks (Excel QUARTILE.INC / type 7). */
   function quantile(sorted, p) {
@@ -105,10 +121,10 @@
 
       /* custom box series data: [catIndex, low, q1, median, q3, high, mean, targetValue] */
       var boxData = groups.map(function (g, i) {
-        var tr = g.rows.filter(isTarget)[0];
+        var tRow = g.rows.filter(isTarget)[0];
         return {
-          value: [i, g.s.low, g.s.q1, g.s.median, g.s.q3, g.s.high, g.s.mean, tr ? tr[enc.value] : null],
-          stats: g.s, key: g.key, target: tr || null,
+          value: [i, g.s.low, g.s.q1, g.s.median, g.s.q3, g.s.high, g.s.mean, tRow ? tRow[enc.value] : null],
+          stats: g.s, key: g.key, target: tRow || null,
           dim: selG.length && selG.indexOf(g.key) < 0
         };
       });
@@ -190,7 +206,8 @@
        * left end, then the gaps between boxes (above, then below the line) — clear of every box, whisker,
        * point column, value label and target label. Drawn by the box series above the line, with a halo.
        */
-      var olText = overall != null ? 'Overall ' + o.overall + ' ' + RK.format(overall, fmt) : '';
+      var olStat = o.overall === 'mean' ? tr('boxplot.overallMean', 'Overall mean') : tr('boxplot.overallMedian', 'Overall median');
+      var olText = overall != null ? olStat + ' ' + RK.format(overall, fmt) : '';
       var olFont = 'italic 400 10.5px ' + t.fontSans;
       function overallLabel(api) {
         var y = api.coord([0, overall])[1], bandPx = api.size([1, 0])[0];
@@ -225,7 +242,7 @@
           if (!hit({ x: cands[j][0], y: cands[j][1], w: tw, h: th })) return { type: 'text', name: 'overall', silent: true, style: util.merge(style, { x: cands[j][0] + 2, y: cands[j][1], text: olText }) };
         }
         // no room along the line (every gap holds a box): stack the label in the right gutter at the line's end
-        var stacked = ['Overall', o.overall, RK.format(overall, fmt)].join('\n');
+        var stacked = olStat.split(' ').concat([RK.format(overall, fmt)]).join('\n');
         return { type: 'text', name: 'overall', silent: true, style: util.merge(style, { x: right + 4, y: y - 19.5, text: stacked }) };
       }
 
@@ -304,17 +321,17 @@
           formatter: function (p) {
             if (p.seriesId === 'box') {
               var d = boxData[p.dataIndex], s = d.stats, f = function (x) { return RK.format(x, fmt); };
-              var tr = [
-                { label: 'Observations', value: String(s.n) },
-                { label: o.whiskers === 'minmax' ? 'Maximum' : 'Upper whisker', value: f(s.high) },
-                { label: 'Upper quartile', value: f(s.q3) },
-                { label: 'Median', value: f(s.median), bold: true },
-                { label: 'Lower quartile', value: f(s.q1) },
-                { label: o.whiskers === 'minmax' ? 'Minimum' : 'Lower whisker', value: f(s.low) },
-                { label: 'Mean', value: f(s.mean) }
+              var tipRows = [
+                { label: tr('boxplot.observations', 'Observations'), value: String(s.n) },
+                { label: o.whiskers === 'minmax' ? tr('boxplot.maximum', 'Maximum') : tr('boxplot.upperWhisker', 'Upper whisker'), value: f(s.high) },
+                { label: tr('boxplot.upperQuartile', 'Upper quartile'), value: f(s.q3) },
+                { label: tr('median', 'Median'), value: f(s.median), bold: true },
+                { label: tr('boxplot.lowerQuartile', 'Lower quartile'), value: f(s.q1) },
+                { label: o.whiskers === 'minmax' ? tr('boxplot.minimum', 'Minimum') : tr('boxplot.lowerWhisker', 'Lower whisker'), value: f(s.low) },
+                { label: tr('mean', 'Mean'), value: f(s.mean) }
               ];
-              if (d.target) tr.push({ color: t.accent2, label: String(d.target[nameF] || 'Target'), value: f(d.target[enc.value]) });
-              return C.tip(String(d.key), tr, o.whiskers === 'minmax' ? null : 'Whiskers at 1.5 × IQR (' + f(s.iqr) + ')');
+              if (d.target) tipRows.push({ color: t.accent2, label: String(d.target[nameF] || tr('boxplot.target', 'Target')), value: f(d.target[enc.value]) });
+              return C.tip(String(d.key), tipRows, o.whiskers === 'minmax' ? null : tr('boxplot.whiskers', 'Whiskers at 1.5 × IQR ({iqr})', { iqr: f(s.iqr) }));
             }
             var r = p.data && p.data.row;
             if (!r) return '';
@@ -323,7 +340,7 @@
             return C.tip(title, [
               { label: ctx.title(enc.group), value: String(r[enc.group]) },
               { label: ctx.title(enc.value), value: RK.format(r[enc.value], fmt), bold: true }
-            ], isTarget(r) ? 'Target' : (p.data.outlier ? 'Outlier (beyond whiskers)' : null));
+            ], isTarget(r) ? tr('boxplot.target', 'Target') : (p.data.outlier ? tr('boxplot.outlier', 'Outlier (beyond whiskers)') : null));
           }
         },
         xAxis: vert ? catAxis : valAxis,

@@ -210,6 +210,135 @@
   };
 
   /* ------------------------------------------------------------------ *
+   * i18n — runtime / UI strings
+   * ------------------------------------------------------------------ *
+   *   RK.i18n.locale                       'en' | 'zh-CN' | ... (from <meta name="rk:locale">, else <html lang>)
+   *   RK.i18n.t('viewData', 'View data')   string for the current locale; {name} placeholders filled from vars:
+   *   RK.i18n.t('showingFirst', 'Showing first {max} of {n} rows.', {max: 500, n: 812})
+   *   RK.i18n.add('zh-CN', {myKey: '…'})   components register their own strings (merged into the pack)
+   *   RK.i18n.set('zh-CN')                 switch at runtime (emits 'i18n:changed'; RK.format follows)
+   * Lookup order: exact locale pack ('zh-CN'), the language's pack ('zh' -> 'zh-CN'), 'en', the fallback, the key —
+ * so a component's own key (with its English text as the fallback) works in English before any pack lists it.
+   * Strings are plain text: callers put them in textContent / attributes, never innerHTML.
+   */
+  var PACKS = Object.create(null);
+  PACKS.en = {
+    close: 'Close', viewData: 'View data', downloadCSV: 'Download CSV', downloadPNG: 'Download PNG', downloadSVG: 'Download SVG',
+    expand: 'Expand', noData: 'No data for the current filters', reset: 'Reset', resetAll: 'Reset all', resetZoom: 'Reset zoom',
+    resetView: 'Reset view', clear: 'Clear', clearFilters: 'Clear filters', clearSelection: 'Clear selection',
+    filtered: 'Filtered', filteredView: 'Filtered view', filteredBy: 'Filtered by', filters: 'Filters', activeFilters: 'Active filters',
+    removeFilter: 'Remove filter {label}', selection: 'Selection', selectionNotInView: 'Selection not in this view',
+    selectionIgnored: 'Selections made in other charts ({list}) leave no data here, so this chart ignores them',
+    dataTitle: '{title} — {n} rows', rowsCount: '{n} rows', showingFirst: 'Showing first {max} of {n} rows.',
+    dataLoadError: 'Report data could not be loaded.', page: 'Page {n}', contents: 'Contents', print: 'Print', theme: 'Theme',
+    'theme.navy': 'Navy classic', 'theme.bronze': 'Bronze & ivory', 'theme.slate': 'Slate modern', 'theme.ink': 'Ink (dark)',
+    colon: ': ', listSep: ', ', choose: 'Choose {channel}', metric: 'Metric', dimension: 'Dimension', field: 'Field', value: 'Value', dataset: 'Dataset',
+    yes: 'Yes', no: 'No', none: 'None', all: 'All', other: 'Other', others: 'Others', total: 'Total', subtotal: 'Subtotal',
+    average: 'Average', mean: 'Mean', median: 'Median', min: 'Min', max: 'Max', sum: 'Sum', count: 'Count',
+    high: 'High', low: 'Low', current: 'Current', search: 'Search', searchFor: 'Search {label}…', loading: 'Loading…',
+    apply: 'Apply', cancel: 'Cancel', add: 'Add', remove: 'Remove', run: 'Run', copy: 'Copy', copied: 'Copied', export: 'Export',
+    query: 'Query', builder: 'Builder', examples: 'Examples', history: 'History', results: 'Results', columns: 'Columns', rows: 'Rows',
+    addAsMetric: 'Add as metric', myMetrics: 'My metrics', removeMetric: 'Remove metric {name}', noMetrics: 'No saved metrics',
+    metricAdded: 'Metric "{name}" added', sortAsc: 'Sort ascending', sortDesc: 'Sort descending', previous: 'Previous', next: 'Next',
+    zoomIn: 'Zoom in', zoomOut: 'Zoom out', source: 'Source', notes: 'Notes', scenario: 'Scenario', points: 'points',
+    unknownComponent: 'Unknown component "{id}" — is its script included?', datasetNotFound: 'Dataset "{id}" not found'
+  };
+  PACKS['zh-CN'] = {
+    close: '关闭', viewData: '查看数据', downloadCSV: '下载 CSV', downloadPNG: '下载 PNG', downloadSVG: '下载 SVG',
+    expand: '放大查看', noData: '当前筛选条件下无数据', reset: '重置', resetAll: '全部重置', resetZoom: '重置缩放',
+    resetView: '重置视图', clear: '清除', clearFilters: '清除筛选', clearSelection: '清除选择',
+    filtered: '已筛选', filteredView: '筛选视图', filteredBy: '筛选条件', filters: '筛选', activeFilters: '当前筛选',
+    removeFilter: '移除筛选：{label}', selection: '选择', selectionNotInView: '所选项不在本视图中',
+    selectionIgnored: '其他图表中的选择（{list}）在此没有对应数据，本图表已忽略这些选择',
+    dataTitle: '{title} — {n} 行', rowsCount: '{n} 行', showingFirst: '显示前 {max} 行，共 {n} 行。',
+    dataLoadError: '报告数据无法加载。', page: '第 {n} 页', contents: '目录', print: '打印', theme: '主题',
+    'theme.navy': '经典海军蓝', 'theme.bronze': '古铜象牙', 'theme.slate': '现代石板灰', 'theme.ink': '墨色（深色）',
+    colon: '：', listSep: '、', choose: '选择{channel}', metric: '指标', dimension: '维度', field: '字段', value: '数值', dataset: '数据集',
+    yes: '是', no: '否', none: '无', all: '全部', other: '其他', others: '其他', total: '合计', subtotal: '小计',
+    average: '平均值', mean: '均值', median: '中位数', min: '最小值', max: '最大值', sum: '合计', count: '计数',
+    high: '高', low: '低', current: '当前', search: '搜索', searchFor: '搜索{label}…', loading: '加载中…',
+    apply: '应用', cancel: '取消', add: '添加', remove: '删除', run: '运行', copy: '复制', copied: '已复制', export: '导出',
+    query: '查询', builder: '构建器', examples: '示例', history: '历史记录', results: '结果', columns: '列', rows: '行',
+    addAsMetric: '添加为指标', myMetrics: '我的指标', removeMetric: '删除指标 {name}', noMetrics: '暂无已保存的指标',
+    metricAdded: '已添加指标“{name}”', sortAsc: '升序', sortDesc: '降序', previous: '上一页', next: '下一页',
+    zoomIn: '放大', zoomOut: '缩小', source: '资料来源', notes: '注', scenario: '情景', points: '个点',
+    unknownComponent: '未知组件“{id}”——是否已引入其脚本？', datasetNotFound: '未找到数据集“{id}”'
+  };
+  // a language without its own pack uses this one ('zh', 'zh-Hans', 'zh-SG' -> 'zh-CN')
+  var LANG_PACK = { zh: 'zh-CN', en: 'en' };
+
+  function hasOwn(o, k) { return o != null && Object.prototype.hasOwnProperty.call(o, k); }
+
+  /** Normalise a BCP-47 tag: 'zh_cn' -> 'zh-CN', 'EN-us' -> 'en-US'. */
+  function normLocale(tag) {
+    var parts = String(tag || '').trim().replace(/_/g, '-').split('-').filter(Boolean);
+    if (!parts.length) return 'en';
+    return parts.map(function (p, i) { return i === 0 ? p.toLowerCase() : p.length === 2 ? p.toUpperCase() : p; }).join('-');
+  }
+
+  function detectLocale() {
+    if (typeof document === 'undefined' || !document) return 'en';
+    var m = document.querySelector && document.querySelector('meta[name="rk:locale"]');
+    var v = m && m.getAttribute('content');
+    if (!v && document.documentElement && document.documentElement.getAttribute) v = document.documentElement.getAttribute('lang');
+    return normLocale(v || 'en');
+  }
+
+  /** Packs to search for a locale, most specific first. */
+  function chain(locale) {
+    var out = [], lang = locale.split('-')[0];
+    function push(k) { if (k && hasOwn(PACKS, k) && out.indexOf(k) < 0) out.push(k); }
+    push(locale);
+    push(hasOwn(LANG_PACK, lang) ? LANG_PACK[lang] : null);
+    Object.keys(PACKS).forEach(function (k) { if (k.split('-')[0] === lang) push(k); });
+    push('en');
+    return out;
+  }
+
+  var i18n = RK.i18n = {
+    locale: detectLocale(),
+    packs: PACKS,
+    _explicit: false,
+    /** t(key, fallback?, vars?) — fallback may be omitted: t(key, vars). */
+    t: function (key, fallback, vars) {
+      if (fallback && typeof fallback === 'object') { vars = fallback; fallback = null; }
+      var list = chain(i18n.locale), s = null;
+      for (var i = 0; i < list.length && s == null; i++) if (hasOwn(PACKS[list[i]], key)) s = PACKS[list[i]][key];
+      if (s == null) s = fallback != null ? fallback : key;
+      s = String(s);
+      if (vars) s = s.replace(/\{(\w+)\}/g, function (m, k) { return hasOwn(vars, k) && vars[k] != null ? String(vars[k]) : m; });
+      return s;
+    },
+    /** Merge strings into a locale pack (creates it). */
+    add: function (locale, dict) {
+      var key = locale === 'en' ? 'en' : normLocale(locale);
+      var p = hasOwn(PACKS, key) ? PACKS[key] : (PACKS[key] = {});
+      for (var k in dict) if (hasOwn(dict, k)) p[k] = dict[k];
+      return p;
+    },
+    has: function (key, locale) {
+      return chain(locale ? normLocale(locale) : i18n.locale).some(function (l) { return hasOwn(PACKS[l], key); });
+    },
+    /** Primary language subtag: 'zh-CN' -> 'zh'. */
+    lang: function () { return i18n.locale.split('-')[0]; },
+    /** Switch locale at runtime. Blocks / toolbars built earlier keep their text until re-rendered. */
+    set: function (locale) {
+      i18n.locale = normLocale(locale);
+      i18n._explicit = true;
+      RK.bus.emit('i18n:changed', i18n.locale);
+      return i18n.locale;
+    },
+    /** Re-read <meta name="rk:locale"> / <html lang> (RK.boot calls it) unless set() chose a locale. */
+    detect: function () {
+      if (i18n._explicit) return i18n.locale;
+      var l = detectLocale();
+      if (l !== i18n.locale) { i18n.locale = l; RK.bus.emit('i18n:changed', l); }
+      return l;
+    },
+    normalize: normLocale
+  };
+
+  /* ------------------------------------------------------------------ *
    * Component registry
    * ------------------------------------------------------------------ *
    * RK.component({
@@ -271,6 +400,11 @@
     days: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     daysLong: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
     compactUnits: [[1e12, 'tn'], [1e9, 'bn'], [1e6, 'm'], [1e3, 'k']]
+  };
+  /** Compact ('auto') units per language; RK.i18n picks one (zh-CN: 亿 = 1e8, 万 = 1e4). */
+  var COMPACT_UNITS = {
+    en: [[1e12, 'tn'], [1e9, 'bn'], [1e6, 'm'], [1e3, 'k']],
+    zh: [[1e8, '亿'], [1e4, '万']]
   };
 
   // Lookup tables have no prototype and are read with has(): "constructor", "toString", "__proto__" ... are never presets.
@@ -627,7 +761,7 @@
       return v;
     }
     if (v instanceof Date) return isNaN(v) ? ((opts && opts.na != null) ? opts.na : config.na) : compile(spec || 'date')(v);
-    if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+    if (typeof v === 'boolean') return RK.i18n ? RK.i18n.t(v ? 'yes' : 'no', v ? 'Yes' : 'No') : (v ? 'Yes' : 'No');
     if (!isFinite(v)) return (opts && opts.nm != null) ? opts.nm : config.nm;
     return compile(spec)(v);
   }
@@ -653,6 +787,18 @@
   };
   format.presets = presets;
   format.config = config;
+  format.compactUnits = COMPACT_UNITS;
+  /**
+   * Locale-dependent settings (compact units) for an RK.i18n locale. Runs on load and on 'i18n:changed'.
+   * A page that set config.compactUnits itself keeps them (only the kit's own defaults are swapped).
+   */
+  format.applyLocale = function (locale) {
+    var lang = String(locale || (RK.i18n && RK.i18n.locale) || 'en').split('-')[0].toLowerCase();
+    var known = Object.keys(COMPACT_UNITS).some(function (k) { return config.compactUnits === COMPACT_UNITS[k]; }) || config._defaultUnits === config.compactUnits;
+    if (!known) return;
+    config.compactUnits = has(COMPACT_UNITS, lang) ? COMPACT_UNITS[lang] : COMPACT_UNITS.en;
+    config._defaultUnits = config.compactUnits;
+  };
   format.toDate = toDate;
   format.isDateCode = isDateCode;
   /** Number of decimals a format code shows — useful for axis label precision. */
@@ -663,6 +809,9 @@
   };
 
   RK.format = format;
+  config._defaultUnits = config.compactUnits;
+  format.applyLocale();
+  if (RK.bus) RK.bus.on('i18n:changed', function (l) { format.applyLocale(l); });
 })(typeof window !== 'undefined' ? window : this);
 
 /* ==== kit/core/rk.expr.js ==== */
@@ -1511,6 +1660,8 @@
     if (c.aggregate) throw new RK.expr.ExprError('Computed fields must be row formulas (no sum/avg/...)');
     if (c.fields.indexOf(spec.name) >= 0) throw new RK.expr.ExprError('Computed field "' + spec.name + '" cannot reference itself — give the result a new name');
     var def = { name: spec.name, title: spec.title || spec.name, type: spec.type || 'number', format: spec.format, formula: spec.formula, computed: true };
+    // spec.user: a metric the client created (query console "Add as metric"): kept in localStorage for this report
+    if (spec.user) def.user = true;
     var entry = { def: def, compiled: c }, list = this.computed.slice(), i = list.length;
     while (i-- > 0) if (list[i].def.name === def.name) break;
     if (i >= 0) list[i] = entry; else list.push(entry);
@@ -1520,11 +1671,15 @@
     this.computed = list;
     this._rev++;
     this._materialize(def.name);
+    if (spec.user && !spec._restoring) userStore.save(this.id, def);
+    else if (!spec.user && existing && existing.user) delete existing.user;   // redefined by the report: no longer the client's (storage untouched)
     if (!silent) RK.bus.emit('data:changed', { dataset: this.id, field: def.name });
     return def;
   };
 
   Dataset.prototype.removeComputed = function (name) {
+    var f = this._index[name];
+    if (f && f.user) userStore.drop(this.id, name);
     this.computed = this.computed.filter(function (x) { return x.def.name !== name; });
     this.fields = this.fields.filter(function (f) { return f.name !== name; });
     delete this._index[name];
@@ -1766,23 +1921,66 @@
     var ds = typeof id === 'string' ? data.get(id) : id;
     if (!ds) return [];
     var rows = ds.rows;
-    if (opts.filters !== false) {
-      var fs = store.filters();
-      var preds = [];
-      Object.keys(fs).forEach(function (k) {
-        var spec = fs[k];
-        if (opts.exclude && spec.source === opts.exclude) return;
-        if (opts.ignore && opts.ignore.indexOf(k) >= 0) return;
-        if (!filterApplies(spec, ds)) return;
-        preds.push(makePredicate(spec, ds));
-      });
-      if (preds.length) rows = rows.filter(function (r) { for (var i = 0; i < preds.length; i++) if (!preds[i](r)) return false; return true; });
-    }
+    var preds = applied(ds, opts).map(function (x) { return makePredicate(x.spec, ds); });
+    if (preds.length) rows = rows.filter(function (r) { for (var i = 0; i < preds.length; i++) if (!preds[i](r)) return false; return true; });
     if (opts.where) {
       var c = RK.expr.compile(opts.where, { fields: ds.fields }), env = { params: store.params() };
       rows = rows.filter(function (r) { return !!c.eval(r, env); });
     }
     return rows;
+  }
+
+  /**
+   * The store filters view(ds, opts) applies to a dataset, as [{key, spec}] (same opts: exclude, ignore, filters).
+   * Used for the "Filtered" block badge and the page's "Filtered view" stamp.
+   */
+  function applied(ds, opts) {
+    opts = opts || {};
+    ds = typeof ds === 'string' ? data.get(ds) : ds;
+    var out = [];
+    if (!ds || opts.filters === false) return out;
+    var fs = store.filters();
+    Object.keys(fs).forEach(function (k) {
+      var spec = fs[k];
+      if (opts.exclude && spec.source === opts.exclude) return;
+      if (opts.ignore && opts.ignore.indexOf(k) >= 0) return;
+      if (!filterApplies(spec, ds)) return;
+      out.push({ key: k, spec: spec });
+    });
+    return out;
+  }
+
+  /**
+   * Human-readable filter: "Region = Europe", "Sector = Software, Media +2", "Market cap: $1,000 – $5,000",
+   * "EV/EBITDA ≥ 8.0x", "“alpha”". spec.label (set by filter controls) names it; otherwise the field title from ds
+   * (or any loaded dataset that has the field). Values use the field format.
+   */
+  function describeFilter(spec, ds) {
+    if (!spec) return '';
+    var t = RK.i18n ? RK.i18n.t : function (k, f) { return f; };
+    ds = typeof ds === 'string' ? data.get(ds) : ds;
+    var fld = ds && spec.field ? ds.field(spec.field) : null;
+    if (!fld && spec.field) {
+      var ids = spec.datasets || data.ids();
+      for (var i = 0; i < ids.length && !fld; i++) { var d = data.get(ids[i]); if (d && d.has(spec.field)) fld = d.field(spec.field); }
+    }
+    var label = spec.label || (fld && fld.title) || spec.field || '';
+    var fmt = fld && fld.type !== 'string' ? fld.format : null;
+    function val(v) { return RK.format(v, fmt); }
+    function list(vs) { var max = 3, shown = vs.slice(0, max).map(val).join(', '); return vs.length > max ? shown + ' +' + (vs.length - max) : shown; }
+    switch (spec.op) {
+      case 'in': return label + ' = ' + (spec.values && spec.values.length ? list(spec.values) : t('none', 'None'));
+      case 'not_in': return label + ' \u2260 ' + list(spec.values || []);
+      case 'eq': return label + ' = ' + val(spec.value);
+      case 'between':
+        if (spec.min != null && spec.max != null) return label + ': ' + val(spec.min) + ' \u2013 ' + val(spec.max);
+        return label + (spec.min != null ? ' \u2265 ' + val(spec.min) : ' \u2264 ' + val(spec.max));
+      case 'search': return (spec.field ? label + ' ~ ' : '') + '\u201c' + spec.text + '\u201d';
+      case 'expr':
+        if (spec.values) return label + ' = ' + (spec.values.length ? list(spec.values) : t('none', 'None'));
+        return spec.label || String(spec.expr || '');
+    }
+    return label;
   }
 
   /** Does any active filter (or param) affect this dataset? Used to skip needless re-renders. */
@@ -2052,6 +2250,183 @@
   RK.query = query;
 
   /* ------------------------------------------------------------------ *
+   * Text templates: "{{peers: median(ev_ebitda_25e) | 0.0x}}" in titles
+   * ------------------------------------------------------------------ *
+   * Placeholders:  {{<dataset>: <RK.expr> | <format>}}   aggregate over the dataset's filtered rows, or a row formula /
+   *                                                     plain field on the first filtered row
+   *                {{@wacc | 0.0%}}                    report parameter (dataset optional)
+   *                {{<expr>}}                          dataset from opts.dataset (a block's own dataset)
+   * The format is optional: a parameter uses its manifest format, a formula the format inferred like query columns.
+   * Output is plain text (callers write textContent). A placeholder that cannot be resolved renders as "…".
+   */
+  var PH_RE = /\{\{([\s\S]*?)\}\}/g;
+  var DS_PREFIX = /^([A-Za-z0-9_][A-Za-z0-9_.-]*)\s*:(?!:)\s*([\s\S]*)$/;
+  var tplCache = new Map(), TPL_MAX = 300;
+
+  /** "expr | format" -> [expr, format]: split at the first single "|" outside quotes ("||" is logical or). */
+  function splitFormat(src) {
+    var q = null;
+    for (var i = 0; i < src.length; i++) {
+      var c = src[i];
+      if (q) { if (c === '\\' && q !== '`') i++; else if (c === q) q = null; continue; }
+      if (c === '"' || c === "'" || c === '`') { q = c; continue; }
+      if (c === '|') {
+        if (src[i + 1] === '|') { i++; continue; }
+        return [src.slice(0, i).trim(), src.slice(i + 1).trim() || null];
+      }
+    }
+    return [src.trim(), null];
+  }
+
+  function parsePlaceholder(inner) {
+    var sp = splitFormat(inner), expr = sp[0], dsId = null, m = DS_PREFIX.exec(expr);
+    if (m) { dsId = m[1]; expr = m[2].trim(); }
+    return { src: inner.trim(), dataset: dsId, expr: expr, format: sp[1] };
+  }
+
+  /** Template -> array of literal strings and placeholder objects {src, dataset, expr, format}. */
+  function parseTemplate(tpl) {
+    tpl = String(tpl == null ? '' : tpl);
+    if (tplCache.has(tpl)) return tplCache.get(tpl);
+    var parts = [], last = 0, m;
+    PH_RE.lastIndex = 0;
+    while ((m = PH_RE.exec(tpl))) {
+      if (m.index > last) parts.push(tpl.slice(last, m.index));
+      parts.push(parsePlaceholder(m[1]));
+      last = m.index + m[0].length;
+    }
+    if (last < tpl.length) parts.push(tpl.slice(last));
+    if (tplCache.size >= TPL_MAX) tplCache.delete(tplCache.keys().next().value);
+    tplCache.set(tpl, parts);
+    return parts;
+  }
+
+  /**
+   * Value of one placeholder -> {value, format, dataset}.
+   * opts.dataset: default dataset id; opts.rows(ds): rows to use (default view(ds, {filters: opts.filters !== false})).
+   */
+  function evalPlaceholder(ph, opts) {
+    opts = opts || {};
+    if (typeof ph === 'string') ph = parsePlaceholder(ph);
+    var dsId = ph.dataset || opts.dataset || null;
+    var ds = dsId ? data.get(dsId) : null;
+    if (ph.dataset && !ds) throw new RK.expr.ExprError('Unknown dataset "' + ph.dataset + '" in {{' + ph.src + '}}');
+    if (!ph.expr) throw new RK.expr.ExprError('Empty placeholder {{' + ph.src + '}}');
+    var c = RK.expr.compile(ph.expr, ds ? { fields: ds.fields } : {});
+    var env = { params: store.params() }, fmt = ph.format, value;
+    if (c.ast.type === 'param') {
+      value = store.resolve('@' + c.ast.name);
+      if (!fmt) { var pd = get((data.manifest && data.manifest.params) || {}, c.ast.name); fmt = (pd && pd.format) || null; }
+      return { value: value, format: fmt, dataset: null };
+    }
+    if (!ds && c.fields.length) throw new RK.expr.ExprError('Name the dataset in {{' + ph.src + '}}, e.g. {{peers: ' + ph.expr + '}}');
+    var rows = ds ? (opts.rows ? opts.rows(ds) : view(ds, { filters: opts.filters !== false })) : [];
+    if (c.aggregate) value = c.eval(rows, env);
+    else if (!ds) value = c.eval({}, env);
+    else value = rows.length ? c.eval(rows[0], env) : null;
+    if (!fmt && ds) fmt = guessFormat(c, ds);
+    return { value: value, format: fmt, dataset: ds ? ds.id : null };
+  }
+
+  /** Template -> text. opts: {dataset, rows(ds), filters, missing: '…', onError(err, placeholder)} */
+  function renderTemplate(tpl, opts) {
+    opts = opts || {};
+    var out = '';
+    parseTemplate(tpl).forEach(function (p) {
+      if (typeof p === 'string') { out += p; return; }
+      try { var r = evalPlaceholder(p, opts); out += RK.format(r.value, r.format); }
+      catch (e) { out += opts.missing != null ? opts.missing : '…'; if (opts.onError) opts.onError(e, p); }
+    });
+    return out;
+  }
+
+  var template = RK.template = {
+    parse: parseTemplate,
+    evaluate: evalPlaceholder,
+    render: renderTemplate,
+    /** What the builder writes as fallback text: every placeholder replaced by "…". */
+    fallback: function (tpl) { return String(tpl == null ? '' : tpl).replace(PH_RE, '…'); },
+    /** Datasets a template reads (explicit prefixes only). */
+    datasets: function (tpl) {
+      return util.unique(parseTemplate(tpl).filter(function (p) { return typeof p !== 'string' && p.dataset; }).map(function (p) { return p.dataset; }));
+    },
+    test: function (s) { return typeof s === 'string' && s.indexOf('{{') >= 0 && /\{\{[\s\S]*?\}\}/.test(s); }
+  };
+
+  /* ------------------------------------------------------------------ *
+   * Per-report browser storage + the client's own metrics
+   * ------------------------------------------------------------------ *
+   * Reports opened from file:// can share one localStorage origin, so every key is namespaced by reportKey():
+   * report title + date (manifest) + <meta name="rk:built">. Storage may be missing or throw (private mode,
+   * sandboxed iframes): every access is guarded and the report works without it.
+   */
+  function storage() {
+    try { var s = global.localStorage; return s && typeof s.getItem === 'function' ? s : null; } catch (e) { return null; }
+  }
+
+  function reportKey() {
+    var rep = (data.manifest && data.manifest.report) || {};
+    if (!rep.title && !rep.date && preloaded && preloaded.manifest && preloaded.manifest.report) rep = preloaded.manifest.report;
+    var parts = [rep.title || '', rep.date || '', meta('rk:built') || ''];
+    // nothing identifies the report (gallery, harness): fall back to the page path so pages do not share state
+    if (!parts.join('')) {
+      try { parts.push(global.location && global.location.pathname ? String(global.location.pathname) : ''); } catch (e) { /* no location */ }
+    }
+    return parts.join('|');
+  }
+  function storageKey(kind) { return 'rk:' + kind + ':' + reportKey(); }
+
+  function readJSON(key, dflt) {
+    var s = storage();
+    if (!s) return dflt;
+    try { var v = s.getItem(key); return v == null ? dflt : JSON.parse(v); } catch (e) { return dflt; }
+  }
+  function writeJSON(key, v) {
+    var s = storage();
+    if (!s) return false;
+    try { if (v == null) s.removeItem(key); else s.setItem(key, JSON.stringify(v)); return true; } catch (e) { return false; }
+  }
+
+  function str(v) { return typeof v === 'string' ? v : null; }
+  /** Saved metrics: [{dataset, name, title, formula, format}] (malformed entries dropped). */
+  var userStore = {
+    read: function () {
+      var list = readJSON(storageKey('metrics'), []);
+      if (!Array.isArray(list)) return [];
+      return list.filter(function (m) { return m && typeof m === 'object' && str(m.dataset) && str(m.name) && str(m.formula); })
+        .map(function (m) { return { dataset: m.dataset, name: m.name, title: str(m.title) || m.name, formula: m.formula, format: str(m.format) }; });
+    },
+    write: function (list) { return writeJSON(storageKey('metrics'), list.length ? list : null); },
+    save: function (dsId, def) {
+      var list = userStore.read(), rec = { dataset: dsId, name: def.name, title: def.title || def.name, formula: def.formula, format: def.format || null };
+      for (var i = 0; i < list.length; i++) if (list[i].dataset === dsId && list[i].name === def.name) { list[i] = rec; return userStore.write(list); }
+      list.push(rec);
+      return userStore.write(list);
+    },
+    drop: function (dsId, name) {
+      var list = userStore.read(), keep = list.filter(function (m) { return !(m.dataset === dsId && m.name === name); });
+      if (keep.length === list.length) return false;
+      userStore.write(keep);
+      return true;
+    }
+  };
+
+  /** Re-create saved metrics on loaded datasets (ids: only these). Metrics that no longer compile are skipped. */
+  function restoreUserMetrics(ids) {
+    var n = 0;
+    userStore.read().forEach(function (m) {
+      if (ids && ids.indexOf(m.dataset) < 0) return;
+      var ds = data.get(m.dataset);
+      if (!ds) return;
+      var f = ds.field(m.name);
+      if (f && !f.computed) return;   // the data now has a real column of that name: never overwrite it
+      try { ds.addComputed({ name: m.name, title: m.title, formula: m.formula, format: m.format, user: true, _restoring: true }, true); n++; }
+      catch (e) { RK.log('saved metric "' + m.name + '" skipped:', e.message); }
+    });
+    return n;
+  }
+
+  /* ------------------------------------------------------------------ *
    * Data registry + loading
    * ------------------------------------------------------------------ */
   var datasets = Object.create(null);
@@ -2068,6 +2443,7 @@
       var ds = json instanceof Dataset ? json : new Dataset(json);
       if (!ds.id) throw new Error('[RK] dataset needs an id');
       datasets[ds.id] = ds;
+      if (data._ready) restoreUserMetrics([ds.id]);
       RK.bus.emit('data:changed', { dataset: ds.id });
       if (data._ready) store._notify({ type: 'data', dataset: ds.id });
       return ds;
@@ -2075,8 +2451,33 @@
     get: function (id) { return datasets[id] || null; },
     ids: function () { return Object.keys(datasets); },
     view: view,
+    applied: applied,
+    describeFilter: describeFilter,
     affected: affected,
     applies: filterApplies,
+    template: template,
+
+    /** Report identity used to namespace browser storage: "title|date|built". */
+    reportKey: reportKey,
+    /** 'rk:<kind>:' + reportKey() — e.g. storageKey('theme'), storageKey('metrics'). */
+    storageKey: storageKey,
+    storage: storage,
+    /** Metrics the client saved for this report: [{dataset, name, title, formula, format, active}]. */
+    userMetrics: function () {
+      return userStore.read().map(function (m) {
+        var ds = data.get(m.dataset), f = ds && ds.field(m.name);
+        m.active = !!(f && f.user);
+        return m;
+      });
+    },
+    /** Delete a saved metric (and its field). ds: dataset id or Dataset. Returns true when something was removed. */
+    removeUserMetric: function (ds, name) {
+      var id = typeof ds === 'string' ? ds : ds && ds.id, d = data.get(id), f = d && d.field(name);
+      var had = userStore.drop(id, name);
+      if (f && f.user && f.computed) { d.removeComputed(name); had = true; }
+      return had;
+    },
+    restoreUserMetrics: restoreUserMetrics,
     /** Column names too generic to cross-filter across datasets (see ctx.select scope). */
     GENERIC_FIELDS: /^(type|kind|source|target|step|stage|metric|category|group|name|label|id|parent|value|series|status|item|node|link|bucket|class|level)$/i,
     isGenericField: function (field) { return !!field && RK.data.GENERIC_FIELDS.test(String(field)); },
@@ -2104,6 +2505,7 @@
           if (!json.id) json.id = id;
           datasets[id] = new Dataset(json);
         });
+        restoreUserMetrics();
         data._ready = true;
         RK.bus.emit('data:loaded', data);
         return data;
@@ -2352,6 +2754,24 @@
     };
   }
 
+  /* ---------------- up / down convention ---------------- */
+  var swapped = false;   // --rk-pos / --rk-neg currently set inline by applyUpdown()
+  /** Read tokens with the theme's own pos / neg, then swap them (CSS + tokens) for the 'cn' convention. */
+  function applyUpdown() {
+    var root = document.documentElement;
+    if (swapped) { root.style.removeProperty('--rk-pos'); root.style.removeProperty('--rk-neg'); swapped = false; }
+    var t = readTokens();
+    if (theme.updown() === 'cn') {
+      var pos = t.pos, neg = t.neg;
+      root.style.setProperty('--rk-pos', neg);
+      root.style.setProperty('--rk-neg', pos);
+      swapped = true;
+      t.pos = neg; t.neg = pos;
+      t.updown = 'cn';
+    } else t.updown = 'us';
+    return t;
+  }
+
   /* ---------------- public API ---------------- */
   var theme = RK.theme = {
     current: null,
@@ -2376,9 +2796,24 @@
     },
 
     refresh: function () {
-      theme.current = readTokens();
+      theme.current = applyUpdown();
       if (global.echarts) global.echarts.registerTheme('rk', echartsTheme(theme.current));
       return theme.current;
+    },
+
+    /**
+     * Up / down colour convention: 'us' (default: up = green-ish pos, down = red-ish neg) or 'cn' (<html
+     * data-rk-updown="cn">: up = red, down = green). 'cn' swaps --rk-pos / --rk-neg (inline on <html>, re-applied after
+     * every theme change) and the pos / neg tokens charts read.
+     */
+    updown: function () {
+      var v = document.documentElement.getAttribute('data-rk-updown');
+      return v && v.toLowerCase() === 'cn' ? 'cn' : 'us';
+    },
+    setUpdown: function (mode) {
+      document.documentElement.setAttribute('data-rk-updown', mode === 'cn' ? 'cn' : 'us');
+      theme.refresh();
+      RK.bus.emit('theme:changed', theme.current);
     },
     init: function () {
       var meta = document.querySelector('meta[name="rk:themes"]');
@@ -2393,10 +2828,24 @@
     /** Switch theme at runtime: sets <html data-rk-theme>, re-reads tokens, re-renders blocks. */
     set: function (name) {
       document.documentElement.setAttribute('data-rk-theme', name);
-      try { localStorage.setItem('rk:theme', name); } catch (e) { /* storage unavailable */ }
+      theme.save(name);
       theme.refresh();
       RK.bus.emit('theme:changed', theme.current);
     },
+
+    /** Theme preference of this report (localStorage key 'rk:theme:' + RK.data.reportKey()); null when none / no storage. */
+    saved: function () {
+      try {
+        var s = RK.data && RK.data.storage ? RK.data.storage() : null;
+        var v = s ? s.getItem(RK.data.storageKey('theme')) : null;
+        return v && theme.list.indexOf(v) >= 0 ? v : null;
+      } catch (e) { return null; }
+    },
+    save: function (name) {
+      try { var s = RK.data && RK.data.storage ? RK.data.storage() : null; if (s) s.setItem(RK.data.storageKey('theme'), name); } catch (e) { /* storage unavailable */ }
+    },
+    /** Localised label of a theme for switchers. */
+    label: function (name) { return RK.i18n ? RK.i18n.t('theme.' + name, theme.labels[name] || name) : (theme.labels[name] || name); },
 
     /** Resolve a token name ('accent2', 'cat3', 'ref', 'seq5', 'ink-2') or pass a literal colour through. */
     resolve: function (c) {
@@ -2506,7 +2955,9 @@
     return function render(ctx) {
       if (!global.echarts) throw new Error('ECharts is not loaded (vendor/echarts/echarts.min.js)');
       var renderer = ctx.options.renderer || (ctx.print ? 'svg' : 'svg');
-      var inst = global.echarts.init(ctx.el, 'rk', { renderer: renderer, locale: ctx.options.locale || 'EN' });
+      // ECharts' own strings (aria chart descriptions, toolbox) follow the report locale: built-in 'ZH' / 'EN'
+      var locale = ctx.options.locale || (RK.i18n && RK.i18n.lang() === 'zh' ? 'ZH' : 'EN');
+      var inst = global.echarts.init(ctx.el, 'rk', { renderer: renderer, locale: locale });
       var current = ctx;
       // ECharts' roam/inside-zoom controller calls preventDefault on every wheel event before checking
       // zoomOnMouseWheel:'ctrl', which swallows page scrolling. Keep plain wheel for the report; let
@@ -2853,7 +3304,11 @@
     if (cache[name]) return cache[name];
     var d = raw[name];
     if (!d && global.__RK_GEO && global.__RK_GEO[name]) d = raw[name] = global.__RK_GEO[name];
-    if (!d) throw new Error('Basemap "' + name + '" is not loaded (include vendor/geo-world/' + name + '.js and add "geo-world" to the component deps)');
+    if (!d) {
+      // vendor id per basemap: world-110m -> geo-world, world-50m -> geo-world-50m (block option -> manifest optionDeps)
+      var dep = name === 'world-50m' ? 'geo-world-50m' : 'geo-world';
+      throw new Error('Basemap "' + name + '" is not loaded (include vendor/' + dep + '/' + name + '.js and add "' + dep + '" to the component deps)');
+    }
     var fc;
     if (d.type === 'Topology') {
       if (!global.topojson) throw new Error('topojson-client is required to read TopoJSON basemap "' + name + '"');
@@ -3286,7 +3741,9 @@
   }
   /** Plural noun for the marks, from the label field title: "Site" -> "sites"; "points" without one. */
   function noun(ctx, field) {
-    if (!field || !ctx.field(field)) return 'points';
+    var zh = RK.i18n && RK.i18n.lang() === 'zh';
+    if (!field || !ctx.field(field)) return RK.i18n ? RK.i18n.t('points', 'points') : 'points';
+    if (zh || /[\u3400-\u9fff]/.test(String(ctx.title(field)))) return String(ctx.title(field));   // no plural forms
     var w = String(ctx.title(field)).toLowerCase();
     return /[^aeiou]y$/.test(w) ? w.slice(0, -1) + 'ies' : /(s|x|ch|sh)$/.test(w) ? w + 'es' : w + 's';
   }
@@ -3514,6 +3971,14 @@
  * Imperative API (used by the gallery):
  *   var block = RK.mount(el, { component: 'bar', data: 'peers', options: {...} });
  *   block.setOptions({...}); block.destroy();
+ *
+ * Report chrome kept in sync with the store (boot + every filter / param / data change):
+ *   [data-rk-template]          title templates ("{{peers: median(ev_ebitda_25e) | 0.0x}}", see RK.template)
+ *   .rk-page__filtered          "Filtered view: Region = Europe · …" stamp in a page foot (printed)
+ *   .rk-block__status           "Filtered" badge (+ clear) / "Selection not in this view" in a block head
+ *   .rk-block__choices          metric / dimension pickers from options.choices
+ *   <section data-rk-filters="off">   page whose blocks ignore global filters and chart selections
+ * Print: RK.runtime.printFit() scales overflowing block content to fit (CSS zoom, min 0.55); printUnfit() restores.
  */
 (function (global) {
   'use strict';
@@ -3522,6 +3987,14 @@
 
   var blocks = [];
   var runtime = RK.runtime = { printing: false, booted: false };
+  function t(key, fallback, vars) { return RK.i18n ? RK.i18n.t(key, fallback, vars) : String(fallback); }
+
+  /** Page (section) of an element and whether it opted out of global filters (data-rk-filters="off"). */
+  function pageOf(el) { return el && el.closest ? el.closest('.rk-page, [data-rk-page]') : null; }
+  function pageFiltersOff(el) {
+    var p = el && el.closest ? el.closest('[data-rk-filters]') : null;
+    return !!p && String(p.getAttribute('data-rk-filters')).toLowerCase() === 'off';
+  }
 
   /* ------------------------------------------------------------------ *
    * Small UI helpers (modal, icons) shared with components
@@ -3533,7 +4006,8 @@
     expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
     close: '<path d="M6 6l12 12M18 6 6 18"/>',
     reset: '<path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v5h5"/>',
-    print: '<path d="M7 9V4h10v5M7 17H4v-7h16v7h-3M7 14h10v6H7z"/>'
+    print: '<path d="M7 9V4h10v5M7 17H4v-7h16v7h-3M7 14h10v6H7z"/>',
+    filter: '<path d="M4 5h16l-6.2 7.4V18l-3.6 1.8v-7.4z"/>'
   };
   function icon(name) {
     return '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || '') + '</svg>';
@@ -3548,7 +4022,7 @@
         h('div.rk-modal__panel' + (opts.wide ? '.is-wide' : ''),
           h('div.rk-modal__head',
             h('h3.rk-modal__title', title),
-            h('button.rk-iconbtn', { type: 'button', 'aria-label': 'Close', html: icon('close'), on: { click: function () { close(); } } })),
+            h('button.rk-iconbtn', { type: 'button', 'aria-label': t('close', 'Close'), html: icon('close'), on: { click: function () { close(); } } })),
           h('div.rk-modal__body', content)));
       function onKey(e) { if (e.key === 'Escape') close(); }
       close = function () {
@@ -3659,7 +4133,7 @@
         }));
       }));
       var wrap = h('div.rk-datatable', h('table', thead, tbody));
-      if (rows.length > max) wrap.appendChild(h('p.rk-muted', 'Showing first ' + max + ' of ' + rows.length + ' rows.'));
+      if (rows.length > max) wrap.appendChild(h('p.rk-muted', t('showingFirst', 'Showing first {max} of {n} rows.', { max: max, n: rows.length })));
       return wrap;
     }
   };
@@ -3695,10 +4169,62 @@
     return ids;
   };
 
+  /** Page opted out (data-rk-filters="off") or options.filters === false: no global filters, no selections. */
+  Block.prototype.filtersOff = function (opts) {
+    return (opts || this.options()).filters === false || pageFiltersOff(this.el);
+  };
+
+  /**
+   * Rows this block shows -> {rows, applied: [{key, spec}], ignored: [{key, spec}]}.
+   * Global filters + other blocks' selections (never its own), options.ignoreFilters / where. Cross-filter safety:
+   * when the rows are empty only because of selections made in OTHER blocks (filters with a source), those
+   * selections are ignored for this block (listed in `ignored`; the head shows "Selection not in this view").
+   * options.selectionFallback: false keeps the empty view.
+   */
+  Block.prototype.view = function (opts) {
+    opts = opts || this.options();
+    var self = this, ds = this.datasetId ? RK.data.get(this.datasetId) : null;
+    var out = { rows: [], applied: [], ignored: [] };
+    if (!ds) return out;
+    var ig = opts.ignoreFilters, off = this.filtersOff(opts);
+    var ignore = Array.isArray(ig) ? ig : typeof ig === 'string' && ig ? [ig] : [];
+    var where = null;
+    // view() also runs for title templates and page stamps: warn about a bad "where" once per formula
+    function warn(e) { if (self._whereWarned !== opts.where) { self._whereWarned = opts.where; console.warn('[RK] bad "where" on', self.id, e.message); } }
+    if (opts.where) {
+      try { where = RK.expr.compile(opts.where, { fields: ds.fields }); } catch (e) { warn(e); }
+    }
+    function run(vo) {
+      var rows = RK.data.view(ds, vo);
+      if (where) {
+        var env = { params: RK.store.params() };
+        try { rows = rows.filter(function (r) { return !!where.eval(r, env); }); } catch (e) { warn(e); }
+      }
+      return rows;
+    }
+    var vo = { exclude: this.id, ignore: ignore, filters: !off };
+    out.rows = run(vo);
+    out.applied = off ? [] : RK.data.applied(ds, vo);
+    if (!out.rows.length && ds.rows.length && !off && opts.selectionFallback !== false) {
+      var sel = out.applied.filter(function (x) { return x.spec.source && x.spec.source !== self.id; });
+      if (sel.length) {
+        var keys = sel.map(function (x) { return x.key; });
+        var alt = run({ exclude: this.id, ignore: ignore.concat(keys), filters: true });
+        if (alt.length) {
+          out.rows = alt;
+          out.ignored = sel;
+          out.applied = out.applied.filter(function (x) { return keys.indexOf(x.key) < 0; });
+        }
+      }
+    }
+    return out;
+  };
+
   Block.prototype.ctx = function () {
     var self = this;
     var opts = this.options();
     var ds = this.datasetId ? RK.data.get(this.datasetId) : null;
+    var off = this.filtersOff(opts);
     function selExtra(opt, field) {
       opt = opt || {};
       // generic column names (type, source, step...) mean different things in different datasets:
@@ -3709,11 +4235,8 @@
       else if (scope === 'dataset' && ds) extra.datasets = [ds.id];
       return extra;
     }
-    var viewOpts = { exclude: this.id, ignore: opts.ignoreFilters, filters: opts.filters !== false };
-    var rows = ds ? RK.data.view(ds, viewOpts) : [];
-    if (ds && opts.where) {
-      try { rows = rows.filter(RK.expr.compile(opts.where, { fields: ds.fields }).eval); } catch (e) { console.warn('[RK] bad "where" on', this.id, e.message); }
-    }
+    var v = this._view = this.view(opts);
+    var rows = v.rows;
     function fieldOf(name) { return ds ? ds.field(name) : null; }
     var printing = runtime.printing;
     return {
@@ -3733,7 +4256,9 @@
       theme: RK.theme.tokens(),
       store: RK.store,
       data: function (id) { return RK.data.get(id); },
-      view: function (id, o) { return RK.data.view(id, util.merge({ exclude: self.id }, o || {})); },
+      view: function (id, o) { return RK.data.view(id, util.merge({ exclude: self.id }, off ? { filters: false } : {}, o || {})); },
+      /** Other blocks' selections ignored because they left this block empty (cross-filter safety). */
+      ignoredSelections: v.ignored.map(function (x) { return x.key; }),
       /**
        * Cross-filter: toggle one value of this block's selection on `field`.
        * opt.scope: 'global' (default; every dataset with that field) | 'dataset' (only this block's dataset)
@@ -3756,13 +4281,14 @@
   };
 
   Block.prototype.render = function () {
-    if (!this.def) return this.fail(new Error('Unknown component "' + this.component + '" — is its script included?'));
-    if (this.def.needsData && this.datasetId && !RK.data.get(this.datasetId)) return this.fail(new Error('Dataset "' + this.datasetId + '" not found'));
+    if (!this.def) return this.fail(new Error(t('unknownComponent', 'Unknown component "{id}" — is its script included?', { id: this.component })));
+    if (this.def.needsData && this.datasetId && !RK.data.get(this.datasetId)) return this.fail(new Error(t('datasetNotFound', 'Dataset "{id}" not found', { id: this.datasetId })));
     var ctx = this.ctx();
     this.clearMessages();
+    this.updateStatus();
     if (this.def.needsData && this.datasetId && !ctx.rows.length && !this.def.allowEmpty) {
       this.destroyInstance();
-      this.message('No data for the current filters', true);
+      this.message(t('noData', 'No data for the current filters'), true);
       this.state = 'empty';
       return;
     }
@@ -3774,6 +4300,7 @@
       }
       this.state = 'rendered';
       this.el.classList.add('is-rendered');
+      keepFitLast();   // after any 'beforeprint' listener the component just added
     } catch (e) {
       this.fail(e);
     }
@@ -3791,7 +4318,9 @@
   Block.prototype.setOptions = function (opts, replace) {
     this.userOptions = replace ? opts : util.merge({}, this.userOptions, opts);
     this._optsJson = null;
+    this.addChoices();
     this.rerender();
+    scheduleChrome();
   };
 
   Block.prototype.resize = function () {
@@ -3809,6 +4338,8 @@
 
   Block.prototype.destroy = function () {
     this.destroyInstance();
+    if (this._statusEl) { this._statusEl.remove(); this._statusEl = null; }
+    if (this._choicesEl) { this._choicesEl.remove(); this._choicesEl = null; }
     if (this._ro) this._ro.disconnect();
     if (this._unvis) this._unvis();
     var i = blocks.indexOf(this);
@@ -3839,18 +4370,18 @@
       bar.appendChild(h('button.rk-iconbtn', { type: 'button', title: label, 'aria-label': label, html: icon(name), on: { click: fn } }));
     }
     if (this.datasetId && this.def && this.def.needsData) {
-      btn('table', 'View data', function () {
+      btn('table', t('viewData', 'View data'), function () {
         var ds = RK.data.get(self.datasetId);
         if (!ds) return;
         var c = self.ctx();
-        ui.modal(ds.title + ' — ' + c.rows.length + ' rows', ui.table(c.rows, ds.fields), { wide: true });
+        ui.modal(t('dataTitle', '{title} — {n} rows', { title: ds.title, n: c.rows.length }), ui.table(c.rows, ds.fields), { wide: true });
       });
-      btn('download', 'Download CSV', function () {
+      btn('download', t('downloadCSV', 'Download CSV'), function () {
         var ds = RK.data.get(self.datasetId);
         if (ds) util.download((self.id || ds.id) + '.csv', ds.toCSV(self.ctx().rows), 'text/csv;charset=utf-8');
       });
     }
-    btn('image', 'Download PNG', function () {
+    btn('image', t('downloadPNG', 'Download PNG'), function () {
       if (!self.instance) return;
       // charts export themselves; DOM components (tables, cards, KPI tiles) are rasterised via SVG foreignObject
       var job = self.instance.exportImage ? self.instance.exportImage() : ui.exportDOM(self.body);
@@ -3861,9 +4392,111 @@
         document.body.appendChild(a); a.click(); a.remove();
       }).catch(function (e) { console.warn('[RK] PNG export failed for', self.id, e); });
     });
-    btn('expand', 'Expand', function () { self.expand(); });
+    btn('expand', t('expand', 'Expand'), function () { self.expand(); });
     var head = this.el.querySelector(':scope > .rk-block__head');
     (head || this.el).appendChild(bar);
+  };
+
+  /** Insert el into the block head right after the title (and after `after` when given). */
+  function placeInHead(head, el, after) {
+    var ref = after && after.parentNode === head ? after : head.querySelector(':scope > .rk-block__title');
+    head.insertBefore(el, ref ? ref.nextSibling : head.firstChild);
+  }
+
+  /**
+   * Head badges: "Filtered" (filters that affect this block; hover lists them, × clears them) and the soft
+   * "Selection not in this view" when other blocks' selections were ignored (see Block.view). options.badges: false hides both.
+   */
+  Block.prototype.updateStatus = function () {
+    var head = this.el.querySelector(':scope > .rk-block__head');
+    var v = this._view, ds = this.datasetId ? RK.data.get(this.datasetId) : null;
+    var show = head && ds && this.def && this.def.needsData && this.options().badges !== false && v && (v.applied.length || v.ignored.length);
+    if (!show) {
+      if (this._statusEl) { this._statusEl.remove(); this._statusEl = null; this._statusSig = null; }
+      return;
+    }
+    var applied = v.applied.map(function (x) { return { key: x.key, text: RK.data.describeFilter(x.spec, ds) }; });
+    var ignored = v.ignored.map(function (x) { return { key: x.key, text: RK.data.describeFilter(x.spec, ds) }; });
+    var sig = JSON.stringify([applied, ignored, RK.i18n && RK.i18n.locale]);
+    if (this._statusEl && this._statusSig === sig && this._statusEl.parentNode === head) return;
+    this._statusSig = sig;
+    var wrap = this._statusEl || (this._statusEl = h('span.rk-block__status'));
+    while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
+    if (applied.length) {
+      var list = applied.map(function (x) { return x.text; });
+      var keys = applied.map(function (x) { return x.key; });
+      var tip = t('filteredBy', 'Filtered by') + t('colon', ': ').trim() + '\n' + list.join('\n');
+      wrap.appendChild(h('span.rk-badge.rk-badge--filtered', { title: tip },
+        h('span.rk-badge__icon', { 'aria-hidden': 'true', html: icon('filter') }),
+        h('span.rk-badge__text', t('filtered', 'Filtered')),
+        h('span.rk-sr-only', t('colon', ': ') + list.join('; ')),
+        h('button.rk-badge__clear.rk-noprint', {
+          type: 'button', title: t('clearFilters', 'Clear filters'), 'aria-label': t('clearFilters', 'Clear filters') + t('colon', ': ') + list.join('; '),
+          on: { click: function (e) { e.stopPropagation(); keys.forEach(function (k) { RK.store.clearFilter(k); }); } }
+        }, '\u00d7')));
+    }
+    if (ignored.length) {
+      var il = ignored.map(function (x) { return x.text; }).join('; ');
+      wrap.appendChild(h('span.rk-badge.rk-badge--soft', { title: t('selectionIgnored', 'Selections made in other charts ({list}) leave no data here, so this chart ignores them', { list: il }) },
+        t('selectionNotInView', 'Selection not in this view')));
+    }
+    if (wrap.parentNode !== head) placeInHead(head, wrap);
+  };
+
+  /** Fields offered for one channel of options.choices ("*computed" = the dataset's computed / user metrics). */
+  Block.prototype.choiceFields = function (list, ds) {
+    var out = [];
+    (Array.isArray(list) ? list : []).forEach(function (n) {
+      if (n === '*computed') {
+        if (ds) ds.fields.forEach(function (f) { if (f.computed && out.indexOf(f.name) < 0) out.push(f.name); });
+      } else if (typeof n === 'string' && out.indexOf(n) < 0 && (!ds || ds.has(n))) out.push(n);
+    });
+    return out;
+  };
+
+  /**
+   * Metric / dimension pickers: options.choices = {y: ['revenue', 'ebitda', '*computed'], x: [...]} renders one
+   * compact select per channel in the head; picking a field sets options.encode[channel] (kept by this block across
+   * filter changes) and re-renders. options.choiceLabels = {y: 'Metric'} adds a visible label.
+   */
+  Block.prototype.addChoices = function () {
+    var self = this, opts = this.options(), choices = opts.choices;
+    var head = this.el.querySelector(':scope > .rk-block__head');
+    if (this._choicesEl) { this._choicesEl.remove(); this._choicesEl = null; }
+    if (!head || !util.isObj(choices)) return;
+    var ds = this.datasetId ? RK.data.get(this.datasetId) : null;
+    var enc = opts.encode || {}, labels = util.isObj(opts.choiceLabels) ? opts.choiceLabels : {};
+    var wrap = h('span.rk-block__choices');
+    Object.keys(choices).forEach(function (channel) {
+      var names = self.choiceFields(choices[channel], ds);
+      var cur = Array.isArray(enc[channel]) ? enc[channel][0] : enc[channel];
+      if (cur != null && names.indexOf(cur) < 0 && (!ds || ds.has(cur))) names.unshift(cur);
+      if (names.length < 2) return;   // nothing to choose (yet: user metrics may add options later)
+      var label = typeof labels[channel] === 'string' ? labels[channel] : null;
+      var sel = h('select.rk-select.rk-select--sm.rk-block__choice', {
+        'aria-label': label || t('choose', 'Choose {channel}', { channel: channel }), 'data-channel': channel
+      }, names.map(function (n) {
+        var f = ds && ds.field(n);
+        return h('option', { value: n }, (f && f.title) || n);
+      }));
+      sel.value = cur != null && names.indexOf(cur) >= 0 ? cur : names[0];
+      sel.addEventListener('change', function () { self.choose(channel, sel.value); });
+      wrap.appendChild(label ? h('label.rk-block__choice-wrap', h('span.rk-block__choice-label', label), sel) : sel);
+    });
+    if (!wrap.childNodes.length) return;
+    this._choicesEl = wrap;
+    placeInHead(head, wrap, this._statusEl);
+  };
+
+  /** Show `field` on `channel` (what the picker does). Clears this block's own selection, which was on the old field. */
+  Block.prototype.choose = function (channel, field) {
+    var opts = this.options(), cur = (opts.encode || {})[channel];
+    if (cur === field) return;
+    RK.store.clearFilters(this.id);
+    var enc = {};
+    enc[channel] = field;
+    this.setOptions({ encode: enc });
+    RK.bus.emit('block:choice', { block: this.id, channel: channel, field: field });
   };
 
   /** Re-mount the same component full-screen in a modal. */
@@ -3877,7 +4510,7 @@
     });
     var b = null;
     setTimeout(function () {
-      b = mount(host, { component: self.component, data: self.datasetId, options: util.merge({}, self.userOptions, { tools: false }), lazy: false });
+      b = mount(host, { component: self.component, data: self.datasetId, options: util.merge({}, self.userOptions, { tools: false }, self.filtersOff() ? { filters: false } : {}), lazy: false });
     }, 60);
     return m;
   };
@@ -3891,6 +4524,8 @@
     var b = new Block(el, spec);
     blocks.push(b);
     b.addTools();
+    b.addChoices();
+    if (runtime.booted) scheduleChrome();
     var lazy = spec.lazy !== false && !runtime.printing && (b.def ? b.def.lazy !== false : true);
     if (lazy) b._unvis = util.onVisible(el, function () { b.render(); }, '0px 0px -4% 0px');
     else b.render();
@@ -3930,9 +4565,11 @@
       }
       if (b.instance && b.instance.onStore && !b.def.needsData) { b.instance.onStore(changes); return; }
       var ids = b.datasetIds();
-      var hit = ids.some(function (id) {
+      // a block that ignores filters (page data-rk-filters="off", options.filters false) only follows params / data
+      var relevant = b.filtersOff() ? changes.filter(function (c) { return c.type !== 'filter'; }) : changes;
+      var hit = relevant.length > 0 && ids.some(function (id) {
         var ds = RK.data.get(id);
-        return ds && RK.data.affected(ds, changes);
+        return ds && RK.data.affected(ds, relevant);
       });
       // a block whose own selection changed must re-render to update highlighting
       var own = changes.some(function (c) { return c.type === 'filter' && c.key.indexOf(b.id + ':') === 0; });
@@ -3942,14 +4579,109 @@
       var stateHit = changes.some(function (c) { return c.type === 'state' && b.def.listens && b.def.listens.indexOf(c.key) >= 0; });
       if (hit || own || stateHit || paramHit) b.refresh();
     });
+    updateChrome();
   });
 
   RK.bus.on('theme:changed', function () {
     blocks.forEach(function (b) { b.rerender(); });
   });
   RK.bus.on('data:changed', util.debounce(function () {
-    blocks.forEach(function (b) { if (b.def && (b.def.needsData || b.datasetId) && !(b.instance && b.instance.onStore && !b.def.needsData)) b.refresh(); });
+    blocks.forEach(function (b) {
+      if (b.state === 'destroyed') return;
+      if (b._choicesEl || b.options().choices) b.addChoices();   // "*computed" follows new / removed metrics
+      if (b.def && (b.def.needsData || b.datasetId) && !(b.instance && b.instance.onStore && !b.def.needsData)) b.refresh();
+    });
+    updateChrome();
   }, 30));
+
+  /* ------------------------------------------------------------------ *
+   * Report chrome that follows the data: title templates, "Filtered view" stamps
+   * ------------------------------------------------------------------ */
+  var warnedTpl = Object.create(null);
+
+  /** Dataset a page-level template without "<dataset>:" uses: the first bound block on its page. */
+  function pageDataset(el) {
+    var page = pageOf(el), b = page && page.querySelector('[data-rk-data]');
+    return b ? b.getAttribute('data-rk-data') : null;
+  }
+
+  /**
+   * Fill every [data-rk-template] element (textContent only) from the currently filtered data. Inside a block the
+   * block's own dataset is the default and its rows are what the block shows; elsewhere the page's filter setting applies.
+   */
+  function refreshTemplates(root) {
+    if (!RK.template || !RK.data._ready) return;
+    util.qsa('[data-rk-template]', root || document).forEach(function (el) {
+      var tpl = el.getAttribute('data-rk-template');
+      if (!tpl) return;
+      var be = el.closest('.rk-block'), b = be && be.rkBlock && be.rkBlock.state !== 'destroyed' ? be.rkBlock : null;
+      var off = pageFiltersOff(el);
+      var text = RK.template.render(tpl, {
+        dataset: b ? b.datasetId : be && be.getAttribute('data-rk-data') ? be.getAttribute('data-rk-data') : pageDataset(el),
+        filters: !off,
+        rows: function (ds) { return b && ds.id === b.datasetId ? b.view().rows : RK.data.view(ds, { filters: !off }); },
+        onError: function (e, ph) {
+          var k = tpl + '\u0001' + ph.src;
+          if (!warnedTpl[k]) { warnedTpl[k] = 1; console.warn('[RK] title template {{' + ph.src + '}}:', e.message); }
+        }
+      });
+      if (el.textContent !== text) el.textContent = text;
+    });
+  }
+
+  /** Filters applied to the data blocks of a page -> unique [{key, text}] (empty for data-rk-filters="off"). */
+  function pageFilters(page) {
+    var out = [], seen = Object.create(null);
+    if (pageFiltersOff(page)) return out;
+    blocks.forEach(function (b) {
+      if (b.state === 'destroyed' || !b.def || !b.def.needsData || !b.datasetId || !page.contains(b.el)) return;
+      var ds = RK.data.get(b.datasetId);
+      if (!ds) return;
+      var opts = b.options();
+      if (b.filtersOff(opts)) return;
+      // a rendered block's last view is current (blocks re-render before the chrome updates); others are computed
+      var v = (b.state === 'rendered' || b.state === 'empty') && b._view ? b._view : b.view(opts);
+      v.applied.forEach(function (x) {
+        if (seen[x.key]) return;
+        seen[x.key] = 1;
+        out.push({ key: x.key, text: RK.data.describeFilter(x.spec, ds) });
+      });
+    });
+    return out;
+  }
+
+  /** "Filtered view: Region = Europe · Sector = Automation" in the foot of every page whose blocks are filtered. */
+  function refreshStamps() {
+    util.qsa('.rk-page').forEach(function (page) {
+      var foot = page.querySelector(':scope > .rk-page__foot');
+      var stamp = foot ? foot.querySelector(':scope > .rk-page__filtered') : null;
+      var list = foot ? pageFilters(page) : [];
+      page.classList.toggle('is-filtered', list.length > 0);
+      if (!list.length) { if (stamp) stamp.remove(); return; }
+      if (!stamp) {
+        stamp = h('span.rk-page__filtered', { role: 'status' });
+        foot.insertBefore(stamp, foot.querySelector(':scope > .rk-page__conf, :scope > .rk-page__num'));
+      }
+      var text = t('filteredView', 'Filtered view') + t('colon', ': ') + list.map(function (x) { return x.text; }).join(' \u00b7 ');
+      if (stamp.textContent !== text) { stamp.textContent = text; stamp.title = text; }
+    });
+  }
+
+  function updateChrome() {
+    if (!runtime.booted || !RK.data._ready) return;
+    try { refreshTemplates(); } catch (e) { console.error('[RK] title templates failed', e); }
+    try { refreshStamps(); } catch (e2) { console.error('[RK] filtered-view stamps failed', e2); }
+  }
+  var chromeQueued = false;
+  function scheduleChrome() {
+    if (chromeQueued) return;
+    chromeQueued = true;
+    Promise.resolve().then(function () { chromeQueued = false; updateChrome(); });
+  }
+  runtime.updateChrome = updateChrome;
+  runtime.refreshTemplates = refreshTemplates;
+  runtime.refreshStamps = refreshStamps;
+  runtime.pageFilters = pageFilters;
 
   /* ------------------------------------------------------------------ *
    * Page chrome: nav, progress, page numbers, theme switch, print
@@ -3968,7 +4700,7 @@
       var kicker = p.querySelector('.rk-page__kicker');
       var a = h('a.rk-nav__link', { href: '#' + p.id },
         h('span.rk-nav__num', String(i + 1).padStart(2, '0')),
-        h('span.rk-nav__text', p.getAttribute('data-rk-page') || (kicker ? kicker.textContent : 'Page ' + (i + 1))));
+        h('span.rk-nav__text', p.getAttribute('data-rk-page') || (kicker && kicker.textContent.trim() ? kicker.textContent : t('page', 'Page {n}', { n: i + 1 }))));
       list.appendChild(h('li', a));
       return a;
     });
@@ -4001,7 +4733,7 @@
   function wireThemeSwitch() {
     util.qsa('[data-rk-theme-switch]').forEach(function (sel) {
       if (sel.tagName === 'SELECT' && !sel.options.length) {
-        RK.theme.list.forEach(function (t) { sel.appendChild(h('option', { value: t }, RK.theme.labels[t] || t)); });
+        RK.theme.list.forEach(function (name) { sel.appendChild(h('option', { value: name }, RK.theme.label ? RK.theme.label(name) : (RK.theme.labels[name] || name))); });
       }
       sel.value = document.documentElement.getAttribute('data-rk-theme') || RK.theme.list[0];
       sel.addEventListener('change', function () { RK.theme.set(sel.value); });
@@ -4014,7 +4746,92 @@
     });
   }
 
-  function beforePrint() {
+  /* ------------------------------------------------------------------ *
+   * Print fit: block content that overflows its body (a wide comps table, a tall grid, a Tabulator holder) is
+   * scaled down with CSS zoom so the printed page shows all of it, instead of a clipped scroll viewport.
+   * ------------------------------------------------------------------ */
+  var PRINT_MIN_ZOOM = 0.55;
+  var fitted = [];
+
+  function overflows(el) { return el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1; }
+  function isScroller(el) {
+    var cs = getComputedStyle(el);
+    return /(auto|scroll)/.test(cs.overflowX + ' ' + cs.overflowY + ' ' + cs.overflow);
+  }
+  /** Fit one block body -> {block, zoom, clipped, ...} or null when nothing overflows. */
+  function fitBody(b) {
+    var body = b.body;
+    if (!body || body === b.el || !body.isConnected || !body.firstElementChild) return null;
+    // maps fit their own bounds; Leaflet's overlay panes extend past the (clipping) container by design
+    if (body.classList.contains('leaflet-container') || body.querySelector('.leaflet-container')) return null;
+    var bw = body.clientWidth, bh = body.clientHeight;
+    if (!bw || !bh) return null;
+    // nested scroll containers (table wrappers, Tabulator holders) that hide part of their content
+    var nested = [].filter.call(body.querySelectorAll('*'), function (el) {
+      return !(el instanceof SVGElement) && overflows(el) && isScroller(el);
+    });
+    if (!overflows(body) && !nested.length) return null;
+    var rec = { block: b, unclamped: [], zoomed: [], body: null, zoom: 1, clipped: false, box: [bw, bh], content: null };
+    // unclamp them (and the boxes between them and the body) so the content takes its natural size. A class with
+    // !important rules (components.css), not inline styles: a component that re-lays out during print (Tabulator
+    // sets holder heights inline on resize) cannot clamp them again.
+    nested.forEach(function (el) {
+      for (var n = el; n && n !== body; n = n.parentElement) {
+        if (rec.unclamped.indexOf(n) < 0) { n.classList.add('rk-pf-unclamp'); rec.unclamped.push(n); }
+      }
+    });
+    // ... then scale the body's content to the box it had on the page (scroll sizes: the same, unzoomed, units as client sizes)
+    var w = Math.max(body.scrollWidth, bw), hgt = Math.max(body.scrollHeight, bh);
+    var z = Math.min(1, bw / w, bh / hgt);
+    rec.content = [w, hgt];
+    if (z > 0.995) { restore(rec); return null; }
+    if (z < PRINT_MIN_ZOOM) { z = PRINT_MIN_ZOOM; rec.clipped = true; }
+    z = Math.floor(z * 1000) / 1000;
+    [].forEach.call(body.children, function (c) {
+      if (c.classList.contains('rk-block__msg')) return;
+      rec.zoomed.push({ el: c, prev: c.style.getPropertyValue('zoom'), prio: c.style.getPropertyPriority('zoom') });
+      c.style.setProperty('zoom', String(z), 'important');
+    });
+    if (rec.clipped) { rec.body = { el: body, prev: body.style.getPropertyValue('overflow') }; body.style.setProperty('overflow', 'hidden'); }
+    rec.zoom = z;
+    b.el.classList.add('is-print-fit');
+    return rec;
+  }
+  function restore(rec) {
+    rec.unclamped.forEach(function (n) { n.classList.remove('rk-pf-unclamp'); });
+    rec.zoomed.forEach(function (x) { if (x.prev) x.el.style.setProperty('zoom', x.prev, x.prio); else x.el.style.removeProperty('zoom'); });
+    if (rec.body) { if (rec.body.prev) rec.body.el.style.setProperty('overflow', rec.body.prev); else rec.body.el.style.removeProperty('overflow'); }
+    rec.block.el.classList.remove('is-print-fit');
+  }
+
+  /**
+   * Scale every overflowing block's content to fit its body (CSS zoom on the body's children, min 0.55; content that
+   * still does not fit is clipped at the body). Idempotent; runs on beforeprint / print media and can be called after
+   * emulating print media. Returns [{id, zoom, clipped, box: [w, h], content: [w, h]}] (CSS px, before zoom).
+   */
+  function printFit() {
+    printUnfit();
+    blocks.forEach(function (b) {
+      if (b.state !== 'rendered' || !b.el.isConnected || b.el.closest('.rk-modal')) return;
+      if (b.options().printFit === false) return;
+      try { var rec = fitBody(b); if (rec) fitted.push(rec); } catch (e) { console.warn('[RK] print fit failed for', b.id, e); }
+    });
+    return fitted.map(function (r) { return { id: r.block.id, zoom: Math.round(r.zoom * 1000) / 1000, clipped: r.clipped, box: r.box, content: r.content }; });
+  }
+  function printUnfit() {
+    fitted.forEach(restore);
+    fitted = [];
+  }
+  runtime.printFit = printFit;
+  runtime.printUnfit = printUnfit;
+
+  /*
+   * Print sequence (Chrome): 'beforeprint' (styles are still screen styles) -> matchMedia('print') change -> snapshot ->
+   * 'afterprint'. DOM changes made in either handler reach the paper; measurements see the screen layout, which
+   * html.rk-printing lays out at the print page width (print.css). Components add their own 'beforeprint' handlers
+   * (Tabulator swaps in its print table), so the fit runs in a listener kept LAST on window, and again on the media change.
+   */
+  function enterPrint() {
     if (runtime.printing) return;
     runtime.printing = true;
     document.documentElement.classList.add('rk-printing');
@@ -4022,16 +4839,32 @@
     // rebuild already-rendered blocks so they see ctx.print (no zoom sliders, no animation)
     blocks.forEach(function (b) { if (b.state === 'rendered') b.refresh(); b.resize(); });
   }
+  var printDispatch = false;   // inside the 'beforeprint' dispatch: a listener removed now would not run for it
+  function beforePrint() {
+    printDispatch = true;
+    setTimeout(function () { printDispatch = false; }, 0);
+    enterPrint();
+  }
+  function fitLast() { printDispatch = false; if (runtime.printing) printFit(); }
+  /** Move the print-fit listener behind every 'beforeprint' listener added so far (blocks call it after rendering). */
+  function keepFitLast() {
+    if (printDispatch) return;
+    global.removeEventListener('beforeprint', fitLast);
+    global.addEventListener('beforeprint', fitLast);
+  }
   function afterPrint() {
+    if (!runtime.printing) return;
+    printUnfit();
     runtime.printing = false;
     document.documentElement.classList.remove('rk-printing');
     blocks.forEach(function (b) { if (b.state === 'rendered') b.refresh(); b.resize(); });
   }
   global.addEventListener('beforeprint', beforePrint);
+  keepFitLast();
   global.addEventListener('afterprint', afterPrint);
   if (global.matchMedia) {
     var mq = global.matchMedia('print');
-    var onMq = function (e) { if (e.matches) beforePrint(); else afterPrint(); };
+    var onMq = function (e) { if (e.matches) { enterPrint(); printFit(); } else afterPrint(); };
     if (mq.addEventListener) mq.addEventListener('change', onMq); else if (mq.addListener) mq.addListener(onMq);
   }
 
@@ -4042,19 +4875,28 @@
     cfg = cfg || {};
     if (runtime.booted && !cfg.force) return Promise.resolve(RK);
     runtime.booted = true;
-    try {
-      var saved = cfg.theme || (global.localStorage && localStorage.getItem('rk:theme'));
-      if (saved && RK.theme.list.indexOf(saved) >= 0 && !cfg.ignoreSavedTheme) document.documentElement.setAttribute('data-rk-theme', saved);
-    } catch (e) { /* storage unavailable */ }
+    if (RK.i18n) RK.i18n.detect();
+    // theme preference of THIS report (key namespaced by RK.data.reportKey(); file:// reports may share storage)
+    function applySavedTheme() {
+      if (cfg.ignoreSavedTheme) return false;
+      var saved = cfg.theme || RK.theme.saved();
+      var root = document.documentElement;
+      if (!saved || RK.theme.list.indexOf(saved) < 0 || root.getAttribute('data-rk-theme') === saved) return false;
+      root.setAttribute('data-rk-theme', saved);
+      return true;
+    }
     RK.theme.init();
+    if (applySavedTheme()) RK.theme.refresh();
     document.documentElement.classList.add('rk-js');
     return RK.data.load(cfg).catch(function (e) {
       console.error(e);
-      var msg = h('div.rk-boot-error', h('strong', 'Report data could not be loaded. '), (e && e.message) || String(e));
+      var msg = h('div.rk-boot-error', h('strong', t('dataLoadError', 'Report data could not be loaded.') + ' '), (e && e.message) || String(e));
       document.body.insertBefore(msg, document.body.firstChild);
       return RK.data;
     }).then(function () {
+      if (applySavedTheme()) RK.theme.refresh();   // the report key is complete once the manifest is loaded
       fillMeta();
+      try { refreshTemplates(); } catch (e) { console.error('[RK] title templates failed', e); }   // before the nav reads kickers
       buildNav();
       wireThemeSwitch();
       if (cfg.progress !== false) buildProgress();
@@ -4070,6 +4912,7 @@
           blocks.forEach(function (b) { if (b.state === 'rendered') { b.resize(); if (b.def && b.def.relayoutOnFonts !== false) b.refresh(); } });
         });
       }
+      updateChrome();
       RK.bus.emit('report:ready', RK);
       return RK;
     });
@@ -4080,7 +4923,8 @@
     var rep = (RK.data.manifest && RK.data.manifest.report) || {};
     util.qsa('[data-rk-meta]').forEach(function (el) {
       var k = el.getAttribute('data-rk-meta');
-      if (rep[k] != null && !el.textContent.trim()) el.textContent = k === 'date' ? RK.format(rep[k], 'dd mmmm yyyy') : rep[k];
+      var dateFmt = RK.i18n && RK.i18n.lang() === 'zh' ? 'yyyy"\u5e74"m"\u6708"d"\u65e5"' : 'dd mmmm yyyy';
+      if (rep[k] != null && !el.textContent.trim()) el.textContent = k === 'date' ? RK.format(rep[k], dateFmt) : rep[k];
     });
   }
 

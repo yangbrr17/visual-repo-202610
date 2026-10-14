@@ -9,6 +9,20 @@
   var C = RK.chart;
   var OTHERS = /^(others?|other .+|rest of .+|all other.*)$/i;
   var ef = function () { return window.echarts && window.echarts.format; };
+
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'marimekko.pctOf': '占{name}比例', 'marimekko.pctMarket': '占整体市场比例', 'marimekko.segTotal': '{name}合计',
+      'marimekko.ofMarket': '（占市场 {pct}）'
+    });
+  }
   function ellipsize(s, w, font) { var f = ef(); return f && f.truncateText ? f.truncateText(String(s), w, font, '…') : String(s); }
   /** Word-wrap into lines no wider than w (null when one word alone is wider). */
   function wrapWords(s, w, font) {
@@ -31,7 +45,7 @@
   /** Segments (columns) and players (stacks) with cumulative geometry in [0, 1] x [0, 1]. */
   function model(ctx) {
     var o = ctx.options, enc = ctx.enc;
-    var othersName = o.othersLabel;
+    var othersName = o.othersLabel === 'Others' ? tr('others', 'Others') : o.othersLabel;
     function num(v) { return v == null || v === '' || !isFinite(v) ? null : +v; }
     function collect(rows) {
       var segs = new Map(), totals = new Map();
@@ -295,9 +309,9 @@
           var v = p.value, sg = m.segs[v[6]];
           return C.tip(p.seriesName + '  —  ' + sg.name, [
             { color: colorOf[p.seriesName], label: ctx.title(enc.value), value: RK.format(v[4], fmt), bold: true },
-            { label: '% of ' + sg.name, value: RK.format(v[5], '0.0%') },
-            { label: '% of total market', value: RK.format(m.grand ? v[4] / m.grand : null, '0.0%') },
-            { label: sg.name + ' total', value: RK.format(sg.total, fmt) + '  (' + RK.format(sg.share, '0.0%') + ' of market)' }
+            { label: tr('marimekko.pctOf', '% of {name}', { name: sg.name }), value: RK.format(v[5], '0.0%') },
+            { label: tr('marimekko.pctMarket', '% of total market'), value: RK.format(m.grand ? v[4] / m.grand : null, '0.0%') },
+            { label: tr('marimekko.segTotal', '{name} total', { name: sg.name }), value: RK.format(sg.total, fmt) + '  ' + tr('marimekko.ofMarket', '({pct} of market)', { pct: RK.format(sg.share, '0.0%') }) }
           ]);
         }
       },

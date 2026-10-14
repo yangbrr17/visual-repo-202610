@@ -9,6 +9,20 @@
   var C = RK.chart, util = RK.util;
   var MINUS = '−';
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'dumbbell.increase': '上升', 'dumbbell.decrease': '下降', 'dumbbell.vs': '较{name}', 'dumbbell.change': '变动',
+      'dumbbell.pctOf': '占{name}比例', 'dumbbell.position': '区间内位置', 'dumbbell.changePct': '变动 %'
+    });
+  }
+
   var isNum = util.isNum;
 
   /** Axis tick format: the value format with no more decimals than the tick step needs ($1,250 not $1,250.0). */
@@ -209,8 +223,8 @@
     };
     var toName = o.toLabel || ctx.title(enc.to);
     if (byDir) {
-      series.push(toSeries('to-up', o.upLabel || 'Increase', up, function (d) { return d.gap == null || d.gap >= 0; }));
-      series.push(toSeries('to-down', o.downLabel || 'Decrease', down, function (d) { return d.gap != null && d.gap < 0; }));
+      series.push(toSeries('to-up', o.upLabel || tr('dumbbell.increase', 'Increase'), up, function (d) { return d.gap == null || d.gap >= 0; }));
+      series.push(toSeries('to-down', o.downLabel || tr('dumbbell.decrease', 'Decrease'), down, function (d) { return d.gap != null && d.gap < 0; }));
     } else {
       series.push(toSeries('to', toName, single, function () { return true; }));
     }
@@ -244,7 +258,7 @@
     var deltaFmt = o.deltaFormat || (o.delta === 'abs' ? (ppAbs ? ppFmt(rawFmt) : rawFmt) : '0.0%');
     var deltaVal = function (d) { var x = deltaOf(d); return o.delta === 'abs' && ppAbs && !o.deltaFormat && isNum(x) ? x * 100 : x; };
     // right-aligned numbers: column width = widest label; the header is right-aligned over it
-    var deltaTitle = o.deltaTitle || (o.delta === 'marker' ? 'vs. ' + (o.toLabel || ctx.title(enc.to)) : 'Change');
+    var deltaTitle = o.deltaTitle || (o.delta === 'marker' ? tr('dumbbell.vs', 'vs. {name}', { name: o.toLabel || ctx.title(enc.to) }) : tr('dumbbell.change', 'Change'));
     var colW = 0;
     if (o.delta) items.forEach(function (d) { colW = Math.max(colW, C.measure(signed(deltaVal(d), deltaFmt), '600 11px ' + t.fontNum)); });
     colW = Math.ceil(colW) + 2;
@@ -273,7 +287,7 @@
     var fromName = o.fromLabel || ctx.title(enc.from), legendData = [];
     if (range) legendData.push({ name: rangeName, itemStyle: { color: RK.theme.alpha(single, 0.45) } });
     else if (byDir) legendData.push({ name: fromName, itemStyle: { color: fromCol } },
-      { name: o.upLabel || 'Increase', itemStyle: { color: up } }, { name: o.downLabel || 'Decrease', itemStyle: { color: down } });
+      { name: o.upLabel || tr('dumbbell.increase', 'Increase'), itemStyle: { color: up } }, { name: o.downLabel || tr('dumbbell.decrease', 'Decrease'), itemStyle: { color: down } });
     else legendData.push({ name: fromName, itemStyle: { color: t.paper, borderColor: single, borderWidth: 1.5 } },   // hollow = 'from'
       { name: toName, itemStyle: { color: single } });
     if (hasMarker) legendData.push({ name: o.markerLabel || ctx.title(enc.marker), icon: 'diamond', itemStyle: { color: markerCol } });   // marker shape
@@ -304,22 +318,22 @@
         formatter: function (p) {
           var d = items[p.dataIndex];
           if (!d) return '';
-          var tr = [
+          var tipRows = [
             { color: fromCol, label: o.fromLabel || ctx.title(enc.from), value: num(d.from, rawFmt) },
             { color: colorOf(d), label: toName, value: num(d.to, rawFmt) }
           ];
           if (hasMarker) {
-            tr.push({ color: d.hi ? t.accent2 : markerCol, label: o.markerLabel || ctx.title(enc.marker), value: num(d.marker, rawFmt), bold: true });
-            if (d.to != null && d.marker != null) tr.push({ label: '% of ' + toName, value: RK.format(d.to ? d.marker / d.to : NaN, '0.0%') });
-            if (d.from != null && d.to != null && d.marker != null) tr.push({ label: 'Position in range', value: RK.format(d.to - d.from ? (d.marker - d.from) / (d.to - d.from) : NaN, '0%') });
+            tipRows.push({ color: d.hi ? t.accent2 : markerCol, label: o.markerLabel || ctx.title(enc.marker), value: num(d.marker, rawFmt), bold: true });
+            if (d.to != null && d.marker != null) tipRows.push({ label: tr('dumbbell.pctOf', '% of {name}', { name: toName }), value: RK.format(d.to ? d.marker / d.to : NaN, '0.0%') });
+            if (d.from != null && d.to != null && d.marker != null) tipRows.push({ label: tr('dumbbell.position', 'Position in range'), value: RK.format(d.to - d.from ? (d.marker - d.from) / (d.to - d.from) : NaN, '0%') });
           } else {
-            if (isPct(rawFmt)) tr.push({ label: 'Change', value: signed(isNum(d.gap) ? d.gap * 100 : d.gap, ppFmt(rawFmt)), bold: true });
+            if (isPct(rawFmt)) tipRows.push({ label: tr('dumbbell.change', 'Change'), value: signed(isNum(d.gap) ? d.gap * 100 : d.gap, ppFmt(rawFmt)), bold: true });
             else {
-              tr.push({ label: 'Change', value: signed(d.gap, rawFmt), bold: true });
-              tr.push({ label: 'Change %', value: signed(d.from ? (d.gap == null ? null : d.gap / Math.abs(d.from)) : NaN, '0.0%') });
+              tipRows.push({ label: tr('dumbbell.change', 'Change'), value: signed(d.gap, rawFmt), bold: true });
+              tipRows.push({ label: tr('dumbbell.changePct', 'Change %'), value: signed(d.from ? (d.gap == null ? null : d.gap / Math.abs(d.from)) : NaN, '0.0%') });
             }
           }
-          return C.tip(d.label, tr);
+          return C.tip(d.label, tipRows);
         }
       },
       xAxis: valAxis,

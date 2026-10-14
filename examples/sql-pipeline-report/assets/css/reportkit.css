@@ -424,6 +424,18 @@ table { border-collapse: collapse; }
 .rk-page__source { flex: 1; }
 .rk-page__notes { display: block; margin-top: 2px; }
 .rk-page__conf { white-space: nowrap; text-transform: uppercase; letter-spacing: .06em; }
+/* "Filtered view: Region = Europe · …" — set by the runtime whenever filters / selections affect the page (printed) */
+.rk-page__filtered {
+  flex: 0 1 auto; max-width: 62%; min-width: 0;
+  color: var(--rk-accent-3); font-weight: 600; text-align: right;
+  overflow-wrap: anywhere;
+  /* at most two lines, so a long filter list never pushes the foot off the page (the title attribute has it all) */
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+.rk-page__filtered::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 5px; vertical-align: 1px;
+  border-radius: 50%; background: var(--rk-accent-2);
+}
 .rk-page__num { font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; min-width: 18px; text-align: right; color: var(--rk-ink-2); font-weight: 600; }
 
 /* page proportions: 16:9 widescreen (default) | US Letter landscape | A4 landscape (Report(page_size=...)) */
@@ -443,13 +455,13 @@ table { border-collapse: collapse; }
 /* ---------- cover page ---------- */
 .rk-page--cover { padding: 0; background: var(--rk-accent); color: #fff; justify-content: flex-end; }
 .rk-page--cover::before { height: 0; }
-.rk-cover__inner { position: relative; z-index: 1; padding: clamp(28px, 5vw, 72px); max-width: 78%; }
+.rk-cover__inner { position: relative; z-index: 1; padding: var(--rk-cover-pad, clamp(28px, 5vw, 72px)); max-width: 78%; }
 .rk-cover__kicker { font-size: var(--rk-fs-sm); letter-spacing: .16em; text-transform: uppercase; color: color-mix(in srgb, #fff 70%, var(--rk-accent-2)); margin-bottom: 18px; }
 .rk-cover__title { font-family: var(--rk-font-serif); font-size: var(--rk-fs-display); font-weight: 600; line-height: 1.06; color: #fff; letter-spacing: -.01em; text-wrap: balance; }
-.rk-cover__subtitle { margin-top: 14px; font-size: clamp(14px, .6vw + 10px, 19px); color: rgba(255, 255, 255, .78); max-width: 60ch; }
+.rk-cover__subtitle { margin-top: 14px; font-size: var(--rk-fs-cover-sub, clamp(14px, .6vw + 10px, 19px)); color: rgba(255, 255, 255, .78); max-width: 60ch; }
 .rk-cover__meta { display: flex; flex-wrap: wrap; gap: 6px 28px; margin-top: 34px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, .24); font-size: var(--rk-fs-base); color: rgba(255, 255, 255, .86); }
 .rk-cover__meta span { white-space: nowrap; }
-.rk-cover__conf { position: absolute; right: clamp(20px, 3vw, 48px); top: clamp(18px, 2.4vw, 36px); font-size: var(--rk-fs-xs); letter-spacing: .14em; text-transform: uppercase; color: rgba(255, 255, 255, .6); }
+.rk-cover__conf { position: absolute; right: var(--rk-cover-conf-x, clamp(20px, 3vw, 48px)); top: var(--rk-cover-conf-y, clamp(18px, 2.4vw, 36px)); font-size: var(--rk-fs-xs); letter-spacing: .14em; text-transform: uppercase; color: rgba(255, 255, 255, .6); }
 .rk-page--cover::after {                  /* subtle geometric motif */
   content: ""; position: absolute; right: -8%; top: -30%; width: 62%; aspect-ratio: 1;
   border-radius: 50%;
@@ -461,7 +473,7 @@ table { border-collapse: collapse; }
 
 /* ---------- section divider ---------- */
 .rk-page--section { justify-content: center; }
-.rk-section__num { font-family: var(--rk-font-serif); font-size: clamp(56px, 6vw, 110px); line-height: 1; color: var(--rk-accent-2); font-weight: 600; }
+.rk-section__num { font-family: var(--rk-font-serif); font-size: var(--rk-fs-section-num, clamp(56px, 6vw, 110px)); line-height: 1; color: var(--rk-accent-2); font-weight: 600; }
 .rk-section__title { margin-top: 10px; font-family: var(--rk-font-serif); font-size: var(--rk-fs-display); color: var(--rk-accent); font-weight: 600; }
 .rk-section__subtitle { margin-top: 10px; color: var(--rk-ink-3); font-size: var(--rk-fs-lg); max-width: 60ch; }
 [data-rk-theme="ink"] .rk-section__title { color: var(--rk-ink); }
@@ -482,12 +494,14 @@ table { border-collapse: collapse; }
   .rk-deck { margin-left: 0; }
   .rk-nav-toggle { display: inline-flex; }
 }
+/* phone layout — never while the runtime lays pages out for print (html.rk-printing): the print fit is measured on
+   the desktop page whatever the window width */
 @media (max-width: 760px) {
-  .rk-page { aspect-ratio: auto; }
-  .rk-grid > * { grid-column: span 12; }
+  html:not(.rk-printing) .rk-page { aspect-ratio: auto; }
+  html:not(.rk-printing) .rk-grid > * { grid-column: span 12; }
   .rk-topbar__firm { display: none; }
-  .rk-cover__inner { max-width: 100%; }
-  .rk-page__head { max-width: 100%; }
+  html:not(.rk-printing) .rk-cover__inner { max-width: 100%; }
+  html:not(.rk-printing) .rk-page__head { max-width: 100%; }
 }
 
 /* ==== kit/styles/components.css ==== */
@@ -529,6 +543,35 @@ table { border-collapse: collapse; }
   transition: background var(--rk-dur-fast), color var(--rk-dur-fast), border-color var(--rk-dur-fast);
 }
 .rk-iconbtn:hover { background: var(--rk-surface); color: var(--rk-accent); border-color: var(--rk-rule); }
+
+/* head status badges: "Filtered" (+ clear) and "Selection not in this view" (runtime, Block.updateStatus) */
+.rk-block__status { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; align-self: center; min-width: 0; }
+.rk-badge {
+  display: inline-flex; align-items: center; gap: 4px; height: 19px; padding: 0 7px;
+  border: 1px solid var(--rk-rule); border-radius: 999px;
+  font-family: var(--rk-font-sans); font-size: 10.5px; font-weight: 500; line-height: 1; letter-spacing: .01em;
+  color: var(--rk-ink-2); background: var(--rk-surface); white-space: nowrap; cursor: default;
+}
+.rk-badge--filtered { color: var(--rk-accent-3); border-color: color-mix(in srgb, var(--rk-accent-3) 38%, transparent); background: color-mix(in srgb, var(--rk-accent-3) 8%, var(--rk-paper)); padding-right: 2px; }
+.rk-badge__icon { display: inline-flex; }
+.rk-badge__icon svg { width: 11px; height: 11px; }
+.rk-badge__clear {
+  display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; margin-left: 1px; padding: 0;
+  border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 13px; line-height: 1; cursor: pointer;
+  transition: background var(--rk-dur-fast), color var(--rk-dur-fast);
+}
+.rk-badge__clear:hover, .rk-badge__clear:focus-visible { background: color-mix(in srgb, var(--rk-accent-3) 16%, transparent); color: var(--rk-accent); }
+.rk-badge--soft { color: var(--rk-ink-3); background: transparent; border-style: dashed; font-style: italic; }
+
+/* metric / dimension pickers (options.choices) */
+.rk-block__choices { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; align-self: center; min-width: 0; }
+.rk-block__choice-wrap { display: inline-flex; align-items: center; gap: 5px; }
+.rk-block__choice-label { font-size: var(--rk-fs-xs); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--rk-ink-3); }
+.rk-select.rk-select--sm { height: 23px; max-width: 220px; padding: 0 22px 0 7px; font-size: 11.5px; text-overflow: ellipsis; background-position: calc(100% - 11px) 50%, calc(100% - 7px) 50%; }
+
+/* RK.runtime.printFit(): nested scroll containers of a block being fitted for print take their natural size
+   (!important: components that re-lay out during print must not clamp them again) */
+.rk-pf-unclamp { overflow: visible !important; max-height: none !important; height: auto !important; max-width: none !important; }
 
 /* messages */
 .rk-block__msg {
@@ -622,6 +665,18 @@ textarea.rk-input { height: auto; padding: 8px 10px; line-height: 1.45; resize: 
 .rk-btn--primary { background: var(--rk-accent); border-color: var(--rk-accent); color: #fff; }
 .rk-btn--primary:hover { background: color-mix(in srgb, var(--rk-accent) 86%, #fff); color: #fff; }
 [data-rk-theme="ink"] .rk-btn--primary { color: #0f1724; }
+.rk-btn:focus-visible {
+  outline: 2px solid transparent; outline-offset: 2px;     /* transparent: still drawn in forced-colors mode */
+  border-color: var(--rk-accent-3); box-shadow: 0 0 0 2px var(--rk-paper), 0 0 0 4px var(--rk-accent-3);   /* gap + solid ring */
+}
+/* anchors styled as buttons (the builder's Excel download, gallery CTAs): the same look as button.rk-btn — no
+   underline, no link / visited colour (explicit :visited pairs keep the specificity of the primary variant) */
+a.rk-btn { text-decoration: none; white-space: nowrap; user-select: none; -webkit-user-select: none; }
+a.rk-btn, a.rk-btn:visited { color: var(--rk-ink-2); }
+a.rk-btn:hover, a.rk-btn:visited:hover { color: var(--rk-accent); text-decoration: none; }
+a.rk-btn--primary, a.rk-btn--primary:visited, a.rk-btn--primary:hover, a.rk-btn--primary:visited:hover { color: #fff; }
+[data-rk-theme="ink"] a.rk-btn--primary, [data-rk-theme="ink"] a.rk-btn--primary:visited,
+[data-rk-theme="ink"] a.rk-btn--primary:hover, [data-rk-theme="ink"] a.rk-btn--primary:visited:hover { color: #0f1724; }
 .rk-chip {
   display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px 0 10px;
   border-radius: 999px; border: 1px solid var(--rk-rule); background: var(--rk-surface);
@@ -698,6 +753,22 @@ textarea.rk-input { height: auto; padding: 8px 10px; line-height: 1.45; resize: 
    ========================================================================== */
 @page { size: 13.333in 7.5in; margin: 0; }   /* the builder appends a Letter / A4 @page rule when page_size is set */
 
+/* Paper metrics. The tokens below are viewport-relative (vw) on screen; on paper vw would be the SHEET width (1280px
+   for 16:9, 1056px for Letter) and while the runtime measures for print (html.rk-printing, before the media switch)
+   it is the WINDOW width. Both are pinned to their values in a 1440px window — the canonical 1135px page — so the
+   fit measured at 'beforeprint' (RK.runtime.printFit, data-grid row fit) is exactly the fit on paper, at any window
+   width, and paper shows the layout designed on screen. */
+html.rk-printing {
+  --rk-page-pad-x: 46.08px; --rk-page-pad-y: 37.44px; --rk-fs-title: 27px; --rk-fs-display: 48px;
+  --rk-cover-pad: 72px; --rk-fs-cover-sub: 18.64px; --rk-cover-conf-x: 43.2px; --rk-cover-conf-y: 34.56px; --rk-fs-section-num: 86.4px;
+}
+@media print {
+  :root {
+    --rk-page-pad-x: 46.08px; --rk-page-pad-y: 37.44px; --rk-fs-title: 27px; --rk-fs-display: 48px;
+    --rk-cover-pad: 72px; --rk-fs-cover-sub: 18.64px; --rk-cover-conf-x: 43.2px; --rk-cover-conf-y: 34.56px; --rk-fs-section-num: 86.4px;
+  }
+}
+
 @media print {
   html, body { background: #fff !important; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -722,6 +793,18 @@ textarea.rk-input { height: auto; padding: 8px 10px; line-height: 1.45; resize: 
   .rk-js .rk-reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
   .rk-block { break-inside: avoid; }
   a { color: inherit; text-decoration: none; }
+  /* the page's "Filtered view" stamp states the filters on paper; per-block "Filtered" badges are screen-only */
+  .rk-badge--filtered { display: none !important; }
+  .rk-badge--soft { border: 0; padding: 0; height: auto; }
+  /* metric / dimension pickers print as the chosen field's name (label + value, no control chrome) */
+  .rk-block__choices .rk-select { border: 0; background: none; padding: 0; height: auto; max-width: none; box-shadow: none; color: var(--rk-ink-2); font-weight: 600; text-overflow: clip; }
+  .rk-block__choice-wrap { gap: 4px; }
+  /* RK.runtime.printFit(): content zoomed to fit its block; whatever still does not fit is clipped at the block */
+  .rk-block.is-print-fit > .rk-block__body { overflow: hidden; }
+}
+/* between beforeprint and afterprint the screen layout is measured for print fit: lay pages out at the print width */
+@media screen {
+  html.rk-printing .rk-page { width: 1135px; max-width: none; }
 }
 
 /* ==== kit/components/comps-table/comps-table.css ==== */
@@ -1007,6 +1090,32 @@ textarea.rk-input { height: auto; padding: 8px 10px; line-height: 1.45; resize: 
 .rk-fb--inline .rk-fb__reset.is-shown { display: inline; }
 .rk-topbar .rk-fb { justify-content: flex-end; }
 .rk-topbar .rk-fb__count { display: none; }
+/* chart selections on the same line: chips shrink first (high flex-shrink), the ones that do not fit go under "+N" */
+.rk-topbar .rk-fb--inline .rk-fb__controls { justify-content: flex-end; }
+/* the wrapper is layout-transparent: the strip shrinks (to nothing if need be) while "+N" keeps its size */
+.rk-fb__xsel { display: contents; }
+.rk-fb__xsel.is-empty .rk-fb__xchips { display: none; }
+.rk-fb__xchips { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; flex: 0 100 auto; min-width: 0; overflow: hidden; padding: 2px 0; }
+.rk-fb__xsel.has-more:not(.has-shown) .rk-fb__xchips { margin-right: -8px; }   /* no empty gap before a lone "+N" */
+.rk-fb__xchips .rk-fb-chip { flex: none; }
+.rk-fb__xchips .rk-fb-chip__v, .rk-fb-morepop .rk-fb-chip__v { max-width: 150px; white-space: nowrap; }
+.rk-fb__xchips .rk-fb-chip.is-over { display: none; }
+.rk-fb-more {
+  display: none; align-items: center; gap: 4px; flex: none; height: 24px; padding: 0 8px; border-radius: 12px;
+  border: 1px dashed color-mix(in srgb, var(--rk-accent-2) 55%, var(--rk-rule)); background: color-mix(in srgb, var(--rk-accent-2) 7%, var(--rk-paper));
+  color: var(--rk-ink); font-size: var(--rk-fs-sm); font-weight: 600; white-space: nowrap; cursor: pointer;
+  transition: border-color var(--rk-dur-fast), box-shadow var(--rk-dur-fast);
+}
+.rk-fb-more .rk-fb-chip__icon { margin-left: 0; }
+.rk-fb__xsel.has-more .rk-fb-more { display: inline-flex; }
+.rk-fb-more:hover { border-color: var(--rk-accent-2); }
+.rk-fb-more:focus-visible, .rk-fb-more.is-open { outline: none; border-style: solid; box-shadow: 0 0 0 3px color-mix(in srgb, var(--rk-accent-3) 18%, transparent); }
+.rk-fb-morepop { width: 300px; }
+.rk-fb-morepop__list { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 6px 14px 12px; max-height: 260px; overflow: auto; }
+.rk-fb-morepop__list .rk-fb-chip { max-width: 100%; }
+/* the block holding an inline bar takes the top bar's free width so the chips can use it (and shrink before it overflows) */
+.rk-topbar .rk-block.rk-fb-host { flex: 1 1 auto; min-width: 0; }
+.rk-topbar .rk-block.rk-fb-host > .rk-block__body { min-width: 0; }
 
 /* ---------- motion off / print ---------- */
 .rk-fb.is-static *, .rk-fb.is-static *::before, .rk-fb.is-static *::after { transition: none !important; animation: none !important; }
@@ -1130,6 +1239,8 @@ textarea.rk-input { height: auto; padding: 8px 10px; line-height: 1.45; resize: 
 @media (prefers-reduced-motion: reduce) { .rk-ps__reset { transition: none; } .rk-ps__preview.is-flash td.is-live, .rk-ps__preview.is-flash .rk-ps__sval { animation: none; } }
 /* print: an assumptions read-out (label · value · change), no slider controls */
 @media print { .rk-ps__reset, .rk-ps__base, .rk-ps__track, .rk-ps__minmax { display: none; } .rk-ps__value { border-color: transparent; } }
+/* change not meaningful (relative change from a zero / negative base): neutral, never red / green */
+.rk-ps__chg.is-nm { color: var(--rk-ink-3); font-weight: 500; }
 
 /* ==== kit/components/scatter/scatter.css ==== */
 /* scatter / bubble — hover toolbar (box select, box zoom, reset) inside the chart body */

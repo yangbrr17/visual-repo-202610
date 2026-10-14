@@ -1,0 +1,18 @@
+{
+  "id": "outreach_funnel",
+  "title": "Targeted auction: expected buyer funnel",
+  "schema": {"fields": [
+    {"name": "stage", "type": "string", "title": "Stage"},
+    {"name": "parties", "type": "number", "title": "Parties", "format": "#,##0"},
+    {"name": "strategics", "type": "number", "title": "Of which strategic", "format": "#,##0"},
+    {"name": "timing", "type": "string", "title": "Timing"}
+  ]},
+  "data": [
+    {"stage": "Parties contacted", "parties": 40, "strategics": 22, "timing": "26-Oct to 13-Nov-2026"},
+    {"stage": "NDAs signed", "parties": 26, "strategics": 13, "timing": "By 13-Nov-2026"},
+    {"stage": "Indicative offers", "parties": 9, "strategics": 5, "timing": "11-Dec-2026"},
+    {"stage": "Phase 2 (data room)", "parties": 5, "strategics": 3, "timing": "Jan to Feb-2027"},
+    {"stage": "Final binding bids", "parties": 3, "strategics": 2, "timing": "5-Mar-2027"}
+  ],
+  "meta": {"asOf": "2026-10-10", "notes": ["Indicative; based on the buyer universe identified to date.", "Illustrative: all companies, banks and investors are fictional."], "source": "Northbridge Capital; median of 12 industrials sale processes advised since 2022"}
+}

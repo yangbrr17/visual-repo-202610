@@ -7,6 +7,19 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'footballField.range': '估值区间', 'footballField.low': '低值', 'footballField.high': '高值', 'footballField.mid': '中值'
+    });
+  }
+
   /**
    * Category label lines: one line when it fits, else break before an opening parenthesis
    * ("Trading comparables / (EV / EBITDA)"), else greedy word wrap.
@@ -119,7 +132,7 @@
         { id: 'base', type: 'bar', stack: 'ff', silent: true, itemStyle: { color: 'transparent' }, tooltip: { show: false },
           data: lows, barWidth: '52%' },
         {
-          id: 'range', name: 'Range', type: 'bar', stack: 'ff', barWidth: '52%',
+          id: 'range', name: tr('footballField.range', 'Range'), type: 'bar', stack: 'ff', barWidth: '52%',
           data: rows.map(function (r, i) {
             var c = C.dim(ctx, enc.label, r[enc.label], colorOf(r, i));
             return { value: (r[enc.high] != null && r[enc.low] != null) ? r[enc.high] - r[enc.low] : null, itemStyle: { color: c } };
@@ -170,13 +183,13 @@
           formatter: function (p) {
             var r = rows[p.dataIndex];
             if (!r) return '';
-            var tr = [
-              { label: 'Low', value: RK.format(r[enc.low], fmt) },
-              { label: 'High', value: RK.format(r[enc.high], fmt) },
-              { label: 'Midpoint', value: RK.format((r[enc.low] + r[enc.high]) / 2, fmt) }
+            var tipRows = [
+              { label: tr('footballField.low', 'Low'), value: RK.format(r[enc.low], fmt) },
+              { label: tr('footballField.high', 'High'), value: RK.format(r[enc.high], fmt) },
+              { label: tr('footballField.mid', 'Midpoint'), value: RK.format((r[enc.low] + r[enc.high]) / 2, fmt) }
             ];
-            if (enc.group) tr.unshift({ color: colorOf(r, p.dataIndex), label: ctx.title(enc.group), value: r[enc.group] });
-            return C.tip(r[enc.label], tr, enc.note ? r[enc.note] : (ctx.dataset.has('basis') ? r.basis : null));
+            if (enc.group) tipRows.unshift({ color: colorOf(r, p.dataIndex), label: ctx.title(enc.group), value: r[enc.group] });
+            return C.tip(r[enc.label], tipRows, enc.note ? r[enc.note] : (ctx.dataset.has('basis') ? r.basis : null));
           }
         },
         xAxis: { type: 'value', min: axMin, max: axMax, interval: step, axisLabel: { formatter: C.tickFmt(fmt, step), hideOverlap: true } },

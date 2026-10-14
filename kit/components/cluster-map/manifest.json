@@ -33,7 +33,7 @@
     "filterField": {"type": "string", "default": null, "desc": "Field used for click-to-filter; defaults to encode.label. Shared business dimensions (country, company, sector, region, segment, year…) filter the whole report; other fields (site name, type, from / to…) only this block's dataset — set crossFilterScope to override"},
     "scrollZoom": {"type": "boolean|string", "default": "click", "desc": "Plain mouse-wheel zoom: 'click' (armed after clicking the map, so page scrolling is never hijacked) | true | false. Ctrl/Cmd + wheel or a trackpad pinch always zooms; +/- buttons and drag too"}
   },
-  "interactions": ["Hover a cluster: breakdown by category + coverage outline", "Click a cluster to zoom in; spiderfy at max zoom", "Hover a point for its formatted fields", "Click a point or legend category to cross-filter", "PNG export"],
+  "interactions": ["Hover a cluster: breakdown by category + coverage outline", "Click a cluster to zoom in; spiderfy at max zoom", "Hover a point for its formatted fields", "Click a point or legend category to cross-filter", "Ctrl/⌘ + wheel or pinch to zoom; drag to pan; +/− buttons (plain wheel scrolls the page until the map is clicked)", "PNG export"],
   "samples": [
     {"title": "Site network — clustered by proximity", "data": "assets_locations", "height": 460,
      "options": {"encode": {"lat": "lat", "lon": "lon", "label": "name", "color": "type", "value": "capacity"}, "tooltip": ["city", "country", "utilization", "opened"]}},

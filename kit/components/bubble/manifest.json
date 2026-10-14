@@ -52,7 +52,7 @@
     "wheelZoom": {"type": "boolean", "default": null, "desc": "true = a plain mouse wheel zooms; default: Ctrl/Cmd + wheel or a trackpad pinch zooms, so the wheel keeps scrolling the report"},
     "legend": {"type": "boolean", "default": true, "desc": "Category legend (top-left; wraps onto extra rows, never pages)"}
   },
-  "interactions": ["Hover tooltip with all four dimensions", "Click a bubble to cross-filter (toggle); box-select several", "Legend toggles categories; continuous colour band handles filter by value", "Box zoom, Ctrl + wheel zoom, drag to pan, reset", "Timeline play / scrub with animated transitions and trails", "PNG / CSV export"],
+  "interactions": ["Hover tooltip with all four dimensions", "Click a bubble to cross-filter (toggle); box-select several", "Legend toggles categories; continuous colour band handles filter by value", "Box-zoom and reset buttons; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)", "Timeline play / scrub with animated transitions and trails", "PNG / CSV export"],
   "samples": [
     {"title": "Growth vs. margin, sized by market cap", "data": "peers", "height": 420,
      "options": {"encode": {"x": "rev_growth_25e", "y": "ebitda_margin_25e", "size": "mkt_cap", "color": "sector", "label": "ticker", "name": "company"},

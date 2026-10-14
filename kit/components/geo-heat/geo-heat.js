@@ -9,6 +9,23 @@
   'use strict';
   var h = RK.util.h, G = RK.geo;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'geoHeat.toggleTitle': '显示 / 隐藏底层数据点', 'geoHeat.show': '显示{noun}', 'geoHeat.numberOf': '{noun}数量',
+      'geoHeat.within': '约 {km} 公里范围内的{what}', 'geoHeat.location': '{n} 个地点', 'geoHeat.locations': '{n} 个地点',
+      'geoHeat.total': '合计 {value}', 'geoHeat.weighted': '按距离加权'
+    });
+  }
+  /** The marks' plural noun for running text (the zh pack's '个点' carries a measure word the templates do not need). */
+  function nounOf(ctx) { return String(RK.geo.noun(ctx, ctx.enc.label)).replace(/^\u4e2a/, ''); }
+
   function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
 
   /* ---------------- colour guards (same block in the map components) ---------------- */
@@ -320,10 +337,10 @@
       if (o0.pointsToggle !== false && !ctx.print) {   // print: no buttons
         var ctl = L.control({ position: 'topright' });
         ctl.onAdd = function () {
-          var nouns = G.noun(cur, cur.enc.label);
-          toggle = h('button.rk-geo-toggle' + (showPts ? '.is-on' : ''), { type: 'button', 'aria-pressed': String(showPts), title: 'Show / hide the underlying points',
+          var nouns = nounOf(cur);
+          toggle = h('button.rk-geo-toggle' + (showPts ? '.is-on' : ''), { type: 'button', 'aria-pressed': String(showPts), title: tr('geoHeat.toggleTitle', 'Show / hide the underlying points'),
             on: { click: function () { showPts = !showPts; toggle.setAttribute('aria-pressed', String(showPts)); drawPoints(); } } },
-          h('i.rk-geo-toggle__box'), h('span', 'Show ' + nouns));
+          h('i.rk-geo-toggle__box'), h('span', tr('geoHeat.show', 'Show {noun}', { noun: nouns })));
           L.DomEvent.disableClickPropagation(toggle);
           return toggle;
         };
@@ -333,14 +350,14 @@
       function setLegend() {
         var o = cur.options, enc = cur.enc;
         if (o.legend === false || !K) { legend.set(null); return; }
-        var what = enc.weight ? G.fieldTitle(cur, enc.weight) : 'Number of ' + G.noun(cur, enc.label);
+        var what = enc.weight ? G.fieldTitle(cur, enc.weight) : tr('geoHeat.numberOf', 'Number of {noun}', { noun: nounOf(cur) });
         var lf = G.tidyFmt(S.fmt, [0, K.top / 2, K.top]);
         var bar = [0, 0.25, 0.5, 0.75, 1].map(onLand);
-        legend.set(h('div.rk-geo-leg', G.legendSection(what + ' within ~' + RK.format(K.km, '#,##0') + ' km',
+        legend.set(h('div.rk-geo-leg', G.legendSection(tr('geoHeat.within', '{what} within ~{km} km', { what: what, km: RK.format(K.km, '#,##0') }),
           G.legendRamp(bar, [0, K.top / 2, K.top].map(function (v) { return RK.format(v, lf); }))),
-          h('div.rk-geo-leg__note', S.items.length + ' ' + (S.items.length === 1 ? 'location' : 'locations') +
-            (enc.weight ? ' · total ' + RK.format(S.items.reduce(function (s, it) { return s + (it.w || 0); }, 0), G.tidyFmt(S.fmt, [0])) : '') +
-            ' · distance-weighted')));
+          h('div.rk-geo-leg__note', tr(S.items.length === 1 ? 'geoHeat.location' : 'geoHeat.locations', S.items.length === 1 ? '{n} location' : '{n} locations', { n: S.items.length }) +
+            (enc.weight ? ' · ' + tr('geoHeat.total', 'total {value}', { value: RK.format(S.items.reduce(function (s, it) { return s + (it.w || 0); }, 0), G.tidyFmt(S.fmt, [0])) }) : '') +
+            ' · ' + tr('geoHeat.weighted', 'distance-weighted'))));
       }
 
       function draw(first) {

@@ -1,0 +1,42 @@
+{
+  "id": "market_share",
+  "title": "Market share by segment (2025)",
+  "schema": {"fields": [
+    {"name": "segment", "type": "string", "title": "Market segment"},
+    {"name": "player", "type": "string", "title": "Player"},
+    {"name": "revenue", "type": "number", "title": "Revenue 2025", "format": "$#,##0", "unit": "USD m"}
+  ]},
+  "data": [
+    {"segment": "Factory automation", "player": "Helios Industrial", "revenue": 1806.6},
+    {"segment": "Factory automation", "player": "Corvane Automation", "revenue": 2376.8},
+    {"segment": "Factory automation", "player": "Valdris Controls", "revenue": 1327.3},
+    {"segment": "Factory automation", "player": "Kanemori Systems", "revenue": 2038.8},
+    {"segment": "Factory automation", "player": "Norrvik Drives", "revenue": 509.3},
+    {"segment": "Factory automation", "player": "Others", "revenue": 7033.0},
+    {"segment": "Motion control", "player": "Helios Industrial", "revenue": 1202.6},
+    {"segment": "Motion control", "player": "Corvane Automation", "revenue": 591.0},
+    {"segment": "Motion control", "player": "Valdris Controls", "revenue": 446.5},
+    {"segment": "Motion control", "player": "Kanemori Systems", "revenue": 856.2},
+    {"segment": "Motion control", "player": "Norrvik Drives", "revenue": 1681.0},
+    {"segment": "Motion control", "player": "Others", "revenue": 5339.7},
+    {"segment": "Machine vision", "player": "Helios Industrial", "revenue": 431.5},
+    {"segment": "Machine vision", "player": "Corvane Automation", "revenue": 334.2},
+    {"segment": "Machine vision", "player": "Valdris Controls", "revenue": 538.8},
+    {"segment": "Machine vision", "player": "Kanemori Systems", "revenue": 650.8},
+    {"segment": "Machine vision", "player": "Norrvik Drives", "revenue": 56.2},
+    {"segment": "Machine vision", "player": "Others", "revenue": 2646.3},
+    {"segment": "Industrial sensors", "player": "Helios Industrial", "revenue": 828.0},
+    {"segment": "Industrial sensors", "player": "Corvane Automation", "revenue": 393.5},
+    {"segment": "Industrial sensors", "player": "Valdris Controls", "revenue": 1104.6},
+    {"segment": "Industrial sensors", "player": "Kanemori Systems", "revenue": 456.5},
+    {"segment": "Industrial sensors", "player": "Norrvik Drives", "revenue": 223.6},
+    {"segment": "Industrial sensors", "player": "Others", "revenue": 4753.9},
+    {"segment": "Industrial software", "player": "Helios Industrial", "revenue": 561.1},
+    {"segment": "Industrial software", "player": "Corvane Automation", "revenue": 729.5},
+    {"segment": "Industrial software", "player": "Valdris Controls", "revenue": 451.1},
+    {"segment": "Industrial software", "player": "Kanemori Systems", "revenue": 261.6},
+    {"segment": "Industrial software", "player": "Norrvik Drives", "revenue": 100.1},
+    {"segment": "Industrial software", "player": "Others", "revenue": 4449.3}
+  ],
+  "meta": {"asOf": "2026-10-10", "notes": ["Addressable market = sum of players per segment (Marimekko input).", "Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."], "source": "Project Atlas analysis (synthetic); Helios Industrial management plan", "unit": "USD m"}
+}

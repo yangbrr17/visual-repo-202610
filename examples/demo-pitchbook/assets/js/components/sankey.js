@@ -7,6 +7,19 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'sankey.pctOf': '占{name}比例', 'sankey.inflow': '流入', 'sankey.outflow': '流出', 'sankey.cost': '成本 / 扣减项'
+    });
+  }
+
   /** Label width via the shared canvas measure; +7% because the canvas may still measure a fallback face. */
   function measure(text, font) { return C.measure(text, font) * 1.07; }
 
@@ -353,18 +366,18 @@
               var d = p.data, src = g.byName.get(d.source);
               return C.tip(d.source + '  →  ' + d.target, [
                 { label: ctx.title(enc.value), value: RK.format(d.value, fmt), bold: true },
-                { label: '% of ' + d.source, value: src && src.outV ? RK.format(d.value / src.outV, '0.0%') : RK.format(null) },
-                { label: '% of ' + d.target, value: RK.format(d.value / (g.byName.get(d.target).inV || NaN), '0.0%') }
+                { label: tr('sankey.pctOf', '% of {name}', { name: d.source }), value: src && src.outV ? RK.format(d.value / src.outV, '0.0%') : RK.format(null) },
+                { label: tr('sankey.pctOf', '% of {name}', { name: d.target }), value: RK.format(d.value / (g.byName.get(d.target).inV || NaN), '0.0%') }
               ]);
             }
             var n = g.byName.get(p.name);
             if (!n) return '';
             var rows = [];
-            if (n.ins.length) rows.push({ label: 'Inflow', value: RK.format(n.inV, fmt) });
-            if (n.outs.length) rows.push({ label: 'Outflow', value: RK.format(n.outV, fmt) });
+            if (n.ins.length) rows.push({ label: tr('sankey.inflow', 'Inflow'), value: RK.format(n.inV, fmt) });
+            if (n.outs.length) rows.push({ label: tr('sankey.outflow', 'Outflow'), value: RK.format(n.outV, fmt) });
             if (!n.ins.length || !n.outs.length) rows.push({ label: ctx.title(enc.value), value: RK.format(n.value, fmt), bold: true });
-            if (refNode && refNode !== n) rows.push({ label: '% of ' + refNode.name, value: RK.format(n.value / refNode.value, '0.0%') });
-            return C.tip(n.name, rows, isCost(n.name) ? 'Cost / deduction' : null);
+            if (refNode && refNode !== n) rows.push({ label: tr('sankey.pctOf', '% of {name}', { name: refNode.name }), value: RK.format(n.value / refNode.value, '0.0%') });
+            return C.tip(n.name, rows, isCost(n.name) ? tr('sankey.cost', 'Cost / deduction') : null);
           }
         },
         series: [{

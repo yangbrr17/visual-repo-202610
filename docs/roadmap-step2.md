@@ -1,6 +1,7 @@
 # Step 2 路线图 · 数据 API · 客户技能 (Skills) · 本地 LLM
 
-> 状态：提案（2026-10-14）。范围：在 Step 1 的离线、数据分离报告上增加三项能力：
+> 状态：提案（2026-10-14）；同日按 Step 1 第一阶段补齐项（标题模板、筛选标注、指标切换、自建指标持久化、i18n、单文件 / Excel 交付、
+> vendor 完整性）更新了 §1 基线与各处状态。范围：在 Step 1 的离线、数据分离报告上增加三项能力：
 > ① 数据从 API 实时获取；② 客户导入自己的 "skills"（指标、查询、图表预设和工具）；③ 接入银行内网或本机部署的 LLM，
 > 支持自然语言提问、生成查询和生成图表。
 > 依据：`research/raw/08-query-ai.md`（`file://` / CSP / 引擎 / LLM 服务实测）、`09-architecture.md`（打包、契约与版本）、
@@ -37,10 +38,28 @@
 | 安全公式语言 `RK.expr`（Pratt parser → closures，没有 `eval` / `new Function`，`check()` 返回错误位置） | `kit/core/rk.expr.js` | ✅ |
 | 查询语言 `RK.query`（RKQL）+ 解析结果 `RK.query.parse(text)` → `{from, select[{expr,as,format}], by, where, sort, limit}` | `kit/core/rk.data.js`，`docs/formula-language.md` §10 | ✅ |
 | 交叉筛选 `RK.store`：组件不会被自己发出的筛选影响（crossfilter 语义） | `rk.data.js` | ✅ |
-| 客户自助：`query-console`（Builder + RKQL 编辑器 + "Add as metric" 写回 `computed[]`） | `kit/components/query-console` | ✅ |
-| 53 个组件的 manifest（channels / options / best_for / avoid_when / samples）→ `kit/catalog.json` | `tools/build_catalog.py` | ✅ |
-| JSON layout spec（`reportkit` / `report` / `datasets` / `pages[].blocks[]`）与 `reportkit validate` | `py/README.md` | ✅ |
-| 函数注册表 `RK.expr.register`、严格 CSP、`RK.skills`、`RK.ai`、companion server | — | ⬜ |
+| 客户自助：`query-console`（Builder + RKQL 编辑器 + "Add as metric" 写回 `computed[]`；`options.examples` 预置查询模板） | `kit/components/query-console` | ✅ |
+| **客户自建指标持久化**：`ds.addComputed({…, user: true})` 存入 `localStorage["rk:metrics:" + RK.data.reportKey()]`，重开报告自动恢复；`RK.data.userMetrics()` / `removeUserMetric()`；控制台"我的指标" | `kit/core/rk.data.js`，`docs/architecture.md` §7.4 | ✅ |
+| **按报告隔离的浏览器存储**：所有键为 `rk:<kind>:<标题\|日期\|构建日期>`，存储不可用时照常工作 | `RK.data.storageKey()` | ✅ |
+| **指标 / 维度切换**：block `options.choices`（`"*computed"` 含客户自建指标）+ `block.choose(channel, field)` | `rk.runtime.js`，architecture §7.3 | ✅ |
+| **标题模板**：`{{dataset: expr \| format}}` 在筛选后的数据上实时求值，builder 构建时校验 | `RK.template`，`py/reportkit/template.py` | ✅ |
+| **筛选透明**：页脚 "Filtered view"、block "Filtered" 徽标、交叉选择导致空白时的回退、`filters=False` 页面 | architecture §7.2 | ✅ |
+| **i18n**：`RK.i18n`（en / zh-CN 内置包，`add()` 扩展）、zh-CN 万 / 亿、中文日期、`updown="cn"` 红涨绿跌 | `rk.core.js`，architecture §7.5 | ✅ |
+| **交付**：单文件 HTML（零网络请求）、Excel 底稿（openpyxl）、CLI `--single-file --excel --locale` | `py/reportkit/build.py`、`excel.py` | ✅ |
+| **供应链**：`vendor.json` 记录 npm `integrity` 与逐文件 sha256，`tools/vendor.py --check` 离线校验，`npm pack --ignore-scripts` | `tools/vendor.py` | ✅ |
+| 57 个组件的 manifest（channels / options / optionDeps / best_for / avoid_when / samples）→ `kit/catalog.json` | `tools/build_catalog.py` | ✅ |
+| JSON layout spec（`reportkit` / `report` / `datasets` / `topbar` / `pages[].blocks[]`，含 `filters`、`locale`、`updown`）与 `reportkit validate` | `py/README.md` | ✅ |
+| 函数注册表 `RK.expr.register`、严格 CSP、`RK.skills`、`RK.ai`、companion server（`reportkit serve`）、JS 端 block spec 校验器 | — | ⬜ |
+
+### 1.1 Step 2 还需要做什么（摘要）
+
+| 能力 | 依赖的 Step 1 基础 | 还缺 | 见 |
+|---|---|---|---|
+| **客户导入 skills** | 自建指标的 `addComputed` 路径与持久化、`query-console` 示例查询、block spec、`kit/catalog.json` | `rk-skill.json` schema 与校验器、`RK.skills.import()`（预览 diff → 用户确认）、命名空间、权限模型、沙箱 iframe、审计日志 | §3 |
+| **本地大模型接入** | 数据 API 适配器（`data_source="api"`、`RK.data.adapter`、`RK.boot({token})`）作为与 companion 的接缝；RKQL / RK.expr 的 `check()` 错误位置；i18n（中文提示与界面） | `reportkit serve` companion（同源提供报告 + `/api/*` 数据 + 白名单反代 `/llm/v1/*`）、`RK.ai` provider、意图 schema、聊天面板、评测集 | §4 |
+| **Text-to-chart** | 57 个组件的 catalog、Python `reportkit validate` 规则 | JS 端 block spec 校验器、"钉到页面"、spec 导出 | §4.6 |
+| **数据 API 生产化** | `api` adapter（`GET {api}manifest`、`GET {api}datasets/<id>`）、Bearer token | ETag / 304、按需加载、problem+json 错误、版本协商、Arrow 通道、"Data as of" 刷新提示 | §2 |
+| **安全底座** | 无 `eval` 的公式 / 查询引擎、`textContent` 渲染、vendor 完整性 | builder 输出严格 CSP + CSP 冒烟测试；函数注册表 + Formula.js | §4.7、§6 M0 |
 
 ---
 
@@ -77,7 +96,9 @@
 ### 2.3 缓存与版本
 
 - **HTTP 缓存**：`Cache-Control: private, no-cache` + ETag（每次都重新验证，数据未变时返回 304）。客户数据**默认不落地**：
-  `localStorage` 和 IndexedDB 只存 UI 状态，key 带前缀 `rk:<report.id>:<revision>:`（09 §9）。
+  `localStorage` 和 IndexedDB 只存 UI 状态和客户自己写的公式。Step 1 已实现按报告的命名空间：键为 `rk:<kind>:<reportKey>`，
+  `reportKey = 报告标题|日期|构建日期`（`rk:metrics:…` 存自建指标的公式，`rk:theme:…` 存主题偏好）✅。API 模式下建议把
+  `revision` 也并入 reportKey（09 §9），这样数据重发新版本后旧指标不会误套到新口径上 ⬜。
 - **契约版本**：dataset 带 `contract: "rk.dataset@1"`，只升 major，允许增加字段。spec 带 `$schema` + `specVersion`。
   运行时接受当前 major 和 N-1（在内存中 migrate），遇到更新的 major 时显示 "This report requires ReportKit ≥ 2.0"（09 §7）。
 - **API 路径版本**：`/api/v1/reports/{id}/…`。`v1` 对应 `rk.dataset@1`，契约升 major 时才换路径。
@@ -125,8 +146,8 @@ comps-valuation/                # = skill name（小写连字符，Agent Skills 
 | 贡献 | 落点 | 校验 | 前置条件 |
 |---|---|---|---|
 | `functions` | 由公式模板定义的函数，展开后交给 `RK.expr` | 展开后的公式必须通过 `RK.expr.check` | ⬜ `RK.expr.register(name, {fn\|formula, kind, arity, doc})`；同时更新 `RK.expr.functions`，用于自动补全和 LLM 提示（08 §4.3） |
-| `metrics` | `Dataset.addComputed()`，与 "Add as metric" 同一路径 | `RK.expr.check` + 字段存在性检查 | ✅ |
-| `queries` | `query-console` 的 Templates 菜单 | `RK.query.parse` | 🟡 控制台已有历史记录，模板入口待加 |
+| `metrics` | `Dataset.addComputed()`，与 "Add as metric" 同一路径 | `RK.expr.check` + 字段存在性检查 | ✅ 路径已有；skill 指标应带命名空间、**不**写入客户的 `rk:metrics:` 存储（由 skill 启用状态决定是否存在） |
+| `queries` | `query-console` 的示例查询（`options.examples`） | `RK.query.parse` | 🟡 构建时可预置示例查询 ✅；运行时由 skill 注入的模板入口待加 |
 | `charts` | block JSON spec，在 "Insert / Explore" 面板中挂载 | §4.6 的 spec 校验器 | ⬜ |
 | `prompts` / `SKILL.md` | `RK.skills.catalogForLLM()` / `activate(name)` | 长度上限；作为数据插入提示词，不当作指令执行 | ⬜ |
 | `tools` | `RK.ai.tools()`；`impl` 只能是 `sandbox:*` | JSON Schema（参数） | ⬜ |
@@ -169,7 +190,7 @@ comps-valuation/                # = skill name（小写连字符，Agent Skills 
 - [ ] manifest 和资源里不能有远程 URL，资源必须内联。AntV 的 `chart-visualization` skill 会把数据发到 AntV 云端渲染（07 §0-8），这种行为必须拒绝。
 - [ ] 加命名空间：skill 贡献的名字带前缀（`comps-valuation.ev_to`），避免覆盖内置函数或数据集字段。
 - [ ] 完整性：`integrity.sha256` 和实际内容一致。银行内部分发时可以加签名 ⬜。
-- [ ] 供应链：skill 不能带 npm 依赖；kit 的 vendor 一律精确锁定版本，用 `npm pack --ignore-scripts` 获取，并记录 sha256（AntV 投毒事件教训，06 §2）。现状：精确版本 ✅；`tools/vendor.py` 用 `npm pack <pkg>@<ver>` 取 registry tarball、`tarfile` 解压，不跑安装脚本 ✅，但命令里没有显式加 `--ignore-scripts`；sha256 / `dist.integrity` 还没记录 ⬜。
+- [ ] 供应链：skill 不能带 npm 依赖；kit 的 vendor 一律精确锁定版本，用 `npm pack --ignore-scripts` 获取，并记录 sha256（AntV 投毒事件教训，06 §2）。现状：精确版本 ✅；`tools/vendor.py` 用 `npm pack <pkg>@<ver> --ignore-scripts` 取 registry tarball、`tarfile` 解压 ✅；`vendor.json` 记录 tarball `integrity`（sha512）与逐文件 sha256，`--check` 离线校验、integrity 不符即报错 ✅。skill 包的 `integrity.sha256` 可复用同一套校验代码。
 - [ ] 资源上限：单个 skill ≤ 1 MB，沙箱单次调用 ≤ 5 s，返回 ≤ 1 万行。
 - [ ] 审计：导入、启用、禁用、每次 tool 调用都写入本地审计日志（IndexedDB，可导出）。
 
@@ -267,7 +288,7 @@ LLM 只填写和 JSON layout spec 里 `blocks[]` 相同的结构：
  "options": {"regression": true}}
 ```
 
-- **可选组件和通道表**：直接来自 `kit/catalog.json`（53 个组件的 `channels`、`options`、`best_for`、`avoid_when`、`category`）。
+- **可选组件和通道表**：直接来自 `kit/catalog.json`（57 个组件的 `channels`、`options`、`best_for`、`avoid_when`、`category`）。
   它本身就是给 LLM 用的工具清单（07 R1）。
 - **校验器** ⬜：组件必须存在；必填通道都要给；字段必须在 dataset 里存在且类型匹配；`options` 的键必须在 manifest 里声明过；
   未知键给警告。用一个小型手写 JS 校验器实现，不用 Ajv（Ajv 依赖代码生成，和严格 CSP 冲突，09 §2.7）。Python 端已有的
@@ -291,7 +312,7 @@ LLM 只填写和 JSON layout spec 里 `blocks[]` 相同的结构：
 
 ### 4.8 离线 / 物理隔离（air-gapped）部署
 
-- **交付物**：报告 zip（`file://` 只读模式可用）+ companion（`pip install reportkit` 的离线 wheel）+ 安装说明。
+- **交付物**：报告 zip 或单文件 HTML（`single_file=True`，`file://` 只读模式可用，零网络请求）+ companion（`pip install reportkit` 的离线 wheel）+ 安装说明。
   模型权重由银行内部的制品库分发（Ollama 的 `OLLAMA_MODELS` 指向内部目录，或者 vLLM 挂载本地权重）。
 - **启动**：`python -m reportkit serve ./report --llm http://gpu-node:8000/v1 --port 8765` ⬜。
   它只监听 127.0.0.1，使用随机 token，路由白名单是 `/`、`/llm/v1/chat/completions`、`/llm/v1/models` 和 `/api/*`（数据 API），
@@ -309,7 +330,7 @@ LLM 只填写和 JSON layout spec 里 `blocks[]` 相同的结构：
 | 项目 | 版本 · 许可 | 形态 | 我们怎么用 | 结论 |
 |---|---|---|---|---|
 | **Vega-Lite** | 6.5.0 · BSD-3（vega 6.4.0、vega-embed 7.3.0，有 UMD，175 + 79 + 20 KB gz） | 声明式 grammar：`mark` + `encoding` + `datasets` + `params` | ① **通道词汇**：我们 `encode` 的通道名尽量和它对齐（x / y / color / size / shape / label / tooltip），它在模型训练语料里很常见（09 §10）；② **导入器** ⬜：把 VL 子集（bar / line / point / rect / arc + field encoding）转成 block spec；③ 可选的懒加载 `vega-lite` 组件给高级用户。注意 `data.url` 在 `file://` 下会失败，只能用 `values`（04 §13-7） | consider |
-| **Microsoft Flint** | `flint-chart` 0.5.1 · MIT · 只发 ESM | 面向 AI 的图表 spec，可以编译成 Vega-Lite / ECharts / Chart.js / Plotly / **可编辑的 Excel 图表**；有 `flint-chart-mcp` | ① 借鉴它的通道表（含 `open/high/low/close`）和 70 多种语义类型（Rank、Price、Country…），用来丰富字段 `role`；② **导出到 Excel 原生图表**很有价值：构建时用 esbuild 打包成 IIFE，只在 builder 或 companion 侧使用（07 §7，https://github.com/microsoft/flint-chart ） | consider（Step 2 后期） |
+| **Microsoft Flint** | `flint-chart` 0.5.1 · MIT · 只发 ESM | 面向 AI 的图表 spec，可以编译成 Vega-Lite / ECharts / Chart.js / Plotly / **可编辑的 Excel 图表**；有 `flint-chart-mcp` | ① 借鉴它的通道表（含 `open/high/low/close`）和 70 多种语义类型（Rank、Price、Country…），用来丰富字段 `role`；② **导出到 Excel 原生图表**很有价值：构建时用 esbuild 打包成 IIFE，只在 builder 或 companion 侧使用（07 §7，https://github.com/microsoft/flint-chart ）。Step 1 的 `excel=True` 只导出数据表（openpyxl，数字格式沿用字段格式码），不含图表 | consider（Step 2 后期） |
 | **VMind**（VisActor） | 2.0.10 · MIT | LLM → VChart spec | 仓库已改名为 `VisActor/skills`，README 写明 "The previous VMind SDK is no longer maintained"（06 §0-6）；而且它输出的是 VChart spec，不是我们的引擎 | avoid（只借鉴思路） |
 | **GPT-Vis**（AntV） | 1.0.2 · MIT | 类 Markdown 的 ```` ```vis ```` DSL，可流式渲染、容错 | 借鉴"流式 + 容错 DSL"的思路；以后可以加一个 ```` ```vis ```` → block spec 的转换器 ⬜。**不引入依赖**：AntV 命名空间在 2026-05-19 被投毒（`@antv/gpt-vis` 1.1.0 / 1.2.0 是恶意版本，06 §2），而且风格不是投行风 | reference |
 | AntV chart-visualization-skills | MIT | `SKILL.md` 目录 | 学习技能包的组织方式；其中的 `chart-visualization` 会调用云端渲染，**禁止用于客户数据** | reference |
@@ -327,8 +348,8 @@ LLM 只填写和 JSON layout spec 里 `blocks[]` 相同的结构：
 | **M0 基础**（1–2 周） | `RK.expr.register` 函数注册表 + Formula.js 4.6.1 金融函数包（IRR / XNPV / PMT，MIT，严格 CSP 下可用，08 §4.2）；把 RKQL 解析结果、block spec、intent 写成 JSON Schema（`schemas/*.json`，由 pydantic 生成）；builder 生成严格 CSP，并加 CSP 冒烟测试；manifest 和 dataset 增加 `$schema`、`contract`、`hash`、`revision` | `tools/check.sh` 全绿；每个组件在严格 CSP 下截图无报错 |
 | **M1 数据 API**（2–3 周） | 参考服务端（`reportkit serve` 内置 `/api/v1/reports/{id}/…`）；ETag / 304；按需加载；鉴权（cookie / OIDC token）；problem+json 错误；Arrow 通道（可选）；"Data as of" 刷新提示 | API 模式和离线 bundle 渲染结果逐像素一致（smoke 截图对比）；断网和 401 时显示可读错误 |
 | **M2 Skills v1**（3 周） | `rk-skill.json` schema；`RK.skills` 运行时；声明式导入（metrics / queries / charts / functions）；权限预览与确认；query-console Templates；构建时打包 skill | 3 个示例 skill（comps-valuation、precedents-premia、dcf-sensitivity）；恶意样例（远程 URL、JS 注入、越权数据集）全部被拒绝 |
-| **M3 本地 LLM v1**（3–4 周） | companion 反向代理 + token + 审计；`RK.ai` provider；意图 query / metric / filter / answer；聊天面板；评测工具 | 在评测集上执行准确率 ≥ 85%（Qwen3 14B 级）；CSP 拦截外泄测试通过；所有数字都可追溯 |
-| **M4 Text-to-chart + 沙箱**（3 周） | chart 意图 → block spec 校验器 → 钉到页面或导出 spec；iframe 沙箱 JSON-RPC；Vega-Lite 子集导入器 | 53 个组件的 sample 都能被 LLM 复现（catalog 驱动）；沙箱逃逸测试通过 |
+| **M3 本地 LLM v1**（3–4 周） | companion 反向代理 + token + 审计；`RK.ai` provider；意图 query / metric / filter / answer（metric 意图走与"添加为指标"相同的 `addComputed` 路径，客户确认后才持久化）；聊天面板（文案走 `RK.i18n`，中英文）；评测工具 | 在评测集上执行准确率 ≥ 85%（Qwen3 14B 级）；CSP 拦截外泄测试通过；所有数字都可追溯 |
+| **M4 Text-to-chart + 沙箱**（3 周） | chart 意图 → block spec 校验器 → 钉到页面或导出 spec；iframe 沙箱 JSON-RPC；Vega-Lite 子集导入器 | 57 个组件的 sample 都能被 LLM 复现（catalog 驱动）；沙箱逃逸测试通过 |
 | **M5 加固与试点**（2–3 周） | 物理隔离安装手册、GPO 模板；在银行数据字典上评测模型；安全评审签字；可选：transformers.js 语义搜索、DuckDB power-pack（46 MB，懒加载，08 §5.5）、Flint → Excel 导出 | 1–2 个真实项目试点；合规审阅通过 |
 
 依赖顺序：M0 → M1 / M2 可以并行 → M3 → M4 → M5。
@@ -341,7 +362,7 @@ LLM 只填写和 JSON layout spec 里 `blocks[]` 相同的结构：
 |---|---|---|
 | Chrome LNA 对 `file://` 的行为没有明确规范 | 模式 A 可能被浏览器拦截 | 默认用模式 B；在目标浏览器版本上实测；准备 GPO 模板 |
 | 模型对 RKQL 这种专有方言不熟 | 生成的查询准确率低 | 约束解码 + few-shot + 错误位置回传重试；失败时回退到 Builder |
-| Chrome 中所有 `file://` 页面共享 IndexedDB / localStorage | 不同报告之间可能串数据 | 用命名空间区分；客户数据不落地；审计日志只记元数据 |
+| Chrome 中所有 `file://` 页面共享 IndexedDB / localStorage | 不同报告之间可能串数据 | 已按 `rk:<kind>:<reportKey>` 命名空间区分 ✅；客户数据不落地；审计日志只记元数据 |
 | DuckDB-WASM 体积 46 MB，npm `latest` 是 dev 构建 | 交付包过大；版本漂移 | 默认关闭；精确锁定 1.32.0；只在大数据附录中使用 |
 | 第三方 AI / 图表包的供应链风险 | 恶意版本混入 | 只在构建时打包；`npm pack --ignore-scripts`；记录 integrity；不在运行时拉取任何依赖 |
 | MCP ext-apps 许可证标注不一致 | 法律风险 | 引入代码前先确认；在此之前只对齐协议，不复制代码 |

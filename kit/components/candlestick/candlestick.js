@@ -11,6 +11,29 @@
   var DAY = 864e5;
   var RANGES = [['1m', '1M'], ['3m', '3M'], ['6m', '6M'], ['ytd', 'YTD'], ['1y', '1Y'], ['2y', '2Y'], ['5y', '5Y'], ['all', 'All']];
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'candlestick.r1m': '近1月', 'candlestick.r3m': '近3月', 'candlestick.r6m': '近6月', 'candlestick.rytd': '今年以来',
+      'candlestick.r1y': '近1年', 'candlestick.r2y': '近2年', 'candlestick.r5y': '近5年', 'candlestick.ma': '{n}日均线',
+      'candlestick.ohlc': 'K线', 'candlestick.volume': '成交量', 'candlestick.open': '开盘价', 'candlestick.high': '最高价',
+      'candlestick.low': '最低价', 'candlestick.close': '收盘价', 'candlestick.change': '涨跌', 'candlestick.dateRange': '日期范围',
+      'candlestick.dateLong': 'yyyy"年"m"月"d"日"', 'candlestick.dateMonth': 'yy"年"m"月"', 'candlestick.dateDay': 'm"月"d"日"'
+    });
+  }
+  /** Range button text in the report locale. */
+  function rangeText(r) { return r[0] === 'all' ? tr('all', r[1]) : tr('candlestick.r' + r[0], r[1]); }
+  /** Built-in date codes (field formats win where a field has one) in the report locale. */
+  function dateCode(kind) {
+    return kind === 'month' ? tr('candlestick.dateMonth', 'mmm-yy') : kind === 'day' ? tr('candlestick.dateDay', 'd mmm') : tr('candlestick.dateLong', 'dd mmm yyyy');
+  }
+
   RK.component({
     id: 'candlestick',
     deps: ['echarts'],
@@ -94,7 +117,7 @@
     var V = o.volume !== false && enc.volume ? rows.map(function (r) { return r[enc.volume]; }) : [];
     var up = Cl.map(function (c, i) { return c > O[i] || (c === O[i] && (i === 0 || c >= Cl[i - 1])); });
     var mas = (o.ma || []).filter(function (d) { return util.isNum(d) && d > 1 && d < n; }).map(function (d) {
-      return { key: 'ma' + d, name: d + '-day MA', days: d, values: sma(Cl, d) };
+      return { key: 'ma' + d, name: tr('candlestick.ma', '{n}-day MA', { n: d }), days: d, values: sma(Cl, d) };
     });
     return {
       rows: rows, n: n, xs: xs, xv: xv, O: O, H: H, L: L, C: Cl, V: V, up: up, mas: mas,
@@ -241,7 +264,7 @@
     // MAs sit on dense red / green candles: keep them well clear of up / down and of the accent2 highlight
     var pal = overlayPalette([upC, dnC, t.accent2, t.ref], m.mas.length, t);
     var series = [{
-      id: 'ohlc', name: 'OHLC', type: 'candlestick', xAxisIndex: 0, yAxisIndex: 0,
+      id: 'ohlc', name: tr('candlestick.ohlc', 'OHLC'), type: 'candlestick', xAxisIndex: 0, yAxisIndex: 0,
       barMaxWidth: 14, barMinWidth: 1,
       itemStyle: { color: upC, color0: dnC, borderColor: upC, borderColor0: dnC, borderWidth: 1 },
       emphasis: { itemStyle: { borderWidth: 1.5 } },
@@ -263,7 +286,7 @@
     if (pins.length) series.push(pinSeries(ctx, m, pins, state));
     if (hasVol) {
       series.push({
-        id: 'volume', name: ctx.title(ctx.enc.volume) || 'Volume', type: 'bar', xAxisIndex: 1, yAxisIndex: 1,
+        id: 'volume', name: ctx.title(ctx.enc.volume) || tr('candlestick.volume', 'Volume'), type: 'bar', xAxisIndex: 1, yAxisIndex: 1,
         barMaxWidth: 14, barMinWidth: 1, barCategoryGap: '25%', animationDuration: 600,
         itemStyle: { color: RK.theme.alpha(t.ink3, 0.5) },
         data: m.V.map(function (v, i) {
@@ -272,13 +295,13 @@
       });
     }
 
-    var legendData = m.mas.map(function (s) { return s.name; }).concat(hasVol ? [ctx.title(ctx.enc.volume) || 'Volume'] : []);
+    var legendData = m.mas.map(function (s) { return s.name; }).concat(hasVol ? [ctx.title(ctx.enc.volume) || tr('candlestick.volume', 'Volume')] : []);
     var xBase = {
       type: 'category', data: m.xs, boundaryGap: true,
       axisLine: { show: true, lineStyle: { color: t.axis } },
       axisTick: { show: true, length: 3, alignWithLabel: true, lineStyle: { color: t.axis }, customValues: tk.values },
       splitLine: { show: false },
-      axisPointer: { label: { formatter: function (p) { return RK.format(p.value, 'dd mmm yyyy'); } } }
+      axisPointer: { label: { formatter: function (p) { return RK.format(p.value, dateCode()); } } }
     };
     // core zoom (Ctrl/Cmd + wheel or pinch, drag to pan, slider unless printing) shared by both panels
     var z = state.zoom, link = { xAxisIndex: [0, 1], start: z.start, end: z.end, minValueSpan: 10 };
@@ -437,15 +460,15 @@
     var i = p0.dataIndex, prev = i > 0 ? m.C[i - 1] : null;
     var col = m.up[i] ? t.pos : t.neg;
     var rows = [
-      { label: ctx.title(ctx.enc.open) || 'Open', value: RK.format(m.O[i], fmt) },
-      { label: ctx.title(ctx.enc.high) || 'High', value: RK.format(m.H[i], fmt) },
-      { label: ctx.title(ctx.enc.low) || 'Low', value: RK.format(m.L[i], fmt) },
-      { color: col, label: ctx.title(ctx.enc.close) || 'Close', value: RK.format(m.C[i], fmt), bold: true },
-      { label: 'Change', value: prev ? RK.format(m.C[i] - prev, signed(fmt)) + '  (' + RK.format(m.C[i] / prev - 1, DELTA) + ')' : 'n.a.' }
+      { label: ctx.title(ctx.enc.open) || tr('candlestick.open', 'Open'), value: RK.format(m.O[i], fmt) },
+      { label: ctx.title(ctx.enc.high) || tr('candlestick.high', 'High'), value: RK.format(m.H[i], fmt) },
+      { label: ctx.title(ctx.enc.low) || tr('candlestick.low', 'Low'), value: RK.format(m.L[i], fmt) },
+      { color: col, label: ctx.title(ctx.enc.close) || tr('candlestick.close', 'Close'), value: RK.format(m.C[i], fmt), bold: true },
+      { label: tr('candlestick.change', 'Change'), value: prev ? RK.format(m.C[i] - prev, signed(fmt)) + '  (' + RK.format(m.C[i] / prev - 1, DELTA) + ')' : RK.format(null, fmt) }
     ];
-    if (m.V.length) rows.push({ label: ctx.title(ctx.enc.volume) || 'Volume', value: RK.format(m.V[i], m.vfmt) });
+    if (m.V.length) rows.push({ label: ctx.title(ctx.enc.volume) || tr('candlestick.volume', 'Volume'), value: RK.format(m.V[i], m.vfmt) });
     m.mas.forEach(function (s) { if (shown(state, s.name)) rows.push({ color: s.color, label: s.name, value: RK.format(s.values[i], fmt) }); });
-    var html = C.tip(RK.format(m.xs[i], (ctx.field(ctx.enc.x) || {}).format || 'dd mmm yyyy'), rows);
+    var html = C.tip(RK.format(m.xs[i], (ctx.field(ctx.enc.x) || {}).format || dateCode()), rows);
     var hits = (state.pins || []).filter(function (pin) { return Math.abs(pin.i - i) <= Math.max(0, Math.round(8 / bandWidth(inst, state))); });
     if (hits.length) html = html.slice(0, -6) + hits.map(eventHTML).join('') + '</div>';
     return html;
@@ -466,7 +489,7 @@
     var e = util.escapeHTML;
     return '<div class="rk-tip__foot rk-cs-tip-event">' +
       '<b>' + pin.n + '. ' + e(pin.label) + '</b>' + (pin.kind ? ' <span class="rk-cs-tip-kind">' + e(pin.kind) + '</span>' : '') +
-      '<br>' + e(RK.format(pin.x, pin.dateFmt || 'dd mmm yyyy')) + (pin.detail ? ' — ' + e(pin.detail) : '') + '</div>';
+      '<br>' + e(RK.format(pin.x, pin.dateFmt || dateCode())) + (pin.detail ? ' — ' + e(pin.detail) : '') + '</div>';
   }
 
   /* ------------------------------------------------------------------ *
@@ -489,11 +512,11 @@
     var keepNarrow = w < 340 ? ['3m', '1y', 'all'] : w < 480 ? ['1m', '3m', '6m', '1y', 'all'] : null;
     if (keepNarrow && !keys) items = items.filter(function (r) { return keepNarrow.indexOf(r[0]) >= 0; });
     var btns = {};
-    var bar = h('div.rk-seg.rk-cs-range.rk-noprint', { role: 'group', 'aria-label': 'Date range' }, items.map(function (r) {
+    var bar = h('div.rk-seg.rk-cs-range.rk-noprint', { role: 'group', 'aria-label': tr('candlestick.dateRange', 'Date range') }, items.map(function (r) {
       var b = h('button', { type: 'button', 'aria-pressed': 'false', on: { click: function () {
         var z = zoomFor(state.model, r[0]);
         inst.dispatchAction({ type: 'dataZoom', start: z.start, end: z.end });
-      } } }, r[1]);
+      } } }, rangeText(r));
       btns[r[0]] = b;
       return b;
     }));
@@ -550,7 +573,7 @@
     return { values: vals, unit: unit, key: unit + n + ':' + vals.join(',') };
   }
   function tickLabel(tk) {
-    var f = tk.unit === 'y' ? 'yyyy' : tk.unit === 'm' ? 'mmm-yy' : 'd mmm';
+    var f = tk.unit === 'y' ? 'yyyy' : tk.unit === 'm' ? dateCode('month') : dateCode('day');
     return { customValues: tk.values, hideOverlap: true, interval: 0, formatter: function (v) { return RK.format(v, f); } };
   }
 })();

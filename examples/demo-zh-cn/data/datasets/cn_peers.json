@@ -1,0 +1,42 @@
+{
+  "id": "cn_peers",
+  "title": "A股 / 港股可比公司",
+  "schema": {"fields": [
+    {"name": "company", "type": "string", "title": "公司"},
+    {"name": "market", "type": "string", "title": "上市地"},
+    {"name": "segment", "type": "string", "title": "细分领域"},
+    {"name": "hq", "type": "string", "title": "总部"},
+    {"name": "is_acquirer", "type": "boolean", "title": "收购方"},
+    {"name": "mkt_cap", "type": "number", "title": "市值", "format": "#,##0.0", "unit": "人民币亿元"},
+    {"name": "net_debt", "type": "number", "title": "净债务", "format": "#,##0.0;(#,##0.0)", "unit": "人民币亿元"},
+    {"name": "ev", "type": "number", "title": "企业价值", "format": "#,##0.0", "unit": "人民币亿元"},
+    {"name": "revenue_25e", "type": "number", "title": "收入 2025E", "format": "#,##0.0", "unit": "人民币亿元"},
+    {"name": "revenue_26e", "type": "number", "title": "收入 2026E", "format": "#,##0.0", "unit": "人民币亿元"},
+    {"name": "ebitda_25e", "type": "number", "title": "EBITDA 2025E", "format": "#,##0.0", "unit": "人民币亿元"},
+    {"name": "ebitda_26e", "type": "number", "title": "EBITDA 2026E", "format": "#,##0.0", "unit": "人民币亿元"},
+    {"name": "net_income_26e", "type": "number", "title": "净利润 2026E", "format": "#,##0.0", "unit": "人民币亿元"},
+    {"name": "ev_ebitda_25e", "type": "number", "title": "EV/EBITDA 2025E", "format": "0.0x"},
+    {"name": "ev_ebitda_26e", "type": "number", "title": "EV/EBITDA 2026E", "format": "0.0x"},
+    {"name": "ev_revenue_26e", "type": "number", "title": "EV/收入 2026E", "format": "0.0x"},
+    {"name": "pe_26e", "type": "number", "title": "市盈率 2026E", "format": "0.0x"},
+    {"name": "rev_growth_26e", "type": "number", "title": "收入增速 2026E", "format": "0.0%"},
+    {"name": "ebitda_margin_26e", "type": "number", "title": "EBITDA利润率 2026E", "format": "0.0%"}
+  ]},
+  "data": [
+    {"company": "华辰智能", "market": "A股", "segment": "运动控制", "hq": "苏州", "is_acquirer": true, "mkt_cap": 583.2, "net_debt": -22.0, "ev": 561.2, "revenue_25e": 186.27, "revenue_26e": 208.62, "ebitda_25e": 31.57, "ebitda_26e": 36.3, "net_income_26e": 22.01, "ev_ebitda_25e": 17.78, "ev_ebitda_26e": 15.46, "ev_revenue_26e": 2.69, "pe_26e": 26.5, "rev_growth_26e": 0.12, "ebitda_margin_26e": 0.174},
+    {"company": "鼎峰自动化", "market": "A股", "segment": "运动控制", "hq": "深圳", "is_acquirer": false, "mkt_cap": 412.0, "net_debt": -18.5, "ev": 393.5, "revenue_25e": 99.04, "revenue_26e": 114.4, "ebitda_25e": 18.39, "ebitda_26e": 21.62, "net_income_26e": 13.51, "ev_ebitda_25e": 21.4, "ev_ebitda_26e": 18.2, "ev_revenue_26e": 3.44, "pe_26e": 30.5, "rev_growth_26e": 0.155, "ebitda_margin_26e": 0.189},
+    {"company": "恒拓机电", "market": "A股", "segment": "运动控制", "hq": "杭州", "is_acquirer": false, "mkt_cap": 186.5, "net_debt": 6.2, "ev": 192.7, "revenue_25e": 79.66, "revenue_26e": 87.46, "ebitda_25e": 12.76, "ebitda_26e": 14.17, "net_income_26e": 8.33, "ev_ebitda_25e": 15.1, "ev_ebitda_26e": 13.6, "ev_revenue_26e": 2.2, "pe_26e": 22.4, "rev_growth_26e": 0.098, "ebitda_margin_26e": 0.162},
+    {"company": "启衡机器人", "market": "A股", "segment": "工业机器人", "hq": "沈阳", "is_acquirer": false, "mkt_cap": 228.0, "net_debt": -9.4, "ev": 218.6, "revenue_25e": 74.9, "revenue_26e": 88.83, "ebitda_25e": 8.44, "ebitda_26e": 10.21, "net_income_26e": 5.53, "ev_ebitda_25e": 25.9, "ev_ebitda_26e": 21.4, "ev_revenue_26e": 2.46, "pe_26e": 41.2, "rev_growth_26e": 0.186, "ebitda_margin_26e": 0.115},
+    {"company": "中川精密", "market": "A股", "segment": "精密传动", "hq": "宁波", "is_acquirer": false, "mkt_cap": 152.3, "net_debt": 4.8, "ev": 157.1, "revenue_25e": 44.82, "revenue_26e": 49.84, "ebitda_25e": 9.46, "ebitda_26e": 10.61, "net_income_26e": 6.12, "ev_ebitda_25e": 16.6, "ev_ebitda_26e": 14.8, "ev_revenue_26e": 3.15, "pe_26e": 24.9, "rev_growth_26e": 0.112, "ebitda_margin_26e": 0.213},
+    {"company": "卓延控制", "market": "A股", "segment": "运动控制", "hq": "北京", "is_acquirer": false, "mkt_cap": 98.6, "net_debt": -3.1, "ev": 95.5, "revenue_25e": 34.27, "revenue_26e": 37.42, "ebitda_25e": 4.92, "ebitda_26e": 5.65, "net_income_26e": 3.51, "ev_ebitda_25e": 19.4, "ev_ebitda_26e": 16.9, "ev_revenue_26e": 2.55, "pe_26e": 28.1, "rev_growth_26e": 0.092, "ebitda_margin_26e": 0.151},
+    {"company": "远图传感", "market": "A股", "segment": "传感与视觉", "hq": "武汉", "is_acquirer": false, "mkt_cap": 135.4, "net_debt": -6.6, "ev": 128.8, "revenue_25e": 30.29, "revenue_26e": 35.38, "ebitda_25e": 4.25, "ebitda_26e": 5.24, "net_income_26e": 2.99, "ev_ebitda_25e": 30.3, "ev_ebitda_26e": 24.6, "ev_revenue_26e": 3.64, "pe_26e": 45.3, "rev_growth_26e": 0.168, "ebitda_margin_26e": 0.148},
+    {"company": "宏晟工业", "market": "港股", "segment": "精密传动", "hq": "香港", "is_acquirer": false, "mkt_cap": 88.2, "net_debt": 12.4, "ev": 100.6, "revenue_25e": 53.62, "revenue_26e": 58.66, "ebitda_25e": 9.67, "ebitda_26e": 10.27, "net_income_26e": 6.04, "ev_ebitda_25e": 10.4, "ev_ebitda_26e": 9.8, "ev_revenue_26e": 1.72, "pe_26e": 14.6, "rev_growth_26e": 0.094, "ebitda_margin_26e": 0.175},
+    {"company": "粤科精工", "market": "港股", "segment": "运动控制", "hq": "深圳", "is_acquirer": false, "mkt_cap": 121.7, "net_debt": 8.9, "ev": 130.6, "revenue_25e": 67.5, "revenue_26e": 73.44, "ebitda_25e": 10.45, "ebitda_26e": 11.46, "net_income_26e": 7.08, "ev_ebitda_25e": 12.5, "ev_ebitda_26e": 11.4, "ev_revenue_26e": 1.78, "pe_26e": 17.2, "rev_growth_26e": 0.088, "ebitda_margin_26e": 0.156},
+    {"company": "泰隆机电", "market": "港股", "segment": "工业机器人", "hq": "东莞", "is_acquirer": false, "mkt_cap": 46.3, "net_debt": 5.5, "ev": 51.8, "revenue_25e": 46.31, "revenue_26e": 48.57, "ebitda_25e": 5.76, "ebitda_26e": 6.02, "net_income_26e": 3.53, "ev_ebitda_25e": 9.0, "ev_ebitda_26e": 8.6, "ev_revenue_26e": 1.07, "pe_26e": 13.1, "rev_growth_26e": 0.049, "ebitda_margin_26e": 0.124},
+    {"company": "澜禾智造", "market": "港股", "segment": "传感与视觉", "hq": "深圳", "is_acquirer": false, "mkt_cap": 72.5, "net_debt": -4.2, "ev": 68.3, "revenue_25e": 34.25, "revenue_26e": 40.11, "ebitda_25e": 4.65, "ebitda_26e": 5.29, "net_income_26e": 3.33, "ev_ebitda_25e": 14.7, "ev_ebitda_26e": 12.9, "ev_revenue_26e": 1.7, "pe_26e": 21.8, "rev_growth_26e": 0.171, "ebitda_margin_26e": 0.132}
+  ],
+  "meta": {"asOf": "2026-10-09", "notes": ["港股按港元兑人民币 0.92 折算；倍数按日历年调整。", "示例数据：文中公司、机构与数据均为虚构，仅用于演示。"], "source": "示例市场数据，截至2026年10月9日", "unit": "人民币亿元"},
+  "computed": [
+    {"name": "peg", "formula": "pe_26e / (rev_growth_26e * 100)", "title": "PEG 2026E", "format": "0.00x"}
+  ]
+}

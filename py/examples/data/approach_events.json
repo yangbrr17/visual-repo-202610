@@ -1,0 +1,50 @@
+{
+  "id": "approach_events",
+  "title": "Granite Arch approach: chronology",
+  "schema": {
+    "fields": [
+      {
+        "name": "date",
+        "type": "date",
+        "title": "Date",
+        "format": "dd mmm yyyy"
+      },
+      {
+        "name": "label",
+        "type": "string",
+        "title": "Event"
+      },
+      {
+        "name": "kind",
+        "type": "string",
+        "title": "Type"
+      },
+      {
+        "name": "price",
+        "type": "number",
+        "title": "Proposal per share",
+        "format": "$#,##0.00"
+      },
+      {
+        "name": "detail",
+        "type": "string",
+        "title": "Detail"
+      }
+    ]
+  },
+  "data": [
+    {"date": "2026-06-18", "label": "Press reports of sponsor interest", "kind": "market", "price": null, "detail": "Shares +9.8% on the day from an unaffected $39.30."},
+    {"date": "2026-08-12", "label": "Initial proposal: $47.00", "kind": "proposal", "price": 47.0, "detail": "Non-binding, all cash; 20% premium to unaffected."},
+    {"date": "2026-08-21", "label": "Board rejects $47.00", "kind": "board", "price": null, "detail": "Undervalues Helios; Northbridge appointed."},
+    {"date": "2026-09-15", "label": "Revised proposal: $49.50", "kind": "proposal", "price": 49.5, "detail": "Bank financing letters; seeks exclusivity."},
+    {"date": "2026-10-06", "label": "Final proposal: $52.00", "kind": "proposal", "price": 52.0, "detail": "'Best and final'; exclusivity asked to 15-Nov."},
+    {"date": "2026-10-20", "label": "Board decision on next steps", "kind": "board", "price": null, "detail": "Proposed: a targeted two-stage process."}
+  ],
+  "meta": {
+    "source": "Company information; Northbridge Capital",
+    "notes": [
+      "Illustrative: Granite Arch Partners and all other companies, banks and investors are fictional."
+    ],
+    "asOf": "2026-10-14"
+  }
+}

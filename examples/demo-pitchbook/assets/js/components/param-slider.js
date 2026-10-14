@@ -8,11 +8,26 @@
  * - live formatted value (click it to type an exact number), change vs. base (bps for % formats),
  *   base-value tick on the track, per-slider reset, compact single-row mode for the top bar
  * - options.computed adds formula fields to the bound dataset; options.preview renders a small live
- *   readout table of the bound dataset (current value and % change vs. base parameters)
+ *   readout table of the bound dataset (current value and change vs. base parameters: relative % for
+ *   amounts, percentage points / bps for rates, n.m. when the base is zero or negative)
  */
 (function () {
   'use strict';
   var h = RK.util.h, isNum = RK.util.isNum;
+
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'paramSlider.nmZero': '无意义：基准值为零', 'paramSlider.nmNeg': '无意义：基准值为负数', 'paramSlider.type': '点击输入数值',
+      'paramSlider.resetTo': '恢复为 {value}', 'paramSlider.resetLabel': '将{label}恢复为基准值', 'paramSlider.base': '基准 {value}'
+    });
+  }
 
   /* ---------------- parameter definitions ---------------- */
   function decimalsOf(step) {
@@ -72,8 +87,60 @@
   function deltaText(v, d) {
     var diff = v - d.base;
     if (Math.abs(diff) < d.step / 1000) return '';
-    if (d.pct) return (diff > 0 ? '+' : '−') + RK.format(Math.abs(diff) * 10000, '#,##0') + ' bps';
+    if (d.pct) return (diff > 0 ? '+' : '−') + bpsText(diff);
     return (diff > 0 ? '+' : '−') + RK.format(Math.abs(diff), d.format);
+  }
+  /** |diff| of two rates (fractions) in basis points: 0.0025 -> "25 bps". */
+  function bpsText(diff) { return RK.format(Math.abs(diff) * 10000, '#,##0') + ' bps'; }
+  /** |diff| of two rates (fractions) in percentage points: 0.023 -> "2.3 pp". */
+  function ppText(diff) { return RK.format(Math.abs(diff) * 100, '#,##0.0') + ' pp'; }
+
+  /**
+   * How a readout value's change vs. base reads, from its format code (or an explicit preview.changes entry):
+   *   'pp'  — a rate shown with % (0.0%, +0%;-0%): the change in percentage points (bps when every move is < 1 pp);
+   *           v / b - 1 on a rate is meaningless (a premium going from -2% to +4% is not a "(300%)" change)
+   *   'pts' — values already in percent units ('0.0"%"', unit '%'): the plain difference, in pp
+   *   'bps' — values in basis points ('#,##0" bps"'): the plain difference, in bps
+   *   'rel' — amounts ($, x, counts): relative change v / b - 1, n.m. when the base is zero or negative
+   *   'none'
+   */
+  function changeKind(fmt, field, override) {
+    if (override === 'rel' || override === 'pp' || override === 'pts' || override === 'bps' || override === 'none') return override;
+    var code = String((fmt && RK.format.presets[fmt]) || fmt || ''), bare = code.replace(/"[^"]*"/g, '').replace(/\\./g, '');
+    if (/%/.test(bare)) return 'pp';
+    var lit = (code.match(/"[^"]*"/g) || []).join(' ') + ' ' + ((field && field.unit) || '');
+    if (/bps|bp\b/i.test(lit)) return 'bps';
+    if (/%|\bpp\b|percent/i.test(lit)) return 'pts';
+    return 'rel';
+  }
+  /**
+   * Change badge text + direction for value v vs. base b. small = every change in this column is < 1 pp, so rates
+   * read in bps. Negatives in parentheses (table convention); null when there is no change to show.
+   */
+  function changeOf(kind, v, b, small) {
+    if (kind === 'none' || !isNum(v) || !isNum(b)) return null;
+    var diff = v - b;
+    if (Math.abs(diff) <= 1e-9 * Math.max(1, Math.abs(b))) return null;
+    var text;
+    if (kind === 'pp') text = small ? bpsText(diff) : ppText(diff);
+    else if (kind === 'pts') text = small ? bpsText(diff / 100) : ppText(diff / 100);
+    else if (kind === 'bps') text = RK.format(Math.abs(diff), '#,##0') + ' bps';
+    else {
+      // a relative change needs a positive base: from 0 it is undefined, from a negative base its sign is inverted
+      if (!(b > 0)) return { text: RK.format.config.nm, dir: 'nm', title: b === 0 ? tr('paramSlider.nmZero', 'Not meaningful: the base value is zero') : tr('paramSlider.nmNeg', 'Not meaningful: the base value is negative') };
+      var chg = v / b - 1;
+      if (Math.abs(chg) <= 1e-9) return null;
+      return { text: RK.format(chg, '+0.0%;(0.0%)'), dir: chg > 0 ? 'up' : 'down' };
+    }
+    return { text: diff > 0 ? '+' + text : '(' + text + ')', dir: diff > 0 ? 'up' : 'down' };
+  }
+  /** True when every change in a column of rates is below 1 pp (the column then reads in bps). */
+  function smallMoves(kind, pairs) {
+    var unit = kind === 'pp' ? 0.01 : kind === 'pts' ? 1 : 0;
+    return !!unit && pairs.every(function (p) { return !isNum(p[0]) || !isNum(p[1]) || Math.abs(p[0] - p[1]) < unit - 1e-12; });
+  }
+  function changeEl(c) {
+    return c ? h('span.rk-ps__chg', { class: 'is-' + c.dir, title: c.title || null }, c.text) : null;
   }
 
   /** Parse typed input ("9.25%", "9.25", "0.0925", "$1,200", "8.5x"). */
@@ -137,14 +204,14 @@
           type: 'range', id: d.id, min: d.min, max: d.max, step: d.step, 'aria-label': d.label,
           on: { input: function () { set(+input.value, true); }, change: function () { set(+input.value, false); } }
         });
-        var valueBtn = h('button.rk-ps__value.rk-num', { type: 'button', title: 'Click to type a value', on: { click: edit } });
+        var valueBtn = h('button.rk-ps__value.rk-num', { type: 'button', title: tr('paramSlider.type', 'Click to type a value'), on: { click: edit } });
         var delta = h('span.rk-ps__delta.rk-num');
         var reset = h('button.rk-ps__reset', {
-          type: 'button', title: 'Reset to ' + RK.format(d.base, d.format), 'aria-label': 'Reset ' + d.label + ' to base value',
+          type: 'button', title: tr('paramSlider.resetTo', 'Reset to {value}', { value: RK.format(d.base, d.format) }), 'aria-label': tr('paramSlider.resetLabel', 'Reset {label} to base value', { label: d.label }),
           html: RK.ui.icon('reset'), on: { click: function () { set(d.base, false); } }
         });
         var basePct = (d.base - d.min) / ((d.max - d.min) || 1) * 100;
-        var tick = h('i.rk-ps__base', { style: { left: 'calc(' + basePct + '% + ' + (8 - basePct * 0.16) + 'px)' }, title: 'Base ' + RK.format(d.base, d.format) });
+        var tick = h('i.rk-ps__base', { style: { left: 'calc(' + basePct + '% + ' + (8 - basePct * 0.16) + 'px)' }, title: tr('paramSlider.base', 'Base {value}', { value: RK.format(d.base, d.format) }) });
         var track = h('div.rk-ps__track', input, tick);
         var range = o.showRange && !compact ? h('div.rk-ps__minmax.rk-num', h('span', RK.format(d.min, d.format)), h('span', RK.format(d.max, d.format))) : null;
         var row = h('div.rk-ps__item',
@@ -215,6 +282,7 @@
         var strField = ds.fields.filter(function (f) { return f.type === 'string' || f.type === 'date'; })[0];
         var fields = (p.fields || [strField && strField.name].concat(computedNames)).filter(function (n) { return n && ds.has(n); });
         var totals = p.total === true ? fields.filter(function (n) { return ds.field(n).type === 'number'; }) : (p.total || []);
+        var changes = RK.util.isObj(p.changes) ? p.changes : {};   // per-field override: rel | pp | pts | bps | none
         var wrap = h('div.rk-ps__preview');
         if (p.title) wrap.appendChild(h('div.rk-ps__ptitle', String(p.title)));
         var table = h('table.rk-table.rk-ps__table');
@@ -268,19 +336,24 @@
             var f = ds.field(n);
             return h('th', { class: (f.type === 'number' ? 'is-num' : '') + (n === key ? ' is-key' : '') }, String(f.title || n));
           })));
-          var tbody = h('tbody', data.map(function (r) {
-            var base = null;
+          // base-case rows once per draw; each live column reads its change in its own unit (relative %, pp or bps)
+          var bases = data.map(function (r) { return baseRow(r, env); });
+          var kinds = {}, small = {};
+          fields.forEach(function (n) {
+            if (!live[n]) return;
+            var f = ds.field(n);
+            kinds[n] = changeKind(f.format, f, changes[n]);
+            small[n] = smallMoves(kinds[n], data.map(function (r, i) { return [r[n], bases[i][n]]; }));
+          });
+          var tbody = h('tbody', data.map(function (r, ri) {
             return h('tr', fields.map(function (n) {
               var f = ds.field(n), v = r[n];
               var td = h('td', { class: f.type === 'number' ? 'is-num' : null }, RK.format(v, f.format));
               if (n === key) td.classList.add('is-key');
               if (live[n]) {
                 td.classList.add('is-live');
-                var b = (base || (base = baseRow(r, env)))[n];
-                if (isNum(v) && isNum(b) && b !== 0 && Math.abs(v / b - 1) > 1e-9) {
-                  var chg = v / b - 1;
-                  td.appendChild(h('span.rk-ps__chg', { class: chg > 0 ? 'is-up' : 'is-down' }, RK.format(chg, '+0.0%;(0.0%)')));
-                }
+                var ch = changeEl(changeOf(kinds[n], v, bases[ri][n], small[n]));
+                if (ch) td.appendChild(ch);
               }
               return td;
             }));
@@ -289,7 +362,7 @@
           if (totals.length) {
             tfoot = h('tfoot', h('tr.is-stat', fields.map(function (n, i) {
               var f = ds.field(n);
-              if (totals.indexOf(n) < 0) return h('td', { class: f.type === 'number' ? 'is-num' : null }, i === 0 ? 'Total' : '');
+              if (totals.indexOf(n) < 0) return h('td', { class: f.type === 'number' ? 'is-num' : null }, i === 0 ? tr('total', 'Total') : '');
               var s = RK.expr.agg.sum(data.map(function (r) { return r[n]; }));
               return h('td.is-num', RK.format(s, f.format));
             })));
@@ -304,12 +377,12 @@
             sumEl.innerHTML = '';
             summary.forEach(function (it, i) {
               var v = now[i], b = then[i];
-              var fmt = it.format || (it.field && ds.field(it.field) && ds.field(it.field).format) || '$#,##0';
-              var chg = isNum(v) && isNum(b) && b !== 0 && Math.abs(v / b - 1) > 1e-9 ? v / b - 1 : null;
+              var sf = it.field ? ds.field(it.field) : null;
+              var fmt = it.format || (sf && sf.format) || '$#,##0';
+              var kind = changeKind(fmt, sf, it.change);
               sumEl.appendChild(h('div.rk-ps__sitem', { class: it.key ? 'is-key' : null },
                 h('span.rk-ps__slabel', String(it.label || it.name || '')),
-                h('span.rk-ps__sval.rk-num', RK.format(v, fmt),
-                  chg != null ? h('span.rk-ps__chg', { class: chg > 0 ? 'is-up' : 'is-down' }, RK.format(chg, '+0.0%;(0.0%)')) : null)));
+                h('span.rk-ps__sval.rk-num', RK.format(v, fmt), changeEl(changeOf(kind, v, b, smallMoves(kind, [[v, b]]))))));
             });
           }
           if (ctx.motion) {

@@ -36,6 +36,11 @@
       "title": "Helios Industrial financial summary",
       "rows": 10
     },
+    "quarterly": {
+      "path": "datasets/quarterly.json",
+      "title": "Quarterly results vs. consensus",
+      "rows": 11
+    },
     "segment_revenue": {
       "path": "datasets/segment_revenue.json",
       "title": "Revenue by segment and region",
@@ -76,6 +81,16 @@
       "title": "Global footprint",
       "rows": 47
     },
+    "market_share": {
+      "path": "datasets/market_share.json",
+      "title": "Market share by segment (2025)",
+      "rows": 30
+    },
+    "peer_scores": {
+      "path": "datasets/peer_scores.json",
+      "title": "Peer scorecard",
+      "rows": 30
+    },
     "ownership": {
       "path": "datasets/ownership.json",
       "title": "Shareholder structure",
@@ -106,6 +121,41 @@
       "title": "Global industrials M&A league table (LTM Sep-2026)",
       "rows": 12
     },
+    "scenarios": {
+      "path": "datasets/scenarios.json",
+      "title": "Management plan scenarios",
+      "rows": 18
+    },
+    "sotp": {
+      "path": "datasets/sotp.json",
+      "title": "Sum-of-the-parts valuation",
+      "rows": 5
+    },
+    "sources_uses": {
+      "path": "datasets/sources_uses.json",
+      "title": "Illustrative LBO sources & uses at $52.00 per share",
+      "rows": 11
+    },
+    "network_nodes": {
+      "path": "datasets/network_nodes.json",
+      "title": "Ecosystem map: nodes",
+      "rows": 24
+    },
+    "network_edges": {
+      "path": "datasets/network_edges.json",
+      "title": "Ecosystem map: relationships",
+      "rows": 35
+    },
+    "monthly_returns": {
+      "path": "datasets/monthly_returns.json",
+      "title": "Helios Industrial monthly TSR",
+      "rows": 57
+    },
+    "daily_activity": {
+      "path": "datasets/daily_activity.json",
+      "title": "Daily trading activity 2026 YTD",
+      "rows": 204
+    },
     "kpis": {
       "path": "datasets/kpis.json",
       "title": "Key performance indicators",
@@ -131,10 +181,60 @@
       "title": "Cross-border industrials M&A flows (2021–2026 YTD)",
       "rows": 26
     },
+    "credentials": {
+      "path": "datasets/credentials.json",
+      "title": "Selected transaction credentials",
+      "rows": 12
+    },
+    "league_ranks": {
+      "path": "datasets/league_ranks.json",
+      "title": "M&A adviser league table rank, prior year vs. LTM",
+      "rows": 24
+    },
+    "offer_prices": {
+      "path": "datasets/offer_prices.json",
+      "title": "Offer price levels for the analysis at various prices",
+      "rows": 6
+    },
+    "approach_events": {
+      "path": "datasets/approach_events.json",
+      "title": "Granite Arch approach: chronology",
+      "rows": 6
+    },
+    "outreach_funnel": {
+      "path": "datasets/outreach_funnel.json",
+      "title": "Targeted auction: expected buyer funnel",
+      "rows": 5
+    },
+    "buyers": {
+      "path": "datasets/buyers.json",
+      "title": "Potential acquirers: assessment inputs",
+      "rows": 10
+    },
+    "scenario_long": {
+      "path": "datasets/scenario_long.json",
+      "title": "Management plan scenarios (long format)",
+      "rows": 54
+    },
+    "sotp_mix": {
+      "path": "datasets/sotp_mix.json",
+      "title": "SOTP enterprise value by segment (mid-point)",
+      "rows": 4
+    },
     "dcf_live": {
       "path": "datasets/dcf_live.json",
       "title": "Live DCF by management-plan scenario",
       "rows": 3
+    },
+    "dcf_scenario": {
+      "path": "datasets/dcf_scenario.json",
+      "title": "Live DCF by management-plan scenario",
+      "rows": 3
+    },
+    "deal_terms": {
+      "path": "datasets/deal_terms.json",
+      "title": "Proposal terms (live with the offer price)",
+      "rows": 1
     }
   },
   "params": {
@@ -153,6 +253,14 @@
       "step": 0.0025,
       "format": "0.00%",
       "title": "Terminal growth"
+    },
+    "offer": {
+      "value": 52.0,
+      "min": 42.5,
+      "max": 60.0,
+      "step": 0.25,
+      "format": "$0.00",
+      "title": "Offer price per share"
     }
   }
 }

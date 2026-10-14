@@ -105,10 +105,10 @@
     }
   },
   "interactions": [
-    "Axis tooltip with totals",
+    "Axis tooltip (with the stack total when stacked)",
     "Click a bar to cross-filter (generic fields such as type / kind filter this dataset only)",
     "Legend toggle",
-    "Optional zoom (slider, drag, Ctrl/Cmd + wheel or pinch)",
+    "Optional zoom (zoom: true): slider; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)",
     "PNG / CSV export"
   ],
   "samples": [

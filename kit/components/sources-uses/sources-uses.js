@@ -11,6 +11,22 @@
   'use strict';
   var util = RK.util, h = util.h;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'sourcesUses.totalCap': '资本化总额', 'sourcesUses.totalOf': '{Title}合计', 'sourcesUses.cumMultiple': '累计 EBITDA 倍数',
+      'sourcesUses.pctTotal': '占比', 'sourcesUses.xEbitda': 'EBITDA 倍数', 'sourcesUses.dateMonth': 'yyyy"年"m"月"',
+      'sourcesUses.ladder': '累计杠杆倍数', 'sourcesUses.unbalanced': '不平衡：{Big}超出{Small} {diff}', 'sourcesUses.amount': '金额',
+      'sourcesUses.pctOf': '占{Title}比例'
+    });
+  }
+
   /** Format code without currency symbols outside quoted literals: '$#,##0.0' -> '#,##0.0'. */
   function bare(code) {
     code = String(RK.format.presets[code] || code || '');
@@ -126,7 +142,7 @@
           var p = itemsOf(c.rows);
           p.side = 'capitalization';
           p.title = o.sideTitles.capitalization || c.title(F.item);
-          p.totalLabel = o.totalLabels.total || 'Total capitalisation';
+          p.totalLabel = o.totalLabels.total || tr('sourcesUses.totalCap', 'Total capitalisation');
           m.panels.push(p);
         } else {
           var groups = util.groupBy(c.rows, function (r) { return String(r[F.side]); });
@@ -139,7 +155,7 @@
             var p = itemsOf(groups.get(k));
             p.side = k;
             p.title = o.sideTitles[k] || k;
-            p.totalLabel = o.totalLabels[k] || 'Total ' + p.title.toLowerCase();
+            p.totalLabel = o.totalLabels[k] || tr('sourcesUses.totalOf', 'Total {title}', { title: p.title.toLowerCase(), Title: p.title });
             m.panels.push(p);
           });
         }
@@ -176,9 +192,9 @@
         if (want.indexOf('amount') >= 0) cols.push({ key: 'amount', title: amountTitle });
         if (m.cap && F.rate) cols.push({ key: 'rate', title: T.rate || c.title(F.rate) });
         if (m.cap && F.maturity) cols.push({ key: 'maturity', title: T.maturity || c.title(F.maturity) });
-        if (want.indexOf('multiple') >= 0 && m.hasMultiple && m.cap) cols.push({ key: 'multiple', title: T.multiple || (F.multiple ? c.title(F.multiple) : 'Cumulative x EBITDA') });
-        if (want.indexOf('pct') >= 0) cols.push({ key: 'pct', title: T.pct || (m.cap ? '% of total' : (F.pct ? c.title(F.pct) : '% of total')) });
-        if (want.indexOf('multiple') >= 0 && m.hasMultiple && !m.cap) cols.push({ key: 'multiple', title: T.multiple || (F.multiple ? c.title(F.multiple) : 'x EBITDA') });
+        if (want.indexOf('multiple') >= 0 && m.hasMultiple && m.cap) cols.push({ key: 'multiple', title: T.multiple || (F.multiple ? c.title(F.multiple) : tr('sourcesUses.cumMultiple', 'Cumulative x EBITDA')) });
+        if (want.indexOf('pct') >= 0) cols.push({ key: 'pct', title: T.pct || (m.cap ? tr('sourcesUses.pctTotal', '% of total') : (F.pct ? c.title(F.pct) : tr('sourcesUses.pctTotal', '% of total'))) });
+        if (want.indexOf('multiple') >= 0 && m.hasMultiple && !m.cap) cols.push({ key: 'multiple', title: T.multiple || (F.multiple ? c.title(F.multiple) : tr('sourcesUses.xEbitda', 'x EBITDA')) });
         return cols;
       }
 
@@ -191,7 +207,7 @@
           case 'rate': return h('td.is-num', RK.format(it.r[F.rate], c.fmtOf(F.rate) || '0.00%'));
           case 'maturity': {
             var mf = c.fmtOf(F.maturity);
-            return h('td.is-num', RK.format(it.r[F.maturity], mf && RK.format.isDateCode(mf) ? mf : (c.field(F.maturity) && c.field(F.maturity).type === 'date' ? 'mmm yyyy' : mf)));
+            return h('td.is-num', RK.format(it.r[F.maturity], mf && RK.format.isDateCode(mf) ? mf : (c.field(F.maturity) && c.field(F.maturity).type === 'date' ? tr('sourcesUses.dateMonth', 'mmm yyyy') : mf)));
           }
         }
         return h('td');
@@ -249,7 +265,7 @@
         var xs = marks.map(function (it) { return it.runPct * W; });
         var pos = RK.chart.spreadLabels(xs, gap, gap / 2, W - gap / 2);
         // caption at the left end when the first label leaves room for it
-        var caption = (cur.options.titles || {}).ladder || 'Cumulative leverage';
+        var caption = (cur.options.titles || {}).ladder || tr('sourcesUses.ladder', 'Cumulative leverage');
         var capW = RK.chart.measure(caption, '10px ' + cur.theme.fontSans);
         if (pos.length && pos[0] - widths[0] / 2 > capW + 14) L.el.appendChild(h('span.rk-su__lcap', caption));
         marks.forEach(function (it, i) {
@@ -270,7 +286,7 @@
           tbody.appendChild(itemRow(it, i, p, m, c, cols));
           subs.filter(function (s) { return s && String(s.after) === it.key; }).forEach(function (s) {
             var sub = { amount: it.run, pct: it.runPct, mult: it.mult, r: {} };
-            tbody.appendChild(h('tr.rk-su__sub', h('td', s.label || 'Subtotal'), cols.map(function (col) {
+            tbody.appendChild(h('tr.rk-su__sub', h('td', s.label || tr('subtotal', 'Subtotal')), cols.map(function (col) {
               if (col.key === 'rate' || col.key === 'maturity') return h('td');
               return cell(col, sub, m, c, true);
             })));
@@ -307,7 +323,7 @@
           var b = m.balance, big = b.diff > 0 ? b.a : b.b, small = b.diff > 0 ? b.b : b.a;
           root.appendChild(h('div.rk-su__status', h('span.rk-su__warn', { role: 'status' },
             h('span.rk-su__warnicon', { 'aria-hidden': 'true' }, '!'),
-            'Out of balance: ' + big.title.toLowerCase() + ' exceed ' + small.title.toLowerCase() + ' by ' + RK.format(Math.abs(b.diff), m.af))));
+            tr('sourcesUses.unbalanced', 'Out of balance: {big} exceed {small} by {diff}', { big: big.title.toLowerCase(), small: small.title.toLowerCase(), Big: big.title, Small: small.title, diff: RK.format(Math.abs(b.diff), m.af) }))));
         }
         var maxRows = Math.max.apply(null, m.panels.map(function (p) { return p.items.length; }).concat([0]));
         var wrap = h('div.rk-su__panels', { class: m.panels.length > 1 ? 'is-multi' : '' });
@@ -337,9 +353,9 @@
         root.classList.toggle('has-hot', on);
       }
       function tipFor(d) {
-        var m = d.m, it = d.it, rows = [{ color: it.color, label: 'Amount', value: RK.format(it.amount, m.af) },
-          { label: m.cap ? '% of total' : '% of ' + d.p.title.toLowerCase(), value: RK.format(it.pct, m.pf) }];
-        if (m.hasMultiple) rows.push({ label: m.cap ? 'Cumulative leverage' : 'x EBITDA', value: RK.format(it.mult, m.mf) });
+        var m = d.m, it = d.it, rows = [{ color: it.color, label: tr('sourcesUses.amount', 'Amount'), value: RK.format(it.amount, m.af) },
+          { label: m.cap ? tr('sourcesUses.pctTotal', '% of total') : tr('sourcesUses.pctOf', '% of {title}', { title: d.p.title.toLowerCase(), Title: d.p.title }), value: RK.format(it.pct, m.pf) }];
+        if (m.hasMultiple) rows.push({ label: m.cap ? tr('sourcesUses.ladder', 'Cumulative leverage') : tr('sourcesUses.xEbitda', 'x EBITDA'), value: RK.format(it.mult, m.mf) });
         return RK.chart.tip(it.name, rows, it.note);
       }
       var hotKey = null;

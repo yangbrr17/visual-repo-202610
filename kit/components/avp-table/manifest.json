@@ -50,7 +50,7 @@
     "tooltip": {"type": "boolean", "default": true, "desc": "Hover tooltip with the calculation behind each figure"},
     "paramDefaults": {"type": "object", "default": {}, "desc": "Fallback values for '@param' options the report does not define (e.g. {\"offer\": 52}); they are then defined in the store and shared with sliders"}
   },
-  "interactions": ["Offer stepper (− / +) and click-a-price-header to move the offer; sets the bound @param so sliders and other blocks follow", "Live recompute with number tweening when bound @params change", "Hovered column highlight + tooltip with the calculation (price ÷ reference − 1, price × shares, EV ÷ EBITDA)", "Rows rise in on first reveal; a moved offer column fades in"],
+  "interactions": ["Offer stepper (− / +) and click (or Enter on) a price header to move the offer; sets the bound @param so sliders and other blocks follow", "Live recompute with number tweening when bound @params change", "Hovered column highlight + tooltip with the calculation (price ÷ reference − 1, price × shares, EV ÷ EBITDA)", "Rows rise in on first reveal; a moved offer column fades in", "PNG export"],
   "samples": [
     {"title": "Analysis at various prices — offer bound to @offer", "height": 420,
      "options": {"prices": [45, 47.5, 50, 55, 57.5], "current": 42.5, "offer": "@offer", "paramDefaults": {"offer": 52.0}, "offerStep": 0.5,

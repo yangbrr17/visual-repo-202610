@@ -11,6 +11,27 @@
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'calendarHeatmap.months': '1月,2月,3月,4月,5月,6月,7月,8月,9月,10月,11月,12月', 'calendarHeatmap.weekdays': '周日,周一,周二,周三,周四,周五,周六',
+      'calendarHeatmap.year': '全年', 'calendarHeatmap.avg': '均值', 'calendarHeatmap.vsAvg': '较期间均值',
+      'calendarHeatmap.dateFmt': 'yyyy"年"m"月"d"日"', 'calendarHeatmap.dayTitle': '{date} {weekday}',
+      'calendarHeatmap.monthYear': '{year}年{month}', 'calendarHeatmap.ytd': '{year}年初至今',
+      'calendarHeatmap.compounded': '月度{Field}（复合）', 'calendarHeatmap.sumOf': '月度{Field}（合计）',
+      'calendarHeatmap.monthsOfData': '含 {n} 个月数据', 'calendarHeatmap.monthAvg': '{month}均值', 'calendarHeatmap.years': '{n} 年'
+    });
+  }
+  /** Display names in the report locale (MONTHS stays English: it parses 'Jan' ... in the data). */
+  function monthNames() { var a = tr('calendarHeatmap.months', MONTHS.join(',')).split(','); return a.length === 12 ? a : MONTHS; }
+  function dayNames() { var a = tr('calendarHeatmap.weekdays', WEEKDAYS.join(',')).split(','); return a.length === 7 ? a : WEEKDAYS; }
+
   RK.component({
     id: 'calendar-heatmap',
     deps: ['echarts'],
@@ -127,12 +148,12 @@
         if (!first) return;
         var x = left + first.col * cwF, yr = y0 + first.row * ch;
         graphic.push({ type: 'text', silent: true, x: x + 1, y: bd.top + monthRow / 2,
-          style: { text: MONTHS[mo.m], fill: t.ink2, font: '11px ' + t.fontSans, align: 'left', verticalAlign: 'middle' } });
+          style: { text: monthNames()[mo.m], fill: t.ink2, font: '11px ' + t.fontSans, align: 'left', verticalAlign: 'middle' } });
         if (mi === 0) return;
         var pts2 = first.row === 0 ? [[x, y0], [x, y1]] : [[x + cwF, y0], [x + cwF, yr], [x, yr], [x, y1]];
         graphic.push({ type: 'polyline', silent: true, z: 5, shape: { points: pts2 }, style: { stroke: lineCol, lineWidth: 1.25, fill: null } });
       });
-      ['Mon', '', 'Wed', '', 'Fri', '', ''].slice(0, nRows).forEach(function (lab, r) {
+      [dayNames()[1], '', dayNames()[3], '', dayNames()[5], '', ''].slice(0, nRows).forEach(function (lab, r) {
         if (!lab || ch < 8) return;
         graphic.push({ type: 'text', silent: true, x: left - 6, y: y0 + r * ch + ch / 2,
           style: { text: lab, fill: t.ink3, font: '11px ' + t.fontSans, align: 'right', verticalAlign: 'middle' } });
@@ -178,8 +199,9 @@
           if (!c) return '';
           var dt = RK.format.toDate(c.date);
           var rows = [{ label: ctx.title(vf), value: RK.format(c.v, fmt) }];
-          if (avg) rows.push({ label: 'vs. period average', value: RK.format(c.v / avg - 1, '+0.0%;(0.0%);0.0%') });
-          return C.tip((dt ? WEEKDAYS[dt.getDay()] + ' ' : '') + RK.format(c.date, 'dd mmm yyyy'), rows);
+          if (avg) rows.push({ label: tr('calendarHeatmap.vsAvg', 'vs. period average'), value: RK.format(c.v / avg - 1, '+0.0%;(0.0%);0.0%') });
+          var dStr = RK.format(c.date, tr('calendarHeatmap.dateFmt', 'dd mmm yyyy'));
+          return C.tip(dt ? tr('calendarHeatmap.dayTitle', '{weekday} {date}', { weekday: dayNames()[dt.getDay()], date: dStr }) : dStr, rows);
         }
       },
       visualMap: vm,
@@ -240,8 +262,8 @@
     var years = Object.keys(cells).sort();
     if (o.yearOrder !== 'asc') years.reverse();
     var total = o.yearTotal !== false, avgRow = !!o.avgRow;
-    var xCats = MONTHS.concat(total ? [o.totalLabel || 'Year'] : []);
-    var yCats = years.concat(avgRow ? ['Avg'] : []);
+    var xCats = monthNames().concat(total ? [o.totalLabel && o.totalLabel !== 'Year' ? o.totalLabel : tr('calendarHeatmap.year', 'Year')] : []);
+    var yCats = years.concat(avgRow ? [tr('calendarHeatmap.avg', 'Avg')] : []);
 
     var main = [], extra = [];
     years.forEach(function (y, yi) {
@@ -320,14 +342,15 @@
           var d = p.data;
           if (!d) return '';
           if (p.seriesId === 'cells') {
-            return C.tip(MONTHS[d[0]] + ' ' + yCats[d[1]], [{ label: ctx.title(vf), value: RK.format(d[2], fmt) }]);
+            return C.tip(tr('calendarHeatmap.monthYear', '{month} {year}', { month: monthNames()[d[0]], year: yCats[d[1]] }), [{ label: ctx.title(vf), value: RK.format(d[2], fmt) }]);
           }
           if (d[4] === 'total') {
             var partial = d[3] < 12;
-            return C.tip(String(d[5]) + (partial ? ' YTD' : ''), [{ label: (o.compound !== false ? 'Compounded ' : 'Sum of ') + 'monthly ' + ctx.title(vf).toLowerCase(), value: RK.format(d[2], sumFmt) }],
-              partial ? d[3] + ' months of data' : null);
+            var fld = ctx.title(vf).toLowerCase(), Fld = ctx.title(vf);
+            return C.tip(partial ? tr('calendarHeatmap.ytd', '{year} YTD', { year: d[5] }) : String(d[5]), [{ label: o.compound !== false ? tr('calendarHeatmap.compounded', 'Compounded monthly {field}', { field: fld, Field: Fld }) : tr('calendarHeatmap.sumOf', 'Sum of monthly {field}', { field: fld, Field: Fld }), value: RK.format(d[2], sumFmt) }],
+              partial ? tr('calendarHeatmap.monthsOfData', '{n} months of data', { n: d[3] }) : null);
           }
-          return C.tip(MONTHS[d[0]] + ' average', [{ label: ctx.title(vf), value: RK.format(d[2], sumFmt) }], d[3] + ' years');
+          return C.tip(tr('calendarHeatmap.monthAvg', '{month} average', { month: monthNames()[d[0]] }), [{ label: ctx.title(vf), value: RK.format(d[2], sumFmt) }], tr('calendarHeatmap.years', '{n} years', { n: d[3] }));
         }
       },
       visualMap: {

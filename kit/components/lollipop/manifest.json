@@ -33,7 +33,7 @@
     "zoom": {"type": "boolean", "default": false, "desc": "Scroll / zoom along the category axis for long lists (slider; Ctrl/Cmd + wheel or pinch zooms)"},
     "wheelZoom": {"type": "boolean", "default": null, "desc": "With zoom: true = zoom on the plain mouse wheel; null = plain wheel scrolls the report, Ctrl/Cmd + wheel zooms"}
   },
-  "interactions": ["Hover tooltip with premium / (discount) to the median and period change", "Click a dot to cross-filter", "Legend toggles groups", "Optional category zoom for long lists", "PNG / CSV export"],
+  "interactions": ["Hover tooltip with premium / (discount) to the median and period change", "Click a dot to cross-filter", "Legend toggles groups", "Optional category zoom for long lists (zoom: true): slider; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)", "PNG / CSV export"],
   "samples": [
     {"title": "EV / EBITDA 2025E — trading peers", "data": "peers", "height": 440, "span": 6,
      "options": {"encode": {"label": "company", "value": "ev_ebitda_25e"}, "refLabel": "Peer median"}},

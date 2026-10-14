@@ -10,6 +10,19 @@
   var C = RK.chart, U = RK.util;
   var BAR_GAP = 0.18, MAX_BAR = 96;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'bar.avg': '均值 {value}'
+    });
+  }
+
   RK.component({
     id: 'bar',
     deps: ['echarts'],
@@ -167,7 +180,7 @@
       // total labels on stacks
       if (o.stack === true && o.showTotal && showLabels && data.series.length > 1) {
         series.push({
-          id: 's-total', name: 'Total', type: 'bar', stack: 'total', silent: true, barMaxWidth: MAX_BAR,
+          id: 's-total', name: tr('total', 'Total'), type: 'bar', stack: 'total', silent: true, barMaxWidth: MAX_BAR,
           itemStyle: { color: 'transparent' }, tooltip: { show: false },
           label: { show: true, position: horiz ? 'insideLeft' : 'insideBottom', color: t.ink, fontWeight: 600, fontSize: 11, fontFamily: t.fontNum,
             formatter: function (p) { return lfmt(totals[p.dataIndex]); } },
@@ -197,7 +210,7 @@
               var v = raw ? RK.format(raw[i], data.yFormat) + '  (' + RK.format(p.value, '0.0%') + ')' : RK.format(p.value, fmt);
               return { color: p.color, label: p.seriesName, value: v };
             });
-            if (ps.length > 1 && o.stack === true) rows.push({ label: 'Total', value: RK.format(totals[i], fmt), bold: true });
+            if (ps.length > 1 && o.stack === true) rows.push({ label: tr('total', 'Total'), value: RK.format(totals[i], fmt), bold: true });
             return C.tip(cats[i], rows);
           }
         },
@@ -268,8 +281,8 @@
     if (o.avgLine) {
       var vals = se.values.filter(function (v) { return v != null; });
       var avg = vals.reduce(function (s, v) { return s + v; }, 0) / (vals.length || 1);
-      var avgText = 'Avg ' + RK.format(avg, vfmt);
-      var d = { name: 'Average', lineStyle: { color: t.ink3, type: 'dashed', width: 1 },
+      var avgText = tr('bar.avg', 'Avg {value}', { value: RK.format(avg, vfmt) });
+      var d = { name: tr('average', 'Average'), lineStyle: { color: t.ink3, type: 'dashed', width: 1 },
         label: { formatter: function () { return avgText; }, color: t.ink2 } };
       d[horiz ? 'xAxis' : 'yAxis'] = avg;
       lines.push(d);

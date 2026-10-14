@@ -9,6 +9,22 @@
   var NS = 'http://www.w3.org/2000/svg';
   var h = RK.util.h;
 
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'waffle.aria': '华夫饼图', 'waffle.share': '占比', 'waffle.pctTotal': '占比', 'waffle.squares': '方格数', 'waffle.nOf': '{n} / {total}',
+      'waffle.items': '{n} 项：{list}', 'waffle.unit': '每格 = {value}'
+    });
+  }
+  /** Name of the grouped bucket: options.othersLabel, in the report locale when left at the default 'Others'. */
+  function othersName(o) { return o.othersLabel === 'Others' ? tr('others', 'Others') : o.othersLabel; }
+
   function svgEl(tag, attrs, parent) {
     var el = document.createElementNS(NS, tag);
     for (var k in attrs) if (attrs[k] != null) el.setAttribute(k, attrs[k]);
@@ -54,15 +70,16 @@
     var keep = max && bySize.length > max ? new Set(bySize.slice(0, max - 1)) : new Set(bySize);
     var cats = ranked.filter(function (c) { return keep.has(c); });
     var members = ranked.filter(function (c) { return !keep.has(c); });
-    if (members.length) cats.push(o.othersLabel);
-    function bucket(c) { return keep.has(c) ? c : o.othersLabel; }
+    var others = othersName(o);
+    if (members.length) cats.push(others);
+    function bucket(c) { return keep.has(c) ? c : others; }
 
     var hl = o.highlight == null ? [] : [].concat(o.highlight).map(String);
     // nominal categories: categorical colours; with a highlight none may read like the accent2 target
     var pal = RK.theme.palette(hl.length ? { n: cats.length } : { exclude: [], n: cats.length });
     var color = {}, k = 0;
     cats.forEach(function (c) {
-      color[c] = c === o.othersLabel && members.length ? t.neutral : hl.indexOf(c) >= 0 ? t.accent2 : pal[k++ % pal.length];
+      color[c] = c === others && members.length ? t.neutral : hl.indexOf(c) >= 0 ? t.accent2 : pal[k++ % pal.length];
     });
 
     // waffles: one (stacked), one per facet value (stacked), or one per category (facet mode)
@@ -202,7 +219,7 @@
         var cat = catAt(e), c = state.ctx;
         if (!cat || c.options.crossFilter === false) return;
         var f = c.enc.label;   // generic label fields ('type' …) stay within this dataset (core scoping)
-        if (cat !== c.options.othersLabel || !state.m.members.length) { c.select(f, cat); return; }
+        if (cat !== othersName(c.options) || !state.m.members.length) { c.select(f, cat); return; }
         // "Others": all members selected -> drop them, else add the missing ones (one store write)
         var sel = c.selected(f), mem = state.m.members;
         var all = mem.every(function (x) { return sel.indexOf(x) >= 0; });
@@ -239,7 +256,7 @@
     var base = m.color[cat] || ctx.theme.neutral;
     var sel = ctx.selected(ctx.enc.label);
     if (!sel.length) return base;
-    var on = cat === ctx.options.othersLabel && m.members.length
+    var on = cat === othersName(ctx.options) && m.members.length
       ? m.members.some(function (x) { return sel.indexOf(x) >= 0; })
       : sel.indexOf(cat) >= 0;
     return on ? base : RK.theme.mix(base, ctx.theme.paper, 0.75);
@@ -333,7 +350,7 @@
 
   function paint(ctx, m, L, wrap, animate, state) {
     var o = ctx.options, t = ctx.theme, N = m.N;
-    var svg = svgEl('svg', { width: L.W, height: L.H, viewBox: '0 0 ' + L.W + ' ' + L.H, class: 'rk-waffle__svg' + (animate ? ' is-animated' : ''), role: 'img', 'aria-label': 'Waffle chart' });
+    var svg = svgEl('svg', { width: L.W, height: L.H, viewBox: '0 0 ' + L.W + ' ' + L.H, class: 'rk-waffle__svg' + (animate ? ' is-animated' : ''), role: 'img', 'aria-label': tr('waffle.aria', 'Waffle chart') });
     wrap.appendChild(svg);
     var empty = emptyColor(t);
     var font = function (size, weight, num) {
@@ -411,7 +428,7 @@
     function text(x, y, s, attrs) { var el = svgEl('text', RK.util.merge({ x: x, y: y }, attrs), g); el.textContent = s; return el; }
     text(0, 10, ctx.title(ctx.enc.label), RK.util.merge({ fill: t.ink3 }, font(10, 600)));
     if (T.valW) text(xVal, 10, truncate(ctx.title(ctx.enc.value), T.valW + T.nameW / 2, '600 10px ' + t.fontSans), RK.util.merge({ fill: t.ink3, 'text-anchor': 'end' }, font(10, 600)));
-    text(xPct, 10, m.pctLike ? truncate(ctx.title(ctx.enc.value), T.pctW, '600 10px ' + t.fontSans) : '% of total', RK.util.merge({ fill: t.ink3, 'text-anchor': 'end' }, font(10, 600)));
+    text(xPct, 10, m.pctLike ? truncate(ctx.title(ctx.enc.value), T.pctW, '600 10px ' + t.fontSans) : tr('waffle.pctTotal', '% of total'), RK.util.merge({ fill: t.ink3, 'text-anchor': 'end' }, font(10, 600)));
     svgEl('line', { x1: 0, x2: T.w, y1: 17.5, y2: 17.5, stroke: t.ink3, 'stroke-width': 1 }, g);
     var y = 22;
     m.cats.forEach(function (cat, i) {
@@ -433,7 +450,7 @@
     var fy = y + T.rowH * m.cats.length + 4;
     svgEl('line', { x1: 0, x2: T.w, y1: fy + 0.5, y2: fy + 0.5, stroke: t.rule, 'stroke-width': 1 }, g);
     var tot = svgEl('text', RK.util.merge({ x: 16, y: fy + 13, 'dominant-baseline': 'central', fill: t.ink }, font(11.5, 600)), g);
-    tot.textContent = 'Total';
+    tot.textContent = tr('total', 'Total');
     if (T.valW) {
       var tv = svgEl('text', RK.util.merge({ x: xVal, y: fy + 13, 'dominant-baseline': 'central', 'text-anchor': 'end', fill: t.ink, 'data-lt': 1 }, font(11.5, 600, true)), g);
       tv.textContent = RK.format(wf.total, m.fmt);
@@ -441,7 +458,7 @@
     var tp = svgEl('text', RK.util.merge({ x: xPct, y: fy + 13, 'dominant-baseline': 'central', 'text-anchor': 'end', fill: t.ink, 'data-ltp': 1 }, font(11.5, 600, true)), g);
     tp.textContent = RK.format(m.pctLike || m.abs ? wf.total : 1, ctx.options.pctFormat);
     var note = svgEl('text', RK.util.merge({ x: 0, y: fy + 34, fill: t.ink3 }, font(10, 400)), g);
-    note.textContent = '1 square = ' + RK.format(1 / m.cells, m.cells === 100 ? '0%' : '0.0%');
+    note.textContent = tr('waffle.unit', '1 square = {value}', { value: RK.format(1 / m.cells, m.cells === 100 ? '0%' : '0.0%') });
   }
 
   /** Update legend numbers in place (filters changed, same geometry). */
@@ -486,11 +503,11 @@
     if (!c) return '';
     var rows = [
       { color: m.color[cat], label: ctx.title(ctx.enc.value), value: RK.format(c.value, m.fmt) },
-      m.pctLike && m.abs ? null : { label: m.abs ? 'Share' : '% of total', value: RK.format(c.share, ctx.options.pctFormat) },
-      { label: 'Squares', value: c.n + ' of ' + m.cells }
+      m.pctLike && m.abs ? null : { label: m.abs ? tr('waffle.share', 'Share') : tr('waffle.pctTotal', '% of total'), value: RK.format(c.share, ctx.options.pctFormat) },
+      { label: tr('waffle.squares', 'Squares'), value: tr('waffle.nOf', '{n} of {total}', { n: c.n, total: m.cells }) }
     ];
     var foot = null;
-    if (cat === ctx.options.othersLabel && m.members.length) foot = m.members.length + ' items: ' + m.members.slice(0, 5).join(', ') + (m.members.length > 5 ? ', …' : '');
+    if (cat === othersName(ctx.options) && m.members.length) foot = tr('waffle.items', '{n} items: {list}', { n: m.members.length, list: m.members.slice(0, 5).join(', ') + (m.members.length > 5 ? ', …' : '') });
     return RK.chart.tip((wf.title && wf.title !== cat ? wf.title + ' · ' : '') + cat, rows, foot);
   }
 

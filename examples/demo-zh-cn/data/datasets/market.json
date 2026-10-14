@@ -1,0 +1,42 @@
+{
+  "id": "market",
+  "title": "中国运动控制与自动化核心部件市场（2025年）",
+  "schema": {"fields": [
+    {"name": "segment", "type": "string", "title": "细分市场"},
+    {"name": "player", "type": "string", "title": "厂商"},
+    {"name": "origin", "type": "string", "title": "品牌属性"},
+    {"name": "revenue", "type": "number", "title": "2025年收入", "format": "#,##0.0", "unit": "人民币亿元"}
+  ]},
+  "data": [
+    {"segment": "工业机器人", "player": "外资品牌A", "origin": "外资", "revenue": 96.0},
+    {"segment": "工业机器人", "player": "外资品牌B", "origin": "外资", "revenue": 71.0},
+    {"segment": "工业机器人", "player": "内资品牌C", "origin": "内资", "revenue": 58.0},
+    {"segment": "工业机器人", "player": "华辰智能", "origin": "内资", "revenue": 52.0},
+    {"segment": "工业机器人", "player": "内资品牌D", "origin": "内资", "revenue": 35.0},
+    {"segment": "工业机器人", "player": "其他", "origin": "其他", "revenue": 138.0},
+    {"segment": "变频器", "player": "外资品牌A", "origin": "外资", "revenue": 68.0},
+    {"segment": "变频器", "player": "外资品牌E", "origin": "外资", "revenue": 44.0},
+    {"segment": "变频器", "player": "内资品牌C", "origin": "内资", "revenue": 52.0},
+    {"segment": "变频器", "player": "华辰智能", "origin": "内资", "revenue": 31.0},
+    {"segment": "变频器", "player": "凯斯勒", "origin": "外资", "revenue": 1.6},
+    {"segment": "变频器", "player": "其他", "origin": "其他", "revenue": 83.0},
+    {"segment": "伺服系统", "player": "外资品牌B", "origin": "外资", "revenue": 62.0},
+    {"segment": "伺服系统", "player": "外资品牌E", "origin": "外资", "revenue": 41.0},
+    {"segment": "伺服系统", "player": "内资品牌C", "origin": "内资", "revenue": 38.0},
+    {"segment": "伺服系统", "player": "华辰智能", "origin": "内资", "revenue": 38.0},
+    {"segment": "伺服系统", "player": "凯斯勒", "origin": "外资", "revenue": 3.2},
+    {"segment": "伺服系统", "player": "其他", "origin": "其他", "revenue": 47.0},
+    {"segment": "PLC/控制器", "player": "外资品牌A", "origin": "外资", "revenue": 61.0},
+    {"segment": "PLC/控制器", "player": "外资品牌B", "origin": "外资", "revenue": 24.0},
+    {"segment": "PLC/控制器", "player": "华辰智能", "origin": "内资", "revenue": 18.5},
+    {"segment": "PLC/控制器", "player": "内资品牌D", "origin": "内资", "revenue": 12.0},
+    {"segment": "PLC/控制器", "player": "凯斯勒", "origin": "外资", "revenue": 0.8},
+    {"segment": "PLC/控制器", "player": "其他", "origin": "其他", "revenue": 26.0},
+    {"segment": "视觉与传感", "player": "外资品牌F", "origin": "外资", "revenue": 33.0},
+    {"segment": "视觉与传感", "player": "内资品牌D", "origin": "内资", "revenue": 21.0},
+    {"segment": "视觉与传感", "player": "华辰智能", "origin": "内资", "revenue": 15.0},
+    {"segment": "视觉与传感", "player": "内资品牌C", "origin": "内资", "revenue": 9.0},
+    {"segment": "视觉与传感", "player": "其他", "origin": "其他", "revenue": 64.0}
+  ],
+  "meta": {"notes": ["示例数据：文中公司、机构与数据均为虚构，仅用于演示。"], "source": "行业访谈、北桥资本分析（示例）", "unit": "人民币亿元"}
+}

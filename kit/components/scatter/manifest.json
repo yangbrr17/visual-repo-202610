@@ -37,7 +37,7 @@
     "wheelZoom": {"type": "boolean", "default": null, "desc": "true = a plain mouse wheel zooms; default: Ctrl/Cmd + wheel or a trackpad pinch zooms, so the wheel keeps scrolling the report"},
     "legend": {"type": "boolean", "default": true, "desc": "Category legend (top-left; wraps onto extra rows, never pages)"}
   },
-  "interactions": ["Hover tooltip with both metrics (+ extra fields)", "Click a point to cross-filter (toggle)", "Box-select points to cross-filter", "Box zoom, Ctrl + wheel zoom, drag to pan, reset", "Legend toggles categories", "Animated transitions when filters change", "PNG / CSV export"],
+  "interactions": ["Hover tooltip with both metrics (+ extra fields)", "Click a point to cross-filter (toggle)", "Box-select points to cross-filter", "Box-zoom and reset buttons; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)", "Legend toggles categories", "Animated transitions when filters change", "PNG / CSV export"],
   "samples": [
     {"title": "EV / EBITDA 2025E vs. revenue growth 2025E", "data": "peers", "height": 400,
      "options": {"encode": {"x": "rev_growth_25e", "y": "ev_ebitda_25e", "label": "ticker", "name": "company", "color": "sector"},
