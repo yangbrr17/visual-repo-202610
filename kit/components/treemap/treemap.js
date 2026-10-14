@@ -106,7 +106,7 @@
       showShare: false,        // add the % of total to leaf labels
       drill: true,             // click a group to zoom in; breadcrumb to go back
       rootName: null,          // breadcrumb root (defaults to the single root node or 'Total')
-      highlight: null,         // node name(s) outlined in the accent colour (e.g. the client)
+      highlight: null,         // leaf name(s) in the accent colour: filled (group colours) or outlined (metric colours)
       format: null,            // value format; defaults to the value field format
       metricFormat: null,      // metric format; defaults to the color field format
       legend: true             // colour scale legend (metric mode)

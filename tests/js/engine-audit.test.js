@@ -120,6 +120,14 @@ const eqJ = (a, b, msg) => assert.strictEqual(J(a), J(b), msg);
   const xl = [[10.35, '0.0x', '10.4x'], [8.85, '0.0x', '8.9x'], [10.45, '0.0x', '10.5x'], [2.675, '$#,##0.00', '$2.68'], [1.005, '0.00', '1.01'],
     [1.045, '0.00', '1.05'], [1.255, '0.00', '1.26'], [-10.35, '0.0x', '-10.4x'], [-1.005, '#,##0.00;(#,##0.00)', '(1.01)'], [0.01005, '0.00%', '1.01%']];
   for (const [v, code, want] of xl) t('F1 ' + v + ' "' + code + '" -> ' + want + ' (Excel)', () => assert.strictEqual(F(v, code), want));
+  t('F1 sample data: Corvane Automation revenue growth 0.0705 -> "7.1%" (renders "7.0%")', () => {
+    const row = RK.data.get('peers').rows.find(x => x.company === 'Corvane Automation');
+    assert.strictEqual(F(row.rev_growth_25e, RK.data.get('peers').field('rev_growth_25e').format), '7.1%');
+  });
+  t('F1 sample data: Brightwell Motion EV/LTM revenue 1.65 -> "1.7x" (renders "1.6x")', () => {
+    const row = RK.data.get('precedents').rows.find(x => x.target === 'Brightwell Motion');
+    assert.strictEqual(F(row.ev_revenue, '0.0x'), '1.7x');
+  });
   t('F1 more than 100 decimals does not throw RangeError', () => assert.ok(/^1\.50*$/.test(F(1.5, '0.' + '0'.repeat(150)))));
 
   // F2 — General (the format of every unformatted column) mis-grouped negatives and rounded small values to 0
@@ -127,6 +135,7 @@ const eqJ = (a, b, msg) => assert.strictEqual(J(a), J(b), msg);
   t('F2 General -123456789', () => assert.strictEqual(F(-123456789, 'General'), '-123,456,789'));
   t('F2 General 0.000123 is not "0"', () => assert.strictEqual(F(0.000123), '0.000123'));
   t('F2 General 0.0042 is not "0"', () => assert.strictEqual(F(0.0042), '0.0042'));
+  t('F2 General -0.0023 is not "-0"', () => assert.strictEqual(F(-0.0023), '-0.0023'));
 
   // F3 — toFixed() switches to exponent notation from 1e21 and the code then splits on "."
   t('F3 1e21 "#,##0" (was "1e,+21")', () => assert.strictEqual(F(1e21, '#,##0'), '1,000,000,000,000,000,000,000'));
