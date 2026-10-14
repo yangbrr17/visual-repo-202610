@@ -8,3 +8,4 @@ node_modules/
 *.egg-info/
 /py/build/
 /py/dist/
+/tests/.xss-tmp/
