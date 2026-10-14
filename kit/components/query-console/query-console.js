@@ -113,14 +113,26 @@
     try { window.localStorage.setItem(HKEY, JSON.stringify(list)); } catch (e) { /* storage unavailable (file://, private mode) */ }
   }
 
-  /** Better "did you mean" for unknown fields: prefix / substring matches before edit distance. */
+  function editDistance(a, b) {
+    var prev = [], cur, i, j;
+    for (j = 0; j <= b.length; j++) prev[j] = j;
+    for (i = 1; i <= a.length; i++) {
+      cur = [i];
+      for (j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+    return prev[b.length];
+  }
+  /** Better "did you mean" for unknown fields: prefix, then substring, then small edit distance. */
   function suggest(name, ds) {
     var n = norm(name);
     var scored = ds.fields.map(function (f) {
       var a = norm(f.name), b = norm(f.title || '');
-      var s = a.indexOf(n) === 0 || b.indexOf(n) === 0 ? 0 : (a.indexOf(n) >= 0 || b.indexOf(n) >= 0 ? 1 : 2 + Math.abs(a.length - n.length) / 10);
-      return [f.name, s];
-    }).filter(function (x) { return x[1] < 2; }).sort(function (x, y) { return x[1] - y[1]; });
+      if (a.indexOf(n) === 0 || b.indexOf(n) === 0) return [f.name, 0];
+      if (a.indexOf(n) >= 0 || b.indexOf(n) >= 0) return [f.name, 1];
+      var d = Math.min(editDistance(n, a), editDistance(n, b));
+      return [f.name, d <= Math.max(2, Math.floor(n.length / 4)) ? 2 + d : 99];
+    }).filter(function (x) { return x[1] < 99; }).sort(function (x, y) { return x[1] - y[1]; });
     return scored.slice(0, 3).map(function (x) { return x[0]; });
   }
   function friendlyError(msg, ds) {
@@ -187,7 +199,7 @@
     var q = '', act = 0, rows = [];
     var listId = RK.util.uid('rk-qc-pk');
     var list = h('div.rk-qc-pk__list', { id: listId, role: 'listbox', tabindex: '-1', 'aria-label': opts.label || 'Options', on: { keydown: onKey } });
-    var search = items.length > 7 ? h('input.rk-qc-pk__q', {
+    var search = items.length > 10 ? h('input.rk-qc-pk__q', {
       type: 'text', placeholder: opts.placeholder || 'Search…', role: 'combobox', 'aria-expanded': 'true', 'aria-controls': listId, autocomplete: 'off', spellcheck: 'false',
       on: { input: function () { q = search.value; act = 0; render(); }, keydown: onKey }
     }) : null;
@@ -1058,7 +1070,7 @@
       function axisFmt(fmt) {
         var code = String(RK.format.presets[fmt] || fmt || '');
         var whole = fmtKind(code) === 'num' && /\.0+/.test(code) ? code.replace(/\.0+/g, '') : null;   // $#,##0.0 -> $#,##0 on axes
-        return function (v) { return RK.format(v, whole && Math.abs(v) >= 100 ? whole : (fmt || 'auto')); };
+        return function (v) { return RK.format(v, whole && (Math.abs(v) >= 100 || v === 0) ? whole : (fmt || 'auto')); };
       }
       function isEstimate(c) { return typeof c === 'string' && /\d{2}\s?[EFPB]$/i.test(c.trim()); }
       function paintChart(rows, rerun) {
@@ -1112,17 +1124,26 @@
           // ---- side-by-side horizontal panels sharing the category axis ----
           var panels = meas.slice(0, 3);
           dropped = meas.length - panels.length;
-          panelMode = panels.length > 1;
+          // "Median EV/EBITDA 2025E" + "Median EBITDA margin" -> drop the shared aggregation word in panel titles
+          var first = panels.map(function (p) { return String(p.title).split(' ')[0]; });
+          var strip = panels.length > 1 && first.every(function (w) { return w === first[0]; }) && AGG_LABEL[first[0].toLowerCase()] != null;
+          function panelTitle(p) { return strip ? String(p.title).slice(first[0].length + 1) : p.title; }
           var W = chartHost.clientWidth || 420;
           var labelW = Math.min(170, Math.max(70, labelLen * 6.3 + 14));
-          var valPad = cats.length <= 24 ? 40 : 10, gap = 14, n = panels.length;
-          var pw = Math.max(50, (W - labelW - n * valPad - (n - 1) * gap) / n);
+          var valPad = cats.length <= 24 ? 40 : 10, gap = 14, MINW = 60;
+          // fit: shrink the label column first (labels truncate), then drop panels that still do not fit
+          var fits = function (k, lw) { return (W - lw - k * valPad - (k - 1) * gap) / k >= MINW; };
+          while (panels.length > 1 && !fits(panels.length, 90)) { panels.pop(); dropped++; }
+          if (!fits(panels.length, labelW)) labelW = Math.max(90, W - panels.length * (MINW + valPad) - (panels.length - 1) * gap);
+          var n = panels.length;
+          panelMode = n > 1;
+          var pw = Math.max(40, (W - labelW - n * valPad - (n - 1) * gap) / n);
           var top = n > 1 ? 24 : 8;
           var showVals = cats.length <= 24;
           opt = {
             animation: ctx.motion, color: t.cat,
             title: n > 1 ? panels.map(function (p, i) {
-              return { text: p.title, left: labelW + i * (pw + valPad + gap), top: 2, textStyle: { fontSize: 11, fontWeight: 600, color: t.ink2, fontFamily: t.fontSans, width: pw + valPad - 8, overflow: 'truncate' } };
+              return { text: panelTitle(p), left: labelW + i * (pw + valPad + gap), top: 2, textStyle: { fontSize: 11, fontWeight: 600, color: t.ink2, fontFamily: t.fontSans, width: pw + valPad - 8, overflow: 'truncate' } };
             }) : [],
             grid: panels.map(function (p, i) { return { left: labelW + i * (pw + valPad + gap), width: pw, top: top, bottom: n > 1 && showVals ? 6 : 22, containLabel: false }; }),
             tooltip: {
@@ -1145,7 +1166,7 @@
             series: panels.map(function (p, i) {
               return {
                 name: p.title, type: 'bar', xAxisIndex: i, yAxisIndex: i, barMaxWidth: 26, barCategoryGap: '32%',
-                data: barData(byCat(rows, p.name), RK.theme.color(i), true),
+                data: barData(byCat(rows, p.name), t.cat[0], true),     // one colour: panels are labelled, accent-2 stays for the target
                 label: showVals ? labelCfg(p.format || 'auto', 'right') : { show: false },
                 emphasis: { focus: 'none' }
               };
@@ -1175,9 +1196,12 @@
               series.push(mk(String(name), byCat(list, meas[0].name), meas[0], 0, color, kind, false));
             });
           } else {
+            // the second-unit line takes accent-2 unless a bar already uses that colour (e.g. the ink theme)
+            var barCols = plotted.filter(function (p) { return p.axis === 0; }).map(function (p, i) { return String(RK.theme.color(i)).toLowerCase(); });
+            var lineCol = [t.accent2].concat(t.cat).filter(function (c) { return barCols.indexOf(String(c).toLowerCase()) < 0; })[0] || t.accent2;
             plotted.forEach(function (p, i) {
               var asLine = kind === 'line' || p.axis === 1;
-              var color = p.axis === 1 && kind === 'bar' ? t.accent2 : RK.theme.color(i);
+              var color = p.axis === 1 && kind === 'bar' ? lineCol : RK.theme.color(i);
               legend.push(p.col.title);
               series.push(mk(p.col.title, byCat(rows, p.col.name), p.col, p.axis, color, asLine ? 'line' : 'bar', single));
             });
@@ -1197,6 +1221,11 @@
           var p1 = plotted.filter(function (p) { return p.axis === 1; })[0];
           var catAxis = { type: 'category', data: catLabels, inverse: horiz, boundaryGap: kind === 'bar',
             axisLabel: horiz ? { interval: 0, hideOverlap: true, width: 150, overflow: 'truncate' } : { interval: cats.length <= 16 ? 0 : 'auto', hideOverlap: true } };
+          // narrow charts: "2019A" -> "19A" so every period keeps its label (tooltips show the full label)
+          var slot = ((chartHost.clientWidth || 400) - 90) / Math.max(1, cats.length);
+          if (!horiz && slot < labelLen * 6.4 + 8 && catLabels.every(function (c) { return /^(FY)?\d{4}[A-Z]?$/.test(c); })) {
+            catAxis.axisLabel.formatter = function (v) { return String(v).replace(/^(FY)?\d{2}(\d{2})/, '$2'); };
+          }
           var valAxis = [{ type: 'value', scale: kind === 'line' && primaryKind !== 'num', axisLabel: { formatter: axisFmt(plotted[0] ? plotted[0].col.format : meas[0].format) }, splitLine: { lineStyle: { color: t.grid } } }];
           if (p1 && kind === 'bar') {
             // combo: bars in the lower ~60% of the plot, the second-unit line labelled above them (right axis hidden)

@@ -96,6 +96,8 @@
     t.fontSans = t.fontSans || 'Inter, "Helvetica Neue", Arial, sans-serif';
     t.fontNum = t.fontNum || t.fontSans;
     t.fontSerif = t.fontSerif || 'Georgia, serif';
+    // ECharts writes font stacks into SVG style="" attributes: double quotes would break PNG/SVG export
+    ['fontSans', 'fontNum', 'fontSerif'].forEach(function (k) { t[k] = String(t[k]).replace(/"/g, "'"); });
     t.dark = luminance(t.paper) < 0.3;
     t.name = (document.documentElement.getAttribute('data-rk-theme') || 'navy');
     return t;
@@ -125,7 +127,7 @@
       title: { textStyle: { color: t.ink, fontFamily: t.fontSerif, fontWeight: 600, fontSize: 14 }, subtextStyle: { color: t.ink3 } },
       legend: {
         textStyle: { color: t.ink2, fontSize: 11 },
-        icon: 'roundRect', itemWidth: 10, itemHeight: 10, itemGap: 14,
+        icon: 'roundRect', itemWidth: 10, itemHeight: 10, itemGap: 14, itemStyle: { borderWidth: 0 },
         inactiveColor: t.rule, pageIconColor: t.accent, pageTextStyle: { color: t.ink3 }
       },
       tooltip: {
@@ -195,6 +197,12 @@
       try { localStorage.setItem('rk:theme', name); } catch (e) { /* storage unavailable */ }
       theme.refresh();
       RK.bus.emit('theme:changed', theme.current);
+    },
+
+    /** Readable label colour on top of a data fill, correct in light and dark themes. */
+    textOn: function (fill) {
+      var t = theme.tokens();
+      return onColor(fill, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#ffffff');
     },
 
     /** Categorical color for index i (wraps). */

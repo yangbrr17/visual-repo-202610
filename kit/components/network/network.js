@@ -227,16 +227,14 @@
       crossFilter: true,
       filterScope: 'dataset'
     },
-    render: function (ctx) {
-      var api = C(build, {
-        on: {
-          click: function (p, c) {
-            if (p.dataType === 'node' && p.data && p.data.rkId != null) selectNode(c, p.data.rkId);
-          }
+    render: C(build, {
+      rebuildOnResize: true,     // positions are solved in px for the container size
+      on: {
+        click: function (p, c) {
+          if (p.dataType === 'node' && p.data && p.data.rkId != null) selectNode(c, p.data.rkId);
         }
-      })(ctx);
-      return api;
-    }
+      }
+    })
   });
 
   function build(ctx, inst) {

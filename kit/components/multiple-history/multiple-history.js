@@ -143,10 +143,13 @@
       }
 
       var dfmt = o.dateFormat || 'mmm yy';
+      // blocks rendered on screen are only resized at beforeprint, so read the live print flag too
+      var printing = ctx.print || !!(RK.runtime && RK.runtime.printing);
+      var slider = o.zoom !== false && o.zoomSlider !== false && !printing;
       return {
         legend: C.legend(ctx, { show: o.legend !== false && !!cs, itemWidth: 16,
           data: series.filter(function (x) { return x.type === 'line'; }).map(function (x) { return { name: x.name, icon: LINE_ICON }; }) }),
-        grid: C.grid(ctx, { top: o.legend !== false && cs ? 32 : 14, right: labelW ? labelW + 16 : 12, bottom: o.zoom !== false && !ctx.print ? 32 : 4 }),
+        grid: C.grid(ctx, { top: o.legend !== false && cs ? 32 : 14, right: labelW ? labelW + 16 : 12, bottom: slider ? 32 : 4 }),
         tooltip: {
           trigger: 'axis',
           axisPointer: { type: 'line' },
@@ -173,10 +176,10 @@
           splitLine: { show: false }
         },
         yAxis: { type: 'value', min: yMin, max: yMax, interval: step, axisLabel: { formatter: axisFmt(fmt, step) } },
-        dataZoom: o.zoom !== false ? C.zoom(ctx, 'x', { labelFormatter: function (v) { return RK.format(new Date(v), 'dd mmm yy'); } }) : [],
+        dataZoom: o.zoom !== false ? C.zoom({ options: o, print: printing }, 'x', { labelFormatter: function (v) { return RK.format(new Date(v), 'dd mmm yy'); } }) : [],
         series: series
       };
-    })
+    }, { rebuildOnResize: true })   // also re-evaluates the print flag when the page is laid out for print
   });
 
   /* ------------------------------------------------------------------ *

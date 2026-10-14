@@ -1,6 +1,6 @@
 /* treemap — drill-down breadcrumb (HTML, above the chart's reserved top band) */
 .rk-treemap__crumbs {
-  position: absolute; left: 0; top: 0; z-index: 2; max-width: 62%;
+  position: absolute; left: 0; top: 0; z-index: 2; max-width: 62%;   /* refined in JS when the colour legend is shown */
   display: flex; align-items: center; gap: 6px; height: 20px; overflow: hidden;
   font-size: var(--rk-fs-sm); line-height: 20px; white-space: nowrap;
 }

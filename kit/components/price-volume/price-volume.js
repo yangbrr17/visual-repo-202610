@@ -78,8 +78,8 @@
           if (Math.abs(inst.getHeight() - (state.h || 0)) > 1) api.update(current);
         },
         destroy: function () { selector.remove(); api.destroy(); },
-        exportImage: api.exportImage,
-        exportSVG: api.exportSVG
+        exportImage: function () { return exportPNG(inst, current.theme); },
+        exportSVG: function () { return cleanSVG(inst, current.theme); }
       };
     }
   });
@@ -526,7 +526,7 @@
     [t.accent3, t.ink3].concat(t.cat).forEach(function (c) {
       if (!c) return;
       if (avoid.some(function (a) { return dist(a, c) < 60; })) return;
-      if (out.some(function (x) { return dist(x, c) < 46; })) return;
+      if (out.some(function (x) { return dist(x, c) < 60; })) return;
       out.push(c);
     });
     return out.length ? out : t.cat.slice(1);
@@ -590,5 +590,39 @@
     if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
     measureCtx.font = (weight || '400 11px ') + t.fontNum;
     return measureCtx.measureText(String(str)).width;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Export. Workaround for a core issue (rk.chart exportPNG): ECharts' SVG string keeps the theme's
+   * double-quoted font names inside style="…" — invalid XML, so the browser refuses to rasterise it.
+   * Swap them to single quotes before exporting.
+   * ------------------------------------------------------------------ */
+  function cleanSVG(inst, t) {
+    var svg = inst.renderToSVGString ? inst.renderToSVGString() : null;
+    if (!svg) return null;
+    [t.fontSans, t.fontNum, t.fontSerif].forEach(function (f) {
+      if (f && f.indexOf('"') >= 0) svg = svg.split(f).join(f.replace(/"/g, "'"));
+    });
+    return svg;
+  }
+  function exportPNG(inst, t) {
+    var bg = t.paper || '#ffffff';
+    var zr = inst.getZr && inst.getZr();
+    var svg = zr && zr.painter && zr.painter.type === 'canvas' ? null : cleanSVG(inst, t);
+    if (!svg) return Promise.resolve(inst.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: bg }));
+    var w = inst.getWidth(), h = inst.getHeight();
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () {
+        var c = document.createElement('canvas');
+        c.width = w * 2; c.height = h * 2;
+        var g = c.getContext('2d');
+        g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/png'));
+      };
+      img.onerror = reject;
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    });
   }
 })();

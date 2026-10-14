@@ -161,7 +161,7 @@
       "options": {
         "tab": "query",
         "highlight": "Helios Industrial",
-        "query": "company, ev / ebitda_26e as \"EV/EBITDA 2026E\" format \"0.0x\", ebitda_margin_25e as \"EBITDA margin\"\nfrom peers where region != \"Latin America\"\nsort 2 desc top 12",
+        "query": "company, ev / ebitda_26e as \"EV/EBITDA 2026E\" format \"0.0x\", ebitda_margin_25e as \"EBITDA margin\"\nfrom peers where region != \"Latin America\"\nsort 2 desc",
         "examples": [
           {
             "label": "Sector medians",

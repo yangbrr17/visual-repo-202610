@@ -116,6 +116,8 @@
     render: C(function (ctx) {
       var o = ctx.options, t = ctx.theme, enc = ctx.enc;
       var vert = o.orient === 'vertical';
+      // translucent links read darker on a dark paper: lift them in dark themes
+      if (t.dark) o = util.merge({}, o, { linkOpacity: Math.min(0.6, o.linkOpacity * 1.3) });
       var fmt = o.format || ctx.fmtOf(enc.value) || 'auto';
 
       // aggregate duplicate source -> target rows, drop self-loops / empty flows (ECharts rejects cycles)
@@ -309,6 +311,7 @@
         }]
       };
     }, {
+      rebuildOnResize: true,     // label crowding is estimated from the container height
       on: {
         click: function (p, ctx) {
           if (p.dataType === 'node') selectNode(ctx, p.name);

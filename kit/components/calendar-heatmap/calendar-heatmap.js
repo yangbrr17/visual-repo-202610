@@ -30,7 +30,7 @@
     },
     render: C(function (ctx, inst) {
       return ctx.options.mode === 'monthly' ? monthly(ctx, inst) : daily(ctx, inst);
-    })
+    }, { rebuildOnResize: true })   // daily cell size is derived from the block size
   });
 
   /* ------------------------------------------------------------------ *
@@ -66,7 +66,8 @@
     var calendar = cals.map(function (c, i) {
       return {
         range: c.range, orient: 'horizontal', left: left, top: top + i * (7 * ch + gap), cellSize: [cw, ch],
-        itemStyle: { color: t.surface, borderColor: t.paper, borderWidth: 2 },
+        // empty days (weekends, holidays) must stay distinct from the lowest bucket, also in dark themes
+        itemStyle: { color: t.dark ? RK.theme.mix(t.paper, t.ink, 0.035) : t.surface, borderColor: t.paper, borderWidth: 2 },
         splitLine: { show: true, lineStyle: { color: t.rule, width: 1 } },
         dayLabel: { firstDay: 1, nameMap: ['', 'Mon', '', 'Wed', '', 'Fri', ''], color: t.ink3, fontSize: 10, margin: 6, fontFamily: t.fontSans },
         monthLabel: { nameMap: 'EN', color: t.ink2, fontSize: 10.5, margin: 6, position: 'start', align: 'left', fontFamily: t.fontSans },
@@ -113,13 +114,13 @@
       return U.merge(common, {
         type: 'continuous', min: lo, max: hi, calculable: true, realtime: true,
         itemWidth: 10, itemHeight: 130, formatter: function (v) { return RK.format(v, fmt); },
-        inRange: { color: [0.12, 0.35, 0.6, 0.82, 1].map(ramp) },
+        inRange: { color: [0.18, 0.4, 0.62, 0.82, 1].map(ramp) },
         outOfRange: { color: t.surface2 || t.surface },
         handleStyle: { borderColor: t.ink3 }, indicatorStyle: { borderColor: t.paper }
       });
     }
     var cuts = U.unique([0.2, 0.4, 0.6, 0.8].map(function (p) { return roundSig(q(p), 2); })).filter(function (v) { return v > lo && v < hi; });
-    var cols = [0.1, 0.3, 0.52, 0.76, 1].map(ramp);
+    var cols = [0.18, 0.38, 0.58, 0.78, 1].map(ramp);
     var pieces = [];
     for (var i = 0; i <= cuts.length; i++) {
       var p = { color: cols[Math.round(i * (cols.length - 1) / Math.max(1, cuts.length))] };

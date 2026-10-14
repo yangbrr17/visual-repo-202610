@@ -97,11 +97,11 @@
       nameW = Math.min(Math.ceil(nameW) + 8, 200);
       var tableW = 18 + nameW + valW + pctW;
       var gap = Math.max(28, Math.min(56, W * 0.05));
-      var R = Math.min(H / 2 - 6, (W - tableW - gap) / 2, 190);
+      var R = Math.min(H / 2 - 6, (W - tableW - gap - 10) / 2, 190);
       if (R < 56) {                                   // narrow: shrink the name column first
         nameW = Math.max(60, nameW - (56 - R) * 2);
         tableW = 18 + nameW + valW + pctW;
-        R = Math.max(44, Math.min(H / 2 - 6, (W - tableW - gap) / 2));
+        R = Math.max(44, Math.min(H / 2 - 6, (W - tableW - gap - 10) / 2));
       }
       var groupW = 2 * R + gap + tableW;
       var x0 = Math.max(4, (W - groupW) / 2);
@@ -159,7 +159,7 @@
     };
   }
 
-  /** Legend table + centre total as graphic elements (merged, so the total can count up/over). */
+  /** Legend table + centre total as graphic elements (the total counts up from 0, then from the previous total). */
   function graphics(ctx, m, L, first) {
     var o = ctx.options, t = ctx.theme, els = [];
     var anim = ctx.motion;
@@ -174,7 +174,7 @@
         extra: { v: m.total }, transition: ['extra'],
         during: function (api) { api.setStyle('text', RK.format(api.getExtra('v'), m.fmt)); }
       };
-      if (anim && first) { val.enterFrom = { extra: { v: 0 } }; val.enterAnimation = { duration: 1000 }; }
+      if (anim && L.from !== m.total) { val.enterFrom = { extra: { v: L.from || 0 } }; val.enterAnimation = { duration: first ? 1000 : 600 }; }
       if (!anim) val.transition = [];
       els.push(val);
       els.push({
@@ -203,21 +203,22 @@
         var dim = d.color !== d.base;
         var ink = dim ? RK.theme.alpha(t.ink2, 0.45) : (d.hl ? t.ink : t.ink2);
         var weight = d.hl ? '600 ' : '';
-        var row = {
-          id: 'row-' + i, type: 'group', x: 0, y: 0,
-          children: [
-            { id: 'row-' + i + '-hit', type: 'rect', shape: { x: x - 4, y: cy - T.rowH / 2, width: T.w + 8, height: T.rowH }, style: { fill: 'rgba(0,0,0,0)' } },
-            { id: 'row-' + i + '-sw', type: 'rect', silent: true, shape: { x: x, y: cy - 5, width: 10, height: 10, r: 2 }, style: { fill: d.color } },
-            { id: 'row-' + i + '-n', type: 'text', silent: true, x: xName, y: cy, style: { text: truncate(d.name, T.nameW - 4, weight + '11.5px ' + t.fontSans), fill: ink, font: weight + '11.5px ' + t.fontSans, textVerticalAlign: 'middle' } },
-            { id: 'row-' + i + '-v', type: 'text', silent: true, x: xVal, y: cy, invisible: !T.showV, style: { text: RK.format(d.value, m.fmt), fill: dim ? ink : t.ink, font: weight + '11.5px ' + t.fontNum, textAlign: 'right', textVerticalAlign: 'middle' } },
-            { id: 'row-' + i + '-p', type: 'text', silent: true, x: xPct, y: cy, invisible: !T.showP, style: { text: RK.format(d.share, m.pctFmt), fill: dim ? ink : t.ink3, font: weight + '11.5px ' + t.fontNum, textAlign: 'right', textVerticalAlign: 'middle' } }
-          ],
+        // flat elements (no groups): merges then add / update / remove each one cleanly by id
+        var hit = {
+          id: 'row-' + i + '-hit', type: 'rect', cursor: 'pointer',
+          shape: { x: x - 4, y: cy - T.rowH / 2, width: T.w + 8, height: T.rowH }, style: { fill: 'rgba(0,0,0,0)' },
           onmouseover: function () { L.inst.dispatchAction({ type: 'highlight', seriesId: 'donut', name: d.name }); L.onHover(d); },
           onmouseout: function () { L.inst.dispatchAction({ type: 'downplay', seriesId: 'donut', name: d.name }); L.onHover(null); },
-          onclick: function () { if (L.onPick) L.onPick(d); },
-          cursor: 'pointer'
+          onclick: function () { if (L.onPick) L.onPick(d); }
         };
-        els.push(RK.util.merge(row, enterRow(i)));
+        var parts = [
+          { id: 'row-' + i + '-sw', type: 'rect', silent: true, shape: { x: x, y: cy - 5, width: 10, height: 10, r: 2 }, style: { fill: d.color } },
+          { id: 'row-' + i + '-n', type: 'text', silent: true, x: xName, y: cy, style: { text: truncate(d.name, T.nameW - 4, weight + '11.5px ' + t.fontSans), fill: ink, font: weight + '11.5px ' + t.fontSans, textVerticalAlign: 'middle' } },
+          { id: 'row-' + i + '-v', type: 'text', silent: true, x: xVal, y: cy, invisible: !T.showV, style: { text: RK.format(d.value, m.fmt), fill: dim ? ink : t.ink, font: weight + '11.5px ' + t.fontNum, textAlign: 'right', textVerticalAlign: 'middle' } },
+          { id: 'row-' + i + '-p', type: 'text', silent: true, x: xPct, y: cy, invisible: !T.showP, style: { text: RK.format(d.share, m.pctFmt), fill: dim ? ink : t.ink3, font: weight + '11.5px ' + t.fontNum, textAlign: 'right', textVerticalAlign: 'middle' } }
+        ];
+        els.push(hit);
+        parts.forEach(function (el) { els.push(RK.util.merge(el, enterRow(i))); });
       });
       var fy = y + head + T.rowH * m.items.length + 4;
       els.push({ id: 'f-rule', type: 'line', silent: true, shape: { x1: x, y1: fy, x2: x + T.w, y2: fy }, style: { stroke: t.rule, lineWidth: 1 } });
@@ -279,7 +280,7 @@
       pctFormat: '0.0%'
     },
     render: function (ctx) {
-      var state = { m: null, L: null, first: true, w: 0, h: 0, ctx: ctx, ids: [] };
+      var state = { m: null, L: null, first: true, w: 0, h: 0, ctx: ctx, prevTotal: 0 };
       var base = C(function (c, inst) {
         state.ctx = c;
         state.m = model(c);
@@ -321,11 +322,11 @@
         L.onHover = hover;
         var d = Math.floor(L.r0 * 1.8);
         readout.style.cssText = 'left:' + L.cx + 'px;top:' + L.cy + 'px;width:' + d + 'px;height:' + d + 'px;--rk-donut-v:' + Math.round(Math.max(13, Math.min(24, L.r0 * 0.3))) + 'px';
-        var els = graphics(state.ctx, state.m, L, state.first);
-        var ids = els.map(function (e) { return e.id; });
-        state.ids.forEach(function (id) { if (ids.indexOf(id) < 0) els.push({ id: id, $action: 'remove' }); });
-        state.ids = ids;
-        inst.setOption({ graphic: { elements: els } });
+        // RK.chart's update replaceMerges 'graphic', which drops these elements every time; so they are
+        // always re-added fresh, and the total counts from the previous value via enterFrom
+        L.from = state.first ? 0 : state.prevTotal;
+        inst.setOption({ graphic: { elements: graphics(state.ctx, state.m, L, state.first) } });
+        state.prevTotal = state.m.total;
         state.first = false;
       }
       paint();

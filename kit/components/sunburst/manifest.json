@@ -7,7 +7,7 @@
   "deps": ["echarts"],
   "summary": "Radial hierarchy — inner ring = top level, outer rings = children — with a centre readout and drill-down.",
   "summary_zh": "径向层级图：内环为一级分类、外环为下级，中心显示总数或当前层级，可点击下钻。",
-  "description_zh": "用同心圆环展示多层级构成，例如集团 > 业务板块 > 产品线收入。内环为一级（标注名称与占比），外环为下一级（径向标注名称），角度代表数值；颜色按一级分组（子级为同色系浅色）或按指标（如增长率，发散色阶）。数据格式与矩形树图相同：id / parent 树表或平表 + encode.path。中心显示总数，悬停时显示当前扇区数值与占比；点击分组下钻、点击中心返回上一级，点击叶子节点交叉筛选。适合 2–3 层、强调“整体—部分”层级关系的场景；需要精确比较面积时优先使用矩形树图。",
+  "description_zh": "用同心圆环展示多层级构成，例如集团 > 业务板块 > 产品线收入。内环为一级（标注名称与占比），外环为下一级（径向标注名称），角度代表数值；颜色按一级分组（子级为同色系浅色，Others / Other 为灰色）或按指标（如增长率，发散色阶）。数据格式与矩形树图相同：id / parent 树表或平表 + encode.path。中心显示总数，悬停时显示当前扇区数值与占比；点击分组下钻、点击中心返回上一级，点击叶子节点交叉筛选。适合 2–3 层、强调“整体—部分”层级关系的场景；需要精确比较面积时优先使用矩形树图。",
   "best_for": ["Group > segment > product revenue mix", "Two-level shareholder or customer breakdowns", "Executive summary visual where the hierarchy itself is the message"],
   "avoid_when": ["More than 3 levels or > ~40 leaves (labels become unreadable — use a treemap)", "Precise size comparison is required (use a bar)", "Values can be negative"],
   "channels": {

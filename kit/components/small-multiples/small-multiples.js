@@ -2,7 +2,7 @@
  * RK component: small-multiples — a grid of mini line / area / bar charts, one panel per facet value,
  * all in ONE ECharts instance (one grid + axis pair per panel). Shared or independent y scale,
  * compact axes, last-value labels, optional "ghost" context lines and a linked crosshair.
- * The pixel layout is recomputed on resize so panels keep exact gutters and label room.
+ * The pixel layout is recomputed on resize (rebuildOnResize) so panels keep exact gutters and label room.
  */
 (function () {
   'use strict';
@@ -27,26 +27,14 @@
       dateFormat: 'mmm yy'   // time-axis label format (date x fields)
     },
     render: function (ctx) {
-      var latest = ctx, quiet = false, state = { facets: [] };
-      var inst = C(function (c, chart) {
-        latest = c;
-        var opt = build(c, chart, state);
-        if (quiet) { opt.animation = false; }
-        return opt;
-      }, {
+      var state = { facets: [] };                                   // per-instance: facet order for click -> filter
+      return C(function (c, chart) { return build(c, chart, state); }, {
+        rebuildOnResize: true,                                      // panel geometry is in pixels
         select: function (p, c) {
           var m = /^f-(\d+)$/.exec(p.seriesId || '');
           return m ? { field: c.enc.facet, value: state.facets[+m[1]] } : null;
         }
       })(ctx);
-      // panel geometry is in pixels, so a resize rebuilds the layout (without animation)
-      var baseResize = inst.resize;
-      inst.resize = function () {
-        baseResize();
-        quiet = true;
-        try { inst.update(latest); } finally { quiet = false; }
-      };
-      return inst;
     }
   });
 
@@ -189,7 +177,6 @@
     }
 
     return {
-      animation: true,
       grid: grids,
       xAxis: xAxes,
       yAxis: yAxes,

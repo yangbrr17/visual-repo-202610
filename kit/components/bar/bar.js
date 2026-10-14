@@ -67,7 +67,7 @@
           emphasis: { focus: 'series' },
           label: showLabels ? C.label(ctx, fmt, {
             position: o.stack ? 'inside' : (horiz ? 'right' : 'top'),
-            color: o.stack ? RK.theme.onColor(base, t.ink, '#fff') : t.ink2,
+            color: o.stack ? RK.theme.textOn(base) : t.ink2,
             fontSize: 10.5,
             formatter: function (p) {
               if (o.stack && (p.value == null || Math.abs(p.value) < (o.stack === 'percent' ? 0.06 : 0))) return '';

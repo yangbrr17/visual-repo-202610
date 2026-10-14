@@ -304,7 +304,7 @@
       var cs = getComputedStyle(n), css = '';
       SNAP.forEach(function (p) { css += p + ':' + cs.getPropertyValue(p) + ';'; });
       // legend text boxes keep auto size: the export falls back to a system font of another width
-      var flow = n.childNodes.length && /^(static|relative)$/.test(cs.position) && !(n instanceof SVGElement) && n.closest && n.closest('.leaflet-control');
+      var flow = n.childNodes.length && !(n instanceof SVGElement) && n.closest && n.closest('.leaflet-control-container');
       if (!flow) css += 'width:' + cs.width + ';height:' + cs.height + ';';
       b[i].setAttribute('style', css + 'animation:none;transition:none;');
       if (n.tagName === 'CANVAS' && b[i].parentNode) {

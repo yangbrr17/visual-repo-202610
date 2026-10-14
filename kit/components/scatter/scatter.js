@@ -1,8 +1,9 @@
 /*!
  * RK component: scatter — labelled two-metric scatter (e.g. EV/EBITDA vs. growth) with optional
- * OLS regression line + R², quadrant lines (medians / means / fixed values) with corner labels,
- * collision-avoiding point labels, target highlight, colour by category, click / box-select
- * cross-filter and box zoom. Peer statistics (medians, regression) exclude the target.
+ * OLS regression line + R² (in the legend), quadrant lines (medians / means / fixed values) with corner
+ * labels, point labels placed clear of every other label and point, target highlight, colour by
+ * category, click / box-select cross-filter and box zoom. Peer statistics (medians, regression)
+ * exclude the target.
  */
 (function () {
   'use strict';
@@ -78,6 +79,84 @@
   }
   /** Rough rendered width (px) of an axis label — used to space the rotated y-axis name. */
   function textW(s, px) { return String(s).length * (px || 11) * 0.58; }
+
+  /* ---------------- label placement (greedy, think-cell style) ---------------- */
+  var measureCtx = null;
+  function measure(text, font) {
+    if (measureCtx === null) { try { measureCtx = document.createElement('canvas').getContext('2d') || false; } catch (e) { measureCtx = false; } }
+    if (!measureCtx) return String(text).length * 6.2;
+    measureCtx.font = font;
+    return measureCtx.measureText(String(text)).width;
+  }
+  function gridRect(inst) {
+    try { return inst.getModel().getComponent('grid', 0).coordinateSystem.getRect(); }
+    catch (e) { return { x: 0, y: 0, width: inst.getWidth(), height: inst.getHeight() }; }
+  }
+  /**
+   * Labels overlap neither each other nor any point: each tries 10 positions around its point (right,
+   * left, above, below, the diagonals, then further out) and keeps the first free one. Labels that fit
+   * nowhere are hidden (hover still shows the tooltip); forced labels (the target) always show.
+   * Runs after every render, zoom, resize and legend toggle; updates only the label series.
+   */
+  function layoutLabels(inst) {
+    var L = inst.__rkLabels;
+    if (!L || !L.specs.length || inst.isDisposed()) return;
+    var rect = gridRect(inst), legendSel = {};
+    try { legendSel = (inst.getOption().legend || [])[0].selected || {}; } catch (e) { legendSel = {}; }
+    var on = function (name) { return legendSel[name] !== false; };
+    var toPx = function (p) { return inst.convertToPixel({ gridIndex: 0 }, [p.x, p.y]); };
+    var inRect = function (q) { return q[0] >= rect.x - 0.5 && q[0] <= rect.x + rect.width + 0.5 && q[1] >= rect.y - 0.5 && q[1] <= rect.y + rect.height + 0.5; };
+    var obs = L.obstacles.filter(function (o) { return on(o.name); }).map(function (o) { var q = toPx(o); return { x: q[0], y: q[1], r: o.r, id: o.id }; });
+    var placed = [];
+    function free(b, selfId) {
+      if (b.x < rect.x + 1 || b.y < rect.y + 1 || b.x + b.w > rect.x + rect.width - 1 || b.y + b.h > rect.y + rect.height - 1) return false;
+      for (var i = 0; i < placed.length; i++) {
+        var p = placed[i];
+        if (b.x < p.x + p.w + 2 && b.x + b.w + 2 > p.x && b.y < p.y + p.h && b.y + b.h > p.y) return false;
+      }
+      for (var j = 0; j < obs.length; j++) {
+        var o = obs[j];
+        if (o.id === selfId) continue;
+        var nx = Math.max(b.x, Math.min(o.x, b.x + b.w)), ny = Math.max(b.y, Math.min(o.y, b.y + b.h));
+        if ((o.x - nx) * (o.x - nx) + (o.y - ny) * (o.y - ny) < (o.r + 1) * (o.r + 1)) return false;
+      }
+      return true;
+    }
+    var specs = L.specs.map(function (sp) { var q = toPx(sp); return util.merge({}, sp, { px: q[0], py: q[1] }); });
+    // targets first, then isolated points (they rarely block), then crowded ones
+    specs.forEach(function (sp) {
+      sp.crowd = obs.filter(function (o) { var dx = o.x - sp.px, dy = o.y - sp.py; return dx * dx + dy * dy < 1600; }).length;
+    });
+    specs.sort(function (a, b) { return (b.force ? 1 : 0) - (a.force ? 1 : 0) || a.crowd - b.crowd; });
+    var res = {};
+    specs.forEach(function (sp) {
+      var key = sp.seriesId + '#' + sp.index;
+      if (sp.inside || !on(sp.name) || !inRect([sp.px, sp.py])) { res[key] = sp.inside && on(sp.name) && inRect([sp.px, sp.py]) ? 'inside' : null; return; }
+      var r = sp.r, g = 3, w = sp.w, h = sp.h, d = r * 0.71;
+      var cands = [[r + g, -h / 2], [-r - g - w, -h / 2], [-w / 2, -r - g - h], [-w / 2, r + g],
+        [d + 1, -d - h + 1], [d + 1, d - 1], [-d - 1 - w, -d - h + 1], [-d - 1 - w, d - 1],
+        [r + g + 9, -h / 2], [-r - g - 9 - w, -h / 2]];
+      for (var k = 0; k < cands.length; k++) {
+        var b = { x: sp.px + cands[k][0], y: sp.py + cands[k][1], w: w, h: h };
+        if (free(b, sp.id)) { placed.push(b); res[key] = cands[k]; return; }
+      }
+      if (sp.force) { placed.push({ x: sp.px + r + g, y: sp.py - h / 2, w: w, h: h }); res[key] = [r + g, -h / 2]; return; }
+      res[key] = null;
+    });
+    var upd = Object.keys(L.series).map(function (id) {
+      return {
+        id: id,
+        data: L.series[id].map(function (it, i) {
+          var pos = res[id + '#' + i], r = it.symbolSize ? it.symbolSize / 2 : L.r[id];
+          if (pos === 'inside') return util.merge({}, it, { label: { show: true, position: 'inside' } });
+          if (!pos) return util.merge({}, it, { label: { show: false } });
+          // array positions are offsets from the symbol's bounding-box corner (-r, -r)
+          return util.merge({}, it, { label: { show: true, position: [pos[0] + r, pos[1] + r], align: 'left', verticalAlign: 'top' } });
+        })
+      };
+    });
+    inst.setOption({ series: upd });
+  }
 
   /* ---------------- chart toolbar (select / zoom / reset), HTML so it can hide on hover-out --------------- */
   var ICON = {
@@ -222,23 +301,34 @@
         animationDelay: function (i) { return i * 14; },
         data: data
       });
+      L.data = data;
+      L.sz = sz;
+    });
+    // label layers: transparent companions drawn above every point; positions come from layoutLabels()
+    var labelSeries = {}, specs = [], obstacles = [], radius = {};
+    layers.forEach(function (L) {
+      L.data.forEach(function (d, i) { obstacles.push({ x: d.value[0], y: d.value[1], r: L.sz / 2 + 0.5, id: L.id + '#' + i, name: L.name }); });
       if (!showLabels) return;
+      var font = (L.target ? '700 11px ' : '400 10.5px ') + t.fontSans;
+      var items = L.data.map(function (d, i) {
+        specs.push({ seriesId: L.id + ':lab', index: i, x: d.value[0], y: d.value[1], r: L.sz / 2, w: measure(d.name, font) + 2, h: L.target ? 14 : 13,
+          force: !!L.target, id: L.id + '#' + i, name: L.name });
+        return { value: d.value, name: d.name, label: { show: false, color: d.dim ? RK.theme.alpha(L.target ? t.ink : t.ink2, 0.35) : (L.target ? t.ink : t.ink2) } };
+      });
+      labelSeries[L.id + ':lab'] = items;
+      radius[L.id + ':lab'] = L.sz / 2;
       series.push({
-        id: L.id + ':lab', name: L.name, type: 'scatter', symbol: 'circle', symbolSize: sz, z: 6, silent: true,
+        id: L.id + ':lab', name: L.name, type: 'scatter', symbol: 'circle', symbolSize: L.sz, z: 6, silent: true,
         tooltip: { show: false }, itemStyle: { color: 'transparent', borderWidth: 0 }, emphasis: { disabled: true },
         label: {
-          show: true, position: 'right', distance: 4, fontFamily: t.fontSans,
-          fontSize: L.target ? 11 : 10.5, fontWeight: L.target ? 700 : 400, color: L.target ? t.ink : t.ink2,
-          textBorderColor: t.paper, textBorderWidth: 2.5,
-          formatter: function (p) { return p.name; }
+          show: false, fontFamily: t.fontSans, fontSize: L.target ? 11 : 10.5, fontWeight: L.target ? 700 : 400,
+          textBorderColor: t.paper, textBorderWidth: 2.5, formatter: function (p) { return p.name; }
         },
-        labelLayout: { hideOverlap: true, moveOverlap: 'shiftY' },
         animationDelay: function (i) { return 200 + i * 14; },
-        data: data.map(function (d) {
-          return { value: d.value, name: d.name, label: d.dim ? { color: RK.theme.alpha(L.target ? t.ink : t.ink2, 0.35) } : undefined };
-        })
+        data: items
       });
     });
+    inst.__rkLabels = { series: labelSeries, specs: specs, obstacles: obstacles, r: radius };
 
     /* ---- reference layer: zero lines, quadrant lines + labels, regression ---- */
     var lines = [], areas = [];
@@ -389,9 +479,15 @@
       legend: true
     },
     render: function (ctx) {
-      var api = base(ctx);
-      var bar = !ctx.print && ctx.options.zoom !== false ? toolbar(ctx, api.chart) : null;
-      var destroy = api.destroy;
+      var api = base(ctx), inst = api.chart;
+      var bar = !ctx.print && ctx.options.zoom !== false ? toolbar(ctx, inst) : null;
+      var relabel = util.rafThrottle(function () { layoutLabels(inst); });
+      layoutLabels(inst);
+      inst.on('datazoom', relabel);
+      inst.on('legendselectchanged', relabel);
+      var update = api.update, resize = api.resize, destroy = api.destroy;
+      api.update = function (c) { update(c); layoutLabels(inst); };
+      api.resize = function () { resize(); layoutLabels(inst); };
       api.destroy = function () { if (bar) bar.remove(); destroy(); };
       return api;
     }

@@ -1986,14 +1986,24 @@
         current = c;
         var opt = build(c, inst) || {};
         if (!c.motion) opt.animation = false;
-        if (first) inst.setOption(opt, { notMerge: true });
-        else inst.setOption(opt, { replaceMerge: ['series', 'dataset', 'xAxis', 'yAxis', 'visualMap', 'graphic', 'legend', 'grid', 'dataZoom', 'polar', 'radiusAxis', 'angleAxis', 'radar', 'parallelAxis', 'singleAxis', 'calendar', 'geo', 'matrix'] });
+        if (first) { inst.setOption(opt, { notMerge: true }); return; }
+        // keep the user's zoom window across filter / param updates
+        if (hooks.keepZoom !== false && opt.dataZoom) {
+          var prev = (inst.getOption() || {}).dataZoom || [];
+          [].concat(opt.dataZoom).forEach(function (dz, i) {
+            var p = prev[i];
+            if (p && dz && dz.start == null && dz.end == null && dz.startValue == null && dz.endValue == null && p.start != null) {
+              dz.start = p.start; dz.end = p.end;
+            }
+          });
+        }
+        inst.setOption(opt, { replaceMerge: ['series', 'dataset', 'xAxis', 'yAxis', 'visualMap', 'graphic', 'legend', 'grid', 'dataZoom', 'polar', 'radiusAxis', 'angleAxis', 'radar', 'parallelAxis', 'singleAxis', 'calendar', 'geo', 'matrix'] });
       }
       apply(ctx, true);
 
       if (hooks.select) {
         inst.on('click', function (params) {
-          var sel = hooks.select(params, current);
+          var sel = hooks.select(params, current, inst);
           if (sel && sel.field != null && current.options.crossFilter !== false) current.select(sel.field, sel.value);
         });
       }
@@ -2007,7 +2017,10 @@
       return {
         chart: inst,
         update: function (c) { apply(c, false); },
-        resize: function () { inst.resize(); },
+        resize: function () {
+          inst.resize();
+          if (hooks.rebuildOnResize) apply(current, false);   // width-dependent layouts (tick density, label widths)
+        },
         destroy: function () { inst.dispose(); },
         exportImage: function () { return exportPNG(inst, current); },
         exportSVG: function () {
@@ -2748,10 +2761,12 @@
   RK.store.subscribe(function (changes) {
     blocks.forEach(function (b) {
       if (b.state === 'idle' || b.state === 'destroyed') return;
-      if (!b.def || !b.def.needsData) {
+      // pure UI blocks (no dataset) get the raw change list; bound blocks refresh like data blocks
+      if (!b.def || (!b.def.needsData && !b.datasetId)) {
         if (b.instance && b.instance.onStore) b.instance.onStore(changes);
         return;
       }
+      if (b.instance && b.instance.onStore && !b.def.needsData) { b.instance.onStore(changes); return; }
       var ids = b.datasetIds();
       var hit = ids.some(function (id) {
         var ds = RK.data.get(id);
@@ -2768,7 +2783,7 @@
     blocks.forEach(function (b) { b.rerender(); });
   });
   RK.bus.on('data:changed', util.debounce(function () {
-    blocks.forEach(function (b) { if (b.def && b.def.needsData) b.refresh(); });
+    blocks.forEach(function (b) { if (b.def && (b.def.needsData || b.datasetId) && !(b.instance && b.instance.onStore && !b.def.needsData)) b.refresh(); });
   }, 30));
 
   /* ------------------------------------------------------------------ *

@@ -19,6 +19,13 @@
     };
   })();
 
+  /** Text colour with the higher WCAG contrast against a fill (RK.theme.onColor uses a fixed threshold). */
+  function bestText(fill, dark, light) {
+    var lf = RK.theme.luminance(fill);
+    function ratio(c) { var l = RK.theme.luminance(c); return (Math.max(l, lf) + 0.05) / (Math.min(l, lf) + 0.05); }
+    return ratio(dark) >= ratio(light) ? dark : light;
+  }
+
   RK.component({
     id: 'funnel',
     deps: ['echarts'],
@@ -50,6 +57,9 @@
       var center = o.align !== 'left';
       var hi = o.highlight == null ? [] : [].concat(o.highlight);
       var n = stages.length;
+
+      // readable text on a bar fill in light and dark themes (t.ink is light in dark themes)
+      function textOn(fill) { return bestText(fill, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#fff'); }
 
       function conv(i) {
         if (i <= 0) return null;
@@ -105,7 +115,7 @@
             x: inside ? mid : b + 6, y: cy,
             style: {
               text: txt, align: inside ? 'center' : 'left', verticalAlign: 'middle', font: '600 ' + numFont,
-              fill: inside ? RK.theme.onColor(colors[i], t.ink, '#fff') : t.ink
+              fill: inside ? textOn(colors[i]) : t.ink
             },
             enterFrom: { style: { opacity: 0 } }, transition: ['x', 'y']
           });

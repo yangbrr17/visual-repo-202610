@@ -128,9 +128,25 @@
         paintCrumbs(state);
       };
       base.destroy = function () { state.nav.remove(); destroy(); };
+      // the colour legend is placed in pixels: re-layout when the block is resized
+      var resize = base.resize, size = [base.chart.getWidth(), base.chart.getHeight()];
+      base.resize = function () {
+        resize();
+        var w = base.chart.getWidth(), ht = base.chart.getHeight();
+        if (Math.abs(w - size[0]) > 1 || Math.abs(ht - size[1]) > 1) { size = [w, ht]; base.update(state.ctx); }
+      };
       return base;
     }
   });
+
+  var measurer = null;
+  function textWidth(s, font) {
+    try {
+      measurer = measurer || document.createElement('canvas').getContext('2d');
+      measurer.font = font;
+      return measurer.measureText(String(s)).width;
+    } catch (e) { return String(s).length * 6.2; }
+  }
 
   /* ---------------- drill-down + breadcrumb ---------------- */
 
@@ -306,8 +322,10 @@
 
     // colour legend (metric mode): top-right ramp with low / mid / high ticks
     var graphic = [];
+    var W = inst.getWidth();
+    if (state.nav) state.nav.style.maxWidth = (showLegend ? Math.max(120, W - Math.min(150, W * 0.22) - 24 - textWidth(ctx.title(enc.color) + (o.colorMid === 'avg' ? ' vs. weighted avg.' : ''), '11px ' + t.fontSans)) : W * 0.9) + 'px';
     if (showLegend) {
-      var W = inst.getWidth(), lw = Math.min(150, W * 0.22), lx = W - lw - 2;
+      var lw = Math.min(150, W * 0.22), lx = W - lw - 2;
       var stops = (t.div || []).map(function (c, i, a) { return { offset: i / (a.length - 1), color: c }; });
       var lab = ctx.title(enc.color) + (o.colorMid === 'avg' ? ' vs. weighted avg.' : '');
       var tick = function (x, v, align) {

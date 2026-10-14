@@ -7,11 +7,11 @@
   "deps": ["leaflet", "topojson-client", "geo-world"],
   "summary": "Countries shaded by a metric on an offline world basemap — sequential or diverging, continuous or classed with nice-rounded breaks.",
   "summary_zh": "在离线世界底图上按指标给国家着色：顺序/发散色阶，连续或分级（自动取整的分档）。",
-  "description_zh": "展示按国家汇总的指标（收入、增速、员工数、市场份额）的地理分布。每行数据一个国家，通过 ISO 3166-1 数字代码（如 \"840\"，也兼容国家英文名）与 Natural Earth 底图连接；无数据的国家保持浅色陆地底色。默认按分位数分 5 档并取整为好看的分界值（如 <$20 / $20–50 / …），图例显示每档国家数；增速、相对均值偏离等有正负含义的指标用 diverging 色阶并设置中点。前 N 个国家直接标注数值，悬停显示数值、排名和附加字段，点击国家可交叉筛选其他图表。",
+  "description_zh": "展示按国家汇总的指标（收入、增速、员工数、市场份额）的地理分布。每行数据一个国家，通过 ISO 3166-1 数字代码（如 \"840\"）、三字母代码（如 \"USA\"）或国家英文名与 Natural Earth 底图连接；无数据的国家保持浅色陆地底色。默认按分位数分 5 档并取整为好看的分界值（如 <$20 / $20–50 / …），图例显示每档国家数；增速、相对均值偏离等有正负含义的指标用 diverging 色阶并设置中点。前 N 个国家直接标注数值，悬停显示数值、排名和附加字段，点击国家可交叉筛选其他图表。",
   "best_for": ["Revenue / employees / market share by country", "Growth vs. a benchmark (diverging around 0 or the group average)", "Regional footprint at a glance"],
   "avoid_when": ["Precise comparison of values (use a bar chart)", "Sub-national geography (needs another basemap)", "Totals dominated by large countries' area — consider bubble-map for absolute values"],
   "channels": {
-    "id": {"type": "string", "required": true, "desc": "ISO 3166-1 numeric code (\"840\"; zero-padded automatically) or a country name matching the basemap", "default": "iso_num"},
+    "id": {"type": "string", "required": true, "desc": "Country key: ISO 3166-1 numeric (\"840\", zero-padded automatically), ISO alpha-3 (\"USA\") or a country name (common aliases such as \"United States\", \"UK\" understood)", "default": "iso_num"},
     "value": {"type": "number", "required": true, "desc": "Metric that drives the colour", "default": "value"},
     "label": {"type": "string", "required": false, "desc": "Display name for tooltips / labels; also a name fallback for the join", "default": "country"}
   },

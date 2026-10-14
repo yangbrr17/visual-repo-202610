@@ -32,7 +32,7 @@ python3 py/examples/sql_pipeline.py --dump-db /tmp/kestrel.sqlite   # 导出原�
 |---|---|---|
 | 1. RAW | 内存 SQLite：`companies`、`prices`（10 个 ticker × 2 年日线）、`dividends`、`financials`（FY21A–FY27E）、`transactions`、`deal_prices`；`random.Random(7)` 生成，结果确定 | `generate_raw()` |
 | 2. SQL | 6 个 view + 1 张 staging table：`v_market`、`v_fundamentals`、`v_vol`、`v_tsr`、`comps`、`v_peer_stats`、`v_deals` | `VIEWS` |
-| 3. PYTHON | `PandasBackend`（`read_sql` + pivot / melt / quantile / corr）与 `PlainBackend`（标准库）实现同一组接口 | `analyse()` |
+| 3. PYTHON | `PandasBackend`（`read_sql` + groupby / melt / quantile / corr）与 `PlainBackend`（标准库）实现同一组接口 | `analyse()` |
 | 4. REPORT | 11 个 dataset、1 个 param、7 个 computed field、14 页 | `build_report()` |
 
 同一输入下，pandas 与 no-pandas 两条路径产出的 `data/` 与 `index.html` **逐字节相同**（`--parity` 校验；
@@ -118,16 +118,18 @@ SQL = """
 WITH ranked AS (                                   -- CTE + window：每个 ticker 的最新收盘价
     SELECT ticker, date, close,
            ROW_NUMBER()  OVER (PARTITION BY ticker ORDER BY date DESC) AS rn,
-           FIRST_VALUE(close) OVER (PARTITION BY ticker ORDER BY date) AS first_close
+           FIRST_VALUE(close) OVER (PARTITION BY ticker ORDER BY date) AS first_close,
+           MAX(close)    OVER (PARTITION BY ticker)                    AS high_3d
     FROM prices
 )
 SELECT c.ticker, c.company, c.sector, c.is_target,
        r.date                                                     AS price_date,
        r.close                                                    AS price,
+       r.high_3d,
        ROUND(r.close / r.first_close - 1, 6)                      AS chg_3d,
        ROUND(r.close * c.shares_out, 1)                           AS mkt_cap,
        ROUND(r.close * c.shares_out + c.net_debt, 1)              AS ev,
-       c.ebitda_ntm, c.net_income_ntm, c.revenue_cagr,
+       c.shares_out, c.net_debt, c.ebitda_ntm, c.net_income_ntm, c.revenue_cagr,
        ROUND((r.close * c.shares_out + c.net_debt) / c.ebitda_ntm, 6)    AS ev_ebitda_ntm,
        ROUND(r.close * c.shares_out / NULLIF(c.net_income_ntm, 0), 6)    AS pe_ntm
 FROM companies c
@@ -181,7 +183,9 @@ print(f"peer median EV / EBITDA NTM = {peer_median:.1f}x")
 ```
 
 `r.dataset()` 同时接受 DataFrame、`list[dict]`、`dict[str, list]`、`.csv/.json/.parquet` 路径和契约格式 JSON，
-两条路径后面的代码完全一样。完整示例里把差异封装成两个类（`PandasBackend` / `PlainBackend`），接口相同：
+两条路径后面的代码完全一样。在装了 pandas 的机器上验证 fallback：
+`python3 -c "import sys, runpy; sys.modules['pandas'] = None; sys.argv = ['x', '--check']; runpy.run_path('py/examples/sql_pipeline.py', run_name='__main__')"`
+（`sys.modules['pandas'] = None` 让 `import pandas` 抛 `ImportError`）。完整示例里把差异封装成两个类（`PandasBackend` / `PlainBackend`），接口相同：
 `read / flag / quartiles / r_squared / target_vs_peers / melt`。
 
 > 统计口径要对齐：pandas `Series.quantile()` 默认线性插值，等价于
@@ -207,6 +211,9 @@ r.dataset(
         "is_target": "Target",
         "price_date": {"title": "Price date", "format": "dd mmm yyyy"},
         "price": {"title": "Share price", "format": "$#,##0.00", "unit": "USD"},
+        "high_3d": {"title": "3-day high", "format": "$#,##0.00", "unit": "USD"},
+        "shares_out": {"title": "Diluted shares", "format": "#,##0.0", "unit": "m"},
+        "net_debt": {"title": "Net debt", "format": "$#,##0", "unit": "USD m"},
         "chg_3d": {"title": "3-day change", "format": "+0.0%;-0.0%;0.0%"},
         "mkt_cap": {"title": "Market cap", "format": "$#,##0", "unit": "USD m"},
         "ev": {"title": "Enterprise value", "format": "$#,##0", "unit": "USD m"},
@@ -374,7 +381,7 @@ p.block("comps-table", data="comps", title="Selected listed peers",       # 不�
 | action title | **用 f-string 从数据生成**，不要手写数字；数据更新后标题自动跟着变 |
 | `span` | 12 栅格，整数 1–12；常用 7/5、6/6、8/4、12 |
 | `height` | 数字（px）或 CSS 长度（`"50vh"`）。**不能写 `"auto"`**——自适应高度的 DOM 组件（`kpi-tiles`、`text-block`、`param-slider`、`comps-table` + `scroll: False`）直接省略 `height` |
-| 高度预算 | 一页正文约 460 px：单行图表 340–380；`kpi-tiles`（~150）+ 一行图表时图表 ≤ 340。超出时屏幕上页面变高，打印会挤压 |
+| 高度预算 | 1440 px 宽屏幕上一页正文约 460 px：单行图表 340–380 正好占满。再叠一行（如 Executive summary 的 `kpi-tiles` + 图表）会超出 16:9，屏幕上页面自动变高——打印前用 Print / PDF 预览检查 |
 | id | 页面 id = kicker（或标题）的 slug，block id = 页面 id + block 标题 slug；可在 URL 里 `#trading-comparables` 直达 |
 | 导航 | 左侧目录用 kicker；`nav=` 可自定义 |
 
@@ -391,11 +398,11 @@ p.block("comps-table", data="comps", title="Selected listed peers",       # 不�
 ```python
 r.param("premium", 0.30, min=0.10, max=0.50, step=0.025, format="0.0%", title="Offer premium")
 
-terms = {"shares_out": target["shares_out"] if "shares_out" in target else 182.0,
-         "adj_net_debt": 1265.0, "ebitda_ntm": target["ebitda_ntm"]}
+terms = {"shares_out": target["shares_out"], "adj_net_debt": target["net_debt"],
+         "ebitda_ntm": target["ebitda_ntm"]}                             # 公式用到的常量也作为列
 r.dataset("offer", [
     {"reference": "Current price", "ref_price": target["price"], **terms},
-    {"reference": "52-week high", "ref_price": 36.61, **terms},
+    {"reference": "3-day high", "ref_price": target["high_3d"], **terms},
 ], title="Illustrative offer", source="Northbridge Partners analysis", unit="USD m",
     fields={"reference": "Reference", "ref_price": {"title": "Reference price", "format": "$#,##0.00"}},
     computed=[
@@ -452,13 +459,13 @@ except ReportValidationError as e:
 
 ```
 dataset 'comps' computed field 'm': formula uses @wacc but no param 'wacc' is defined (add r.param('wacc', value))
-dataset 'comps' computed field 'm': formula references unknown field 'ebitda_ntmm' — did you mean 'ebitda_ntm'?
+dataset 'comps' computed field 'm': formula references unknown field 'ebitda_ntmm' — did you mean 'ebitda_ntm', 'ev_ebitda_ntm'?
 page 1 'Typos everywhere' › block 'typos-everywhere-barr' [barr]: unknown component 'barr' (no kit/components/barr/manifest.json) — did you mean 'bar'?
 page 1 'Typos everywhere' › block 'typos-everywhere-bar' [bar]: unknown dataset 'compz' — did you mean 'comps'?
 page 1 'Typos everywhere' › block 'typos-everywhere-bar-2' [bar]: span must be an integer 1-12, got 14
 page 1 'Typos everywhere' › block 'typos-everywhere-bar-2' [bar]: height must be a positive number of px or a CSS length like '50vh', got 'auto'
-page 1 'Typos everywhere' › block 'typos-everywhere-bar-2' [bar]: encode.y -> field 'ev_ebitda' is not in dataset 'comps' — did you mean 'ev_ebitda_ntm'?
-dataset 'comps': fields override for 'ev_ebitda' but the data has no such column (columns: ticker, company, sector, is_target, price_date, price, chg_3d, mkt_cap, ev, ebitda_ntm, net_income_ntm, revenue_cagr, ev_ebitda_ntm, pe_ntm)
+page 1 'Typos everywhere' › block 'typos-everywhere-bar-2' [bar]: encode.y -> field 'ev_ebitda' is not in dataset 'comps' — did you mean 'ev_ebitda_ntm', 'ebitda_ntm'?
+dataset 'comps': fields override for 'ev_ebitda' but the data has no such column (columns: ticker, company, sector, is_target, price_date, price, high_3d, chg_3d, mkt_cap, ev, shares_out, net_debt, ebitda_ntm, net_income_ntm, revenue_cagr, ev_ebitda_ntm, pe_ntm)
 build refused: 7 errors
 ```
 
@@ -604,7 +611,7 @@ python3 api_server.py out/project-demo/data &       # 启动 API
 <script>RK.boot({ token: window.sessionStorage.getItem('rk:token') });</script>
 ```
 
-其他来源（例如公司内部的 GraphQL）可以注册自定义 adapter：
+其他来源（例如公司内部的 GraphQL）可以在 `reportkit.js` 之后的 `<script>` 里注册自定义 adapter：
 `RK.data.adapter('my-source', cfg => Promise.resolve({manifest, datasets}))` 并设置
 `<meta name="rk:data-source" content="my-source">`。只要返回同样的 JSON 形状，所有组件无需改动。
 

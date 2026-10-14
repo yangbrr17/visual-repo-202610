@@ -304,7 +304,7 @@
       var cs = getComputedStyle(n), css = '';
       SNAP.forEach(function (p) { css += p + ':' + cs.getPropertyValue(p) + ';'; });
       // legend text boxes keep auto size: the export falls back to a system font of another width
-      var flow = n.childNodes.length && /^(static|relative)$/.test(cs.position) && !(n instanceof SVGElement) && n.closest && n.closest('.leaflet-control');
+      var flow = n.childNodes.length && !(n instanceof SVGElement) && n.closest && n.closest('.leaflet-control-container');
       if (!flow) css += 'width:' + cs.width + ';height:' + cs.height + ';';
       b[i].setAttribute('style', css + 'animation:none;transition:none;');
       if (n.tagName === 'CANVAS' && b[i].parentNode) {
@@ -332,6 +332,7 @@
   /* ======================================================================================== */
 
   function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
+  function plural(w) { return /[^aeiou]y$/.test(w) ? w.slice(0, -1) + 'ies' : /(s|x|ch|sh)$/.test(w) ? w + 'es' : w + 's'; }
 
   RK.component({
     id: 'geo-heat',
@@ -366,7 +367,15 @@
         grad = {};
         seq.forEach(function (c, i) { grad[(0.2 + 0.8 * i / Math.max(1, seq.length - 1)).toFixed(3)] = c; });
       }
-      var heat = L.heatLayer([], { radius: o0.radius, blur: o0.blur, minOpacity: o0.minOpacity, max: 1, gradient: grad }).addTo(map);
+      var heat = L.heatLayer([], { radius: o0.radius, blur: o0.blur, minOpacity: o0.minOpacity, max: 1, gradient: grad });
+      // simpleheat throws on a 0 x 0 canvas (hidden tab, collapsed section, detached block): skip until sized
+      var redraw0 = heat._redraw;
+      heat._redraw = function () {
+        var sz = this._map && this._map.getSize();
+        if (!sz || !sz.x || !sz.y) { this._frame = null; return; }
+        return redraw0.apply(this, arguments);
+      };
+      heat.addTo(map);
       // points get their own svg renderer in a pane above the density canvas
       map.createPane('rk-heat-points').style.zIndex = 450;
       var ptsRenderer = L.svg({ pane: 'rk-heat-points' }), pts = L.layerGroup();
@@ -415,9 +424,10 @@
         var ctl = L.control({ position: 'topright' });
         ctl.onAdd = function () {
           var noun = cur.title(cur.enc.label) || 'points';
+          var nouns = cur.enc.label && cur.field(cur.enc.label) ? plural(String(noun).toLowerCase()) : 'points';
           toggle = h('button.rk-geo-toggle' + (showPts ? '.is-on' : ''), { type: 'button', 'aria-pressed': String(showPts), title: 'Show / hide the underlying points',
             on: { click: function () { showPts = !showPts; toggle.setAttribute('aria-pressed', String(showPts)); drawPoints(); } } },
-          h('i.rk-geo-toggle__box'), h('span', 'Show ' + String(noun).toLowerCase() + 's'));
+          h('i.rk-geo-toggle__box'), h('span', 'Show ' + nouns));
           L.DomEvent.disableClickPropagation(toggle);
           return toggle;
         };
@@ -430,7 +440,7 @@
         drawPoints();
         var o = cur.options;
         if (o.legend !== false) {
-          var title = cur.enc.weight ? 'Density, weighted by ' + fieldTitle(cur, cur.enc.weight).replace(/^./, function (c) { return c.toLowerCase(); }) : 'Point density';
+          var title = cur.enc.weight ? 'Density, weighted by ' + fieldTitle(cur, cur.enc.weight).replace(/^[A-Z](?=[a-z])/, function (c) { return c.toLowerCase(); }) : 'Point density';
           var stops = Object.keys(grad).sort(function (a, b) { return a - b; }).map(function (k) { return grad[k]; });
           legend.set(h('div.rk-geo-leg', legSec(title, rampEl(stops, ['Lower', 'Higher'])),
             h('div.rk-geo-leg__note', S.items.length + ' ' + (S.items.length === 1 ? 'location' : 'locations') + (cur.enc.weight ? ' · total ' + RK.format(S.items.reduce(function (s, it) { return s + (it.w || 0); }, 0), tidyFmt(S.fmt, [0])) : ''))));

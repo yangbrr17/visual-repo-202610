@@ -191,6 +191,7 @@
         series: series
       };
     }, {
+      rebuildOnResize: true,     // label columns and truncation depend on the width
       select: function (p, ctx) {
         return p.seriesId === 'slope' && p.name && p.name !== 'Median' ? { field: ctx.enc.label, value: p.name } : null;
       }

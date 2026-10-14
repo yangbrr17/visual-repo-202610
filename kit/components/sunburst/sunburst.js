@@ -231,7 +231,7 @@
     var bounds = [L.r0];
     if (maxDepth <= 1) bounds.push(L.R);
     else {
-      var outer = (L.R - L.r0) * (maxDepth === 2 ? 0.52 : 0.4);
+      var outer = (L.R - L.r0) * (maxDepth === 2 ? 0.56 : 0.4);
       var step = (L.R - L.r0 - outer) / (maxDepth - 1);
       for (var k = 1; k < maxDepth; k++) bounds.push(L.r0 + step * k);
       bounds.push(L.R);
@@ -271,8 +271,16 @@
       var box = depth < maxDepth
         ? { width: Math.max(16, Math.min(arc - 10, rMid * 1.6)), height: Math.max(12, thick - 8), overflow: arc > 50 ? 'break' : 'truncate' }
         : { width: Math.max(16, thick - 12), height: Math.max(12, Math.min(arc - 4, 42)), overflow: arc > 30 ? 'break' : 'truncate' };
-      // never split inside a word: if the longest word does not fit, use one truncated line instead
-      if (box.overflow === 'break' && longestWord(n.name, font) * 1.08 + 6 > box.width) box.overflow = 'truncate';
+      // never split inside a word: try a slightly smaller size, else fall back to one truncated line
+      // (generous margin: the web font may not be loaded yet when we measure)
+      var fits = function (f) { return longestWord(n.name, f) * 1.15 + 8 <= box.width; };
+      if (box.overflow === 'break' && !fits(font)) {
+        var sizes = depth === 1 ? [10, 9.5] : [9.5, 9], ok = false;
+        for (var si = 0; si < sizes.length && !ok; si++) {
+          if (fits((depth === 1 ? '600 ' : '') + sizes[si] + 'px ' + t.fontSans)) { box.fontSize = sizes[si]; box.lineHeight = 12; ok = true; }
+        }
+        if (!ok) box.overflow = 'truncate';
+      }
       return box;
     }
 

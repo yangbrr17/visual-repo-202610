@@ -122,8 +122,9 @@
 
 /* ---------- toggle switch ---------- */
 .rk-fb-switch { display: inline-flex; align-items: center; gap: 9px; height: 32px; padding: 0 2px; border: 0; background: none; color: var(--rk-ink-2); font-size: 12.5px; cursor: pointer; white-space: nowrap; }
-.rk-fb-switch__track { position: relative; flex: none; width: 30px; height: 18px; border-radius: 9px; background: var(--rk-rule); transition: background 200ms var(--rk-ease); }
+.rk-fb-switch__track { position: relative; flex: none; width: 30px; height: 18px; border-radius: 9px; background: color-mix(in srgb, var(--rk-axis) 62%, var(--rk-paper)); transition: background 200ms var(--rk-ease); }
 .rk-fb-switch__knob { position: absolute; left: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--rk-paper); box-shadow: 0 1px 2px rgba(16, 24, 40, .3); transition: transform 220ms var(--rk-ease); }
+[data-rk-theme="ink"] .rk-fb-switch__knob { background: var(--rk-ink); }
 .rk-fb-switch[aria-checked="true"] { color: var(--rk-ink); font-weight: 500; }
 .rk-fb-switch[aria-checked="true"] .rk-fb-switch__track { background: var(--rk-accent); }
 .rk-fb-switch[aria-checked="true"] .rk-fb-switch__knob { transform: translateX(12px); }

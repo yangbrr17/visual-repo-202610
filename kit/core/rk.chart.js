@@ -213,5 +213,35 @@
     return RK.theme.alpha(color, 0.25);
   };
 
+  /** Text width in px for a CSS font shorthand (cached canvas). */
+  var measureCtx = null;
+  chart.measure = function (text, font) {
+    if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
+    measureCtx.font = font || '11px ' + (RK.theme.tokens().fontSans || 'sans-serif');
+    return measureCtx.measureText(String(text)).width;
+  };
+
+  /**
+   * Spread 1-D label positions so neighbours are at least `gap` apart, staying within [lo, hi].
+   * items: array of desired positions; returns adjusted positions in the same order.
+   */
+  chart.spreadLabels = function (items, gap, lo, hi) {
+    var idx = items.map(function (y, i) { return i; }).sort(function (a, b) { return items[a] - items[b]; });
+    var pos = idx.map(function (i) { return items[i]; });
+    for (var iter = 0; iter < 50; iter++) {
+      var moved = false;
+      for (var k = 1; k < pos.length; k++) {
+        var d = pos[k] - pos[k - 1];
+        if (d < gap) { var shift = (gap - d) / 2; pos[k - 1] -= shift; pos[k] += shift; moved = true; }
+      }
+      if (lo != null && pos.length && pos[0] < lo) { var dl = lo - pos[0]; pos = pos.map(function (p) { return p + dl; }); }
+      if (hi != null && pos.length && pos[pos.length - 1] > hi) { var dh = pos[pos.length - 1] - hi; pos = pos.map(function (p) { return p - dh; }); }
+      if (!moved) break;
+    }
+    var out = new Array(items.length);
+    idx.forEach(function (i, k) { out[i] = pos[k]; });
+    return out;
+  };
+
   RK.chart = chart;
 })(typeof window !== 'undefined' ? window : this);

@@ -203,21 +203,22 @@
         var dim = d.color !== d.base;
         var ink = dim ? RK.theme.alpha(t.ink2, 0.45) : (d.hl ? t.ink : t.ink2);
         var weight = d.hl ? '600 ' : '';
-        var row = {
-          id: 'row-' + i, type: 'group', x: 0, y: 0,
-          children: [
-            { id: 'row-' + i + '-hit', type: 'rect', shape: { x: x - 4, y: cy - T.rowH / 2, width: T.w + 8, height: T.rowH }, style: { fill: 'rgba(0,0,0,0)' } },
-            { id: 'row-' + i + '-sw', type: 'rect', silent: true, shape: { x: x, y: cy - 5, width: 10, height: 10, r: 2 }, style: { fill: d.color } },
-            { id: 'row-' + i + '-n', type: 'text', silent: true, x: xName, y: cy, style: { text: truncate(d.name, T.nameW - 4, weight + '11.5px ' + t.fontSans), fill: ink, font: weight + '11.5px ' + t.fontSans, textVerticalAlign: 'middle' } },
-            { id: 'row-' + i + '-v', type: 'text', silent: true, x: xVal, y: cy, invisible: !T.showV, style: { text: RK.format(d.value, m.fmt), fill: dim ? ink : t.ink, font: weight + '11.5px ' + t.fontNum, textAlign: 'right', textVerticalAlign: 'middle' } },
-            { id: 'row-' + i + '-p', type: 'text', silent: true, x: xPct, y: cy, invisible: !T.showP, style: { text: RK.format(d.share, m.pctFmt), fill: dim ? ink : t.ink3, font: weight + '11.5px ' + t.fontNum, textAlign: 'right', textVerticalAlign: 'middle' } }
-          ],
+        // flat elements (no groups): merges then add / update / remove each one cleanly by id
+        var hit = {
+          id: 'row-' + i + '-hit', type: 'rect', cursor: 'pointer',
+          shape: { x: x - 4, y: cy - T.rowH / 2, width: T.w + 8, height: T.rowH }, style: { fill: 'rgba(0,0,0,0)' },
           onmouseover: function () { L.inst.dispatchAction({ type: 'highlight', seriesId: 'donut', name: d.name }); L.onHover(d); },
           onmouseout: function () { L.inst.dispatchAction({ type: 'downplay', seriesId: 'donut', name: d.name }); L.onHover(null); },
-          onclick: function () { if (L.onPick) L.onPick(d); },
-          cursor: 'pointer'
+          onclick: function () { if (L.onPick) L.onPick(d); }
         };
-        els.push(RK.util.merge(row, enterRow(i)));
+        var parts = [
+          { id: 'row-' + i + '-sw', type: 'rect', silent: true, shape: { x: x, y: cy - 5, width: 10, height: 10, r: 2 }, style: { fill: d.color } },
+          { id: 'row-' + i + '-n', type: 'text', silent: true, x: xName, y: cy, style: { text: truncate(d.name, T.nameW - 4, weight + '11.5px ' + t.fontSans), fill: ink, font: weight + '11.5px ' + t.fontSans, textVerticalAlign: 'middle' } },
+          { id: 'row-' + i + '-v', type: 'text', silent: true, x: xVal, y: cy, invisible: !T.showV, style: { text: RK.format(d.value, m.fmt), fill: dim ? ink : t.ink, font: weight + '11.5px ' + t.fontNum, textAlign: 'right', textVerticalAlign: 'middle' } },
+          { id: 'row-' + i + '-p', type: 'text', silent: true, x: xPct, y: cy, invisible: !T.showP, style: { text: RK.format(d.share, m.pctFmt), fill: dim ? ink : t.ink3, font: weight + '11.5px ' + t.fontNum, textAlign: 'right', textVerticalAlign: 'middle' } }
+        ];
+        els.push(hit);
+        parts.forEach(function (el) { els.push(RK.util.merge(el, enterRow(i))); });
       });
       var fy = y + head + T.rowH * m.items.length + 4;
       els.push({ id: 'f-rule', type: 'line', silent: true, shape: { x1: x, y1: fy, x2: x + T.w, y2: fy }, style: { stroke: t.rule, lineWidth: 1 } });

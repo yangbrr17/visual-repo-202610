@@ -139,22 +139,15 @@
       crossFilter: true,
       filterScope: 'dataset'
     },
-    render: function (ctx) {
-      var current = ctx;
-      var api = C(build, {
-        on: {
-          click: function (p, c) {
-            if (p.dataType === 'edge' || !p.name || p.name === (c.options.otherLabel || 'Other')) return;
-            selectNode(c, p.name);
-          }
+    render: C(build, {
+      rebuildOnResize: true,     // radius and label room are computed in px from the container
+      on: {
+        click: function (p, c) {
+          if (p.dataType === 'edge' || !p.name || p.name === (c.options.otherLabel || 'Other')) return;
+          selectNode(c, p.name);
         }
-      })(ctx);
-      // radius and label room are computed in px from the container -> re-run on resize
-      var up = api.update;
-      api.update = function (c) { current = c; up(c); };
-      api.resize = function () { api.chart.resize(); up(current); };
-      return api;
-    }
+      }
+    })
   });
 
   function build(ctx) {
@@ -164,6 +157,8 @@
     var m = model(ctx);
     var hi = o.highlight == null ? [] : [].concat(o.highlight);
     var single = o.colorBy === 'single';
+    // translucent ribbons read darker on a dark paper: lift them in dark themes
+    o = util.merge({}, o, { ribbonOpacity: Math.min(0.7, o.ribbonOpacity * (t.dark ? 1.45 : 1)) });
     function touchesHi(l) { return hi.indexOf(l.source) >= 0 || hi.indexOf(l.target) >= 0; }
 
     // palette: theme categorical minus anything close to accent2 (reserved for the highlight), then tints

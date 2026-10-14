@@ -81,8 +81,8 @@
         update: function (c) { current = c; api.update(c); layoutEndLabels(inst, c, state, 'update'); },
         resize: function () { api.resize(); layoutEndLabels(inst, current, state, 'instant'); },
         destroy: function () { api.destroy(); },
-        exportImage: api.exportImage,
-        exportSVG: api.exportSVG
+        exportImage: function () { return exportPNG(inst, current.theme); },
+        exportSVG: function () { return cleanSVG(inst, current.theme); }
       };
     }
   });
@@ -170,12 +170,14 @@
    * (accent, accent3, ink3).
    */
   function palette(t, highlight) {
-    var base = highlight ? [t.accent, t.accent3, t.ink3].concat(t.cat) : t.cat.slice();
+    var semantic = highlight ? [t.accent, t.accent3, t.ink3] : [];
     var out = [];
-    base.forEach(function (c) {
+    semantic.concat(t.cat).forEach(function (c, i) {
       if (!c) return;
       if (colorDist(c, t.accent2) < 72) return;
-      if (out.some(function (x) { return colorDist(x, c) < 46; })) return;
+      // semantic tokens only drop exact look-alikes; categorical fallbacks must be clearly distinct
+      var sep = i < semantic.length ? 30 : 60;
+      if (out.some(function (x) { return colorDist(x, c) < sep; })) return;
       out.push(c);
     });
     return out.length ? out : t.cat.slice();
@@ -725,4 +727,38 @@
   }
 
   function esc(s) { return String(s == null ? '' : s).replace(/[{}|]/g, ' '); }
+
+  /* ------------------------------------------------------------------ *
+   * Export. Workaround for a core issue (rk.chart exportPNG): ECharts' SVG string keeps the theme's
+   * double-quoted font names inside style="…" — invalid XML, so the browser refuses to rasterise it.
+   * Swap them to single quotes before exporting.
+   * ------------------------------------------------------------------ */
+  function cleanSVG(inst, t) {
+    var svg = inst.renderToSVGString ? inst.renderToSVGString() : null;
+    if (!svg) return null;
+    [t.fontSans, t.fontNum, t.fontSerif].forEach(function (f) {
+      if (f && f.indexOf('"') >= 0) svg = svg.split(f).join(f.replace(/"/g, "'"));
+    });
+    return svg;
+  }
+  function exportPNG(inst, t) {
+    var bg = t.paper || '#ffffff';
+    var zr = inst.getZr && inst.getZr();
+    var svg = zr && zr.painter && zr.painter.type === 'canvas' ? null : cleanSVG(inst, t);
+    if (!svg) return Promise.resolve(inst.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: bg }));
+    var w = inst.getWidth(), h = inst.getHeight();
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () {
+        var c = document.createElement('canvas');
+        c.width = w * 2; c.height = h * 2;
+        var g = c.getContext('2d');
+        g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/png'));
+      };
+      img.onerror = reject;
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    });
+  }
 })();

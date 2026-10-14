@@ -304,7 +304,7 @@
       var cs = getComputedStyle(n), css = '';
       SNAP.forEach(function (p) { css += p + ':' + cs.getPropertyValue(p) + ';'; });
       // legend text boxes keep auto size: the export falls back to a system font of another width
-      var flow = n.childNodes.length && /^(static|relative)$/.test(cs.position) && !(n instanceof SVGElement) && n.closest && n.closest('.leaflet-control');
+      var flow = n.childNodes.length && !(n instanceof SVGElement) && n.closest && n.closest('.leaflet-control-container');
       if (!flow) css += 'width:' + cs.width + ';height:' + cs.height + ';';
       b[i].setAttribute('style', css + 'animation:none;transition:none;');
       if (n.tagName === 'CANVAS' && b[i].parentNode) {
@@ -332,6 +332,7 @@
   /* ======================================================================================== */
 
   function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
+  function plural(w) { return /[^aeiou]y$/.test(w) ? w.slice(0, -1) + 'ies' : /(s|x|ch|sh)$/.test(w) ? w + 'es' : w + 's'; }
 
   /** Cluster bubble SVG: accent disc + ring segments by category share. */
   function clusterSVG(size, parts, total, text, t) {
@@ -345,7 +346,7 @@
         off += len;
       });
     } else ring = '<circle cx="' + c + '" cy="' + c + '" r="' + rr.toFixed(2) + '" fill="none" stroke="' + RK.theme.alpha(t.accent, 0.28) + '" stroke-width="4"/>';
-    var fs = size < 36 ? 10.5 : size < 48 ? 11.5 : 12.5;
+    var fs = Math.min(size < 36 ? 10.5 : size < 48 ? 11.5 : 12.5, (2 * (rr - 3.5) - 5) / (0.62 * Math.max(1, String(text).length)));
     return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">' + ring +
       '<circle cx="' + c + '" cy="' + c + '" r="' + (rr - 3.5).toFixed(2) + '" fill="' + t.accent + '" stroke="' + t.paper + '" stroke-width="1"/>' +
       '<text x="' + c + '" y="' + (c + fs * 0.36).toFixed(1) + '" text-anchor="middle" font-size="' + fs + '" fill="' + textOn(t, t.accent) + '">' +
@@ -389,9 +390,10 @@
         });
         return Array.from(m.values()).sort(function (a, b) { return enc.color ? S.cats.indexOf(a.key) - S.cats.indexOf(b.key) : 0; });
       }
+      /** Short cluster figure: the field format without decimals, compact ("50.4k") when that is too long for the disc. */
       function sumFmt(v) {
-        var f = S.fmt && typeof S.fmt === 'string' ? S.fmt.replace(/0\.0+/g, '0') : '#,##0';
-        return Math.abs(v) >= 1e5 ? RK.format(v, 'auto') : RK.format(v, f);
+        var f = S.fmt && typeof S.fmt === 'string' ? S.fmt.replace(/0\.0+/g, '0') : '#,##0', out = RK.format(v, f);
+        return out.length > 5 ? RK.format(v, 'auto') : out;
       }
 
       var group = L.markerClusterGroup({
@@ -416,7 +418,7 @@
         var rows = parts.map(function (p) {
           return { color: p.color, label: enc.color ? String(p.key) : 'Points', value: String(p.n) + (enc.value ? '  ·  ' + RK.format(p.v, S.fmt) : '') };
         });
-        if (enc.value) rows.push({ label: 'Total ' + c.title(enc.value).toLowerCase(), value: RK.format(parts.reduce(function (s, p) { return s + p.v; }, 0), S.fmt), bold: true });
+        if (enc.value) rows.push({ label: 'Total ' + c.title(enc.value).replace(/^[A-Z](?=[a-z])/, function (ch) { return ch.toLowerCase(); }), value: RK.format(parts.reduce(function (s, p) { return s + p.v; }, 0), S.fmt), bold: true });
         var sz = e.layer.options.icon && e.layer.options.icon.options.iconSize ? e.layer.options.icon.options.iconSize[1] : 30;
         e.layer.bindTooltip(RK.chart.tip(ms.length + ' ' + (S.noun || 'points'), rows, 'Click to zoom in'), { direction: 'top', offset: [0, -sz / 2], opacity: 1 }).openTooltip();
       });
@@ -430,7 +432,7 @@
         var items = c.rows.filter(function (r) { return num(r[enc.lat]) != null && num(r[enc.lon]) != null; }).map(function (r) {
           return { row: r, ll: [r[enc.lat], r[enc.lon]], v: enc.value ? num(r[enc.value]) : null, color: colorOf(enc.color ? r[enc.color] : null) };
         });
-        var noun = c.dataset && /site|asset|location|plant/i.test((c.dataset.title || '') + ' ' + (c.title(enc.label) || '')) ? 'sites' : 'points';
+        var noun = enc.label && c.field(enc.label) ? plural(String(c.title(enc.label)).toLowerCase()) : 'points';
         return { items: items, cats: cats, colorOf: colorOf, total: total, fmt: o.format || (enc.value ? c.fmtOf(enc.value) : null) || 'auto', noun: noun };
       }
 
@@ -468,7 +470,7 @@
             secs.push(legSec(cur.title(cur.enc.color), catItems(S.cats, S.colorOf, cur.selected(cur.enc.color),
               o.crossFilter !== false ? function (v) { cur.select(cur.enc.color, v); } : null)));
           }
-          var key = o.clusterValue === 'sum' && cur.enc.value ? 'Cluster: total ' + cur.title(cur.enc.value).toLowerCase() : 'Cluster: number of ' + S.noun;
+          var key = o.clusterValue === 'sum' && cur.enc.value ? 'Cluster: total ' + fieldTitle(cur, cur.enc.value).replace(/^[A-Z](?=[a-z])/, function (ch) { return ch.toLowerCase(); }) : 'Cluster: number of ' + S.noun;
           secs.push(h('div.rk-geo-leg__sec', h('div.rk-geo-leg__item', h('i.rk-cluster__key', { html: clusterSVG(20, [], 1, '', t) }), h('span', key))));
           legend.set(h('div.rk-geo-leg', secs));
         } else legend.set(null);

@@ -268,7 +268,8 @@
     var facet = o.mode === 'facet';
     var L = { W: W, H: H, items: [] };
     var fontName = '11.5px ' + t.fontSans;
-    if (n === 1 && !facet && o.legend !== false) {
+    var tableFits = W - (18 + 60 + (m.pctLike ? 0 : 64) + 56) - 40 >= 110;
+    if (n === 1 && !facet && o.legend !== false && tableFits) {
       // [waffle] [legend table]
       var nameW = Math.min(200, Math.max.apply(null, m.cats.map(function (c) { return textWidth(c, fontName); }).concat([40])) + 8);
       var valW = m.pctLike ? 0 : 64;
@@ -284,7 +285,13 @@
       L.table.y = Math.max(0, (H - (22 + rows * rowH + 26)) / 2);
       return L;
     }
-    var legendH = !facet && o.legend !== false ? 26 : 0;
+    // inline legend: simulate the wrap to reserve its height
+    var legendH = 0;
+    if (!facet && o.legend !== false) {
+      var lx = 0, lines = 1;
+      m.cats.forEach(function (c) { var w = textWidth(c, '11px ' + t.fontSans); if (lx + w + 30 > W && lx > 0) { lx = 0; lines++; } lx += w + 34; });
+      legendH = 8 + lines * 18;
+    }
     var headH = (facet || m.waffles[0].title) ? 20 : 0, footH = facet ? 30 : 0;
     var gx = 28, gy = 18, best = null;
     for (var cols = 1; cols <= n; cols++) {

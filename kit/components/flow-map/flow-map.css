@@ -7,6 +7,7 @@
 /* base.css caps svg at max-width:100%; leaflet only lifts that for its overlay pane — custom panes need it too */
 .rk-geo .leaflet-pane svg, .rk-geo .leaflet-marker-icon svg { max-width: none !important; max-height: none !important; }
 .rk-geo .rk-map-legend { max-width: 340px; box-shadow: none; padding: 7px 9px; font-size: 10.5px; }
+.rk-geo .rk-map-legend__title { white-space: nowrap; }
 .rk-geo-leg.is-row { display: flex; align-items: flex-start; gap: 18px; }
 .rk-geo-leg.is-row > .rk-geo-leg__sec + .rk-geo-leg__sec { margin-top: 0; }
 .rk-geo-leg__sec + .rk-geo-leg__sec, .rk-geo-leg__sec + .rk-geo-leg__item { margin-top: 8px; }

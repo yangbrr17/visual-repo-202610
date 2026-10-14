@@ -75,6 +75,99 @@
     return list.slice().sort(function (a, b) { return nums ? a - b : String(a).localeCompare(String(b)); });
   }
 
+  /* ---------------- label placement (greedy, think-cell style) ---------------- */
+  var measureCtx = null;
+  function measure(text, font) {
+    if (measureCtx === null) { try { measureCtx = document.createElement('canvas').getContext('2d') || false; } catch (e) { measureCtx = false; } }
+    if (!measureCtx) return String(text).length * 6.2;
+    measureCtx.font = font;
+    return measureCtx.measureText(String(text)).width;
+  }
+  function gridRect(inst) {
+    try { return inst.getModel().getComponent('grid', 0).coordinateSystem.getRect(); }
+    catch (e) { return { x: 0, y: 0, width: inst.getWidth(), height: inst.getHeight() }; }
+  }
+  /**
+   * Labels overlap neither each other nor any point: each tries 10 positions around its point (right,
+   * left, above, below, the diagonals, then further out) and keeps the first free one. Labels that fit
+   * nowhere are hidden (hover still shows the tooltip); forced labels (the target) always show.
+   * Runs after every render, zoom, resize and legend toggle; updates only the label series.
+   */
+  function layoutLabels(inst) {
+    var LL = inst.__rkLabels;
+    if (!LL || inst.isDisposed()) return;
+    if (!LL.frames) { var u = placeFrame(inst, LL); if (u) inst.setOption({ series: u }); return; }
+    // timeline: axes are fixed across periods, so every frame is placed now and the labels travel with
+    // their bubbles; the frame options are replaced (a plain series merge would be overridden by the frame)
+    var tl = inst.__rkTimeline;
+    if (!tl) return;
+    var opts = tl.options.map(function (fo, fi) {
+      var u = placeFrame(inst, LL.frames[fi]) || [], byId = {};
+      u.forEach(function (x) { byId[x.id] = x.data; });
+      return util.merge({}, fo, { series: fo.series.map(function (sr) { return byId[sr.id] ? util.merge({}, sr, { data: byId[sr.id] }) : sr; }) });
+    });
+    inst.setOption({ options: opts });
+  }
+  /** Place one frame's labels; returns [{id, data}] updates for its label series (or null). */
+  function placeFrame(inst, L) {
+    if (!L || !L.specs.length) return null;
+    var rect = gridRect(inst), legendSel = {};
+    try { legendSel = (inst.getOption().legend || [])[0].selected || {}; } catch (e) { legendSel = {}; }
+    var on = function (name) { return legendSel[name] !== false; };
+    var toPx = function (p) { return inst.convertToPixel({ gridIndex: 0 }, [p.x, p.y]); };
+    var inRect = function (q) { return q[0] >= rect.x - 0.5 && q[0] <= rect.x + rect.width + 0.5 && q[1] >= rect.y - 0.5 && q[1] <= rect.y + rect.height + 0.5; };
+    var obs = L.obstacles.filter(function (o) { return on(o.name); }).map(function (o) { var q = toPx(o); return { x: q[0], y: q[1], r: o.r, id: o.id }; });
+    var placed = [];
+    function free(b, selfId) {
+      if (b.x < rect.x + 1 || b.y < rect.y + 1 || b.x + b.w > rect.x + rect.width - 1 || b.y + b.h > rect.y + rect.height - 1) return false;
+      for (var i = 0; i < placed.length; i++) {
+        var p = placed[i];
+        if (b.x < p.x + p.w + 2 && b.x + b.w + 2 > p.x && b.y < p.y + p.h && b.y + b.h > p.y) return false;
+      }
+      for (var j = 0; j < obs.length; j++) {
+        var o = obs[j];
+        if (o.id === selfId) continue;
+        var nx = Math.max(b.x, Math.min(o.x, b.x + b.w)), ny = Math.max(b.y, Math.min(o.y, b.y + b.h));
+        if ((o.x - nx) * (o.x - nx) + (o.y - ny) * (o.y - ny) < (o.r + 1) * (o.r + 1)) return false;
+      }
+      return true;
+    }
+    var specs = L.specs.map(function (sp) { var q = toPx(sp); return util.merge({}, sp, { px: q[0], py: q[1] }); });
+    // targets first, then isolated points (they rarely block), then crowded ones
+    specs.forEach(function (sp) {
+      sp.crowd = obs.filter(function (o) { var dx = o.x - sp.px, dy = o.y - sp.py; return dx * dx + dy * dy < 1600; }).length;
+    });
+    specs.sort(function (a, b) { return (b.force ? 1 : 0) - (a.force ? 1 : 0) || a.crowd - b.crowd; });
+    var res = {};
+    specs.forEach(function (sp) {
+      var key = sp.seriesId + '#' + sp.index;
+      if (sp.inside || !on(sp.name) || !inRect([sp.px, sp.py])) { res[key] = sp.inside && on(sp.name) && inRect([sp.px, sp.py]) ? 'inside' : null; return; }
+      var r = sp.r, g = 3, w = sp.w, h = sp.h, d = r * 0.71;
+      var cands = [[r + g, -h / 2], [-r - g - w, -h / 2], [-w / 2, -r - g - h], [-w / 2, r + g],
+        [d + 1, -d - h + 1], [d + 1, d - 1], [-d - 1 - w, -d - h + 1], [-d - 1 - w, d - 1],
+        [r + g + 9, -h / 2], [-r - g - 9 - w, -h / 2]];
+      for (var k = 0; k < cands.length; k++) {
+        var b = { x: sp.px + cands[k][0], y: sp.py + cands[k][1], w: w, h: h };
+        if (free(b, sp.id)) { placed.push(b); res[key] = cands[k]; return; }
+      }
+      if (sp.force) { placed.push({ x: sp.px + r + g, y: sp.py - h / 2, w: w, h: h }); res[key] = [r + g, -h / 2]; return; }
+      res[key] = null;
+    });
+    var upd = Object.keys(L.series).map(function (id) {
+      return {
+        id: id,
+        data: L.series[id].map(function (it, i) {
+          var pos = res[id + '#' + i], r = it.symbolSize ? it.symbolSize / 2 : L.r[id];
+          if (pos === 'inside') return util.merge({}, it, { label: { show: true, position: 'inside' } });
+          if (!pos) return util.merge({}, it, { label: { show: false } });
+          // array positions are offsets from the symbol's bounding-box corner (-r, -r)
+          return util.merge({}, it, { label: { show: true, position: [pos[0] + r, pos[1] + r], align: 'left', verticalAlign: 'top' } });
+        })
+      };
+    });
+    return upd;
+  }
+
   /* ---------------- hover toolbar (select / zoom / reset) — same pattern as scatter ---------------- */
   var ICON = {
     select: '<path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" /><circle cx="12" cy="12" r="1.6"/>',
@@ -205,8 +298,10 @@
     if (targetName) layers.push({ id: 'target', name: targetName, color: continuous ? null : t.accent2, target: true, match: isTarget });
 
     var points = [];
+    var frameLabels = [];
     function frameSeries(list, fi) {
       var topN = o.labels === true ? Infinity : o.labels === false ? 0 : +o.labels || 0;
+      var specs = [], obstacles = [], labelSeries = {};
       var bySize = list.slice().sort(function (a, b) { return (b[sizeF] || 0) - (a[sizeF] || 0); });
       var labelled = new Set(bySize.slice(0, topN));
       var out = [], labelOut = [];
@@ -227,13 +322,18 @@
           if (sizeF && !(r[sizeF] > 0)) it.itemStyle = { opacity: dim ? 0.14 : 1, color: 'transparent', borderColor: fill || t.ink3, borderWidth: 1 };
           if (L.target && continuous) { it.itemStyle.borderColor = t.accent2; it.itemStyle.borderWidth = 2.5; }
           data.push(it);
+          var oid = L.id + '#' + (data.length - 1);
+          obstacles.push({ x: it.value[0], y: it.value[1], r: d / 2 + 0.5, id: oid, name: L.name });
           if (!name || !(L.target || labelled.has(r))) return;
-          var inside = d >= textW(name, 10.5) + 8;
+          var font = (L.target ? '700 ' : '500 ') + '10.5px ' + t.fontSans, tw = measure(name, font);
+          var inside = d >= tw + 8;
           var eff = RK.theme.mix(t.paper, fill || t.cat[0], opacity);
+          specs.push({ seriesId: L.id + ':lab', index: labs.length, x: it.value[0], y: it.value[1], r: d / 2, w: tw + 2, h: 13,
+            force: !!L.target, inside: inside, id: oid, name: L.name });
           labs.push({
             value: it.value, name: name, symbolSize: d,
             label: {
-              position: inside ? 'inside' : 'right', distance: 3,
+              show: false,   // shown by layoutLabels() once a free position is found
               color: dim ? RK.theme.alpha(t.ink2, 0.35) : inside ? RK.theme.onColor(eff, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#ffffff') : (L.target ? t.ink : t.ink2),
               textBorderWidth: inside ? 0 : 2.5, fontWeight: L.target ? 700 : 500
             }
@@ -250,11 +350,11 @@
         labelOut.push({
           id: L.id + ':lab', name: L.name, type: 'scatter', symbol: 'circle', z: 6, silent: true,
           tooltip: { show: false }, itemStyle: { color: 'transparent', borderWidth: 0 }, emphasis: { disabled: true },
-          label: { show: true, fontSize: 10.5, fontFamily: t.fontSans, textBorderColor: t.paper, formatter: function (p) { return p.name; } },
-          labelLayout: { hideOverlap: true },
+          label: { show: false, fontSize: 10.5, fontFamily: t.fontSans, textBorderColor: t.paper, formatter: function (p) { return p.name; } },
           animationDelay: function (i) { return 250 + i * 18; },
           data: labs
         });
+        labelSeries[L.id + ':lab'] = labs;
       });
       // trails: each entity's path through the periods so far
       var trails = [];
@@ -272,6 +372,7 @@
           });
         });
       }
+      frameLabels[fi] = { series: labelSeries, specs: specs, obstacles: obstacles, r: {} };
       return out.concat(labelOut, trails);
     }
 
@@ -340,6 +441,8 @@
     var zs = zoomState(inst), zoomed = zs.some(function (z) { return z.start > 0 || z.end < 100; });
 
     inst.__rk = { ctx: ctx, points: points, selField: selField };
+    inst.__rkLabels = timeline ? { frames: frameLabels } : frameLabels[0];
+    if (!timeline) inst.__rkTimeline = null;
     inst.__rkCanBrush = !!selField && o.brush !== false && !timeline;
 
     var axisBase = function (isX, ext, fmt, scale, title) {
@@ -426,10 +529,9 @@
       },
       series: [ref].concat(frames[idx])
     });
-    return {
-      baseOption: baseOption,
-      options: periods.map(function (p, i) { return { series: [ref].concat(frames[i]), graphic: graphic.concat(wm(p)) }; })
-    };
+    var frameOpts = periods.map(function (p, i) { return { series: [ref].concat(frames[i]), graphic: graphic.concat(wm(p)) }; });
+    inst.__rkTimeline = { options: frameOpts };
+    return { baseOption: baseOption, options: frameOpts };
   }
 
   var base = C(build, {
@@ -495,12 +597,17 @@
     render: function (ctx) {
       var api = base(ctx), inst = api.chart;
       var bar = !ctx.print && ctx.options.zoom !== false ? toolbar(ctx, inst) : null;
-      var update = api.update, destroy = api.destroy;
+      var relabel = util.rafThrottle(function () { layoutLabels(inst); });
+      layoutLabels(inst);
+      inst.on('datazoom', relabel);
+      inst.on('legendselectchanged', relabel);
+      var update = api.update, resize = api.resize, destroy = api.destroy;
+      api.resize = function () { resize(); layoutLabels(inst); };
       // timeline options (baseOption + options) cannot be replace-merged: rebuild them in place, keeping the period
       api.update = function (c) {
-        if (!c.options.timeField) return update(c);
-        var opt = build(c, inst);
-        inst.setOption(opt, { notMerge: true });
+        if (!c.options.timeField) update(c);
+        else inst.setOption(build(c, inst), { notMerge: true });
+        layoutLabels(inst);
       };
       api.destroy = function () { if (bar) bar.remove(); destroy(); };
       return api;

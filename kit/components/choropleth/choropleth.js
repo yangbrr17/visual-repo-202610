@@ -304,7 +304,7 @@
       var cs = getComputedStyle(n), css = '';
       SNAP.forEach(function (p) { css += p + ':' + cs.getPropertyValue(p) + ';'; });
       // legend text boxes keep auto size: the export falls back to a system font of another width
-      var flow = n.childNodes.length && /^(static|relative)$/.test(cs.position) && !(n instanceof SVGElement) && n.closest && n.closest('.leaflet-control');
+      var flow = n.childNodes.length && !(n instanceof SVGElement) && n.closest && n.closest('.leaflet-control-container');
       if (!flow) css += 'width:' + cs.width + ';height:' + cs.height + ';';
       b[i].setAttribute('style', css + 'animation:none;transition:none;');
       if (n.tagName === 'CANVAS' && b[i].parentNode) {
@@ -332,6 +332,19 @@
   /* ======================================================================================== */
 
   function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
+
+  /** ISO 3166-1 alpha-3 -> numeric for every world-110m country, so ISO3 keys join too. */
+  var ISO3 = {};
+  ('FJI242 TZA834 ESH732 CAN124 USA840 KAZ398 UZB860 PNG598 IDN360 ARG032 CHL152 COD180 SOM706 KEN404 SDN729 TCD148 HTI332 DOM214 RUS643 BHS044 FLK238 NOR578 GRL304 ATF260 TLS626 ZAF710 LSO426 MEX484 URY858 BRA076 BOL068 PER604 COL170 PAN591 CRI188 NIC558 HND340 SLV222 GTM320 BLZ084 VEN862 GUY328 SUR740 FRA250 ECU218 PRI630 JAM388 CUB192 ZWE716 BWA072 NAM516 SEN686 MLI466 MRT478 BEN204 NER562 NGA566 CMR120 TGO768 GHA288 CIV384 GIN324 GNB624 LBR430 SLE694 BFA854 CAF140 COG178 GAB266 GNQ226 ZMB894 MWI454 MOZ508 SWZ748 AGO024 BDI108 ISR376 LBN422 MDG450 PSE275 GMB270 TUN788 DZA012 JOR400 ARE784 QAT634 KWT414 IRQ368 OMN512 VUT548 KHM116 THA764 LAO418 MMR104 VNM704 PRK408 KOR410 MNG496 IND356 BGD050 BTN064 NPL524 PAK586 AFG004 TJK762 KGZ417 TKM795 IRN364 SYR760 ARM051 SWE752 BLR112 UKR804 POL616 AUT040 HUN348 MDA498 ROU642 LTU440 LVA428 EST233 DEU276 BGR100 GRC300 TUR792 ALB008 HRV191 CHE756 LUX442 BEL056 NLD528 PRT620 ESP724 IRL372 NCL540 SLB090 NZL554 AUS036 LKA144 CHN156 TWN158 ITA380 DNK208 GBR826 ISL352 AZE031 GEO268 PHL608 MYS458 BRN096 SVN705 FIN246 SVK703 CZE203 ERI232 JPN392 PRY600 YEM887 SAU682 ATA010 CYP196 MAR504 EGY818 LBY434 ETH231 DJI262 UGA800 RWA646 BIH070 MKD807 SRB688 MNE499 TTO780 SSD728').split(' ').forEach(function (x) { ISO3[x.slice(0, 3)] = x.slice(3); });
+  /** Common report spellings -> basemap ids / names. */
+  var ALIAS = {
+    'united states': '840', 'usa': '840', 'us': '840', 'u.s.': '840', 'uk': '826', 'great britain': '826', 'czech republic': '203',
+    'korea': '410', 'republic of korea': '410', 'russian federation': '643', 'uae': '784', 'democratic republic of the congo': '180',
+    'dr congo': '180', 'republic of the congo': '178', 'ivory coast': '384', "cote d'ivoire": '384', 'dominican republic': '214',
+    'bosnia and herzegovina': '070', 'north macedonia': '807', 'eswatini': '748', 'swaziland': '748', 'central african republic': '140',
+    'equatorial guinea': '226', 'solomon islands': '090', 'falkland islands': '238', 'western sahara': '732', 'south sudan': '728',
+    'viet nam': '704', 'turkiye': '792', 'türkiye': '792', 'lao pdr': '418', 'iran, islamic republic of': '364', 'xkx': 'kosovo'
+  };
 
   /** Polygons covering >= 20% of a feature's largest polygon (drops far-flung islands / the antimeridian sliver). */
   function mainBounds(f) {
@@ -447,16 +460,16 @@
       var labels = labelLayer(map), legend = legendControl(map, ctx.options.legendPosition);
 
       function filterField(c) { return c.options.filterField || c.enc.id; }
-      function featureOf(r, enc) {
-        var k = r[enc.id];
-        if (k != null && k !== '') {
-          k = String(k);
-          if (/^\d+$/.test(k)) k = k.padStart(3, '0');
-          if (byId[k]) return byId[k];
-          if (byName[k.toLowerCase()]) return byName[k.toLowerCase()];
-        }
-        return enc.label && r[enc.label] ? byName[String(r[enc.label]).toLowerCase()] || null : null;
+      /** Key -> feature: ISO numeric, ISO alpha-3, basemap name or a common alias. */
+      function lookup(k) {
+        if (k == null || k === '') return null;
+        k = String(k).trim();
+        if (/^\d+$/.test(k)) return byId[k.padStart(3, '0')] || null;
+        var lk = k.toLowerCase(), al = ALIAS[lk];
+        if (/^[a-z]{3}$/i.test(k) && ISO3[k.toUpperCase()]) return byId[ISO3[k.toUpperCase()]] || null;
+        return byName[lk] || (al ? byId[al] || byName[al] : null) || null;
       }
+      function featureOf(r, enc) { return lookup(r[enc.id]) || (enc.label ? lookup(r[enc.label]) : null); }
 
       function derive(c) {
         var enc = c.enc, o = c.options, out = {}, list = [];

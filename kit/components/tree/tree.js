@@ -84,6 +84,13 @@
     return lines;
   }
 
+  /** Text colour with the higher WCAG contrast against a fill (RK.theme.onColor uses a fixed threshold). */
+  function bestText(fill, dark, light) {
+    var lf = RK.theme.luminance(fill);
+    function ratio(c) { var l = RK.theme.luminance(c); return (Math.max(l, lf) + 0.05) / (Math.min(l, lf) + 0.05); }
+    return ratio(dark) >= ratio(light) ? dark : light;
+  }
+
   /** (id, parent) rows -> nodes with children, depth and effective ownership; cycles are cut. */
   function hierarchy(ctx) {
     var enc = ctx.enc, byId = new Map(), order = [];
@@ -186,6 +193,7 @@
     render: function (ctx) {
       var state = { collapsed: null }, current = ctx;
       var api = C(function (c, inst) { return build(c, inst, state); }, {
+        rebuildOnResize: true,     // layout is computed in px from the container size
         on: {
           click: function (p, c) {
             var id = p.data && p.data.rkFor;
@@ -197,10 +205,9 @@
           }
         }
       })(ctx);
-      // layout depends on the container size and the collapse state -> rebuild on both
+      // collapse / expand re-applies the latest ctx (filters may have changed since mount)
       var up = api.update;
       api.update = function (c) { current = c; up(c); };
-      api.resize = function () { api.chart.resize(); up(current); };
       return api;
     }
   });
@@ -255,10 +262,12 @@
     function boxStyle(n) {
       var c = catColor[n.cat || 'Entity'], filled = o.rootFilled && n.depth === 0;
       var fill = filled ? c : RK.theme.mix(c, t.paper, 0.9);
+      // t.ink is light in dark themes: pick the text colour against the actual fill
+      var on = filled ? bestText(fill, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#fff') : t.ink;
       return {
         fill: fill,
-        text: filled ? RK.theme.onColor(fill, t.ink, '#fff') : t.ink,
-        sub: filled ? RK.theme.alpha(RK.theme.onColor(fill, t.ink, '#fff'), 0.78) : t.ink3,
+        text: on,
+        sub: filled ? RK.theme.alpha(on, 0.78) : t.ink3,
         border: isHi(n) ? t.accent2 : c,
         bw: isHi(n) ? 2.2 : (filled ? 0 : 1.1)
       };

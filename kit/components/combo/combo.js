@@ -73,8 +73,9 @@
 
       /* ---------------- value axes ---------------- */
       var hasLegend = o.legend !== false && bars.length + lines.length > 1;
+      var printing = ctx.print || !!(RK.runtime && RK.runtime.printing);   // see multiple-history: no slider in print
       var gridTop = hasLegend ? 40 : (fi >= 0 && o.forecastLabel ? 24 : 12);
-      var plotH = Math.max(120, inst.getHeight() - gridTop - (o.zoom ? 56 : 26));
+      var plotH = Math.max(120, inst.getHeight() - gridTop - (o.zoom && !printing ? 56 : 26));
       var lineLo = 0.72, lineHi = 0.92;
       var yLeft, yRight = null, lAxisFmt = o.lineAxisFormat || lfmt;
       var lmin = hasLine ? Math.min.apply(null, lineVals) : 0, lmax = hasLine ? Math.max.apply(null, lineVals) : 0;
@@ -275,7 +276,7 @@
           show: hasLegend,
           data: bars.map(function (b) { return b.name; }).concat(lines.map(function (l) { return { name: l.name, icon: LINE_ICON, itemStyle: { color: lineColor(lines.indexOf(l)), borderWidth: 0 } }; }))
         }),
-        grid: C.grid(ctx, { top: gridTop, right: hasLine ? 6 : 12, bottom: o.zoom ? 30 : 4 }),
+        grid: C.grid(ctx, { top: gridTop, right: hasLine ? 6 : 12, bottom: o.zoom && !printing ? 30 : 4 }),
         tooltip: {
           trigger: 'axis',
           axisPointer: { type: 'shadow' },
@@ -297,10 +298,11 @@
         },
         xAxis: { type: 'category', data: cats, axisLabel: { interval: 0, hideOverlap: true } },
         yAxis: yAxes,
-        dataZoom: o.zoom ? C.zoom(ctx, 'x') : [],
+        dataZoom: o.zoom ? C.zoom({ options: o, print: printing }, 'x') : [],
         series: series
       };
     }, {
+      rebuildOnResize: true,     // label density and the band split depend on the plot size
       select: function (p, ctx) { return /^b-\d+$/.test(p.seriesId) ? { field: ctx.enc.x, value: p.name } : null; }
     })
   });

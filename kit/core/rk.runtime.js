@@ -401,12 +401,13 @@
     runtime.printing = true;
     document.documentElement.classList.add('rk-printing');
     renderAllNow();
-    blocks.forEach(function (b) { b.resize(); });
+    // rebuild already-rendered blocks so they see ctx.print (no zoom sliders, no animation)
+    blocks.forEach(function (b) { if (b.state === 'rendered') b.refresh(); b.resize(); });
   }
   function afterPrint() {
     runtime.printing = false;
     document.documentElement.classList.remove('rk-printing');
-    blocks.forEach(function (b) { b.resize(); });
+    blocks.forEach(function (b) { if (b.state === 'rendered') b.refresh(); b.resize(); });
   }
   global.addEventListener('beforeprint', beforePrint);
   global.addEventListener('afterprint', afterPrint);
