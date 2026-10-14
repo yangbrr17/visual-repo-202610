@@ -139,6 +139,8 @@
     if (c.aggregate) throw new RK.expr.ExprError('Computed fields must be row formulas (no sum/avg/...)');
     if (c.fields.indexOf(spec.name) >= 0) throw new RK.expr.ExprError('Computed field "' + spec.name + '" cannot reference itself — give the result a new name');
     var def = { name: spec.name, title: spec.title || spec.name, type: spec.type || 'number', format: spec.format, formula: spec.formula, computed: true };
+    // spec.user: a metric the client created (query console "Add as metric"): kept in localStorage for this report
+    if (spec.user) def.user = true;
     var entry = { def: def, compiled: c }, list = this.computed.slice(), i = list.length;
     while (i-- > 0) if (list[i].def.name === def.name) break;
     if (i >= 0) list[i] = entry; else list.push(entry);
@@ -148,11 +150,15 @@
     this.computed = list;
     this._rev++;
     this._materialize(def.name);
+    if (spec.user && !spec._restoring) userStore.save(this.id, def);
+    else if (!spec.user && existing && existing.user) delete existing.user;   // redefined by the report: no longer the client's (storage untouched)
     if (!silent) RK.bus.emit('data:changed', { dataset: this.id, field: def.name });
     return def;
   };
 
   Dataset.prototype.removeComputed = function (name) {
+    var f = this._index[name];
+    if (f && f.user) userStore.drop(this.id, name);
     this.computed = this.computed.filter(function (x) { return x.def.name !== name; });
     this.fields = this.fields.filter(function (f) { return f.name !== name; });
     delete this._index[name];
@@ -394,23 +400,66 @@
     var ds = typeof id === 'string' ? data.get(id) : id;
     if (!ds) return [];
     var rows = ds.rows;
-    if (opts.filters !== false) {
-      var fs = store.filters();
-      var preds = [];
-      Object.keys(fs).forEach(function (k) {
-        var spec = fs[k];
-        if (opts.exclude && spec.source === opts.exclude) return;
-        if (opts.ignore && opts.ignore.indexOf(k) >= 0) return;
-        if (!filterApplies(spec, ds)) return;
-        preds.push(makePredicate(spec, ds));
-      });
-      if (preds.length) rows = rows.filter(function (r) { for (var i = 0; i < preds.length; i++) if (!preds[i](r)) return false; return true; });
-    }
+    var preds = applied(ds, opts).map(function (x) { return makePredicate(x.spec, ds); });
+    if (preds.length) rows = rows.filter(function (r) { for (var i = 0; i < preds.length; i++) if (!preds[i](r)) return false; return true; });
     if (opts.where) {
       var c = RK.expr.compile(opts.where, { fields: ds.fields }), env = { params: store.params() };
       rows = rows.filter(function (r) { return !!c.eval(r, env); });
     }
     return rows;
+  }
+
+  /**
+   * The store filters view(ds, opts) applies to a dataset, as [{key, spec}] (same opts: exclude, ignore, filters).
+   * Used for the "Filtered" block badge and the page's "Filtered view" stamp.
+   */
+  function applied(ds, opts) {
+    opts = opts || {};
+    ds = typeof ds === 'string' ? data.get(ds) : ds;
+    var out = [];
+    if (!ds || opts.filters === false) return out;
+    var fs = store.filters();
+    Object.keys(fs).forEach(function (k) {
+      var spec = fs[k];
+      if (opts.exclude && spec.source === opts.exclude) return;
+      if (opts.ignore && opts.ignore.indexOf(k) >= 0) return;
+      if (!filterApplies(spec, ds)) return;
+      out.push({ key: k, spec: spec });
+    });
+    return out;
+  }
+
+  /**
+   * Human-readable filter: "Region = Europe", "Sector = Software, Media +2", "Market cap: $1,000 – $5,000",
+   * "EV/EBITDA ≥ 8.0x", "“alpha”". spec.label (set by filter controls) names it; otherwise the field title from ds
+   * (or any loaded dataset that has the field). Values use the field format.
+   */
+  function describeFilter(spec, ds) {
+    if (!spec) return '';
+    var t = RK.i18n ? RK.i18n.t : function (k, f) { return f; };
+    ds = typeof ds === 'string' ? data.get(ds) : ds;
+    var fld = ds && spec.field ? ds.field(spec.field) : null;
+    if (!fld && spec.field) {
+      var ids = spec.datasets || data.ids();
+      for (var i = 0; i < ids.length && !fld; i++) { var d = data.get(ids[i]); if (d && d.has(spec.field)) fld = d.field(spec.field); }
+    }
+    var label = spec.label || (fld && fld.title) || spec.field || '';
+    var fmt = fld && fld.type !== 'string' ? fld.format : null;
+    function val(v) { return RK.format(v, fmt); }
+    function list(vs) { var max = 3, shown = vs.slice(0, max).map(val).join(', '); return vs.length > max ? shown + ' +' + (vs.length - max) : shown; }
+    switch (spec.op) {
+      case 'in': return label + ' = ' + (spec.values && spec.values.length ? list(spec.values) : t('none', 'None'));
+      case 'not_in': return label + ' \u2260 ' + list(spec.values || []);
+      case 'eq': return label + ' = ' + val(spec.value);
+      case 'between':
+        if (spec.min != null && spec.max != null) return label + ': ' + val(spec.min) + ' \u2013 ' + val(spec.max);
+        return label + (spec.min != null ? ' \u2265 ' + val(spec.min) : ' \u2264 ' + val(spec.max));
+      case 'search': return (spec.field ? label + ' ~ ' : '') + '\u201c' + spec.text + '\u201d';
+      case 'expr':
+        if (spec.values) return label + ' = ' + (spec.values.length ? list(spec.values) : t('none', 'None'));
+        return spec.label || String(spec.expr || '');
+    }
+    return label;
   }
 
   /** Does any active filter (or param) affect this dataset? Used to skip needless re-renders. */
@@ -680,6 +729,183 @@
   RK.query = query;
 
   /* ------------------------------------------------------------------ *
+   * Text templates: "{{peers: median(ev_ebitda_25e) | 0.0x}}" in titles
+   * ------------------------------------------------------------------ *
+   * Placeholders:  {{<dataset>: <RK.expr> | <format>}}   aggregate over the dataset's filtered rows, or a row formula /
+   *                                                     plain field on the first filtered row
+   *                {{@wacc | 0.0%}}                    report parameter (dataset optional)
+   *                {{<expr>}}                          dataset from opts.dataset (a block's own dataset)
+   * The format is optional: a parameter uses its manifest format, a formula the format inferred like query columns.
+   * Output is plain text (callers write textContent). A placeholder that cannot be resolved renders as "…".
+   */
+  var PH_RE = /\{\{([\s\S]*?)\}\}/g;
+  var DS_PREFIX = /^([A-Za-z0-9_][A-Za-z0-9_.-]*)\s*:(?!:)\s*([\s\S]*)$/;
+  var tplCache = new Map(), TPL_MAX = 300;
+
+  /** "expr | format" -> [expr, format]: split at the first single "|" outside quotes ("||" is logical or). */
+  function splitFormat(src) {
+    var q = null;
+    for (var i = 0; i < src.length; i++) {
+      var c = src[i];
+      if (q) { if (c === '\\' && q !== '`') i++; else if (c === q) q = null; continue; }
+      if (c === '"' || c === "'" || c === '`') { q = c; continue; }
+      if (c === '|') {
+        if (src[i + 1] === '|') { i++; continue; }
+        return [src.slice(0, i).trim(), src.slice(i + 1).trim() || null];
+      }
+    }
+    return [src.trim(), null];
+  }
+
+  function parsePlaceholder(inner) {
+    var sp = splitFormat(inner), expr = sp[0], dsId = null, m = DS_PREFIX.exec(expr);
+    if (m) { dsId = m[1]; expr = m[2].trim(); }
+    return { src: inner.trim(), dataset: dsId, expr: expr, format: sp[1] };
+  }
+
+  /** Template -> array of literal strings and placeholder objects {src, dataset, expr, format}. */
+  function parseTemplate(tpl) {
+    tpl = String(tpl == null ? '' : tpl);
+    if (tplCache.has(tpl)) return tplCache.get(tpl);
+    var parts = [], last = 0, m;
+    PH_RE.lastIndex = 0;
+    while ((m = PH_RE.exec(tpl))) {
+      if (m.index > last) parts.push(tpl.slice(last, m.index));
+      parts.push(parsePlaceholder(m[1]));
+      last = m.index + m[0].length;
+    }
+    if (last < tpl.length) parts.push(tpl.slice(last));
+    if (tplCache.size >= TPL_MAX) tplCache.delete(tplCache.keys().next().value);
+    tplCache.set(tpl, parts);
+    return parts;
+  }
+
+  /**
+   * Value of one placeholder -> {value, format, dataset}.
+   * opts.dataset: default dataset id; opts.rows(ds): rows to use (default view(ds, {filters: opts.filters !== false})).
+   */
+  function evalPlaceholder(ph, opts) {
+    opts = opts || {};
+    if (typeof ph === 'string') ph = parsePlaceholder(ph);
+    var dsId = ph.dataset || opts.dataset || null;
+    var ds = dsId ? data.get(dsId) : null;
+    if (ph.dataset && !ds) throw new RK.expr.ExprError('Unknown dataset "' + ph.dataset + '" in {{' + ph.src + '}}');
+    if (!ph.expr) throw new RK.expr.ExprError('Empty placeholder {{' + ph.src + '}}');
+    var c = RK.expr.compile(ph.expr, ds ? { fields: ds.fields } : {});
+    var env = { params: store.params() }, fmt = ph.format, value;
+    if (c.ast.type === 'param') {
+      value = store.resolve('@' + c.ast.name);
+      if (!fmt) { var pd = get((data.manifest && data.manifest.params) || {}, c.ast.name); fmt = (pd && pd.format) || null; }
+      return { value: value, format: fmt, dataset: null };
+    }
+    if (!ds && c.fields.length) throw new RK.expr.ExprError('Name the dataset in {{' + ph.src + '}}, e.g. {{peers: ' + ph.expr + '}}');
+    var rows = ds ? (opts.rows ? opts.rows(ds) : view(ds, { filters: opts.filters !== false })) : [];
+    if (c.aggregate) value = c.eval(rows, env);
+    else if (!ds) value = c.eval({}, env);
+    else value = rows.length ? c.eval(rows[0], env) : null;
+    if (!fmt && ds) fmt = guessFormat(c, ds);
+    return { value: value, format: fmt, dataset: ds ? ds.id : null };
+  }
+
+  /** Template -> text. opts: {dataset, rows(ds), filters, missing: '…', onError(err, placeholder)} */
+  function renderTemplate(tpl, opts) {
+    opts = opts || {};
+    var out = '';
+    parseTemplate(tpl).forEach(function (p) {
+      if (typeof p === 'string') { out += p; return; }
+      try { var r = evalPlaceholder(p, opts); out += RK.format(r.value, r.format); }
+      catch (e) { out += opts.missing != null ? opts.missing : '…'; if (opts.onError) opts.onError(e, p); }
+    });
+    return out;
+  }
+
+  var template = RK.template = {
+    parse: parseTemplate,
+    evaluate: evalPlaceholder,
+    render: renderTemplate,
+    /** What the builder writes as fallback text: every placeholder replaced by "…". */
+    fallback: function (tpl) { return String(tpl == null ? '' : tpl).replace(PH_RE, '…'); },
+    /** Datasets a template reads (explicit prefixes only). */
+    datasets: function (tpl) {
+      return util.unique(parseTemplate(tpl).filter(function (p) { return typeof p !== 'string' && p.dataset; }).map(function (p) { return p.dataset; }));
+    },
+    test: function (s) { return typeof s === 'string' && s.indexOf('{{') >= 0 && /\{\{[\s\S]*?\}\}/.test(s); }
+  };
+
+  /* ------------------------------------------------------------------ *
+   * Per-report browser storage + the client's own metrics
+   * ------------------------------------------------------------------ *
+   * Reports opened from file:// can share one localStorage origin, so every key is namespaced by reportKey():
+   * report title + date (manifest) + <meta name="rk:built">. Storage may be missing or throw (private mode,
+   * sandboxed iframes): every access is guarded and the report works without it.
+   */
+  function storage() {
+    try { var s = global.localStorage; return s && typeof s.getItem === 'function' ? s : null; } catch (e) { return null; }
+  }
+
+  function reportKey() {
+    var rep = (data.manifest && data.manifest.report) || {};
+    if (!rep.title && !rep.date && preloaded && preloaded.manifest && preloaded.manifest.report) rep = preloaded.manifest.report;
+    var parts = [rep.title || '', rep.date || '', meta('rk:built') || ''];
+    // nothing identifies the report (gallery, harness): fall back to the page path so pages do not share state
+    if (!parts.join('')) {
+      try { parts.push(global.location && global.location.pathname ? String(global.location.pathname) : ''); } catch (e) { /* no location */ }
+    }
+    return parts.join('|');
+  }
+  function storageKey(kind) { return 'rk:' + kind + ':' + reportKey(); }
+
+  function readJSON(key, dflt) {
+    var s = storage();
+    if (!s) return dflt;
+    try { var v = s.getItem(key); return v == null ? dflt : JSON.parse(v); } catch (e) { return dflt; }
+  }
+  function writeJSON(key, v) {
+    var s = storage();
+    if (!s) return false;
+    try { if (v == null) s.removeItem(key); else s.setItem(key, JSON.stringify(v)); return true; } catch (e) { return false; }
+  }
+
+  function str(v) { return typeof v === 'string' ? v : null; }
+  /** Saved metrics: [{dataset, name, title, formula, format}] (malformed entries dropped). */
+  var userStore = {
+    read: function () {
+      var list = readJSON(storageKey('metrics'), []);
+      if (!Array.isArray(list)) return [];
+      return list.filter(function (m) { return m && typeof m === 'object' && str(m.dataset) && str(m.name) && str(m.formula); })
+        .map(function (m) { return { dataset: m.dataset, name: m.name, title: str(m.title) || m.name, formula: m.formula, format: str(m.format) }; });
+    },
+    write: function (list) { return writeJSON(storageKey('metrics'), list.length ? list : null); },
+    save: function (dsId, def) {
+      var list = userStore.read(), rec = { dataset: dsId, name: def.name, title: def.title || def.name, formula: def.formula, format: def.format || null };
+      for (var i = 0; i < list.length; i++) if (list[i].dataset === dsId && list[i].name === def.name) { list[i] = rec; return userStore.write(list); }
+      list.push(rec);
+      return userStore.write(list);
+    },
+    drop: function (dsId, name) {
+      var list = userStore.read(), keep = list.filter(function (m) { return !(m.dataset === dsId && m.name === name); });
+      if (keep.length === list.length) return false;
+      userStore.write(keep);
+      return true;
+    }
+  };
+
+  /** Re-create saved metrics on loaded datasets (ids: only these). Metrics that no longer compile are skipped. */
+  function restoreUserMetrics(ids) {
+    var n = 0;
+    userStore.read().forEach(function (m) {
+      if (ids && ids.indexOf(m.dataset) < 0) return;
+      var ds = data.get(m.dataset);
+      if (!ds) return;
+      var f = ds.field(m.name);
+      if (f && !f.computed) return;   // the data now has a real column of that name: never overwrite it
+      try { ds.addComputed({ name: m.name, title: m.title, formula: m.formula, format: m.format, user: true, _restoring: true }, true); n++; }
+      catch (e) { RK.log('saved metric "' + m.name + '" skipped:', e.message); }
+    });
+    return n;
+  }
+
+  /* ------------------------------------------------------------------ *
    * Data registry + loading
    * ------------------------------------------------------------------ */
   var datasets = Object.create(null);
@@ -696,6 +922,7 @@
       var ds = json instanceof Dataset ? json : new Dataset(json);
       if (!ds.id) throw new Error('[RK] dataset needs an id');
       datasets[ds.id] = ds;
+      if (data._ready) restoreUserMetrics([ds.id]);
       RK.bus.emit('data:changed', { dataset: ds.id });
       if (data._ready) store._notify({ type: 'data', dataset: ds.id });
       return ds;
@@ -703,8 +930,33 @@
     get: function (id) { return datasets[id] || null; },
     ids: function () { return Object.keys(datasets); },
     view: view,
+    applied: applied,
+    describeFilter: describeFilter,
     affected: affected,
     applies: filterApplies,
+    template: template,
+
+    /** Report identity used to namespace browser storage: "title|date|built". */
+    reportKey: reportKey,
+    /** 'rk:<kind>:' + reportKey() — e.g. storageKey('theme'), storageKey('metrics'). */
+    storageKey: storageKey,
+    storage: storage,
+    /** Metrics the client saved for this report: [{dataset, name, title, formula, format, active}]. */
+    userMetrics: function () {
+      return userStore.read().map(function (m) {
+        var ds = data.get(m.dataset), f = ds && ds.field(m.name);
+        m.active = !!(f && f.user);
+        return m;
+      });
+    },
+    /** Delete a saved metric (and its field). ds: dataset id or Dataset. Returns true when something was removed. */
+    removeUserMetric: function (ds, name) {
+      var id = typeof ds === 'string' ? ds : ds && ds.id, d = data.get(id), f = d && d.field(name);
+      var had = userStore.drop(id, name);
+      if (f && f.user && f.computed) { d.removeComputed(name); had = true; }
+      return had;
+    },
+    restoreUserMetrics: restoreUserMetrics,
     /** Column names too generic to cross-filter across datasets (see ctx.select scope). */
     GENERIC_FIELDS: /^(type|kind|source|target|step|stage|metric|category|group|name|label|id|parent|value|series|status|item|node|link|bucket|class|level)$/i,
     isGenericField: function (field) { return !!field && RK.data.GENERIC_FIELDS.test(String(field)); },
@@ -732,6 +984,7 @@
           if (!json.id) json.id = id;
           datasets[id] = new Dataset(json);
         });
+        restoreUserMetrics();
         data._ready = true;
         RK.bus.emit('data:loaded', data);
         return data;

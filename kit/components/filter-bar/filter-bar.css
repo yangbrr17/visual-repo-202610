@@ -167,6 +167,32 @@
 .rk-fb--inline .rk-fb__reset.is-shown { display: inline; }
 .rk-topbar .rk-fb { justify-content: flex-end; }
 .rk-topbar .rk-fb__count { display: none; }
+/* chart selections on the same line: chips shrink first (high flex-shrink), the ones that do not fit go under "+N" */
+.rk-topbar .rk-fb--inline .rk-fb__controls { justify-content: flex-end; }
+/* the wrapper is layout-transparent: the strip shrinks (to nothing if need be) while "+N" keeps its size */
+.rk-fb__xsel { display: contents; }
+.rk-fb__xsel.is-empty .rk-fb__xchips { display: none; }
+.rk-fb__xchips { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; flex: 0 100 auto; min-width: 0; overflow: hidden; padding: 2px 0; }
+.rk-fb__xsel.has-more:not(.has-shown) .rk-fb__xchips { margin-right: -8px; }   /* no empty gap before a lone "+N" */
+.rk-fb__xchips .rk-fb-chip { flex: none; }
+.rk-fb__xchips .rk-fb-chip__v, .rk-fb-morepop .rk-fb-chip__v { max-width: 150px; white-space: nowrap; }
+.rk-fb__xchips .rk-fb-chip.is-over { display: none; }
+.rk-fb-more {
+  display: none; align-items: center; gap: 4px; flex: none; height: 24px; padding: 0 8px; border-radius: 12px;
+  border: 1px dashed color-mix(in srgb, var(--rk-accent-2) 55%, var(--rk-rule)); background: color-mix(in srgb, var(--rk-accent-2) 7%, var(--rk-paper));
+  color: var(--rk-ink); font-size: var(--rk-fs-sm); font-weight: 600; white-space: nowrap; cursor: pointer;
+  transition: border-color var(--rk-dur-fast), box-shadow var(--rk-dur-fast);
+}
+.rk-fb-more .rk-fb-chip__icon { margin-left: 0; }
+.rk-fb__xsel.has-more .rk-fb-more { display: inline-flex; }
+.rk-fb-more:hover { border-color: var(--rk-accent-2); }
+.rk-fb-more:focus-visible, .rk-fb-more.is-open { outline: none; border-style: solid; box-shadow: 0 0 0 3px color-mix(in srgb, var(--rk-accent-3) 18%, transparent); }
+.rk-fb-morepop { width: 300px; }
+.rk-fb-morepop__list { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 6px 14px 12px; max-height: 260px; overflow: auto; }
+.rk-fb-morepop__list .rk-fb-chip { max-width: 100%; }
+/* the block holding an inline bar takes the top bar's free width so the chips can use it (and shrink before it overflows) */
+.rk-topbar .rk-block.rk-fb-host { flex: 1 1 auto; min-width: 0; }
+.rk-topbar .rk-block.rk-fb-host > .rk-block__body { min-width: 0; }
 
 /* ---------- motion off / print ---------- */
 .rk-fb.is-static *, .rk-fb.is-static *::before, .rk-fb.is-static *::after { transition: none !important; animation: none !important; }

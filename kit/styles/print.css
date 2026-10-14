@@ -28,4 +28,15 @@
   .rk-js .rk-reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
   .rk-block { break-inside: avoid; }
   a { color: inherit; text-decoration: none; }
+  /* the page's "Filtered view" stamp states the filters on paper; per-block "Filtered" badges are screen-only */
+  .rk-badge--filtered { display: none !important; }
+  .rk-badge--soft { border: 0; padding: 0; height: auto; }
+  /* metric pickers print as the chosen field's name */
+  .rk-block__choices .rk-select { border: 0; background: none; padding: 0; height: auto; box-shadow: none; color: var(--rk-ink-2); font-weight: 600; }
+  /* RK.runtime.printFit(): content zoomed to fit its block; whatever still does not fit is clipped at the block */
+  .rk-block.is-print-fit > .rk-block__body { overflow: hidden; }
+}
+/* between beforeprint and afterprint the screen layout is measured for print fit: lay pages out at the print width */
+@media screen {
+  html.rk-printing .rk-page { width: 1135px; max-width: none; }
 }

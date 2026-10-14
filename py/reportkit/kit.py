@@ -23,6 +23,28 @@ COMPONENT_ID_RE = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
 IMPLICIT_VENDOR_REQUIRES = {"leaflet-markercluster": ["leaflet"], "leaflet-heat": ["leaflet"]}
 
 
+def _lookup(options: dict, name: str) -> tuple[bool, Any]:
+    cur: Any = options
+    for part in name.split("."):
+        if not isinstance(cur, dict) or part not in cur:
+            return False, None
+        cur = cur[part]
+    return True, cur
+
+
+def _option_key(v: Any) -> str:
+    """How an option value is spelled as an optionDeps key."""
+    if isinstance(v, str):
+        return v
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if v is None:
+        return "null"
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    return json.dumps(v, sort_keys=True) if isinstance(v, (dict, list)) else str(v)
+
+
 def _read_json(path: Path) -> Any:
     with open(path, encoding="utf-8") as fh:
         return json.load(fh)
@@ -139,6 +161,46 @@ class Kit:
     def component_css(self, cid: str) -> Path | None:
         p = self.component_dir(cid) / f"{cid}.css"
         return p if p.is_file() else None
+
+    @staticmethod
+    def option_deps(manifest: dict, options: dict | None) -> list[str]:
+        """Vendor ids a block needs because of its options (manifest ``optionDeps``, contract I6)::
+
+            "optionDeps": {"basemap": {"world-50m": ["geo-world-50m"]}}
+
+        An option not set on the block falls back to the manifest's ``options.<name>.default``. Dotted
+        names ("map.basemap") address nested options; list-valued options match any element; booleans /
+        numbers match their JSON spelling ("true", "2")."""
+        table = manifest.get("optionDeps") or {}
+        if not isinstance(table, dict):
+            return []
+        options = options if isinstance(options, dict) else {}
+        out: list[str] = []
+        for name, by_value in table.items():
+            if not isinstance(by_value, dict):
+                continue
+            found, value = _lookup(options, name)
+            if not found:
+                spec = (manifest.get("options") or {}).get(name)
+                value = spec.get("default") if isinstance(spec, dict) else None
+            for v in value if isinstance(value, (list, tuple)) else [value]:
+                ids = by_value.get(_option_key(v))
+                for vid in ids if isinstance(ids, list) else []:
+                    if isinstance(vid, str) and vid not in out:
+                        out.append(vid)
+        return out
+
+    @staticmethod
+    def option_dep_ids(manifest: dict) -> list[str]:
+        """Every vendor id named anywhere in the manifest's optionDeps (for kit consistency checks)."""
+        out: list[str] = []
+        table = manifest.get("optionDeps") or {}
+        for by_value in table.values() if isinstance(table, dict) else []:
+            for ids in by_value.values() if isinstance(by_value, dict) else []:
+                for vid in ids if isinstance(ids, list) else []:
+                    if isinstance(vid, str) and vid not in out:
+                        out.append(vid)
+        return out
 
     @staticmethod
     def needs_data(manifest: dict) -> bool:

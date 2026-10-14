@@ -13,6 +13,13 @@
         "LICENSE": "LICENSE",
         "NOTICE": "NOTICE",
         "licenses/LICENSE-d3": "LICENSE-d3"
+      },
+      "integrity": "sha512-q0yaFPggC9FUdsWH4blavRWFmxdrIodbkoKNAjJudAI6CA9gNPxHtV2RcZNEepZVlk4yvBYkOkbk6HIVpIyHZA==",
+      "sha256": {
+        "LICENSE": "634293835b43a6dd2094fa39182a3d9a6b9ca43b7fdb9ac354e8037af2a3093a",
+        "LICENSE-d3": "e1211892da0b0e0585b7aebe8f98c1274fba15bafe47fa1f4ee8a7a502c06304",
+        "NOTICE": "d491d358344f842685c1b1585970999db65fe30ecf7ef3867af8814f4016c016",
+        "echarts.min.js": "b66b25aeb4df84e33199dc21694014d336d222cbd9deb0e5a7c14bd6aa0d0fd0"
       }
     },
     {
@@ -27,6 +34,17 @@
         "dist/leaflet.css": "leaflet.css",
         "dist/images/": "images/",
         "LICENSE": "LICENSE"
+      },
+      "integrity": "sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA==",
+      "sha256": {
+        "LICENSE": "53e8dc25862014e4324741ca18fbe3611e11d42ef69f59f86ea8c5389647d4cb",
+        "images/layers-2x.png": "066daca850d8ffbef007af00b06eac0015728dee279c51f3cb6c716df7c42edf",
+        "images/layers.png": "1dbbe9d028e292f36fcba8f8b3a28d5e8932754fc2215b9ac69e4cdecf5107c6",
+        "images/marker-icon-2x.png": "00179c4c1ee830d3a108412ae0d294f55776cfeb085c60129a39aa6fc4ae2528",
+        "images/marker-icon.png": "574c3a5cca85f4114085b6841596d62f00d7c892c7b03f28cbfa301deb1dc437",
+        "images/marker-shadow.png": "264f5c640339f042dd729062cfc04c17f8ea0f29882b538e3848ed8f10edb4da",
+        "leaflet.css": "a7837102824184820dfa198d1ebcd109ff6d0ff9a2672a074b9a1b4d147d04c6",
+        "leaflet.js": "db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a"
       }
     },
     {
@@ -41,6 +59,13 @@
         "dist/MarkerCluster.css": "MarkerCluster.css",
         "dist/MarkerCluster.Default.css": "MarkerCluster.Default.css",
         "MIT-LICENCE.txt": "LICENSE"
+      },
+      "integrity": "sha512-vPTw/Bndq7eQHjLBVlWpnGeLa3t+3zGiuM7fJwCkiMFq+nmRuG3RI3f7f4N4TDX7T4NpbAXpR2+NTRSEGfCSeA==",
+      "sha256": {
+        "LICENSE": "3133dacd38250bd1f524d8166cc60a016a382522e062fce143691c65bf5e4b3d",
+        "MarkerCluster.Default.css": "61258232d98d64dc2a7b1e02130d67421bc5b9bda5994eef70228ff97570c170",
+        "MarkerCluster.css": "614dea0a98ff3f4ead74f04918f6b1d1b9ba435c25b5fc23b21a394d1e3e4d87",
+        "leaflet.markercluster.js": "1e4e1d22972a3926f48598e0caf14e3fe7049835d428a344fed4f9e3665b3508"
       }
     },
     {
@@ -53,6 +78,11 @@
       "files": {
         "dist/leaflet-heat.js": "leaflet-heat.js",
         "LICENSE": "LICENSE"
+      },
+      "integrity": "sha512-Cd5PbAA/rX3X3XKxfDoUGi9qp78FyhWYurFg3nsfhntcM/MCNK08pRkf4iEenO1KNqwVPKCmkyktjW3UD+h9bQ==",
+      "sha256": {
+        "LICENSE": "9010b843aad8e450890fc18dae2dfec00e68c10da775515801c42878afbb0da1",
+        "leaflet-heat.js": "eb952aae5806a1102729f291bab887dde783ace859819a354827a776e73e486a"
       }
     },
     {
@@ -65,6 +95,11 @@
       "files": {
         "dist/topojson-client.min.js": "topojson-client.min.js",
         "LICENSE": "LICENSE"
+      },
+      "integrity": "sha512-605uxS6bcYxGXw9qi62XyrV6Q3xwbndjachmNxu8HWTtVPxZfEJN9fd/SZS1Q54Sn2y0TMyMxFj/cJINqGHrKw==",
+      "sha256": {
+        "LICENSE": "4c4d15b635e04e691825a76db7d33f7f2033b55669a7430011694f31e6c65999",
+        "topojson-client.min.js": "25cd02ae486cc5063e0215a4e4cfb15de83700c87ac48bac4d57dc6aaf3ebb89"
       }
     },
     {
@@ -79,6 +114,13 @@
         "countries-50m.json": "countries-50m.json",
         "land-110m.json": "land-110m.json",
         "LICENSE": "LICENSE"
+      },
+      "integrity": "sha512-IXfV0qwlKXpckz1FhwXVwKRjiIhOnWttOskm5CtxMsjgE/MXAYRHWJqgXOpM8IkcPBoXnyTU5lFHcYa5ChG0LQ==",
+      "sha256": {
+        "LICENSE": "8048290dfdb6e83fbed17e8985c8cfc4ce9da9b842642f3d3e497280790cfa31",
+        "countries-110m.json": "2516c915867c7baf18ddec727aec46c315541a07cfb3d79a6559b05d5e94eee8",
+        "countries-50m.json": "04342cdc1e3016bcd7db1630de95684d67b79fe3c8c460321e87aef469502394",
+        "land-110m.json": "ead5f68119c49a9250902e7da303bcb209341bbb8fefe7369a439b48b704658a"
       }
     },
     {
@@ -92,6 +134,12 @@
         "dist/js/tabulator.min.js": "tabulator.min.js",
         "dist/css/tabulator_simple.min.css": "tabulator_simple.min.css",
         "LICENSE": "LICENSE"
+      },
+      "integrity": "sha512-8A77aN30vJS34w1P5h4HtgEajB7vX2v0AD1fXFIKxp6SxplpGGfKn0Y4ouY91+6gdGK8/quqXoCA2LkrhBVE3A==",
+      "sha256": {
+        "LICENSE": "191a2ee554684e1064c897b432f0e1bc6dfa714ca045d3f6ea2cf692cbd398b7",
+        "tabulator.min.js": "5f945a0327dacb19e50e1abed0942d2563848bcf5220998df325afa74cce3c34",
+        "tabulator_simple.min.css": "2802e99322e3cbcddf0592573c39a1081fcf1e807e85196401960515a325eee8"
       }
     },
     {
@@ -105,6 +153,27 @@
       "files": {
         "world-110m.js": "world-110m.js",
         "LICENSE": "LICENSE"
+      },
+      "sha256": {
+        "LICENSE": "8048290dfdb6e83fbed17e8985c8cfc4ce9da9b842642f3d3e497280790cfa31",
+        "world-110m.js": "763101ccfdd57b5cb0af7e9ba4eb7466ea6314ab4111098c4c48e7538aff185b"
+      }
+    },
+    {
+      "id": "geo-world-50m",
+      "local": true,
+      "npm": "(generated from world-atlas by tools/build_geo.py)",
+      "version": "world-atlas 2.0.2",
+      "license": "ISC (data: Natural Earth, public domain)",
+      "repo": "https://github.com/topojson/world-atlas",
+      "purpose": "Higher-detail (1:50m) offline world basemap: RK.geo.register('world-50m', topojson); shipped only when a map block sets basemap: 'world-50m' (manifest optionDeps)",
+      "files": {
+        "world-50m.js": "world-50m.js",
+        "LICENSE": "LICENSE"
+      },
+      "sha256": {
+        "LICENSE": "8048290dfdb6e83fbed17e8985c8cfc4ce9da9b842642f3d3e497280790cfa31",
+        "world-50m.js": "992597fdb27b4a2fecee30a39c0b9ecc0d34a310c15c5e56e66e8c74e16b139a"
       }
     },
     {
@@ -121,6 +190,14 @@
         "files/inter-latin-600-normal.woff2": "inter-latin-600-normal.woff2",
         "files/inter-latin-700-normal.woff2": "inter-latin-700-normal.woff2",
         "LICENSE": "LICENSE"
+      },
+      "integrity": "sha512-RofMylZmjlJEfELXeNHFWBRcSs75rGU/6bV2S2jfnvv/3rPXPGe0LgUJTklcHZ9lM4OZmAVFhcJPnACfb91A3g==",
+      "sha256": {
+        "LICENSE": "3b0a5fca3d17942cde889069889dedbbbd075e9b599968c82a95f4d944e9b345",
+        "inter-latin-400-normal.woff2": "8909904ab6c872eb994093482a88a28eca2cd95912d7b6fecd72103b0dc07edc",
+        "inter-latin-500-normal.woff2": "f3779f1efccc4bdcdf9c0a02ab95bf6bd092ed09c48c08cedc725889edd1d19f",
+        "inter-latin-600-normal.woff2": "f9a06e79cd3a2a20951c0f0e28f66dd0e6d3fda73911d640a2125c8fcb78f21a",
+        "inter-latin-700-normal.woff2": "6f56409fd3d64bb85f7d070bce20749db2d66b6d63cec586cc22d1c761be2491"
       }
     },
     {
@@ -137,6 +214,14 @@
         "files/source-serif-4-latin-700-normal.woff2": "source-serif-4-latin-700-normal.woff2",
         "files/source-serif-4-latin-400-italic.woff2": "source-serif-4-latin-400-italic.woff2",
         "LICENSE": "LICENSE"
+      },
+      "integrity": "sha512-cWcTCXjYYrgF9A67fThVir1VSc0lPEYmwQ6jA4pPt01s2MSCi/maINUcZoCzaqnU8fyUReDO97eGcBUkHgOeug==",
+      "sha256": {
+        "LICENSE": "18aabf190848725e2576eefb5c29ba06aac1029d02132252a7f312eac2e50cf3",
+        "source-serif-4-latin-400-italic.woff2": "882b7c150c29f29d4f8daae6b8dcae8662aac7f28ca34b34615305154136ecfd",
+        "source-serif-4-latin-400-normal.woff2": "02194deb92d3975dd30e11a3824a1f1db32b48c93654e60560cb81ce8e7b5f95",
+        "source-serif-4-latin-600-normal.woff2": "f2b7e1cf1d277b7608231868135648f8ad8e2b58d8e97ca088bee15dc357bee7",
+        "source-serif-4-latin-700-normal.woff2": "7691c51bc286a9014db0048277d2c3f2ad0a90b533dc8adfb16cb22a95390d39"
       }
     }
   ]

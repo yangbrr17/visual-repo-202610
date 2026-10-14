@@ -18,7 +18,8 @@ classifiers = [
 [project.optional-dependencies]
 pandas = ["pandas>=1.5", "numpy>=1.22"]
 parquet = ["pandas>=1.5", "numpy>=1.22", "pyarrow>=12"]
-excel = ["pandas>=1.5", "openpyxl>=3.1"]
+excel = ["pandas>=1.5", "openpyxl>=3.1"]   # read .xlsx inputs + write the Excel export
+xlsx = ["openpyxl>=3.1"]                    # build(..., excel=True) only
 
 [project.scripts]
 reportkit = "reportkit.cli:main"

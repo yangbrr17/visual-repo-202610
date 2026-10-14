@@ -5,9 +5,10 @@
   "category": "geo",
   "engine": "leaflet",
   "deps": ["leaflet", "topojson-client", "geo-world"],
+  "optionDeps": {"basemap": {"world-50m": ["geo-world-50m"]}},
   "summary": "Proportional symbols at lat / lon — area-true bubble size, colour by category or value, size legend, labelled top N, grow-in animation.",
   "summary_zh": "按经纬度绘制比例气泡：面积与数值成正比，按类别或数值着色，嵌套尺寸图例，标注前 N 个，入场生长动画。",
-  "description_zh": "适合展示点位类数据的规模与分布：工厂/办公室/仓库的产能或面积、各国收入、同业公司总部与市值。每行一个点（lat / lon），气泡面积按 sqrt 比例对应数值（嵌套参考圆图例可读出大小），颜色可以是类别（图例可点击筛选）或数值（顺序/发散色阶）。尺寸与色阶基于全量数据计算，筛选时保持可比。最大的 N 个点自动标注名称和数值（拥挤时自动避让隐藏），目标公司可用 accent-2 高亮；悬停显示详情，点击交叉筛选。",
+  "description_zh": "适合展示点位类数据的规模与分布：工厂/办公室/仓库的产能或面积、各国收入、同业公司总部与市值。每行一个点（lat / lon），气泡面积按 sqrt 比例对应数值（嵌套参考圆图例可读出大小），颜色可以是类别（图例可点击筛选）或数值（顺序/发散色阶）。尺寸与色阶基于全量数据计算，筛选时保持可比。最大的 N 个点自动标注名称和数值（拥挤时自动避让隐藏），目标公司可用 accent-2 高亮；悬停显示详情，点击交叉筛选。放大到区域（如欧洲）时可设 basemap 为 world-50m，使用 1:50m 精度的海岸线与国界（构建器仅在用到时打包该底图）。",
   "best_for": ["Plant / office / warehouse footprint sized by capacity", "Revenue by country when absolute size matters more than area", "Peer HQ map sized by market cap with the target highlighted"],
   "avoid_when": ["Hundreds of overlapping points (use cluster-map or geo-heat)", "Values that are rates or ratios (bubble area implies an additive quantity — use choropleth)"],
   "channels": {
@@ -19,7 +20,7 @@
     "target": {"type": "boolean", "required": false, "desc": "Rows where this field is true are highlighted in accent-2 and always labelled (like options.highlight)", "default": "is_target"}
   },
   "options": {
-    "basemap": {"type": "string", "default": "world-110m", "desc": "Registered basemap name"},
+    "basemap": {"type": "string", "default": "world-110m", "desc": "world-110m (default) | world-50m (1:50m Natural Earth: finer coastlines for regional views such as Europe; the builder ships vendor geo-world-50m only for blocks that ask for it) | any name registered with RK.geo.register"},
     "sizeRange": {"type": "number[]", "default": [4, 26], "desc": "Min / max bubble radius in px on a map at least 1000px wide (sqrt scale, so area tracks the value); narrower maps scale the range down (to 62%) to limit overplotting"},
     "colorScale": {"type": "string", "default": "auto", "desc": "auto (categorical for text fields, sequential for numbers) | categorical | sequential | diverging"},
     "mid": {"type": "number", "default": 0, "desc": "Diverging midpoint"},
@@ -43,6 +44,9 @@
     {"title": "Revenue 2025A by country — size = revenue, colour = growth", "data": "revenue_by_country", "height": 400, "span": 6,
      "options": {"encode": {"lat": "lat", "lon": "lon", "size": "revenue", "color": "growth", "label": "country"}, "labels": 6, "sizeRange": [3, 30], "tooltip": ["employees"]}},
     {"title": "Peer headquarters by market cap", "data": "peers", "height": 400, "span": 6,
-     "options": {"encode": {"lat": "lat", "lon": "lon", "size": "mkt_cap", "color": "sector", "label": "company"}, "highlight": "Helios Industrial", "labels": 3, "labelValue": false, "tooltip": ["hq_city", "ev_ebitda_25e"]}}
+     "options": {"encode": {"lat": "lat", "lon": "lon", "size": "mkt_cap", "color": "sector", "label": "company"}, "highlight": "Helios Industrial", "labels": 3, "labelValue": false, "tooltip": ["hq_city", "ev_ebitda_25e"]}},
+    {"title": "European sites at 1:50m — by capacity", "data": "assets_locations", "height": 420, "span": 6,
+     "options": {"encode": {"lat": "lat", "lon": "lon", "size": "capacity", "color": "type", "label": "name"}, "basemap": "world-50m",
+                 "fit": [[40, -6], [60, 20]], "labels": 4, "sizeRange": [4, 22], "tooltip": ["city", "utilization"]}}
   ]
 }

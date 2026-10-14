@@ -10,7 +10,7 @@
   "needs_data": false,
   "summary": "Client self-service analysis console: a pivot-style Builder and a validated query editor over the report's datasets, with a formatted results table, an automatic chart, CSV export, history and 'Add as metric'.",
   "summary_zh": "客户自助分析控制台：透视表式“构建器”与带实时校验的查询编辑器，结果以格式化表格 + 自动图表呈现，支持 CSV 导出、查询历史和“保存为指标”。",
-  "description_zh": "让客户在报告内自己做分析：选择数据集，在 Builder 中按“值（聚合 × 字段）/ 分组 / 筛选 / 排序 / 前 N”拼出查询，或在 Query 中直接写 RK.query 语句（如 median(ev_ebitda_25e) by sector where region != \"Latin America\" sort 2 desc），编辑器带语法高亮、自动补全、防抖实时校验（错误信息 + 行列位置 + 波浪下划线）和 Ctrl/Cmd+Enter 运行。右侧参考面板列出字段（标题、名称、格式）、@参数与函数，点击即插入光标处。结果以按字段格式显示的可排序表格 + 自动图表（一个类别列用柱状图，年份 / 日期用折线图，单位不同则双轴，单行汇总显示为大数字）分屏呈现；结果遵循全局筛选并在筛选变化时自动重跑。行级公式可“Add as metric”写回数据集（Dataset.addComputed），其他图表随即可用。",
+  "description_zh": "让客户在报告内自己做分析：选择数据集，在 Builder 中按“值（聚合 × 字段）/ 分组 / 筛选 / 排序 / 前 N”拼出查询，或在 Query 中直接写 RK.query 语句（如 median(ev_ebitda_25e) by sector where region != \"Latin America\" sort 2 desc），编辑器带语法高亮、自动补全、防抖实时校验（错误信息 + 行列位置 + 波浪下划线）和 Ctrl/Cmd+Enter 运行。右侧参考面板列出字段（标题、名称、格式）、@参数与函数，点击即插入光标处。结果以按字段格式显示的可排序表格 + 自动图表（一个类别列用柱状图，年份 / 日期用折线图，单位不同则双轴，单行汇总显示为大数字）分屏呈现；结果遵循全局筛选并在筛选变化时自动重跑。行级公式可“Add as metric”写回数据集（Dataset.addComputed），其他图表随即可用；这些客户自定义指标按报告保存在本浏览器中，下次打开自动恢复，并列在参考面板的“My metrics”中（点击插入，× 删除）。界面文字随报告语言（RK.i18n，en / zh-CN）切换。",
   "best_for": [
     "Letting clients answer their own follow-up questions on the comps / precedents / financials",
     "Ad-hoc medians, averages and rankings by sector or region",
@@ -82,7 +82,7 @@
     "addMetric": {
       "type": "boolean",
       "default": true,
-      "desc": "Offer 'Add as metric' for row-level formula columns (Dataset.addComputed)"
+      "desc": "Offer 'Add as metric' for row-level formula columns (Dataset.addComputed with user: true — RK.data keeps the client's metrics in this browser, per report, and restores them on the next visit) and a 'My metrics' list in the reference panel (click to insert, × to delete)"
     },
     "highlight": {
       "type": "string|string[]",
@@ -111,7 +111,8 @@
     "Reference panel: click a field, @parameter or function to insert at the caret",
     "Sortable result columns; chart follows the table order",
     "Results respect global filters and re-run when filters or @parameters change",
-    "Add as metric (Dataset.addComputed) — the new field appears in every field list",
+    "Add as metric (Dataset.addComputed, user: true) — the new field appears in every field list and is saved in this browser for this report",
+    "Reference panel 'My metrics': the client's saved formulas, click to insert (or switch to their dataset), × to delete",
     "CSV export, query history, example chips, dataset picker"
   ],
   "samples": [

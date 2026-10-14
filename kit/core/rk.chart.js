@@ -22,7 +22,9 @@
     return function render(ctx) {
       if (!global.echarts) throw new Error('ECharts is not loaded (vendor/echarts/echarts.min.js)');
       var renderer = ctx.options.renderer || (ctx.print ? 'svg' : 'svg');
-      var inst = global.echarts.init(ctx.el, 'rk', { renderer: renderer, locale: ctx.options.locale || 'EN' });
+      // ECharts' own strings (aria chart descriptions, toolbox) follow the report locale: built-in 'ZH' / 'EN'
+      var locale = ctx.options.locale || (RK.i18n && RK.i18n.lang() === 'zh' ? 'ZH' : 'EN');
+      var inst = global.echarts.init(ctx.el, 'rk', { renderer: renderer, locale: locale });
       var current = ctx;
       // ECharts' roam/inside-zoom controller calls preventDefault on every wheel event before checking
       // zoomOnMouseWheel:'ctrl', which swallows page scrolling. Keep plain wheel for the report; let

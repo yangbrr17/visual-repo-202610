@@ -13,9 +13,12 @@ const root = path.resolve(__dirname, '../..');
 const coreDir = process.env.RK_CORE_DIR ? path.resolve(process.env.RK_CORE_DIR) : path.join(root, 'kit/core');
 const CORE = ['rk.core.js', 'rk.format.js', 'rk.expr.js', 'rk.data.js'];
 
-/** Fresh, isolated RK instance (own Object.prototype, own store, own dataset registry). */
-function loadRK() {
-  const sandbox = { console, Promise, setTimeout, clearTimeout, Map, Set, Math, JSON, Date };
+/**
+ * Fresh, isolated RK instance (own Object.prototype, own store, own dataset registry).
+ * globals: extra sandbox globals, e.g. {localStorage, document, location} (see tests/js/runtime-api.test.js).
+ */
+function loadRK(globals) {
+  const sandbox = Object.assign({ console, Promise, setTimeout, clearTimeout, Map, Set, Math, JSON, Date }, globals || {});
   sandbox.window = sandbox;
   vm.createContext(sandbox);
   for (const f of CORE) vm.runInContext(fs.readFileSync(path.join(coreDir, f), 'utf8'), sandbox, { filename: f });

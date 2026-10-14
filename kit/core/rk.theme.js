@@ -183,6 +183,24 @@
     };
   }
 
+  /* ---------------- up / down convention ---------------- */
+  var swapped = false;   // --rk-pos / --rk-neg currently set inline by applyUpdown()
+  /** Read tokens with the theme's own pos / neg, then swap them (CSS + tokens) for the 'cn' convention. */
+  function applyUpdown() {
+    var root = document.documentElement;
+    if (swapped) { root.style.removeProperty('--rk-pos'); root.style.removeProperty('--rk-neg'); swapped = false; }
+    var t = readTokens();
+    if (theme.updown() === 'cn') {
+      var pos = t.pos, neg = t.neg;
+      root.style.setProperty('--rk-pos', neg);
+      root.style.setProperty('--rk-neg', pos);
+      swapped = true;
+      t.pos = neg; t.neg = pos;
+      t.updown = 'cn';
+    } else t.updown = 'us';
+    return t;
+  }
+
   /* ---------------- public API ---------------- */
   var theme = RK.theme = {
     current: null,
@@ -207,9 +225,24 @@
     },
 
     refresh: function () {
-      theme.current = readTokens();
+      theme.current = applyUpdown();
       if (global.echarts) global.echarts.registerTheme('rk', echartsTheme(theme.current));
       return theme.current;
+    },
+
+    /**
+     * Up / down colour convention: 'us' (default: up = green-ish pos, down = red-ish neg) or 'cn' (<html
+     * data-rk-updown="cn">: up = red, down = green). 'cn' swaps --rk-pos / --rk-neg (inline on <html>, re-applied after
+     * every theme change) and the pos / neg tokens charts read.
+     */
+    updown: function () {
+      var v = document.documentElement.getAttribute('data-rk-updown');
+      return v && v.toLowerCase() === 'cn' ? 'cn' : 'us';
+    },
+    setUpdown: function (mode) {
+      document.documentElement.setAttribute('data-rk-updown', mode === 'cn' ? 'cn' : 'us');
+      theme.refresh();
+      RK.bus.emit('theme:changed', theme.current);
     },
     init: function () {
       var meta = document.querySelector('meta[name="rk:themes"]');
@@ -224,10 +257,24 @@
     /** Switch theme at runtime: sets <html data-rk-theme>, re-reads tokens, re-renders blocks. */
     set: function (name) {
       document.documentElement.setAttribute('data-rk-theme', name);
-      try { localStorage.setItem('rk:theme', name); } catch (e) { /* storage unavailable */ }
+      theme.save(name);
       theme.refresh();
       RK.bus.emit('theme:changed', theme.current);
     },
+
+    /** Theme preference of this report (localStorage key 'rk:theme:' + RK.data.reportKey()); null when none / no storage. */
+    saved: function () {
+      try {
+        var s = RK.data && RK.data.storage ? RK.data.storage() : null;
+        var v = s ? s.getItem(RK.data.storageKey('theme')) : null;
+        return v && theme.list.indexOf(v) >= 0 ? v : null;
+      } catch (e) { return null; }
+    },
+    save: function (name) {
+      try { var s = RK.data && RK.data.storage ? RK.data.storage() : null; if (s) s.setItem(RK.data.storageKey('theme'), name); } catch (e) { /* storage unavailable */ }
+    },
+    /** Localised label of a theme for switchers. */
+    label: function (name) { return RK.i18n ? RK.i18n.t('theme.' + name, theme.labels[name] || name) : (theme.labels[name] || name); },
 
     /** Resolve a token name ('accent2', 'cat3', 'ref', 'seq5', 'ink-2') or pass a literal colour through. */
     resolve: function (c) {

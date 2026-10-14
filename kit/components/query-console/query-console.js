@@ -80,6 +80,49 @@
   /* ------------------------------------------------------------------ *
    * Small helpers
    * ------------------------------------------------------------------ */
+  /** UI string via RK.i18n when present ({name} placeholders filled from vars); English fallback otherwise. */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'queryConsole.metricsHint': '用“添加为指标”保存的公式会显示在这里，并在本浏览器中为本报告保留',
+      'queryConsole.metricInactive': '无法在当前数据中计算（字段缺失）',
+      'queryConsole.metricIn': '{dataset} 中',
+      'queryConsole.metricAddedLong': '已将“{title}”添加为 {dataset} 的字段 {name} — 使用该数据集的所有图表均可使用，并保存在本浏览器中',
+      'queryConsole.addFormula': '将公式添加为数据集字段',
+      'queryConsole.liveNote': '实时重算（含 @参数）· 保存在本浏览器',
+      'queryConsole.addTo': '添加到 {dataset}',
+      'queryConsole.title': '标题',
+      'queryConsole.fieldName': '字段名',
+      'queryConsole.format': '格式',
+      'queryConsole.badName': '字段名须以字母开头，只能包含字母、数字或 _',
+      'queryConsole.sourceField': '“{name}”已是 {dataset} 的源字段',
+      'queryConsole.saveFormula': '将公式列保存为 {dataset} 的新字段',
+      'queryConsole.filterRef': '筛选字段和函数…',
+      'queryConsole.refTip': '点击条目插入到光标处',
+      'queryConsole.fields': '字段',
+      'queryConsole.parameters': '参数',
+      'queryConsole.aggFns': '聚合函数',
+      'queryConsole.rowFns': '行函数',
+      'queryConsole.syntax': '语法',
+      'queryConsole.refTitle': '字段与函数',
+      'queryConsole.groupBy': '分组',
+      'queryConsole.addColumn': '添加列',
+      'queryConsole.values': '数值',
+      'queryConsole.filter': '筛选',
+      'queryConsole.sort': '排序',
+      'queryConsole.top': '前',
+      'queryConsole.clearHistory': '清除历史记录',
+      'queryConsole.split': '分栏',
+      'queryConsole.table': '表格',
+      'queryConsole.chart': '图表'
+    });
+  }
+
   function norm(s) { return String(s).toLowerCase().replace(/[\s_]+/g, ' ').trim(); }
   function quoteName(n) {
     var low = String(n).toLowerCase();
@@ -135,6 +178,8 @@
    */
   function historyKey() {
     var man = (RK.data && RK.data.manifest) || {}, title = (man.report && man.report.title) || '';
+    // RK.data.reportKey(): title + date + build stamp, so two builds of the same report do not mix histories either
+    if (RK.data && typeof RK.data.reportKey === 'function') { try { title = RK.data.reportKey(); } catch (e) { /* keep the title */ } }
     var src = String(location.pathname || '') + '|' + title, hsh = 5381;
     for (var i = 0; i < src.length; i++) hsh = ((hsh << 5) + hsh + src.charCodeAt(i)) | 0;
     return HKEY + ':' + (hsh >>> 0).toString(36);
@@ -457,7 +502,7 @@
       var root = h('div.rk-qc', { class: (ctx.motion ? '' : 'is-static') + (o.reference ? ' has-ref' : '') });
       var tabsEl = h('div.rk-qc-tabs', { role: 'tablist', 'aria-label': 'Console mode' });
       var tabBtn = {};
-      [['builder', 'Builder'], ['query', 'Query']].forEach(function (p) {
+      [['builder', tr('builder', 'Builder')], ['query', tr('query', 'Query')]].forEach(function (p) {
         tabBtn[p[0]] = h('button.rk-qc-tab', {
           type: 'button', role: 'tab', id: ctx.id + '-tab-' + p[0], 'aria-controls': ctx.id + '-pane-' + p[0],
           on: { click: function () { setTab(p[0]); }, keydown: function (e) { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); setTab(p[0] === 'builder' ? 'query' : 'builder'); tabBtn[st.tab].focus(); } } }
@@ -468,9 +513,9 @@
       var dsBtn = h('button.rk-qc-ds', { type: 'button', 'aria-haspopup': 'listbox', on: { click: openDatasets } },
         h('span.rk-qc-ds__k', 'Dataset'), dsName, dsRows, h('span.rk-qc-caret', { html: icon('caret', 12) }));
       var histBtn = o.history ? h('button.rk-iconbtn.rk-qc-hbtn', { type: 'button', title: 'Query history', 'aria-label': 'Query history', html: icon('history', 15), on: { click: openHistory } }) : null;
-      var refBtn = o.reference ? h('button.rk-iconbtn.rk-qc-refbtn', { type: 'button', title: 'Fields & functions', 'aria-label': 'Fields and functions reference', 'aria-expanded': 'false', html: icon('book', 15), on: { click: function () { setRef(!st.refOpen); } } }) : null;
+      var refBtn = o.reference ? h('button.rk-iconbtn.rk-qc-refbtn', { type: 'button', title: tr('queryConsole.refTitle', 'Fields & functions'), 'aria-label': tr('queryConsole.refTitle', 'Fields & functions'), 'aria-expanded': 'false', html: icon('book', 15), on: { click: function () { setRef(!st.refOpen); } } }) : null;
       var runBtn = h('button.rk-btn.rk-btn--primary.rk-qc-run', { type: 'button', on: { click: runCurrent } },
-        h('span', { html: icon('play', 12) }), 'Run', h('kbd.rk-qc-kbd', MAC ? '⌘↵' : 'Ctrl ↵'));
+        h('span', { html: icon('play', 12) }), tr('run', 'Run'), h('kbd.rk-qc-kbd', MAC ? '⌘↵' : 'Ctrl ↵'));
       var head = h('div.rk-qc__head', tabsEl, dsBtn, h('span.rk-qc__spacer'), histBtn, refBtn, runBtn);
 
       // query pane
@@ -488,7 +533,7 @@
       var statusEl = h('div.rk-qc-status', { 'aria-live': 'polite' });
       var editor = h('div.rk-qc__editor', builderPane, queryPane, statusEl);
 
-      var refEl = o.reference ? h('aside.rk-qc__ref', { 'aria-label': 'Fields and functions' }) : null;
+      var refEl = o.reference ? h('aside.rk-qc__ref', { 'aria-label': tr('queryConsole.refTitle', 'Fields & functions') }) : null;
       // bottom fade over the reference list while more items sit below the fold
       var refFade = o.reference ? h('div.rk-qc__reffade', { 'aria-hidden': 'true' }) : null;
       function refEdge() { if (refEl) refFade.classList.toggle('is-on', refEl.scrollHeight - refEl.clientHeight - refEl.scrollTop > 2); }
@@ -657,7 +702,7 @@
         });
         var addR = h('button.rk-qc-add', { type: 'button', on: { click: function () {
           track(picker(addR, fieldItems('dim').filter(function (it) { return b.rows.indexOf(it.value) < 0; }), { label: 'Fields', placeholder: 'Search fields…', minWidth: 300, onPick: function (name) { b.rows.push(name); bChanged(); } }));
-        } } }, h('span', { html: icon('plus', 12) }), aggregated(b) ? 'Group by' : 'Add column');
+        } } }, h('span', { html: icon('plus', 12) }), aggregated(b) ? tr('queryConsole.groupBy', 'Group by') : tr('queryConsole.addColumn', 'Add column'));
 
         // filter
         var where = h('input.rk-input.rk-qc-b__where', {
@@ -704,11 +749,11 @@
         function row(label, body, hint) {
           return h('div.rk-qc-b__row', h('div.rk-qc-b__k', label, hint ? h('span.rk-qc-b__hint', hint) : null), h('div.rk-qc-b__v', body));
         }
-        builderPane.appendChild(row('Values', vals));
-        builderPane.appendChild(row(aggregated(b) ? 'Group by' : 'Columns', h('div.rk-qc-b__items', rws.childNodes.length ? Array.prototype.slice.call(rws.childNodes) : null, addR)));
-        builderPane.appendChild(row('Filter', h('div.rk-qc-b__wherewrap', where, whereMark)));
-        builderPane.appendChild(row('Sort', h('div.rk-qc-b__inline', sortBtn, dirSeg, h('span.rk-qc-b__k2', 'Top'), top)));
-        builderPane.appendChild(row('Query', h('div.rk-qc-b__inline.rk-qc-b__genrow', gen, editAs)));
+        builderPane.appendChild(row(tr('queryConsole.values', 'Values'), vals));
+        builderPane.appendChild(row(aggregated(b) ? tr('queryConsole.groupBy', 'Group by') : tr('columns', 'Columns'), h('div.rk-qc-b__items', rws.childNodes.length ? Array.prototype.slice.call(rws.childNodes) : null, addR)));
+        builderPane.appendChild(row(tr('queryConsole.filter', 'Filter'), h('div.rk-qc-b__wherewrap', where, whereMark)));
+        builderPane.appendChild(row(tr('queryConsole.sort', 'Sort'), h('div.rk-qc-b__inline', sortBtn, dirSeg, h('span.rk-qc-b__k2', tr('queryConsole.top', 'Top')), top)));
+        builderPane.appendChild(row(tr('query', 'Query'), h('div.rk-qc-b__inline.rk-qc-b__genrow', gen, editAs)));
         paintGen();
         if (b.where) checkWhere();
       }
@@ -867,22 +912,23 @@
         var ds = DS();
         var keepFocus = document.activeElement && document.activeElement.classList.contains('rk-qc-ref__q');
         refEl.innerHTML = '';
-        var q = h('input.rk-qc-ref__q', { type: 'text', placeholder: 'Filter fields & functions…', value: refQ, 'aria-label': 'Filter reference', spellcheck: 'false',
+        var q = h('input.rk-qc-ref__q', { type: 'text', placeholder: tr('queryConsole.filterRef', 'Filter fields & functions…'), value: refQ, 'aria-label': tr('queryConsole.filterRef', 'Filter fields & functions…'), spellcheck: 'false',
           on: { input: function () { refQ = q.value; paintRef(); } } });
-        refEl.appendChild(h('div.rk-qc-ref__top', q, h('p.rk-qc-ref__tip', 'Click an item to insert it at the cursor')));
-        var t = refQ.toLowerCase();
-        function match(s) { return !t || String(s).toLowerCase().indexOf(t) >= 0; }
+        refEl.appendChild(h('div.rk-qc-ref__top', q, h('p.rk-qc-ref__tip', tr('queryConsole.refTip', 'Click an item to insert it at the cursor'))));
+        var t0 = refQ.toLowerCase();
+        function match(s) { return !t0 || String(s).toLowerCase().indexOf(t0) >= 0; }
+        if (o.addMetric) paintMyMetrics(ds, match, !!t0);
         if (ds) {
           var fl = h('div.rk-qc-ref__list');
           ds.fields.forEach(function (f) {
             if (!match(f.name + ' ' + f.title)) return;
-            var item = h('button.rk-qc-ref__item', { type: 'button', title: (f.formula ? f.formula : f.title) + (f.format ? '  ·  ' + f.format : ''), on: { click: function () { insert(quoteName(f.name)); } } },
+            var item = h('button.rk-qc-ref__item', { type: 'button', class: f.user ? 'is-user' : null, title: (f.formula ? f.formula : f.title) + (f.format ? '  ·  ' + f.format : ''), on: { click: function () { insert(quoteName(f.name)); } } },
               h('span.rk-qc-tag', (f.computed ? 'ƒ' : '') + typeTag(f.type)),
               h('span.rk-qc-ref__main', h('span.rk-qc-ref__t', f.title), h('span.rk-qc-ref__n', f.name)),
               f.format ? h('span.rk-qc-ref__f', f.format) : null);
             fl.appendChild(item);
           });
-          refEl.appendChild(h('section.rk-qc-ref__sec', h('h4', 'Fields', h('span.rk-num', String(ds.fields.length))), fl));
+          refEl.appendChild(h('section.rk-qc-ref__sec', h('h4', tr('queryConsole.fields', 'Fields'), h('span.rk-num', String(ds.fields.length))), fl));
         }
         var ps = RK.store.params(), pk = Object.keys(ps).filter(function (k) { return match('@' + k); });
         if (pk.length) {
@@ -893,9 +939,9 @@
               h('span.rk-qc-tag', '@'), h('span.rk-qc-ref__main', h('span.rk-qc-ref__t.rk-qc-mono', '@' + k)),
               h('span.rk-qc-ref__f', isNum(v) ? RK.format(v, Math.abs(v) < 1 ? '0.00%' : 'auto') : String(v))));
           });
-          refEl.appendChild(h('section.rk-qc-ref__sec', h('h4', 'Parameters'), pl));
+          refEl.appendChild(h('section.rk-qc-ref__sec', h('h4', tr('queryConsole.parameters', 'Parameters')), pl));
         }
-        [['Aggregate functions', RK.expr.functions.aggregate], ['Row functions', RK.expr.functions.scalar]].forEach(function (grp) {
+        [[tr('queryConsole.aggFns', 'Aggregate functions'), RK.expr.functions.aggregate], [tr('queryConsole.rowFns', 'Row functions'), RK.expr.functions.scalar]].forEach(function (grp) {
           var names = grp[1].filter(function (n) { return match(n + ' ' + (FN_DOC[n] || '')); });
           if (!names.length) return;
           var gl = h('div.rk-qc-ref__fns');
@@ -904,13 +950,66 @@
           });
           refEl.appendChild(h('section.rk-qc-ref__sec', h('h4', grp[0]), gl));
         });
-        if (!t) {
+        if (!t0) {
           var sl = h('dl.rk-qc-ref__syntax');
           SYNTAX.forEach(function (s) { sl.appendChild(h('dt', s[0])); sl.appendChild(h('dd', s[1])); });
-          refEl.appendChild(h('section.rk-qc-ref__sec', h('h4', 'Syntax'), sl));
+          refEl.appendChild(h('section.rk-qc-ref__sec', h('h4', tr('queryConsole.syntax', 'Syntax')), sl));
         }
         if (keepFocus) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
         refEdge();
+      }
+
+      /**
+       * "My metrics": formulas the client saved with "Add as metric" (kept in this browser for this report by
+       * RK.data; without that API, the user fields of the loaded datasets). Click = insert (or switch to that
+       * metric's dataset); × = delete it everywhere.
+       */
+      function savedMetrics() {
+        if (typeof RK.data.userMetrics === 'function') {
+          try { return RK.data.userMetrics() || []; } catch (e) { return []; }
+        }
+        var out = [];
+        RK.data.ids().forEach(function (id) {
+          RK.data.get(id).fields.forEach(function (f) {
+            if (f.user && f.computed) out.push({ dataset: id, name: f.name, title: f.title, formula: f.formula, format: f.format, active: true });
+          });
+        });
+        return out;
+      }
+      function removeMetric(m) {
+        if (typeof RK.data.removeUserMetric === 'function') RK.data.removeUserMetric(m.dataset, m.name);
+        else { var d = RK.data.get(m.dataset); if (d && d.field(m.name) && d.field(m.name).computed) d.removeComputed(m.name); }
+        // a saved metric that was not loaded emits no data change: repaint here
+        paintRef();
+        if (st.tab === 'builder') paintBuilder();
+      }
+      function paintMyMetrics(ds, match, filtering) {
+        var list = savedMetrics().filter(function (m) { return match(m.name + ' ' + (m.title || '') + ' ' + m.dataset); });
+        if (!list.length && filtering) return;
+        // this dataset's metrics first
+        list.sort(function (a, b) { return (a.dataset === st.ds ? 0 : 1) - (b.dataset === st.ds ? 0 : 1); });
+        var ml = h('div.rk-qc-ref__list', { role: 'list' });
+        list.forEach(function (m) {
+          var here = !!ds && m.dataset === ds.id, active = m.active !== false;
+          var tip = m.formula + (m.format ? '  ·  ' + m.format : '') + (active ? '' : '  —  ' + tr('queryConsole.metricInactive', 'cannot be computed on the current data (missing fields)'));
+          var main = h('button.rk-qc-ref__item.rk-qc-my__item', { type: 'button', title: tip, disabled: !active && here ? true : null, on: { click: function () {
+            if (here) { insert(quoteName(m.name)); return; }
+            if (!RK.data.get(m.dataset)) return;
+            st.ds = m.dataset; st.builder = defaultBuilder(m.dataset, null);
+            paintDataset(); paintBuilder(); paintRef();
+            insert(quoteName(m.name));
+          } } },
+            h('span.rk-qc-tag.rk-qc-tag--my', 'ƒ#'),
+            h('span.rk-qc-ref__main', h('span.rk-qc-ref__t', m.title || m.name),
+              h('span.rk-qc-ref__n', m.name + (here ? '' : '  ·  ' + tr('queryConsole.metricIn', 'in {dataset}', { dataset: m.dataset })))),
+            m.format ? h('span.rk-qc-ref__f', m.format) : null);
+          var rm = h('button.rk-qc-my__rm', { type: 'button', title: tr('removeMetric', 'Remove metric {name}', { name: m.title || m.name }),
+            'aria-label': tr('removeMetric', 'Remove metric {name}', { name: m.title || m.name }), html: icon('x', 12), on: { click: function () { removeMetric(m); } } });
+          ml.appendChild(h('div.rk-qc-my', { role: 'listitem', class: (here ? '' : 'is-other') + (active ? '' : ' is-inactive') }, main, rm));
+        });
+        if (!list.length) ml.appendChild(h('p.rk-qc-my__empty', tr('queryConsole.metricsHint', 'Formulas you save with “Add as metric” appear here and are kept in this browser for this report')));
+        refEl.appendChild(h('section.rk-qc-ref__sec.rk-qc-ref__sec--my',
+          h('h4', tr('myMetrics', 'My metrics'), list.length ? h('span.rk-num', String(list.length)) : null), ml));
       }
       function setRef(open) {
         st.refOpen = open;
@@ -923,7 +1022,7 @@
         exEl.innerHTML = '';
         var ex = (o.examples || []).map(function (e) { return typeof e === 'string' ? { label: e, query: e } : e; });
         if (!ex.length) return;
-        exEl.appendChild(h('span.rk-qc-ex__k', 'Examples'));
+        exEl.appendChild(h('span.rk-qc-ex__k', tr('examples', 'Examples')));
         ex.forEach(function (e) {
           exEl.appendChild(h('button.rk-qc-chip', { type: 'button', title: e.query, on: { click: function () {
             ta.value = e.query;
@@ -955,7 +1054,7 @@
           } } }, h('code.rk-qc-hist__q', { html: highlight(x.q, RK.data.get(x.ds), null, -1) }), h('span.rk-qc-hist__meta', (x.ds || '') + ' · ' + relTime(x.t))));
         });
         var foot = h('div.rk-qc-hist__foot', h('span', list.length + ' recent quer' + (list.length === 1 ? 'y' : 'ies')),
-          list.length ? h('button.rk-qc-link', { type: 'button', on: { click: function () { saveHistory([]); p.close(); } } }, 'Clear history') : null);
+          list.length ? h('button.rk-qc-link', { type: 'button', on: { click: function () { saveHistory([]); p.close(); } } }, tr('queryConsole.clearHistory', 'Clear history')) : null);
         var p = track(popover(histBtn, h('div', body, foot), { minWidth: 380, align: 'right', cls: 'rk-qc-pop--hist' }));
       }
 
@@ -1061,14 +1160,14 @@
           nf.length ? h('span.rk-qc-badge', { title: 'Results respect the report filters: ' + nf.join(', ') }, h('span', { html: icon('filter', 11) }), nf.length + ' global filter' + (nf.length > 1 ? 's' : '')) : null,
           h('span.rk-qc-rh__note')));
         resHead.appendChild(h('span.rk-qc__spacer'));
-        var viewSeg = h('div.rk-seg.rk-qc-seg', { role: 'group', 'aria-label': 'Result view' }, [['split', 'Split'], ['table', 'Table'], ['chart', 'Chart']].map(function (v) {
+        var viewSeg = h('div.rk-seg.rk-qc-seg', { role: 'group', 'aria-label': 'Result view' }, [['split', tr('queryConsole.split', 'Split')], ['table', tr('queryConsole.table', 'Table')], ['chart', tr('queryConsole.chart', 'Chart')]].map(function (v) {
           return h('button', { type: 'button', class: st.view === v[0] ? 'is-on' : null, 'aria-pressed': st.view === v[0] ? 'true' : 'false', on: { click: function () { st.view = v[0]; paintResults(true); } } }, v[1]);
         }));
         resHead.appendChild(viewSeg);
         var cands = metricCandidates();
         if (cands.length) {
-          var addBtn = h('button.rk-btn.rk-qc-mbtn', { type: 'button', title: 'Save a formula column as a new field of ' + ds.title, on: { click: function () { openAddMetric(addBtn, cands); } } },
-            h('span', { html: icon('metric', 13) }), 'Add as metric');
+          var addBtn = h('button.rk-btn.rk-qc-mbtn', { type: 'button', title: tr('queryConsole.saveFormula', 'Save a formula column as a new field of {dataset}', { dataset: ds.title }), on: { click: function () { openAddMetric(addBtn, cands); } } },
+            h('span', { html: icon('metric', 13) }), tr('addAsMetric', 'Add as metric'));
           resHead.appendChild(addBtn);
         }
         resHead.appendChild(h('button.rk-btn.rk-qc-csv', { type: 'button', title: 'Download all result rows as CSV', on: { click: exportCSV } }, h('span', { html: icon('download', 13) }), 'CSV'));
@@ -1449,9 +1548,9 @@
       function openAddMetric(anchor, cands) {
         var ds = RK.data.get(result.dataset);
         var chosen = cands[0];
-        var nameIn = h('input.rk-input.rk-qc-mono', { type: 'text', spellcheck: 'false', 'aria-label': 'Field name' });
-        var titleIn = h('input.rk-input', { type: 'text', 'aria-label': 'Title' });
-        var fmtIn = h('input.rk-input.rk-qc-mono', { type: 'text', spellcheck: 'false', placeholder: '0.0x', 'aria-label': 'Format' });
+        var nameIn = h('input.rk-input.rk-qc-mono', { type: 'text', spellcheck: 'false', 'aria-label': tr('queryConsole.fieldName', 'Field name') });
+        var titleIn = h('input.rk-input', { type: 'text', 'aria-label': tr('queryConsole.title', 'Title') });
+        var fmtIn = h('input.rk-input.rk-qc-mono', { type: 'text', spellcheck: 'false', placeholder: '0.0x', 'aria-label': tr('queryConsole.format', 'Format') });
         var preview = h('div.rk-qc-am__preview.rk-num');
         var msg = h('div.rk-qc-am__msg');
         function fill(it) {
@@ -1488,23 +1587,26 @@
         })) : h('code.rk-qc-am__expr', chosen.expr);
         var addBtn = h('button.rk-btn.rk-btn--primary', { type: 'button', on: { click: function () {
           var name = nameIn.value.trim();
-          if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) { msg.textContent = 'Name must start with a letter and use letters, digits or _'; return; }
-          if (ds.field(name) && !ds.field(name).computed) { msg.textContent = '"' + name + '" is already a source field of ' + ds.id; return; }
+          if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) { msg.textContent = tr('queryConsole.badName', 'Name must start with a letter and use letters, digits or _'); return; }
+          if (ds.field(name) && !ds.field(name).computed) { msg.textContent = tr('queryConsole.sourceField', '"{name}" is already a source field of {dataset}', { name: name, dataset: ds.id }); return; }
+          var title = titleIn.value.trim() || name;
           try {
-            ds.addComputed({ name: name, formula: chosen.expr, title: titleIn.value.trim() || name, format: fmtIn.value.trim() || null });
+            // user: true — RK.data keeps it in this browser for this report and restores it on the next visit
+            ds.addComputed({ name: name, formula: chosen.expr, title: title, format: fmtIn.value.trim() || null, user: true });
           } catch (e) { msg.textContent = e.message; return; }
           p.close();
-          setStatus('ok', 'Added “' + (titleIn.value.trim() || name) + '” as field ' + name + ' to ' + ds.title + ' — every block using ' + ds.id + ' can now use it');
-        } } }, 'Add to ' + ds.id);
+          paintRef();
+          setStatus('ok', tr('queryConsole.metricAddedLong', 'Added “{title}” as field {name} to {dataset} — every block using it can now use it; saved in this browser', { title: title, name: name, dataset: ds.title }));
+        } } }, tr('queryConsole.addTo', 'Add to {dataset}', { dataset: ds.id }));
         var form = h('div.rk-qc-am',
-          h('div.rk-qc-am__title', 'Add formula as a dataset field'),
+          h('div.rk-qc-am__title', tr('queryConsole.addFormula', 'Add formula as a dataset field')),
           choice,
           h('div.rk-qc-am__grid',
-            h('label', h('span', 'Title'), titleIn),
-            h('label', h('span', 'Field name'), nameIn),
-            h('label', h('span', 'Format'), fmtIn)),
+            h('label', h('span', tr('queryConsole.title', 'Title')), titleIn),
+            h('label', h('span', tr('queryConsole.fieldName', 'Field name')), nameIn),
+            h('label', h('span', tr('queryConsole.format', 'Format')), fmtIn)),
           preview, msg,
-          h('div.rk-qc-am__foot', h('span.rk-muted', 'Recalculates live (incl. @parameters)'), addBtn));
+          h('div.rk-qc-am__foot', h('span.rk-muted', tr('queryConsole.liveNote', 'Recalculates live (incl. @parameters) · saved in this browser')), addBtn));
         var p = track(popover(anchor, form, { minWidth: 360, align: 'right' }));
         fill(chosen);
         titleIn.focus();

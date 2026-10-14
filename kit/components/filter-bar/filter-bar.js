@@ -14,7 +14,9 @@
  * in sync. The chips row lists the bar's own filters AND chart cross-filter selections (store filters
  * with a `source`), each removable, plus "Reset all". Facet counts and the range histogram respect the
  * other active filters. Dropdowns are custom popovers attached to <body> (never clipped by a page),
- * fully keyboard operable (listbox / slider / switch ARIA patterns). Inline layout inside .rk-topbar.
+ * fully keyboard operable (listbox / slider / switch ARIA patterns). Inline layout inside .rk-topbar:
+ * the controls show their own state, chart selections become removable chips on the same line, and the
+ * chips that do not fit collapse into a "+N" popover so the bar stays one line high.
  */
 (function () {
   'use strict';
@@ -75,6 +77,41 @@
   /* ------------------------------------------------------------------ *
    * Helpers
    * ------------------------------------------------------------------ */
+  /** UI string via RK.i18n when the report has a locale pack ({name} placeholders filled from vars). */
+  function tr(key, fb, vars) {
+    var s = null;
+    try { if (RK.i18n && typeof RK.i18n.t === 'function') s = RK.i18n.t(key, fb); } catch (e) { s = null; }
+    s = s == null ? fb : String(s);
+    return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }) : s;
+  }
+  if (RK.i18n && typeof RK.i18n.add === 'function') {
+    RK.i18n.add('zh-CN', {
+      'filterBar.selections': '图表选择',
+      'filterBar.moreSelections': '另有 {n} 项图表选择',
+      'filterBar.selectionHint': '在图表中点击产生的选择 — 点击 × 清除',
+      'filterBar.clearSelections': '清除图表选择',
+      'filterBar.noFilters': '未应用筛选',
+      'filterBar.selectAll': '全选',
+      'filterBar.selectAllResults': '全选搜索结果',
+      'filterBar.only': '仅此项',
+      'filterBar.selectOnly': '仅选择 {value}',
+      'filterBar.noMatches': '无匹配项',
+      'filterBar.searchIn': '搜索{label}…',
+      'filterBar.searchAll': '搜索全部文本…',
+      'filterBar.selectedOf': '已选 {n} / {total}',
+      'filterBar.selected': '已选 {n} 项',
+      'filterBar.nOf': '{n} / {total}',
+      'filterBar.any': '不限',
+      'filterBar.dragHint': '拖动或使用方向键',
+      'filterBar.on': '开',
+      'filterBar.countOf': '{n} / {total} {noun}',
+      'filterBar.rows': '行'
+    });
+  }
+
+  /** Lower-case a label for running text in languages with case ("Sector" -> "sector"); CJK text is unchanged. */
+  function lower(s) { return /^[A-Z][a-z]/.test(String(s)) ? String(s).charAt(0).toLowerCase() + String(s).slice(1) : String(s); }
+
   function same(a, b) { return typeof a === 'string' && typeof b === 'string' ? a.toLowerCase() === b.toLowerCase() : a === b; }
   function indexOfCI(list, v) { for (var i = 0; i < list.length; i++) if (same(list[i], v)) return i; return -1; }
   function fmtVal(v, fmt) { return typeof v === 'string' && !RK.format.isDateCode(fmt) ? v : RK.format(v, fmt); }
@@ -102,7 +139,7 @@
     return {
       raw: f, ds: ds, field: f.field || null, type: type,
       key: f.key || f.field || (type + ':' + (f.label || 'filter')),
-      label: f.label || (fld && fld.title) || f.field || 'Search',
+      label: f.label || (fld && fld.title) || f.field || tr('search', 'Search'),
       format: f.format || (fld && fld.format) || null,
       fieldType: fld ? fld.type : null
     };
@@ -124,7 +161,7 @@
     var multi = c.type === 'multi';
     var values = c.raw.values ? c.raw.values.slice() : (c.ds && c.field ? c.ds.distinct(c.field) : []);
     if (!c.raw.values && c.raw.sort !== false) values.sort(function (a, b) { return typeof a === 'number' ? a - b : String(a).localeCompare(String(b)); });
-    var allLabel = c.raw.allLabel || 'All';
+    var allLabel = c.raw.allLabel || tr('all', 'All');
     var listId = RK.util.uid('rk-fb-list');
     var valueEl = h('span.rk-fb-trigger__v');
     var trigger = h('button.rk-fb-trigger', {
@@ -166,8 +203,8 @@
 
     function paintTrigger() {
       var s = sel();
-      var text = s === null ? allLabel : !s.length ? 'None' : s.length === 1 ? fmtVal(s[0], c.format)
-        : (s.length === 2 && summarise(s, c.format).length <= 26 ? summarise(s, c.format) : s.length + ' of ' + values.length);
+      var text = s === null ? allLabel : !s.length ? tr('none', 'None') : s.length === 1 ? fmtVal(s[0], c.format)
+        : (s.length === 2 && summarise(s, c.format).length <= 26 ? summarise(s, c.format) : tr('filterBar.nOf', '{n} of {total}', { n: s.length, total: values.length }));
       valueEl.textContent = text;
       trigger.classList.toggle('is-active', s !== null);
       trigger.title = s && s.length ? c.label + ': ' + summarise(s, c.format, 6) : c.label + ': ' + allLabel;
@@ -196,7 +233,7 @@
           id: listId + '-all', role: 'option', 'aria-selected': state === 'on' ? 'true' : 'false', 'aria-checked': multi ? (state === 'mixed' ? 'mixed' : String(state === 'on')) : null,
           class: 'is-' + state, on: { click: function () { if (multi) toggleAll(); else toggleValue(null); } }
         }, multi ? h('span.rk-fb-check', { html: state === 'mixed' ? SVG.dash : SVG.check }) : h('span.rk-fb-radio'),
-          h('span.rk-fb-opt__t', multi ? (q ? 'Select all results' : 'Select all') : allLabel),
+          h('span.rk-fb-opt__t', multi ? (q ? tr('filterBar.selectAllResults', 'Select all results') : tr('filterBar.selectAll', 'Select all')) : allLabel),
           h('span.rk-fb-opt__n.rk-num', String(c.ds ? RK.data.view(c.ds, { ignore: [c.key] }).length : '')));
         listEl.appendChild(allRow);
         rowsEls.push({ el: allRow, all: true });
@@ -209,16 +246,16 @@
         }, multi ? h('span.rk-fb-check', { html: SVG.check }) : h('span.rk-fb-radio'),
           h('span.rk-fb-opt__t', fmtVal(v, c.format)),
           h('span.rk-fb-opt__n.rk-num', c.ds ? String(n) : ''),
-          multi ? h('button.rk-fb-only', { type: 'button', tabindex: '-1', title: 'Select only ' + fmtVal(v, c.format), on: { click: function (e) { e.stopPropagation(); commit([v]); } } }, 'only') : null);
+          multi ? h('button.rk-fb-only', { type: 'button', tabindex: '-1', title: tr('filterBar.selectOnly', 'Select only {value}', { value: fmtVal(v, c.format) }), on: { click: function (e) { e.stopPropagation(); commit([v]); } } }, tr('filterBar.only', 'only')) : null);
         listEl.appendChild(row);
         rowsEls.push({ el: row, v: v });
       });
-      if (!vis.length) listEl.appendChild(h('div.rk-fb-empty', 'No matches'));
+      if (!vis.length) listEl.appendChild(h('div.rk-fb-empty', tr('filterBar.noMatches', 'No matches')));
       act = Math.max(0, Math.min(act, rowsEls.length - 1));
       paintActive(false);
       if (footEl) {
         var cur = s === null ? values.length : s.length;
-        footEl.firstChild.textContent = multi ? cur + ' of ' + values.length + ' selected' : (s === null ? allLabel : s.length + ' selected');
+        footEl.firstChild.textContent = multi ? tr('filterBar.selectedOf', '{n} of {total} selected', { n: cur, total: values.length }) : (s === null ? allLabel : tr('filterBar.selected', '{n} selected', { n: s.length }));
       }
     }
     function paintActive(scroll) {
@@ -251,10 +288,10 @@
         for (var i = 0; i < rowsEls.length; i++) if (rowsEls[i].el === row && act !== i) { act = i; paintActive(false); }
       });
       searchEl = values.length > 6 || c.raw.searchable ? h('input.rk-fb-list__q', {
-        type: 'text', placeholder: 'Search ' + c.label.toLowerCase() + '…', 'aria-label': 'Search ' + c.label, role: 'combobox', 'aria-expanded': 'true', 'aria-controls': listId, autocomplete: 'off',
+        type: 'text', placeholder: tr('filterBar.searchIn', 'Search {label}…', { label: lower(c.label) }), 'aria-label': tr('search', 'Search') + ' ' + c.label, role: 'combobox', 'aria-expanded': 'true', 'aria-controls': listId, autocomplete: 'off',
         on: { input: function () { q = searchEl.value; act = 0; renderRows(); }, keydown: onKey }
       }) : null;
-      footEl = h('div.rk-fb-list__foot', h('span'), h('button.rk-fb-link', { type: 'button', on: { click: function () { put(c, null); } } }, 'Reset'));
+      footEl = h('div.rk-fb-list__foot', h('span'), h('button.rk-fb-link', { type: 'button', on: { click: function () { put(c, null); } } }, tr('reset', 'Reset')));
       var body = h('div.rk-fb-list', searchEl ? h('div.rk-fb-list__search', h('span.rk-fb-list__icon', { html: SVG.search }), searchEl) : null, listEl, footEl);
       pop = popover(trigger, body, {
         minWidth: 220,
@@ -271,7 +308,7 @@
     return {
       c: c, el: trigger,
       sync: function () { paintTrigger(); if (pop) renderRows(); },
-      chip: function () { var s = sel(); return s === null ? null : (s.length ? summarise(s, c.format, 3) : 'None'); },
+      chip: function () { var s = sel(); return s === null ? null : (s.length ? summarise(s, c.format, 3) : tr('none', 'None')); },
       applyDefault: function (d) { commit([].concat(d)); },
       destroy: function () { if (pop) pop.close(); }
     };
@@ -379,7 +416,7 @@
       var active = lo > d0 || hi < d1;
       body.classList.toggle('is-active', active);
       vals.classList.toggle('is-active', active);
-      if (trigVal) trigVal.textContent = active ? show(lo) + ' – ' + show(hi) : 'Any';
+      if (trigVal) trigVal.textContent = active ? show(lo) + ' – ' + show(hi) : tr('filterBar.any', 'Any');
       if (trigger) trigger.classList.toggle('is-active', active);
       if (hist) Array.prototype.forEach.call(hist.children, function (bar, i) {
         var mid = d0 + (i + 0.5) * (d1 - d0) / BINS;
@@ -426,7 +463,7 @@
       var panel = h('div.rk-fb-rangepop',
         h('div.rk-fb-rangepop__head', h('span.rk-fb-rangepop__k', c.label), vals),
         body,
-        h('div.rk-fb-list__foot', h('span', 'Drag or use arrow keys'), h('button.rk-fb-link', { type: 'button', on: { click: function () { put(c, null); } } }, 'Reset')));
+        h('div.rk-fb-list__foot', h('span', tr('filterBar.dragHint', 'Drag or use arrow keys')), h('button.rk-fb-link', { type: 'button', on: { click: function () { put(c, null); } } }, tr('reset', 'Reset'))));
       pop = popover(trigger, panel, { minWidth: 280, onClose: function () { pop = null; trigger.setAttribute('aria-expanded', 'false'); trigger.classList.remove('is-open'); } });
       trigger.setAttribute('aria-expanded', 'true');
       trigger.classList.add('is-open');
@@ -456,7 +493,7 @@
     var timer = null;
     var input = h('input.rk-fb-search__input', {
       type: 'text', role: 'searchbox', autocomplete: 'off', spellcheck: 'false',
-      placeholder: c.raw.placeholder || 'Search ' + (c.field ? c.label.toLowerCase() : 'all text') + '…', 'aria-label': c.label,
+      placeholder: c.raw.placeholder || (c.field ? tr('filterBar.searchIn', 'Search {label}…', { label: lower(c.label) }) : tr('filterBar.searchAll', 'Search all text…')), 'aria-label': c.label,
       on: {
         input: function () { paint(); clearTimeout(timer); timer = setTimeout(commit, 200); },
         keydown: function (e) { if (e.key === 'Escape' && input.value) { e.preventDefault(); input.value = ''; paint(); commit(); } else if (e.key === 'Enter') commit(); }
@@ -501,7 +538,7 @@
     sync();
     return {
       c: c, el: btn, sync: sync,
-      chip: function () { return RK.store.filter(c.key) ? 'On' : null; },
+      chip: function () { return RK.store.filter(c.key) ? tr('filterBar.on', 'On') : null; },
       applyDefault: function (d) { if (d) set(true); },
       destroy: function () {}
     };
@@ -540,7 +577,7 @@
       });
       var ownKeys = controls.map(function (k) { return k.c.key; });
 
-      var root = h('div.rk-fb', { class: (inline ? 'rk-fb--inline' : 'rk-fb--stacked') + (ctx.motion ? '' : ' is-static'), role: 'group', 'aria-label': 'Filters' });
+      var root = h('div.rk-fb', { class: (inline ? 'rk-fb--inline' : 'rk-fb--stacked') + (ctx.motion ? '' : ' is-static'), role: 'group', 'aria-label': tr('filters', 'Filters') });
       var row = h('div.rk-fb__controls');
       controls.forEach(function (k) {
         var c = k.c;
@@ -549,13 +586,22 @@
         row.appendChild(h('div.rk-fb__ctl', { class: 'rk-fb__ctl--' + c.type }, head, k.el));
       });
       var countEl = o.count && ctx.dataset ? h('div.rk-fb__count', { 'aria-live': 'polite' }) : null;
-      var resetInline = inline ? h('button.rk-fb-link.rk-fb__reset', { type: 'button', on: { click: resetAll } }, 'Reset') : null;
+      var resetInline = inline ? h('button.rk-fb-link.rk-fb__reset', { type: 'button', on: { click: resetAll } }, tr('reset', 'Reset')) : null;
+      // inline: chart selections as chips on the same line; those that do not fit go into a "+N" popover
+      var xsel = null;
+      if (inline && o.chips !== false && o.crossFilters) {
+        xsel = { strip: h('div.rk-fb__xchips', { role: 'list', 'aria-label': tr('filterBar.selections', 'Chart selections') }), map: {}, hidden: [], pop: null };
+        xsel.more = h('button.rk-fb-more', { type: 'button', 'aria-haspopup': 'dialog', 'aria-expanded': 'false', on: { click: toggleMore } });
+        xsel.el = h('div.rk-fb__xsel.is-empty', xsel.strip, xsel.more);
+        row.appendChild(xsel.el);
+        ctx.block.classList.add('rk-fb-host');   // lets the bar take the top bar's free width (and shrink the chips first)
+      }
       if (countEl || resetInline) row.appendChild(h('div.rk-fb__aside', countEl, resetInline));
       root.appendChild(row);
 
       var chipsEl = null, chipMap = {};
       if (o.chips && !inline) {
-        chipsEl = h('div.rk-fb__chips', { 'aria-label': 'Active filters' });
+        chipsEl = h('div.rk-fb__chips', { 'aria-label': tr('activeFilters', 'Active filters') });
         root.appendChild(chipsEl);
       }
       ctx.el.appendChild(root);
@@ -580,54 +626,133 @@
             if (!s.source || ownKeys.indexOf(key) >= 0 || s.source === ctx.id) return;
             var info = fieldInfo(s.field, s.datasets);
             // 'in' lists and either-end link selections (op 'expr' carrying values) read as values
-            var text = s.values ? (s.values.length ? summarise(s.values, info.format, 3) : 'None')
+            var text = s.values ? (s.values.length ? summarise(s.values, info.format, 3) : tr('none', 'None'))
               : s.op === 'between' ? RK.format(s.min, info.format) + ' – ' + RK.format(s.max, info.format)
               : s.op === 'search' ? '“' + s.text + '”' : (s.expr || '');
-            list.push({ key: key, label: info.title || s.field || 'Selection', text: text, cross: true });
+            list.push({ key: key, label: info.title || s.field || tr('selection', 'Selection'), text: text, cross: true });
           });
         }
         return list;
       }
 
-      function paintChips() {
-        var list = activeList();
-        if (resetInline) resetInline.classList.toggle('is-shown', list.length > 0);
-        if (!chipsEl) return;
+      /** One removable chip (own filter or chart selection); v = the value span updated in place. */
+      function chipOf(it) {
+        var v = h('span.rk-fb-chip__v');
+        return {
+          v: v,
+          el: h('span.rk-chip.rk-fb-chip', { class: it.cross ? 'is-cross' : null, role: xsel && it.cross ? 'listitem' : null,
+            title: it.cross ? tr('filterBar.selectionHint', 'Selection made in a chart — click × to clear') : null },
+            it.cross ? h('span.rk-fb-chip__icon', { html: SVG.chart }) : null,
+            h('span.rk-fb-chip__k', it.label), v,
+            h('button', { type: 'button', 'aria-label': tr('removeFilter', 'Remove filter {label}', { label: it.label }), html: SVG.x, on: { click: function () { RK.store.clearFilter(it.key); } } }))
+        };
+      }
+      /** Keyed chip list: create new chips, update values, drop stale ones, keep the order stable. */
+      function syncChips(host, map, list) {
         var seen = {};
         list.forEach(function (it) {
           seen[it.key] = true;
-          var ch = chipMap[it.key];
-          if (!ch) {
-            var v = h('span.rk-fb-chip__v');
-            ch = chipMap[it.key] = {
-              v: v,
-              el: h('span.rk-chip.rk-fb-chip', { class: it.cross ? 'is-cross' : null, title: it.cross ? 'Selection made in a chart — click × to clear' : null },
-                it.cross ? h('span.rk-fb-chip__icon', { html: SVG.chart }) : null,
-                h('span.rk-fb-chip__k', it.label), v,
-                h('button', { type: 'button', 'aria-label': 'Remove filter ' + it.label, html: SVG.x, on: { click: function () { RK.store.clearFilter(it.key); } } }))
-            };
-          }
+          var ch = map[it.key] || (map[it.key] = chipOf(it));
           ch.v.textContent = it.text;
-          chipsEl.appendChild(ch.el); // (re)append keeps the order stable
+          ch.v.title = it.text;
+          host.appendChild(ch.el); // (re)append keeps the order stable
         });
-        Object.keys(chipMap).forEach(function (k) { if (!seen[k]) { chipMap[k].el.remove(); delete chipMap[k]; } });
+        Object.keys(map).forEach(function (k) { if (!seen[k]) { map[k].el.remove(); delete map[k]; } });
+      }
+
+      function paintChips() {
+        var list = activeList();
+        if (resetInline) resetInline.classList.toggle('is-shown', list.length > 0);
+        if (xsel) paintSelections(list.filter(function (it) { return it.cross; }));
+        if (!chipsEl) return;
+        syncChips(chipsEl, chipMap, list);
         var empty = chipsEl.querySelector('.rk-fb__none');
         var reset = chipsEl.querySelector('.rk-fb__reset');
         if (!list.length) {
-          if (!empty) chipsEl.insertBefore(h('span.rk-fb__none', 'No filters applied'), chipsEl.firstChild);
+          if (!empty) chipsEl.insertBefore(h('span.rk-fb__none', tr('filterBar.noFilters', 'No filters applied')), chipsEl.firstChild);
           if (reset) reset.remove();
         } else {
           if (empty) empty.remove();
-          chipsEl.appendChild(reset || h('button.rk-fb-link.rk-fb__reset', { type: 'button', on: { click: resetAll } }, 'Reset all'));
+          chipsEl.appendChild(reset || h('button.rk-fb-link.rk-fb__reset', { type: 'button', on: { click: resetAll } }, tr('resetAll', 'Reset all')));
         }
+      }
+
+      /* ---------- inline: chart-selection chips + "+N" overflow ---------- */
+      var xlist = [];
+      function paintSelections(list) {
+        xlist = list;
+        syncChips(xsel.strip, xsel.map, list);
+        xsel.el.classList.toggle('is-empty', !list.length);
+        fitSelections();
+      }
+      /** Hide chips from the end until the strip fits its (shrunk) width; the hidden ones are listed under "+N". */
+      function fitSelections() {
+        if (!xsel) return;
+        var els = xlist.map(function (it) { return xsel.map[it.key].el; });
+        els.forEach(function (el) { el.classList.remove('is-over'); });
+        xsel.hidden = [];
+        xsel.el.classList.remove('has-more');
+        if (els.length && over()) {
+          xsel.el.classList.add('has-more');
+          for (var i = els.length - 1; i >= 0; i--) {
+            els[i].classList.add('is-over');
+            xsel.hidden.unshift(xlist[i]);
+            paintMore(i);
+            if (!over()) break;
+          }
+        }
+        paintMore(els.length - xsel.hidden.length);
+        xsel.el.classList.toggle('has-shown', els.length > xsel.hidden.length);
+        if (xsel.pop) { if (xsel.hidden.length) paintMorePop(); else xsel.pop.close(); }
+      }
+      function over() { return xsel.strip.scrollWidth > xsel.strip.clientWidth + 1; }
+      function paintMore(shown) {
+        var n = xsel.hidden.length;
+        xsel.more.innerHTML = '';
+        if (!n) return;
+        // nothing fits: the button alone stands for every selection (chart icon + count)
+        if (!shown) xsel.more.appendChild(h('span.rk-fb-chip__icon', { html: SVG.chart }));
+        xsel.more.appendChild(document.createTextNode(shown ? '+' + n : String(n)));
+        var label = tr('filterBar.moreSelections', '{n} more chart selection' + (n > 1 ? 's' : ''), { n: n });
+        xsel.more.title = label + ': ' + xsel.hidden.map(function (it) { return it.label + ' = ' + it.text; }).join(' · ');
+        xsel.more.setAttribute('aria-label', label);
+      }
+      function paintMorePop() {
+        var body = xsel.popBody, map = xsel.popMap || (xsel.popMap = {});
+        syncChips(body, map, xsel.hidden);
+        if (xsel.pop) xsel.pop.place();
+      }
+      function toggleMore() {
+        if (xsel.pop) { xsel.pop.close(); return; }
+        xsel.popBody = h('div.rk-fb-morepop__list', { role: 'list' });
+        xsel.popMap = {};
+        var panel = h('div.rk-fb-morepop',
+          h('div.rk-fb-rangepop__head', h('span.rk-fb-rangepop__k', tr('filterBar.selections', 'Chart selections'))),
+          xsel.popBody,
+          h('div.rk-fb-list__foot', h('span'), h('button.rk-fb-link', { type: 'button', on: { click: clearSelections } }, tr('filterBar.clearSelections', 'Clear chart selections'))));
+        xsel.pop = popover(xsel.more, panel, { minWidth: 240, onClose: function () { xsel.pop = null; xsel.more.setAttribute('aria-expanded', 'false'); xsel.more.classList.remove('is-open'); } });
+        xsel.more.setAttribute('aria-expanded', 'true');
+        xsel.more.classList.add('is-open');
+        paintMorePop();
+        var first = xsel.popBody.querySelector('button');
+        if (first) first.focus();
+      }
+      function clearSelections() {
+        var fs = RK.store.filters();
+        Object.keys(fs).forEach(function (k) { if (fs[k].source && ownKeys.indexOf(k) < 0 && fs[k].source !== ctx.id) RK.store.clearFilter(k); });
       }
 
       function paintCount() {
         if (!countEl) return;
         var n = RK.data.view(ctx.dataset).length, N = ctx.dataset.rows.length;
         countEl.innerHTML = '';
-        countEl.appendChild(h('b.rk-num', RK.format(n, '#,##0')));
-        countEl.appendChild(document.createTextNode(' of ' + RK.format(N, '#,##0') + ' ' + (o.countLabel || 'rows')));
+        // "<b>12</b> of 18 companies" — the template decides where the bold count sits (other languages order it differently)
+        var vars = { total: RK.format(N, '#,##0'), noun: o.countLabel || tr('filterBar.rows', 'rows') };
+        tr('filterBar.countOf', '{n} of {total} {noun}').split('{n}').forEach(function (part, i) {
+          if (i) countEl.appendChild(h('b.rk-num', RK.format(n, '#,##0')));
+          part = part.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; });
+          if (part) countEl.appendChild(document.createTextNode(part));
+        });
         countEl.classList.toggle('is-filtered', n < N);
       }
 
@@ -646,11 +771,19 @@
       });
       syncAll();
 
+      // the strip's width depends on fonts and on the top bar's other items: re-fit once layout settles
+      var fitLater = xsel ? RK.util.rafThrottle(fitSelections) : null;
+      if (fitLater) { fitLater(); if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { fitLater(); }); }
+
       return {
         update: function (c) { ctx = c; syncAll(); },
         onStore: function () { syncAll(); },
-        resize: function () {},
-        destroy: function () { controls.forEach(function (k) { k.destroy(); }); root.remove(); }
+        resize: function () { if (fitLater) fitLater(); },
+        destroy: function () {
+          controls.forEach(function (k) { k.destroy(); });
+          if (xsel) { if (xsel.pop) xsel.pop.close(); ctx.block.classList.remove('rk-fb-host'); }
+          root.remove();
+        }
       };
     }
   });

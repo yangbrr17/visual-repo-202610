@@ -11,6 +11,7 @@ from .data import LARGE_DATASET_ROWS
 from .errors import ReportValidationError
 from .expr import ExprSyntaxError, formula_refs, norm_name
 from .kit import Kit
+from .template import check_template
 
 if TYPE_CHECKING:  # pragma: no cover
     from .report import Block, Report
@@ -136,7 +137,12 @@ def check(report: "Report", kit: Any = None) -> tuple[list[str], list[str]]:
             _check_id(b.explicit_id, f"page {i + 1} block {j + 1} ({b.component})", seen, errors)
 
     # -------------------------------------------------------------- pages & blocks
-    from .report import PAGE_KINDS
+    from .report import PAGE_KINDS, UPDOWN
+    if getattr(report, "updown", None) not in (None, *UPDOWN):
+        errors.append(f"report updown {report.updown!r} must be 'us' or 'cn'")
+    if not isinstance(report.locale, str) or not re.fullmatch(r"[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*", report.locale):
+        warnings.append(f"report locale {report.locale!r} is not a BCP 47 tag like 'en-US' or 'zh-CN' "
+                        "(<html lang> / rk:locale; the runtime falls back to English)")
     checked_components: dict[str, bool] = {}
     for i, p in enumerate(report.pages):
         where = f"page {i + 1} '{p.title or p.id}'"
@@ -144,6 +150,12 @@ def check(report: "Report", kit: Any = None) -> tuple[list[str], list[str]]:
             errors.append(f"{where}: kind '{p.kind}' must be one of {', '.join(PAGE_KINDS)}")
         if not p.title:
             errors.append(f"page {i + 1}: title is empty")
+        if not isinstance(getattr(p, "filters", True), bool):
+            errors.append(f"{where}: filters must be True or False, got {p.filters!r}")
+        page_ds = next((b.data for b in p.blocks if b.data is not None), None)
+        for key in ("kicker", "title", "subtitle"):
+            for prob in check_template(getattr(p, key), report.datasets, report.params, page_ds):
+                errors.append(f"{where} › {key} template: {prob}")
         for b in p.blocks:
             _check_block(report, kit, b, f"{where} › block '{b.id}' [{b.component}]", errors, warnings,
                          checked_components)
@@ -168,13 +180,21 @@ def _check_id(value: str | None, where: str, seen: dict[str, str], errors: list[
 def _check_component_files(kit: Kit, cid: str, manifest: dict, errors: list[str]) -> None:
     if not kit.component_js(cid).is_file():
         errors.append(f"kit: component '{cid}' has a manifest but no kit/components/{cid}/{cid}.js")
+    for dep in Kit.option_dep_ids(manifest):
+        if kit.vendor_package(dep) is None:
+            errors.append(f"kit: component '{cid}' optionDeps names unknown vendor package '{dep}' "
+                          f"(not in vendor/vendor.json){_suggest(dep, [p.get('id', '') for p in kit.vendor_packages])}")
     for dep in manifest.get("deps") or []:
         pkg = kit.vendor_package(dep)
         if pkg is None:
             errors.append(f"kit: component '{cid}' depends on unknown vendor package '{dep}' "
                           f"(not in vendor/vendor.json){_suggest(dep, [p.get('id', '') for p in kit.vendor_packages])}")
             continue
-    for pkg in kit.resolve_vendor([d for d in manifest.get("deps") or [] if kit.vendor_package(d)]):
+    _check_vendor_files(kit, [d for d in manifest.get("deps") or [] if kit.vendor_package(d)], errors)
+
+
+def _check_vendor_files(kit: Kit, ids: list[str], errors: list[str]) -> None:
+    for pkg in kit.resolve_vendor(ids):
         base = kit.vendor_dir / pkg["id"]
         files = pkg.get("files") or {}
         dests = list(files.values()) if isinstance(files, dict) else list(files)
@@ -201,6 +221,14 @@ def _check_block(report: "Report", kit: Kit, b: "Block", where: str, errors: lis
     if b.component not in checked:
         checked[b.component] = True
         _check_component_files(kit, b.component, manifest, errors)
+    for dep in Kit.option_deps(manifest, b.options):   # vendor files pulled in by this block's options
+        if kit.vendor_package(dep) is not None and f"vendor:{dep}" not in checked:
+            checked[f"vendor:{dep}"] = True
+            _check_vendor_files(kit, [dep], errors)
+    if not topbar:
+        for key in ("title", "subtitle"):
+            for prob in check_template(getattr(b, key), report.datasets, report.params, b.data):
+                errors.append(f"{where} › {key} template: {prob}")
 
     needs = Kit.needs_data(manifest)
     ds = None
@@ -219,6 +247,28 @@ def _check_block(report: "Report", kit: Kit, b: "Block", where: str, errors: lis
     if ds is None:
         return
     names = _field_names(ds)
+    choices = b.options.get("choices")
+    choice_fields: dict[str, list[str]] = {}
+    if choices is not None:
+        if not isinstance(choices, dict):
+            errors.append(f"{where}: options.choices must be {{channel: [field, ...]}}, got {type(choices).__name__}")
+        else:
+            for ch, fields in choices.items():
+                if not isinstance(fields, list) or not fields:
+                    errors.append(f"{where}: options.choices.{ch} must be a non-empty list of field names "
+                                  "(or '*computed')")
+                    continue
+                for f in fields:
+                    if not isinstance(f, str) or not f:
+                        errors.append(f"{where}: options.choices.{ch} entries must be field names, got {f!r}")
+                    elif f.startswith("*"):
+                        if f != "*computed":
+                            errors.append(f"{where}: options.choices.{ch}: unknown wildcard {f!r} (only '*computed')")
+                    elif f not in names:
+                        errors.append(f"{where}: options.choices.{ch} -> field '{f}' is not in dataset '{b.data}'"
+                                      f"{_suggest(f, names)}")
+                    else:
+                        choice_fields.setdefault(ch, []).append(f)
     enc = b.encode
     for ch, val in enc.items():
         refs = _encode_values(val)
@@ -233,7 +283,7 @@ def _check_block(report: "Report", kit: Kit, b: "Block", where: str, errors: lis
             if not isinstance(spec, dict) or not spec.get("required"):
                 continue
             mapped = _encode_values(enc.get(ch))
-            if mapped or (enc.get(ch) is not None and mapped is None):
+            if mapped or (enc.get(ch) is not None and mapped is None) or choice_fields.get(ch):
                 continue
             default = spec.get("default")
             candidates = [d for d in as_list(default) if isinstance(d, str)] if default else []

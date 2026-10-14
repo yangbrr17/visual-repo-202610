@@ -76,3 +76,5 @@
 @media (prefers-reduced-motion: reduce) { .rk-ps__reset { transition: none; } .rk-ps__preview.is-flash td.is-live, .rk-ps__preview.is-flash .rk-ps__sval { animation: none; } }
 /* print: an assumptions read-out (label · value · change), no slider controls */
 @media print { .rk-ps__reset, .rk-ps__base, .rk-ps__track, .rk-ps__minmax { display: none; } .rk-ps__value { border-color: transparent; } }
+/* change not meaningful (relative change from a zero / negative base): neutral, never red / green */
+.rk-ps__chg.is-nm { color: var(--rk-ink-3); font-weight: 500; }

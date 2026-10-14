@@ -8,21 +8,21 @@
   "needs_data": false,
   "summary": "Global filter bar — searchable multi-select dropdowns, dual-thumb range sliders, search and toggles — with an active-filter chip row that also shows chart cross-filter selections.",
   "summary_zh": "全局筛选栏：可搜索的多选下拉框、双滑块区间、文本搜索和开关，并以标签行汇总当前筛选（包括图表点击产生的交叉筛选）。",
-  "description_zh": "放在页面顶部或固定顶栏（.rk-topbar__controls）中，为整份报告设置全局筛选：所有绑定了包含该字段的数据集的图表都会同步刷新。每个筛选器从 data 指定的数据集读取取值或数值范围；多选下拉框支持搜索、全选 / 仅选此项，并显示在其他筛选条件下的计数；区间滑块显示格式化的上下限和分布条，支持数值与日期字段。下方标签行列出所有生效的筛选（含图表交叉筛选，虚线标签），可逐个移除或一键“Reset all”；右侧显示筛选后的行数。适合同业可比、先例交易、地区 / 行业切片等需要客户自助切换口径的页面。",
+  "description_zh": "放在页面顶部或固定顶栏（.rk-topbar__controls）中，为整份报告设置全局筛选：所有绑定了包含该字段的数据集的图表都会同步刷新。每个筛选器从 data 指定的数据集读取取值或数值范围；多选下拉框支持搜索、全选 / 仅选此项，并显示在其他筛选条件下的计数；区间滑块显示格式化的上下限和分布条，支持数值与日期字段。下方标签行列出所有生效的筛选（含图表交叉筛选，虚线标签），可逐个移除或一键“Reset all”；右侧显示筛选后的行数。放在顶栏（紧凑单行布局）时，图表点击产生的选择同样以可移除的虚线标签显示在同一行，放不下的收进“+N”弹出框，顶栏始终保持一行高。界面文字随报告语言（RK.i18n，en / zh-CN）切换。适合同业可比、先例交易、地区 / 行业切片等需要客户自助切换口径的页面。",
   "best_for": ["Peer universe slicing (sector / region / size)", "Precedent transaction screens (date range, sector, consideration)", "Sticky top-bar global filters for a whole report", "Making chart cross-filter selections visible and removable"],
   "avoid_when": ["A single scenario toggle (use scenario-switch)", "Filters that should only affect one chart (use that chart's own options.where)"],
   "channels": {},
   "options": {
     "filters": {"type": "array", "default": [], "desc": "[{field, type: 'select'|'multi'|'range'|'search'|'toggle', label, data, values, default, format, key, datasets, step, min, max, placeholder, value, expr, searchable, allLabel, sort}] — data = dataset id for values / extent (default: the block's dataset); key = store filter key (default: field); datasets = restrict the filter to these dataset ids; toggle applies {field in [value]} or an expression filter (expr)"},
     "layout": {"type": "string", "default": "auto", "desc": "auto | stacked | inline (auto = inline pills inside .rk-topbar, stacked with labels elsewhere)"},
-    "chips": {"type": "boolean", "default": true, "desc": "Active-filter chip row with per-chip × and 'Reset all' (stacked layout)"},
-    "crossFilters": {"type": "boolean", "default": true, "desc": "Show chart cross-filter selections (store filters with a source) as dashed chips"},
+    "chips": {"type": "boolean", "default": true, "desc": "Active-filter chips with per-chip ×: stacked layout = a chip row for own filters and chart selections plus 'Reset all'; inline / top-bar layout = chart selections as chips on the same line (own filters show in their pills), the ones that do not fit collapse into a '+N' popover so the bar stays one line high"},
+    "crossFilters": {"type": "boolean", "default": true, "desc": "Show chart cross-filter selections (store filters with a source) as dashed chips (both layouts)"},
     "count": {"type": "boolean", "default": true, "desc": "'12 of 18 companies' readout for the bound dataset"},
     "countLabel": {"type": "string", "default": null, "desc": "Noun used by the readout (default 'rows')"},
     "histogram": {"type": "boolean", "default": true, "desc": "Distribution strip above range sliders (counts respect the other filters)"},
     "tools": {"type": "boolean", "default": false, "desc": "Block toolbar (off for controls)"}
   },
-  "interactions": ["Searchable multi-select with select all / 'only' / reset and live facet counts", "Dual-thumb range slider: drag, click the track, arrow / PageUp / Home / End keys", "Debounced search box (Esc clears)", "Toggle switch (value or expression filter)", "Chips for own filters and chart cross-filters with × and 'Reset all'", "Stays in sync with RK.store (other bars, charts, resets)", "Keyboard: listbox, slider and switch ARIA patterns; Esc closes popovers"],
+  "interactions": ["Searchable multi-select with select all / 'only' / reset and live facet counts", "Dual-thumb range slider: drag, click the track, arrow / PageUp / Home / End keys", "Debounced search box (Esc clears)", "Toggle switch (value or expression filter)", "Chips for own filters and chart cross-filters with × and 'Reset all'", "Top bar: chart selections as removable chips on the same line; overflow in a '+N' popover with 'Clear chart selections'", "Stays in sync with RK.store (other bars, charts, resets)", "Keyboard: listbox, slider and switch ARIA patterns; Esc closes popovers"],
   "samples": [
     {"title": "Peer universe filters", "data": "peers", "height": 110,
      "options": {"countLabel": "companies", "filters": [

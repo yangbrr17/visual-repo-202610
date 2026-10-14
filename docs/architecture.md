@@ -223,3 +223,98 @@ RK.expr.compile('ev / ebitda', {fields})
 RK.theme.set('bronze')                       // 运行时换肤
 RK.format(v, '0.0x')
 ```
+
+### 7.1 标题模板（I1）— `RK.template`
+
+任何带 `data-rk-template="…"` 的元素（页面 title / subtitle / kicker、block title / subtitle）在启动时和每次 store
+变化（筛选、交叉选择、参数、数据）后由运行时重新求值，只写 `textContent`（永不 `innerHTML`）。
+
+```text
+{{<dataset>: <RK.expr> | <format>}}   聚合式在该数据集「当前筛选后」的行上求值；行公式 / 普通字段取第一行
+{{@wacc | 0.0%}}                       参数（可省略 dataset）
+{{<expr>}}                              在 block 内省略 dataset 时用该 block 的数据集（及其实际显示的行）
+```
+
+- 格式码可省略：参数用 manifest 中的 `format`，公式按查询列的规则推断（`median(x)` 继承 `x` 的格式，`count()` 为 `#,##0`）。
+- 分隔符是引号外的第一个单独 `|`（`||` 是逻辑或）；无法求值的占位符显示 `…` 并 `console.warn('[RK] title template …')` 一次。
+- `data-rk-filters="off"` 页面上的模板读取未筛选数据；builder 输出的回退文本即把每个占位符替换为 `…`（`RK.template.fallback(tpl)`）。
+
+```js
+RK.template.render('Peers at {{peers: median(ev_ebitda_25e) | 0.0x}}', {dataset, rows(ds), filters, onError})
+RK.template.parse(tpl)      // ['Peers at ', {src, dataset, expr, format}]
+RK.template.evaluate(ph, opts) -> {value, format, dataset}
+RK.runtime.refreshTemplates()   // 手动刷新（通常不需要）
+```
+
+### 7.2 筛选状态：页脚「Filtered view」与 block 徽标（I2 / P2）
+
+- 只要有全局筛选或交叉选择作用于某页的任一 block，该页 `.rk-page__foot` 中出现
+  `<span class="rk-page__filtered">Filtered view: Region = Europe · Sector = Automation</span>`（i18n 键 `filteredView`，打印可见）。
+- `<section class="rk-page" data-rk-filters="off">`（builder：`page(..., filters=False)`）：页内 block 等同 `options.filters === false`，
+  忽略全局筛选与交叉选择，永不显示该标记。
+- block 标题栏：`.rk-block__status` 内的「Filtered」徽标（悬停列出作用于本 block 的筛选，× 清除这些筛选；仅屏幕显示）；
+  若本 block 的行**仅因其他 block 的交叉选择**（带 `source` 的筛选）变为空，则忽略这些选择、按未选择状态渲染，并显示柔和徽标
+  「Selection not in this view」（`options.selectionFallback: false` 关闭；`options.badges: false` 隐藏徽标）。
+- 筛选描述：`spec.label`（筛选控件可设置）优先，否则取字段标题；值按字段格式显示。
+
+```js
+RK.data.applied(ds, {exclude, ignore, filters})  // view() 实际应用的筛选 [{key, spec}]
+RK.data.describeFilter(spec, ds)                 // "Region = Europe" / "Market cap: $1,000 – $5,000"
+block.view() -> {rows, applied, ignored}         // ctx.rows 的来源；ctx.ignoredSelections = 被忽略的选择 key
+RK.runtime.pageFilters(pageEl) / RK.runtime.updateChrome()
+```
+
+### 7.3 指标 / 维度切换（I3）
+
+```json
+{"encode": {"x": "company", "y": "ev_ebitda_25e"},
+ "choices": {"y": ["ev_ebitda_25e", "ev_revenue_25e", "*computed"]}, "choiceLabels": {"y": "Metric"}}
+```
+
+运行时在 block 标题栏渲染紧凑下拉框（`.rk-block__choices`，显示字段标题）；选择后设置 `options.encode[channel]` 并重渲染
+（清除本 block 自己的旧选择），该选择按 block 保存、筛选变化后保留。`"*computed"` 展开为数据集的计算字段与客户自建指标，
+新增 / 删除指标时自动更新。程序化：`block.choose('y', 'ev_revenue_25e')`（触发 `RK.bus` 事件 `block:choice`）。
+
+### 7.4 客户自建指标持久化与存储命名空间（I4）
+
+```js
+ds.addComputed({name, title, formula, format, user: true})   // 写入 localStorage "rk:metrics:" + RK.data.reportKey()
+RK.data.userMetrics()            // [{dataset, name, title, formula, format, active}]
+RK.data.removeUserMetric(ds, name)
+RK.data.reportKey()              // "报告标题|日期|<meta name="rk:built">"；三者皆空时追加页面路径
+RK.data.storageKey('theme')      // "rk:theme:" + reportKey（主题偏好也按报告隔离）
+```
+
+- 加载数据后（`RK.data.load` / `put`）自动恢复；已无法编译的（字段已删除、语法变化）跳过但保留在存储中；
+  与数据中真实列同名的指标永不覆盖该列；`ds.removeComputed(name)` 删除用户指标时同时清除存储。
+- file:// 下多份报告可能共享同一 localStorage 源，因此所有键都带 reportKey；所有存储访问都有 try/catch，
+  无存储（隐私模式、沙箱）时功能照常，只是不持久化。
+
+### 7.5 国际化与涨跌色（I5）
+
+```js
+RK.i18n.locale                    // <meta name="rk:locale"> 优先，其次 <html lang>；'zh' / 'zh-Hans' 使用 zh-CN 包
+RK.i18n.t('viewData', 'View data', {vars})   // 查找顺序：精确 locale → 同语言包 → en → fallback → key；{name} 占位
+RK.i18n.add('zh-CN', {'myComp.title': '…'})  // 组件注册自己的字符串
+RK.i18n.set('zh-CN')              // 运行时切换（事件 i18n:changed；已渲染的工具栏需重建）
+```
+
+- 内置 `en` / `zh-CN` 包覆盖运行时全部 UI 文本（工具栏、View data、Download CSV/PNG、Expand、No data for the current filters、
+  Reset、Filtered / Filtered view、Selection not in this view、主题名称等）以及组件常用词（Search、All、None、Median …）。
+- zh-CN 下 `RK.format` 的紧凑单位为 `亿 / 万`（`RK.format.config.compactUnits = [[1e8,'亿'],[1e4,'万']]`，页面自定义的单位不被覆盖），
+  布尔值显示「是 / 否」，`data-rk-meta="date"` 显示「2026年10月14日」。
+- `<html data-rk-updown="cn">`：红涨绿跌——运行时以内联样式交换 `--rk-pos` / `--rk-neg`（换肤后重新应用），
+  `RK.theme.tokens().pos/neg` 同步交换；`RK.theme.updown()` / `RK.theme.setUpdown('cn'|'us')`。
+- builder：`Report(locale="zh-CN", updown="cn"|"us")` 输出 `<html lang>`、`<meta name="rk:locale">`、`data-rk-updown`。
+
+### 7.6 打印适配（P1）
+
+打印时（`beforeprint` / `matchMedia('print')`）运行时对每个内容溢出其 body 的 block（`scrollWidth > clientWidth + 1` 或
+`scrollHeight > clientHeight + 1`，包括表格包裹层、Tabulator holder 等嵌套滚动容器）先展开嵌套滚动容器，再对 body 的子元素施加
+CSS `zoom` 缩放到 body 原尺寸内（最小 0.55，仍放不下的部分在 body 处裁切）；打印结束后恢复。
+
+```js
+RK.runtime.printFit()     // -> [{id, zoom, clipped, box:[w,h], content:[w,h]}]；模拟打印媒体后可在测试中调用
+RK.runtime.printUnfit()   // 恢复（afterprint 自动调用）
+// block options.printFit: false 跳过某个 block
+```

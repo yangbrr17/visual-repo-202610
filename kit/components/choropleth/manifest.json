@@ -5,18 +5,23 @@
   "category": "geo",
   "engine": "leaflet",
   "deps": ["leaflet", "topojson-client", "geo-world"],
+  "optionDeps": {"basemap": {"world-50m": ["geo-world-50m"]}},
   "summary": "Countries shaded by a metric on an offline world basemap — sequential or diverging, continuous or classed with nice-rounded breaks.",
   "summary_zh": "在离线世界底图上按指标给国家着色：顺序/发散色阶，连续或分级（自动取整的分档）。",
-  "description_zh": "展示按国家汇总的指标（收入、增速、员工数、市场份额）的地理分布。每行数据一个国家，通过 ISO 3166-1 数字代码（如 \"840\"）、三字母代码（如 \"USA\"）或国家英文名与 Natural Earth 底图连接；无数据的国家保持浅色陆地底色。默认按分位数分 5 档并取整为好看的分界值（如 <$20 / $20–50 / …），图例显示每档国家数；增速、相对均值偏离等有正负含义的指标用 diverging 色阶并设置中点。前 N 个国家直接标注数值，悬停显示数值、排名和附加字段，点击国家可交叉筛选其他图表。",
+  "description_zh": "展示按国家汇总的指标（收入、增速、员工数、市场份额）的地理分布。每行数据一个国家，通过 ISO 3166-1 数字代码（如 \"840\"）、三字母代码（如 \"USA\"）或国家英文名与 Natural Earth 底图连接；无数据的国家保持浅色陆地底色。默认按分位数分 5 档并取整为好看的分界值（如 <$20 / $20–50 / …），图例显示每档国家数；增速、相对均值偏离等有正负含义的指标用 diverging 色阶并设置中点。前 N 个国家直接标注数值，悬停显示数值、排名和附加字段，点击国家可交叉筛选其他图表。底图默认 world-110m；需要放大到区域（如欧洲）或包含新加坡、香港、摩纳哥、巴林等微型国家 / 地区时设 basemap 为 world-50m（1:50m 精度，构建器仅在用到时打包）。底图中没有多边形但带经纬度（lat / lon）的行会以同色阶的小圆点绘制，图例注明“• shown as points”。同一国家有多行时可用 aggregate（sum / avg / max …）汇总。",
   "best_for": ["Revenue / employees / market share by country", "Growth vs. a benchmark (diverging around 0 or the group average)", "Regional footprint at a glance"],
   "avoid_when": ["Precise comparison of values (use a bar chart)", "Sub-national geography (needs another basemap)", "Totals dominated by large countries' area — consider bubble-map for absolute values"],
   "channels": {
     "id": {"type": "string", "required": true, "desc": "Country key: ISO 3166-1 numeric (\"840\", zero-padded automatically), ISO alpha-3 (\"USA\") or a country name (common aliases such as \"United States\", \"UK\" understood)", "default": "iso_num"},
     "value": {"type": "number", "required": true, "desc": "Metric that drives the colour", "default": "value"},
-    "label": {"type": "string", "required": false, "desc": "Display name for tooltips / labels; also a name fallback for the join", "default": "country"}
+    "label": {"type": "string", "required": false, "desc": "Display name for tooltips / labels; also a name fallback for the join", "default": "country"},
+    "lat": {"type": "number", "required": false, "desc": "Latitude for rows the basemap has no polygon for (micro-states, territories): drawn as small circles in the same colour scale", "default": "lat"},
+    "lon": {"type": "number", "required": false, "desc": "Longitude for those rows", "default": "lon"}
   },
   "options": {
-    "basemap": {"type": "string", "default": "world-110m", "desc": "Registered basemap name (RK.geo.register)"},
+    "basemap": {"type": "string", "default": "world-110m", "desc": "world-110m (default, 175 countries) | world-50m (1:50m Natural Earth: finer coastlines for zoomed-in regions, plus micro-states and territories such as Singapore, Hong Kong, Monaco, Bahrain, Malta; the builder ships vendor geo-world-50m only for blocks that ask for it) | any name registered with RK.geo.register"},
+    "points": {"type": "boolean", "default": true, "desc": "Rows whose country has no polygon in the basemap (Singapore, Hong Kong … on world-110m) but that have lat / lon (encode.lat / encode.lon) are drawn as small circles in the same colour scale, with a legend note '• shown as points'"},
+    "aggregate": {"type": "string", "default": null, "desc": "Several rows per country (e.g. deal corridors): null = the first row wins | sum | avg | median | min | max | count over the country's rows; numeric tooltip fields use the same aggregate"},
     "scale": {"type": "string", "default": "sequential", "desc": "sequential | diverging"},
     "mid": {"type": "number", "default": 0, "desc": "Diverging midpoint (0 for growth, or e.g. the group average)"},
     "bins": {"type": "number", "default": 5, "desc": "Number of colour classes; 0 / null = continuous ramp. Diverging uses an even count (classes per side = bins / 2)"},
@@ -32,7 +37,7 @@
     "filterField": {"type": "string", "default": null, "desc": "Field used for click-to-filter; defaults to encode.id. Use 'country' to link with assets_locations. Shared business dimensions (country, company, sector, region, segment, year…) filter the whole report; other fields (site name, type, from / to…) only this block's dataset — set crossFilterScope to override"},
     "scrollZoom": {"type": "boolean|string", "default": "click", "desc": "Plain mouse-wheel zoom: 'click' (armed after clicking the map, so page scrolling is never hijacked) | true | false. Ctrl/Cmd + wheel or a trackpad pinch always zooms; +/- buttons and drag too"}
   },
-  "interactions": ["Hover highlight + tooltip (value, rank, extra fields)", "Click a country to cross-filter (dims the others)", "Zoom / pan (+/- buttons, Ctrl/Cmd + wheel or pinch; plain wheel after a click)", "Smooth colour transitions when filters change", "PNG export"],
+  "interactions": ["Hover highlight + tooltip (value, rank, extra fields)", "Click a country to cross-filter (dims the others)", "Zoom / pan (+/- buttons, Ctrl/Cmd + wheel or pinch; plain wheel after a click)", "Micro-states / territories without a polygon shown as coloured points (same scale, hover and click)", "Smooth colour transitions when filters change", "PNG export"],
   "samples": [
     {"title": "Revenue 2025A by country (USD m)", "data": "revenue_by_country", "height": 480, "span": 9,
      "options": {"encode": {"id": "iso_num", "value": "revenue", "label": "country"}, "tooltip": ["growth", "employees"], "filterField": "country"}},
@@ -40,6 +45,12 @@
      "options": {"encode": {"id": "iso_num", "value": "growth", "label": "country"}, "scale": "diverging", "mid": 0.07, "bins": 6, "labels": 4,
                  "fit": [[36, -11], [70, 31]], "legendTitle": "Growth vs. 7.0% average", "tooltip": ["revenue"]}},
     {"title": "Employees by country — continuous scale", "data": "revenue_by_country", "height": 380, "span": 5,
-     "options": {"encode": {"id": "iso_num", "value": "employees", "label": "country"}, "bins": 0, "labels": 0, "fit": "world"}}
+     "options": {"encode": {"id": "iso_num", "value": "employees", "label": "country"}, "bins": 0, "labels": 0, "fit": "world"}},
+    {"title": "Outbound M&A by acquirer country (USD bn) — Singapore drawn as a point", "data": "deal_flows", "height": 400, "span": 7,
+     "options": {"encode": {"id": "from_country", "value": "value", "label": "from_country", "lat": "from_lat", "lon": "from_lon"},
+                 "aggregate": "sum", "bins": 4, "labels": 4, "tooltip": ["deals"], "legendTitle": "Announced deal value (USD bn)", "filterField": "from_country"}},
+    {"title": "Europe at 1:50m — revenue 2025A (USD m)", "data": "revenue_by_country", "height": 420, "span": 5,
+     "options": {"encode": {"id": "iso_num", "value": "revenue", "label": "country"}, "basemap": "world-50m", "labels": 4,
+                 "fit": [[36, -11], [70, 31]], "tooltip": ["growth"], "filterField": "country"}}
   ]
 }

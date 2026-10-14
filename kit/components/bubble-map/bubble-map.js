@@ -8,6 +8,39 @@
   'use strict';
   var h = RK.util.h, G = RK.geo;
 
+  /* ---------------- basemap on demand (same block in choropleth and bubble-map) ----------------
+   * A report ships the basemap a block asks for (manifest optionDeps: basemap 'world-50m' -> vendor geo-world-50m).
+   * Hosts that load only the manifest deps (dev harness, an older build) get it on demand: the script sits next to
+   * world-110m.js (vendor/geo-world/world-110m.js -> vendor/geo-world-50m/world-50m.js). Until it arrives, or when
+   * it cannot be found, the block draws on world-110m and says so in the console.
+   */
+  var GEO_LOADS = window.__RK_GEO_LOADS || (window.__RK_GEO_LOADS = {});
+  function loadBasemap(name) {
+    if (GEO_LOADS[name]) return GEO_LOADS[name];
+    var base = [].filter.call(document.scripts, function (sc) { return /(^|\/)geo-world\/world-110m\.js(\?|#|$)/.test(sc.getAttribute('src') || ''); })[0];
+    if (!base || !/^world-[\w-]+$/.test(name)) return (GEO_LOADS[name] = Promise.reject(new Error('no script location for basemap "' + name + '"')));
+    var src = base.getAttribute('src').replace(/geo-world\/world-110m\.js.*$/, 'geo-' + name + '/' + name + '.js');
+    return (GEO_LOADS[name] = new Promise(function (resolve, reject) {
+      var sc = document.createElement('script');
+      sc.src = src;
+      sc.onload = function () { if (G.has(name)) resolve(name); else reject(new Error(src + ' did not register "' + name + '"')); };
+      sc.onerror = function () { reject(new Error('could not load ' + src)); };
+      document.head.appendChild(sc);
+    }));
+  }
+  /** Basemap to draw now: the requested one when registered, else world-110m while (or instead of) loading it. */
+  function basemapFor(ctx) {
+    var want = ctx.options.basemap || 'world-110m';
+    if (G.has(want)) return want;
+    var blk = ctx.block && ctx.block.rkBlock;
+    loadBasemap(want).then(function () {
+      if (blk && blk.state === 'rendered') blk.rerender();
+    }, function (e) {
+      if (!GEO_LOADS[want].warned) { GEO_LOADS[want].warned = true; console.warn('[RK] ' + ctx.component + ': basemap "' + want + '" is not loaded (' + e.message + '); drawing world-110m. Add vendor "geo-' + want + '" to the report.'); }
+    });
+    return 'world-110m';
+  }
+
   function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
 
   /* ---------------- colour guards (same block in the map components) ---------------- */
@@ -164,7 +197,7 @@
     deps: ['leaflet', 'topojson-client', 'geo-world'],
     defaults: {
       encode: { lat: 'lat', lon: 'lon', size: 'value', color: null, label: 'name', target: 'is_target' },
-      basemap: 'world-110m',
+      basemap: 'world-110m',      // world-110m | world-50m (finer coastlines when zoomed in; the report ships vendor geo-world-50m)
       sizeRange: [4, 26],         // min / max radius in px on a >= 1000px-wide map (sqrt scale); narrower maps scale it down
       colorScale: 'auto',         // auto (categorical for text, sequential for numbers) | categorical | sequential | diverging
       mid: 0,                     // diverging midpoint
@@ -183,7 +216,7 @@
     },
     render: function (ctx) {
       var L = window.L, t = ctx.theme, cur = ctx;
-      var view = G.view(ctx, { cls: 'rk-bubble' }), map = view.map;
+      var view = G.view(ctx, { cls: 'rk-bubble', basemap: basemapFor(ctx) }), map = view.map;
       var group = L.featureGroup().addTo(map);
       var legend = view.legend();
       /** Callout cost: how much of the box covers other bubbles (each counted by the covered share of the box). */

@@ -11,6 +11,7 @@ from typing import Any, Iterator
 from ._util import dumps, iso_date, slugify, unique_id
 from .data import normalize_dataset, to_json_value
 from .errors import ReportKitError
+from .template import fallback_text
 
 __all__ = ["Report", "Page", "Block", "SpecError", "SPEC_VERSION", "CONTRACT_VERSION", "PAGE_KINDS"]
 
@@ -20,6 +21,8 @@ PAGE_KINDS = ("content", "cover", "section")
 # page proportions -> printed @page size: 16:9 widescreen (PowerPoint), US Letter landscape, A4 landscape
 PAGE_SIZES = {"16:9": "13.333in 7.5in", "letter": "11in 8.5in", "a4": "297mm 210mm"}
 DEFAULT_CONFIDENTIALITY = "Strictly private & confidential"
+# up / down colour convention: "us" = green up / red down; "cn" = red up / green down (CN / JP / KR / TW markets)
+UPDOWN = ("us", "cn")
 
 
 class SpecError(ReportKitError, ValueError):
@@ -105,7 +108,7 @@ class Page:
     def __init__(self, report: "Report", title: str, *, kicker: str | None = None,
                  subtitle: str | None = None, source: Any = None, notes: Any = None,
                  id: str | None = None, kind: str = "content", nav: str | None = None,
-                 num: str | None = None):
+                 num: str | None = None, filters: bool = True):
         self.report = report
         self.title = title
         self.kicker = kicker
@@ -116,6 +119,7 @@ class Page:
         self.kind = kind
         self.nav = nav
         self.num = num
+        self.filters = filters   # False: global filters / chart selections do not apply on this page
         self.blocks: list[Block] = []
         self._rid: str | None = None
 
@@ -146,6 +150,8 @@ class Page:
         for key in ("kicker", "subtitle", "source", "notes", "nav", "num"):
             if getattr(self, key) is not None:
                 out[key] = getattr(self, key)
+        if self.filters is not True:
+            out["filters"] = self.filters
         if self.explicit_id:
             out["id"] = self.explicit_id
         out["blocks"] = [b.to_spec() for b in self.blocks]
@@ -166,9 +172,11 @@ class Report:
     def __init__(self, title: str, subtitle: str | None = None, client: str | None = None,
                  date: Any = None, theme: str = "navy",
                  confidentiality: str | None = DEFAULT_CONFIDENTIALITY, locale: str = "en-US",
-                 firm: str | None = None, page_size: str = "16:9"):
+                 firm: str | None = None, page_size: str = "16:9", updown: str | None = None):
         if page_size not in PAGE_SIZES:
             raise ValueError(f"page_size must be one of {', '.join(PAGE_SIZES)}, got {page_size!r}")
+        if updown is not None and updown not in UPDOWN:
+            raise ValueError(f"updown must be 'us' (green up / red down) or 'cn' (red up / green down), got {updown!r}")
         self.title = title
         self.page_size = page_size
         self.subtitle = subtitle
@@ -177,6 +185,7 @@ class Report:
         self.theme = theme
         self.confidentiality = confidentiality
         self.locale = locale or "en-US"
+        self.updown = updown
         self.firm = firm
         self.datasets: dict[str, dict] = {}
         self.params: dict[str, dict] = {}
@@ -239,10 +248,14 @@ class Report:
     # ------------------------------------------------------------------ layout
     def page(self, title: str, *, kicker: str | None = None, subtitle: str | None = None,
              source: Any = None, notes: Any = None, id: str | None = None, kind: str = "content",
-             nav: str | None = None, num: str | None = None) -> Page:
-        """Add a page. kind: "content" (default), "cover" or "section" (divider)."""
+             nav: str | None = None, num: str | None = None, filters: bool = True) -> Page:
+        """Add a page. kind: "content" (default), "cover" or "section" (divider).
+
+        title / subtitle / kicker may be templates ("{{peers: median(ev_ebitda) | 0.0x}}") evaluated
+        live against the filtered data. filters=False: the page ignores global filters and chart
+        selections (e.g. an unfiltered "market overview" next to filtered pages)."""
         p = Page(self, title, kicker=kicker, subtitle=subtitle, source=source, notes=notes, id=id,
-                 kind=kind, nav=nav, num=num)
+                 kind=kind, nav=nav, num=num, filters=filters)
         self.pages.append(p)
         return p
 
@@ -285,20 +298,22 @@ class Report:
         for i, p in enumerate(self.pages):
             p._rid = None
             if not p.explicit_id:
-                base = "cover" if p.kind == "cover" else slugify(p.kicker or p.title) or f"page-{i + 1}"
+                base = "cover" if p.kind == "cover" else \
+                    slugify(fallback_text(p.kicker or p.title)) or f"page-{i + 1}"
                 p._rid = unique_id(base, used)
         for b in self.topbar:
             b._rid = None if b.explicit_id else unique_id(f"topbar-{b.component}", used)
         for p in self.pages:
             for b in p.blocks:
                 if not b.explicit_id:
-                    b._rid = unique_id(f"{p.id}-{slugify(b.title, 32) or b.component}", used)
+                    b._rid = unique_id(f"{p.id}-{slugify(fallback_text(b.title), 32) or b.component}", used)
 
     # ------------------------------------------------------------------ outputs
     def report_meta(self) -> dict:
         meta = {"title": self.title, "subtitle": self.subtitle, "client": self.client, "date": self.date,
                 "confidentiality": self.confidentiality, "locale": self.locale, "firm": self.firm,
-                "theme": self.theme, "page_size": self.page_size if self.page_size != "16:9" else None}
+                "theme": self.theme, "page_size": self.page_size if self.page_size != "16:9" else None,
+                "updown": self.updown}
         return {k: v for k, v in meta.items() if v is not None}
 
     def manifest(self) -> dict:
@@ -330,13 +345,17 @@ class Report:
 
     def build(self, out_dir: str | os.PathLike, *, clean: bool = True, validate: bool = True,
               kit: Any = None, build_date: str | None = None, data_source: str = "bundle",
-              api: str | None = None) -> Path:
+              api: str | None = None, single_file: bool = False, excel: bool = False) -> Path:
         """Write the self-contained report folder; returns its path (open ``<path>/index.html``).
 
-        data_source='bundle' (default, works from file://) | 'http' | 'api' (with api='https://.../')."""
+        data_source='bundle' (default, works from file://) | 'http' | 'api' (with api='https://.../').
+        single_file=True: write ONE self-contained HTML file instead of a folder (``<out_dir>/<slug>.html``,
+        or *out_dir* itself when it ends with ``.html``) and return its path.
+        excel=True: also write every dataset to a styled workbook (``data/<slug>.xlsx``; next to the HTML
+        file in single-file mode) — needs openpyxl."""
         from .build import build
         return build(self, out_dir, clean=clean, validate=validate, kit=kit, build_date=build_date,
-                     data_source=data_source, api=api)
+                     data_source=data_source, api=api, single_file=single_file, excel=excel)
 
     # ------------------------------------------------------------------ spec
     def to_spec(self, base_dir: str | os.PathLike | None = None) -> dict:
@@ -404,13 +423,17 @@ class Report:
 
         keys_ok(spec, {"reportkit", "report", "params", "datasets", "topbar", "pages"}, "spec")
         rep = spec.get("report") or {}
-        report_keys = {"title", "subtitle", "client", "date", "theme", "confidentiality", "locale", "firm", "page_size"}
+        report_keys = {"title", "subtitle", "client", "date", "theme", "confidentiality", "locale", "firm",
+                       "page_size", "updown"}
         keys_ok(rep, report_keys, "report")
         if not isinstance(rep, dict):
             rep = {}
         if not rep.get("title"):
             problems.append("report.title is required")
-        r = cls(**{"title": "", **{k: v for k, v in rep.items() if k in report_keys}})
+        try:
+            r = cls(**{"title": "", **{k: v for k, v in rep.items() if k in report_keys}})
+        except (TypeError, ValueError) as e:
+            raise SpecError(f"Invalid report spec:\n  - report: {e}") from e
 
         for name, p in (spec.get("params") or {}).items():
             try:
@@ -466,13 +489,14 @@ class Report:
                                    encode=b.get("encode"), id=b.get("id"))
                 except (ReportKitError, TypeError, ValueError) as e:
                     problems.append(f"topbar[{i}]: {e}")
-        page_keys = {"title", "kicker", "subtitle", "source", "notes", "id", "kind", "nav", "num", "blocks"}
+        page_keys = {"title", "kicker", "subtitle", "source", "notes", "id", "kind", "nav", "num", "filters", "blocks"}
         for i, p in enumerate(spec.get("pages") or []):
             if not keys_ok(p, page_keys, f"pages[{i}]"):
                 continue
             page = r.page(p.get("title") or "", kicker=p.get("kicker"), subtitle=p.get("subtitle"),
                           source=p.get("source"), notes=p.get("notes"), id=p.get("id"),
-                          kind=p.get("kind") or "content", nav=p.get("nav"), num=p.get("num"))
+                          kind=p.get("kind") or "content", nav=p.get("nav"), num=p.get("num"),
+                          filters=p.get("filters", True))
             for j, b in enumerate(p.get("blocks") or []):
                 if not keys_ok(b, block_keys, f"pages[{i}].blocks[{j}]"):
                     continue

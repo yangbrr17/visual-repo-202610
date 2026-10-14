@@ -73,7 +73,11 @@
     if (cache[name]) return cache[name];
     var d = raw[name];
     if (!d && global.__RK_GEO && global.__RK_GEO[name]) d = raw[name] = global.__RK_GEO[name];
-    if (!d) throw new Error('Basemap "' + name + '" is not loaded (include vendor/geo-world/' + name + '.js and add "geo-world" to the component deps)');
+    if (!d) {
+      // vendor id per basemap: world-110m -> geo-world, world-50m -> geo-world-50m (block option -> manifest optionDeps)
+      var dep = name === 'world-50m' ? 'geo-world-50m' : 'geo-world';
+      throw new Error('Basemap "' + name + '" is not loaded (include vendor/' + dep + '/' + name + '.js and add "' + dep + '" to the component deps)');
+    }
     var fc;
     if (d.type === 'Topology') {
       if (!global.topojson) throw new Error('topojson-client is required to read TopoJSON basemap "' + name + '"');
@@ -506,7 +510,9 @@
   }
   /** Plural noun for the marks, from the label field title: "Site" -> "sites"; "points" without one. */
   function noun(ctx, field) {
-    if (!field || !ctx.field(field)) return 'points';
+    var zh = RK.i18n && RK.i18n.lang() === 'zh';
+    if (!field || !ctx.field(field)) return RK.i18n ? RK.i18n.t('points', 'points') : 'points';
+    if (zh || /[\u3400-\u9fff]/.test(String(ctx.title(field)))) return String(ctx.title(field));   // no plural forms
     var w = String(ctx.title(field)).toLowerCase();
     return /[^aeiou]y$/.test(w) ? w.slice(0, -1) + 'ies' : /(s|x|ch|sh)$/.test(w) ? w + 'es' : w + 's';
   }

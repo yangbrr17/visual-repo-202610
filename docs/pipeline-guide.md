@@ -496,7 +496,45 @@ print(zip_path)
 
 - **确定性**：同样的输入 → 逐字节相同的输出；重跑 pipeline 只更新数字时，git diff 只出现在 `data/`（每行一条记录）。
 - **clean**：`build()` 默认只清理上一次 ReportKit 生成的 `index.html / assets / data`，不会删除别人的文件夹。
-- **交付**：把整个文件夹打成 zip。提醒客户**先"全部解压"再双击 `index.html`**——在 Windows 的压缩包预览里直接打开只会解出 `index.html` 本身，脚本和数据找不到。部分邮件网关会拦截含 `.js` 的压缩包，用公司的安全文件传输渠道。
+- **交付（文件夹）**：把整个文件夹打成 zip。提醒客户**先"全部解压"再双击 `index.html`**——在 Windows 的压缩包预览里直接打开只会解出 `index.html` 本身，脚本和数据找不到。部分邮件网关会拦截含 `.js` 的压缩包，用公司的安全文件传输渠道。
+
+### 8.1 单文件交付（推荐给客户）
+
+```python
+html_file = r.build("out/delivery", single_file=True, excel=True)
+print(html_file)                         # out/delivery/project-demo.html  (+ out/delivery/project-demo.xlsx)
+```
+
+| 选项 | 产物 | 说明 |
+|---|---|---|
+| `single_file=True` | `<out_dir>/<slug>.html`（或直接给 `"…/name.html"`） | CSS、字体（base64）、第三方库、运行时、组件、数据全部内联；双击即开，无需解压，**零网络请求**；内联脚本转义了 `</script>` / `<!--` / U+2028 |
+| `excel=True` | `data/<slug>.xlsx`（单文件模式在 html 旁边） | 每个 dataset 一个工作表：标题、Source / Notes / Unit / As of、加粗表头、**沿用字段格式码的数字格式**（`0.0x`、`0.0%`、`$#,##0` …）、真正的日期、冻结表头、筛选、列宽；报告右上角出现 Excel 下载按钮。需要 `openpyxl` |
+| `data_source="api"` + `single_file=True` | 一个 html，不含数据 | 页面从数据 API 取数（§9） |
+
+命令行等价写法：`python -m reportkit build spec.json out/delivery --single-file --excel [--locale zh-CN]`。
+
+单文件的体积 ≈ 文件夹里 `assets/` + `data/bundle.js` 之和（示例 pitchbook 约 3.4 MB；用到地图时 +0.1 MB，
+`basemap: "world-50m"` 高精度底图 +0.75 MB）。数据很大（> 50k 行，构建时会警告）时仍建议文件夹 + 内网托管。
+
+### 8.2 面向客户的细节：标题模板、语言、不受筛选影响的页面
+
+- **标题跟着筛选变**：action title 里的数字写成模板，客户筛选后标题仍然正确（不会出现“图是欧洲、标题是全球”）：
+
+  ```python
+  r.page("Peers trade at a median {{comps: median(ev_ebitda_ntm) | 0.0x}} NTM EBITDA "
+         "({{comps: count()}} companies)", kicker="Trading comparables")
+  r.page("Offer at a {{@premium | 0%}} premium to the current share price", kicker="Offer")  # 只用参数时可省略 dataset
+  ```
+
+  语法 `{{<dataset>: <公式> | <格式码>}}`：聚合函数作用于**筛选后**的行，普通字段取筛选后的第一行；
+  构建时校验 dataset / 字段 / `@param` 是否存在。HTML 里是 `data-rk-template="…"`，未运行脚本时显示 `…`。
+- **筛选提示**：有全局筛选或图表选中时，受影响页面的页脚自动出现 “Filtered view: Region = Europe · …”，
+  打印成 PDF 也保留——客户转发截图时不会被误读成全量数据。
+- **不受筛选影响的页**：`r.page("Whole-market context", filters=False)`（`data-rk-filters="off"`），该页图表始终显示全量数据，也不显示筛选提示。
+- **中文客户**：`Report(..., locale="zh-CN", updown="cn")`——界面文字、来源 / 注、日期（2026年10月14日）、
+  紧凑单位（亿 / 万）切换为中文，`updown="cn"` 红涨绿跌（默认 `"us"` 绿涨红跌）。
+- **客户自选指标**：`options={"choices": {"y": ["ev_ebitda_ntm", "pe_ntm", "*computed"]}}` 在模块标题栏放一个下拉框；
+  客户在 query-console 里“添加为指标”的自定义公式会出现在 `*computed` 中，并保存在本机浏览器（按报告区分）。
 - **file:// vs http(s)**：
 
 | 打开方式 | 数据从哪来 | 说明 |
@@ -621,9 +659,10 @@ python3 api_server.py out/project-demo/data &       # 启动 API
 
 - [ ] `r.check()` 没有 error，warning 逐条看过（尤其是 `fields override … no such column`）
 - [ ] 每个 dataset 有 `source`、`unit`、`as_of`；比率存小数、bps 存数值，format 正确
-- [ ] action title 由数据生成；页面 subtitle 写明单位；脚注编号与表内标记一致
+- [ ] action title 由数据生成（随筛选变化的数字用 `{{dataset: 公式 | 格式}}` 模板）；页面 subtitle 写明单位；脚注编号与表内标记一致
 - [ ] null（n.a.）与 n.m. 的口径在表格和 peer median 中一致（同一个阈值）
 - [ ] 只用了 `kit/components/` 里存在的组件；可选组件有降级方案
 - [ ] 无 pandas 环境也能跑（`--no-pandas` / `--parity`）
 - [ ] 浏览器打开无 console error，所有 block `rendered`；打印预览每页 16:9
-- [ ] zip 后在另一台机器解压、双击验证
+- [ ] zip 后在另一台机器解压、双击验证；或交付单文件（`single_file=True`）并在断网环境双击验证
+- [ ] 需要给客户底稿时加 `excel=True`，用 Excel 打开检查格式（倍数 `x`、百分比、日期）

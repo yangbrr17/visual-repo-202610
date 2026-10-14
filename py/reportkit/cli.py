@@ -27,10 +27,18 @@ def _print_warnings(warnings: list[str]) -> None:
 def cmd_build(args) -> int:
     kit = _kit(args)
     report = Report.from_spec(args.spec)
+    if args.locale:
+        report.locale = args.locale
     warnings = report.validate(kit) if not args.no_validate else []
     _print_warnings(warnings)
-    out = report.build(args.out_dir, clean=not args.no_clean, validate=False, kit=kit, build_date=args.date)
-    print(f"Built {out / 'index.html'}  ({len(report.pages)} pages, {len(report.datasets)} datasets)")
+    out = report.build(args.out_dir, clean=not args.no_clean, validate=False, kit=kit, build_date=args.date,
+                       single_file=args.single_file, excel=args.excel)
+    target = out if args.single_file else out / "index.html"
+    print(f"Built {target}  ({len(report.pages)} pages, {len(report.datasets)} datasets)")
+    if args.excel:
+        from .build import report_slug
+        xlsx = out.with_suffix(".xlsx") if args.single_file else out / "data" / f"{report_slug(report)}.xlsx"
+        print(f"Excel  {xlsx}")
     return 0
 
 
@@ -229,6 +237,11 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--no-validate", action="store_true", help="skip validation")
     b.add_argument("--no-clean", action="store_true", help="do not remove previous build output first")
     b.add_argument("--date", help="build date stamped in asset headers (default: report date)")
+    b.add_argument("--single-file", action="store_true",
+                   help="write ONE self-contained HTML file (out_dir/<slug>.html, or out_dir if it ends in .html)")
+    b.add_argument("--excel", action="store_true",
+                   help="also write every dataset to a styled Excel workbook (data/<slug>.xlsx; needs openpyxl)")
+    b.add_argument("--locale", help="override report.locale, e.g. zh-CN (UI language, number units, dates)")
     kit_opt(b)
     b.set_defaults(func=cmd_build)
 

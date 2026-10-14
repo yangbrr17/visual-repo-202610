@@ -5,6 +5,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from ._util import as_list, esc, human_date, json_for_script, label
+from .template import fallback_text, has_template
 
 if TYPE_CHECKING:  # pragma: no cover
     from .build import BuildPlan
@@ -14,6 +15,15 @@ __all__ = ["render_index"]
 
 _MENU_ICON = ('<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">'
               '<path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>')
+
+
+def _text_el(tag: str, cls: str, text: Any) -> str:
+    """``<tag class="cls">text</tag>``; a title template (contract I1) becomes
+    ``<tag class="cls" data-rk-template="raw">fallback with …</tag>`` for the runtime to fill in."""
+    if has_template(text):
+        return (f'<{tag} class="{cls}" data-rk-template="{esc(text)}">'
+                f'{esc(fallback_text(text))}</{tag}>')
+    return f'<{tag} class="{cls}">{esc(text)}</{tag}>'
 
 
 def _num(v: Any) -> str:
@@ -80,6 +90,25 @@ def _options_script(options: dict, ind: str) -> list[str]:
     return [f'{ind}<script type="application/json" data-rk-options>{json_for_script(options)}</script>']
 
 
+def _render_options(b: "Block") -> dict:
+    """Block options as emitted. With a metric / dimension picker (``choices``, contract I3) and no
+    ``encode[channel]`` yet, the first concrete choice becomes the initial encoding."""
+    opts = b.options
+    choices = opts.get("choices")
+    if not isinstance(choices, dict) or not choices:
+        return opts
+    enc = dict(opts.get("encode") or {}) if isinstance(opts.get("encode"), dict) else {}
+    added = False
+    for ch, fields in choices.items():
+        if enc.get(ch) or not isinstance(fields, list):
+            continue
+        first = next((f for f in fields if isinstance(f, str) and f and not f.startswith("*")), None)
+        if first:
+            enc[ch] = first
+            added = True
+    return {**opts, "encode": enc} if added else opts
+
+
 def _block(b: "Block", locale: str, ind: str) -> list[str]:
     attrs = f'class="rk-block" style="--rk-span:{_span(b.span)}" data-rk="{esc(b.component)}"'
     if b.data is not None:
@@ -89,9 +118,9 @@ def _block(b: "Block", locale: str, ind: str) -> list[str]:
     if b.title or b.subtitle:
         out.append(f'{ind}  <figcaption class="rk-block__head">')
         if b.title:
-            out.append(f'{ind}    <h3 class="rk-block__title">{esc(b.title)}</h3>')
+            out.append(f'{ind}    {_text_el("h3", "rk-block__title", b.title)}')
         if b.subtitle:
-            out.append(f'{ind}    <p class="rk-block__subtitle">{esc(b.subtitle)}</p>')
+            out.append(f'{ind}    {_text_el("p", "rk-block__subtitle", b.subtitle)}')
         out.append(f"{ind}  </figcaption>")
     if b.height == "auto":   # grows with its content (tables, text, KPI rows)
         out.append(f'{ind}  <div class="rk-block__body is-auto"></div>')
@@ -99,7 +128,7 @@ def _block(b: "Block", locale: str, ind: str) -> list[str]:
         h = _height(b.height)
         style = f' style="--rk-h:{esc(h)}"' if h else ""
         out.append(f'{ind}  <div class="rk-block__body"{style}></div>')
-    out += _options_script(b.options, ind + "  ")
+    out += _options_script(_render_options(b), ind + "  ")
     foot = _block_foot(b.source, b.notes, locale)
     if foot:
         out.append(f'{ind}  <footer class="rk-block__foot">{foot}</footer>')
@@ -159,24 +188,26 @@ def _nav_label(page: "Page") -> str:
     if page.nav:
         return page.nav
     if page.kind == "content" and page.kicker:
-        return page.kicker
-    return page.title or ""
+        return fallback_text(page.kicker)
+    return fallback_text(page.title or "")
 
 
 def _page(report: "Report", page: "Page", section_num: str | None, ind: str) -> list[str]:
     loc = report.locale
     i2, i3 = ind + "  ", ind + "    "
     kind_cls = "" if page.kind == "content" else f" rk-page--{page.kind}"
-    out = [f'{ind}<section class="rk-page{kind_cls}" id="{esc(page.id)}" data-rk-page="{esc(_nav_label(page))}">']
+    filters = ' data-rk-filters="off"' if page.filters is False else ""
+    out = [f'{ind}<section class="rk-page{kind_cls}" id="{esc(page.id)}" data-rk-page="{esc(_nav_label(page))}"'
+           f'{filters}>']
     if page.kind == "cover":
         if report.confidentiality:
             out.append(f'{i2}<p class="rk-cover__conf">{esc(report.confidentiality)}</p>')
         out.append(f'{i2}<div class="rk-cover__inner">')
         if page.kicker:
-            out.append(f'{i3}<p class="rk-cover__kicker">{esc(page.kicker)}</p>')
-        out.append(f'{i3}<h1 class="rk-cover__title">{esc(page.title)}</h1>')
+            out.append(f'{i3}{_text_el("p", "rk-cover__kicker", page.kicker)}')
+        out.append(f'{i3}{_text_el("h1", "rk-cover__title", page.title)}')
         if page.subtitle:
-            out.append(f'{i3}<p class="rk-cover__subtitle">{esc(page.subtitle)}</p>')
+            out.append(f'{i3}{_text_el("p", "rk-cover__subtitle", page.subtitle)}')
         meta = []
         if report.client:
             meta.append(f'<span class="rk-cover__client">{esc(report.client)}</span>')
@@ -195,20 +226,20 @@ def _page(report: "Report", page: "Page", section_num: str | None, ind: str) -> 
         if section_num:
             out.append(f'{i3}<p class="rk-section__num">{esc(section_num)}</p>')
         if page.kicker:
-            out.append(f'{i3}<p class="rk-section__kicker">{esc(page.kicker)}</p>')
-        out.append(f'{i3}<h2 class="rk-section__title">{esc(page.title)}</h2>')
+            out.append(f'{i3}{_text_el("p", "rk-section__kicker", page.kicker)}')
+        out.append(f'{i3}{_text_el("h2", "rk-section__title", page.title)}')
         if page.subtitle:
-            out.append(f'{i3}<p class="rk-section__subtitle">{esc(page.subtitle)}</p>')
+            out.append(f'{i3}{_text_el("p", "rk-section__subtitle", page.subtitle)}')
         out.append(f"{i2}</div>")
         if page.blocks:
             out += _grid(page.blocks, loc, i2)
     else:
         out.append(f'{i2}<header class="rk-page__head">')
         if page.kicker:
-            out.append(f'{i3}<p class="rk-page__kicker">{esc(page.kicker)}</p>')
-        out.append(f'{i3}<h2 class="rk-page__title">{esc(page.title)}</h2>')
+            out.append(f'{i3}{_text_el("p", "rk-page__kicker", page.kicker)}')
+        out.append(f'{i3}{_text_el("h2", "rk-page__title", page.title)}')
         if page.subtitle:
-            out.append(f'{i3}<p class="rk-page__subtitle">{esc(page.subtitle)}</p>')
+            out.append(f'{i3}{_text_el("p", "rk-page__subtitle", page.subtitle)}')
         out.append(f"{i2}</header>")
         out += _grid(page.blocks, loc, i2)
         out += _page_foot(report, page, i2)
@@ -216,19 +247,26 @@ def _page(report: "Report", page: "Page", section_num: str | None, ind: str) -> 
     return out
 
 
-def render_index(report: "Report", plan: "BuildPlan", *, data_source: str = "bundle", api: str | None = None) -> str:
+def render_index(report: "Report", plan: "BuildPlan", *, data_source: str = "bundle", api: str | None = None,
+                 inline: dict[str, str] | None = None, excel_href: str | None = None) -> str:
     """data_source: 'bundle' (default; data/bundle.js, works from file://), 'http' (fetch data/*.json; needs a
-    web server) or 'api' (fetch from a data API at *api* with the same JSON shapes; see docs/architecture.md)."""
+    web server) or 'api' (fetch from a data API at *api* with the same JSON shapes; see docs/architecture.md).
+
+    inline: {href: text} — single-file mode: stylesheets / scripts are emitted inline (text already escaped
+    for <style> / <script>) instead of <link href> / <script src>. excel_href: link to the Excel export."""
     loc = report.locale
-    title = report.title + (f" — {report.subtitle}" if report.subtitle else "")
+    title = fallback_text(report.title) + (f" — {fallback_text(report.subtitle)}" if report.subtitle else "")
+    updown = getattr(report, "updown", None)
     L: list[str] = [
         "<!DOCTYPE html>",
         f'<html lang="{esc(loc)}" data-rk-theme="{esc(report.theme)}"'
-        + (f' data-rk-page-size="{esc(report.page_size)}"' if getattr(report, "page_size", "16:9") != "16:9" else "") + ">",
+        + (f' data-rk-page-size="{esc(report.page_size)}"' if getattr(report, "page_size", "16:9") != "16:9" else "")
+        + (f' data-rk-updown="{esc(updown)}"' if updown else "") + ">",
         "<head>",
         '  <meta charset="utf-8">',
         '  <meta name="viewport" content="width=device-width, initial-scale=1">',
         f"  <title>{esc(title)}</title>",
+        f'  <meta name="rk:locale" content="{esc(loc)}">',
         '  <meta name="rk:data" content="data/">',
         *([f'  <meta name="rk:data-source" content="{esc(data_source)}">'] if data_source != "bundle" else []),
         *([f'  <meta name="rk:api" content="{esc(api)}">'] if data_source == "api" and api else []),
@@ -238,8 +276,11 @@ def render_index(report: "Report", plan: "BuildPlan", *, data_source: str = "bun
         f'  <meta name="rk:built" content="{esc(plan.build_date)}">',
         '  <meta name="robots" content="noindex, nofollow">',
     ]
-    L += [f'  <link rel="stylesheet" href="{esc(href)}">' for href in plan.vendor_css]
-    L.append('  <link rel="stylesheet" href="assets/css/reportkit.css">')
+    for href in [*plan.vendor_css, "assets/css/reportkit.css"]:
+        if inline is not None:
+            L.append(f'  <style data-rk-inline="{esc(href)}">\n{inline[href]}</style>')
+        else:
+            L.append(f'  <link rel="stylesheet" href="{esc(href)}">')
     L += ["</head>", '<body class="rk-report">']
 
     # ---- sticky top bar
@@ -248,8 +289,8 @@ def render_index(report: "Report", plan: "BuildPlan", *, data_source: str = "bun
              f'aria-label="{esc(label("contents", loc))}">{_MENU_ICON}</button>')
     firm = f'<span class="rk-topbar__firm">{esc(report.firm)}</span>' if report.firm else ""
     L.append(f'    <div class="rk-topbar__brand"><span class="rk-topbar__mark" aria-hidden="true"></span>{firm}</div>')
-    sub = f' title="{esc(report.subtitle)}"' if report.subtitle else ""
-    L.append(f'    <div class="rk-topbar__title"{sub}>{esc(report.title)}</div>')
+    sub = f' title="{esc(fallback_text(report.subtitle))}"' if report.subtitle else ""
+    L.append(f'    <div class="rk-topbar__title"{sub}>{esc(fallback_text(report.title))}</div>')
     if report.topbar:
         L.append('    <div class="rk-topbar__controls">')
         for b in report.topbar:
@@ -263,6 +304,9 @@ def render_index(report: "Report", plan: "BuildPlan", *, data_source: str = "bun
         sel = " selected" if tid == report.theme else ""
         L.append(f'        <option value="{esc(tid)}"{sel}>{esc(tlabel)}</option>')
     L.append("      </select>")
+    if excel_href:
+        L.append(f'      <a class="rk-btn" href="{esc(excel_href)}" download data-rk-download="excel" '
+                 f'style="text-decoration:none" title="{esc(label("excel_title", loc))}">{esc(label("excel", loc))}</a>')
     L.append(f'      <button type="button" class="rk-btn" data-rk-print>{esc(label("print", loc))}</button>')
     L.append("    </div>")
     L.append("  </header>")
@@ -282,6 +326,9 @@ def render_index(report: "Report", plan: "BuildPlan", *, data_source: str = "bun
     # ---- scripts: vendor -> core -> components -> data
     data_js = ["data/bundle.js"] if data_source == "bundle" else []
     for src in [*plan.vendor_js, "assets/js/reportkit.js", *plan.component_js, *data_js]:
-        L.append(f'  <script src="{esc(src)}"></script>')
+        if inline is not None:
+            L.append(f'  <script data-rk-inline="{esc(src)}">\n{inline[src]}</script>')
+        else:
+            L.append(f'  <script src="{esc(src)}"></script>')
     L += ["</body>", "</html>", ""]
     return "\n".join(L)

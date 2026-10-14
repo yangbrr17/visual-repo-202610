@@ -3,6 +3,7 @@
 
     python3 py/examples/build_demo.py              # -> examples/demo-pitchbook/
     python3 py/examples/build_demo.py out/atlas    # custom output folder
+    python3 py/examples/build_demo.py out/x --single-file --excel   # -> out/x/project-atlas.html + .xlsx
 
 In a real engagement the datasets come from your SQL / pandas pipeline:
     r.dataset("peers", df_peers, title=..., fields={"ev_ebitda_25e": {"format": "0.0x"}})
@@ -105,7 +106,8 @@ def dcf_rows() -> list[dict]:
     return [dict(rows[s], net_debt=NET_DEBT, other_adj=OTHER_ADJ, shares=SHARES) for s in order]
 
 
-def build(out: Path) -> Path:
+def build(out: Path, **build_kw) -> Path:
+    """Build the demo into *out*; extra keyword arguments go to Report.build (single_file=, excel= ...)."""
     r = Report(
         "Project Atlas",
         subtitle="Discussion materials for the Board of Directors of Helios Industrial",
@@ -435,10 +437,12 @@ def build(out: Path) -> Path:
                     {"field": "premium_30d", "title": "30-day VWAP", "group": "Premium"},
                     "consideration", "status"]})
 
-    return r.build(out)
+    return r.build(out, **build_kw)
 
 
 if __name__ == "__main__":
-    target = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "examples" / "demo-pitchbook"
-    path = build(target)
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    flags = {a for a in sys.argv[1:] if a.startswith("--")}
+    target = Path(args[0]) if args else ROOT / "examples" / "demo-pitchbook"
+    path = build(target, single_file="--single-file" in flags, excel="--excel" in flags)
     print(f"built {path}")

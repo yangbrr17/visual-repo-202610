@@ -8,7 +8,7 @@
   "needs_data": false,
   "summary": "What-if sliders bound to report parameters (@wacc, @tgr …); every computed field using them recalculates and the charts update live.",
   "summary_zh": "绑定报告参数（@wacc、@tgr 等）的假设分析滑块：拖动后所有引用该参数的计算字段实时重算，图表同步更新。",
-  "description_zh": "用于 DCF / LBO / 情景分析页面，让客户自己调整 WACC、永续增长率、退出倍数等假设。每个滑块显示格式化的当前值、相对基准值的变化（百分比参数以 bps 表示）、轨道上的基准刻度和一键还原；点击数值可直接输入精确值。参数默认取报告 manifest.params，可在 options.params 中覆盖标签、范围、步长与格式。options.computed 可向绑定数据集添加引用 @参数 的公式字段，options.preview 则在滑块下方渲染一个实时读数表（当前值及相对基准假设的变化），便于在单个区块中演示参数驱动的计算。",
+  "description_zh": "用于 DCF / LBO / 情景分析页面，让客户自己调整 WACC、永续增长率、退出倍数等假设。每个滑块显示格式化的当前值、相对基准值的变化（百分比参数以 bps 表示）、轨道上的基准刻度和一键还原；点击数值可直接输入精确值。参数默认取报告 manifest.params，可在 options.params 中覆盖标签、范围、步长与格式。options.computed 可向绑定数据集添加引用 @参数 的公式字段，options.preview 则在滑块下方渲染一个实时读数表（当前值及相对基准假设的变化：金额与倍数显示相对变化 %，基准为零或负数时显示 n.m.；百分比字段显示百分点 pp，变动小于 1 pp 时显示 bps，负数用括号），便于在单个区块中演示参数驱动的计算。",
   "best_for": ["DCF WACC / terminal growth what-if", "LBO exit multiple and leverage assumptions", "Sticky top-bar assumptions in an interactive model", "Live readout of formula fields driven by parameters"],
   "avoid_when": ["The audience needs a fixed, printed answer (use a sensitivity table)", "More than ~6 parameters at once (split by page)"],
   "channels": {},
@@ -19,10 +19,10 @@
     "showRange": {"type": "boolean", "default": true, "desc": "Formatted min / max under each track"},
     "showDelta": {"type": "boolean", "default": true, "desc": "Change vs. base value next to the value (bps for % formats)"},
     "computed": {"type": "array", "default": [], "desc": "[{name, formula, title, format}] computed fields added to the bound dataset (formulas may use @params)"},
-    "preview": {"type": "boolean|object", "default": false, "desc": "true or {fields, where, title, total, key, summary} — live readout table of the bound dataset; live cells show % change vs. base parameters; total = true | [fields]; key = the output column set in bold (default: last computed column); summary = [{name, label, field + agg | expr over earlier names, format, key}] headline outputs under the table (e.g. PV of terminal value, enterprise value)"},
+    "preview": {"type": "boolean|object", "default": false, "desc": "true or {fields, where, title, total, key, summary, changes} — live readout table of the bound dataset; live cells show the change vs. base parameters in the field's own unit: relative % for amounts and multiples (n.m. when the base is zero or negative), percentage points for % fields (bps when every move in the column is under 1 pp), plain bps for bps fields; negatives in parentheses; total = true | [fields]; key = the output column set in bold (default: last computed column); summary = [{name, label, field + agg | expr over earlier names, format, key, change}] headline outputs under the table (e.g. PV of terminal value, enterprise value); changes = {field: 'rel' | 'pp' | 'pts' | 'bps' | 'none'} overrides the automatic choice ('pts' = values already in percent units)"},
     "tools": {"type": "boolean", "default": false, "desc": "Block toolbar (off for controls)"}
   },
-  "interactions": ["Drag or arrow keys (native range input, aria-valuetext formatted)", "Click the value to type an exact number (9.25%, 9.25 or 0.0925)", "Reset to base per slider", "Store writes throttled while dragging; every computed field using the parameter recalculates", "Preview cells flash and show % change vs. base"],
+  "interactions": ["Drag or arrow keys (native range input, aria-valuetext formatted)", "Click the value to type an exact number (9.25%, 9.25 or 0.0925)", "Reset to base per slider", "Store writes throttled while dragging; every computed field using the parameter recalculates", "Preview cells flash and show the change vs. base (% for amounts, pp / bps for rates)"],
   "samples": [
     {"title": "DCF assumptions — live readout (USD m)", "data": "financials", "height": 300, "span": 8,
      "options": {
@@ -44,6 +44,15 @@
      }},
     {"title": "Report parameters — compact (top-bar style)", "data": null, "height": 60, "span": 8,
      "options": {"compact": true}},
+    {"title": "Re-rating what-if — upside in pp, not % of a %", "data": "peers", "height": 300, "span": 6,
+     "options": {
+       "params": [{"name": "target_multiple", "label": "Target EV / EBITDA 2025E", "default": 10.0, "min": 7.0, "max": 14.0, "step": 0.25, "format": "0.00x"}],
+       "computed": [
+         {"name": "implied_px", "title": "Implied price", "formula": "(ebitda_25e * @target_multiple - net_debt) / (mkt_cap / share_price)", "format": "$#,##0.00"},
+         {"name": "upside", "title": "Upside / (downside)", "formula": "implied_px / share_price - 1", "format": "+0.0%;(0.0%);0.0%"}
+       ],
+       "preview": {"where": "sector == \"Industrial Automation\"", "fields": ["company", "ev_ebitda_25e", "implied_px", "upside"], "key": "upside"}
+     }},
     {"title": "LBO exit assumption", "data": "financials", "height": 240, "span": 6,
      "options": {
        "params": [{"name": "exit_multiple", "label": "Exit EV / EBITDA", "default": 9.0, "min": 7.0, "max": 12.0, "step": 0.25, "format": "0.00x"}],

@@ -96,6 +96,16 @@
 .rk-page__source { flex: 1; }
 .rk-page__notes { display: block; margin-top: 2px; }
 .rk-page__conf { white-space: nowrap; text-transform: uppercase; letter-spacing: .06em; }
+/* "Filtered view: Region = Europe · …" — set by the runtime whenever filters / selections affect the page (printed) */
+.rk-page__filtered {
+  flex: 0 1 auto; max-width: 62%; min-width: 0;
+  color: var(--rk-accent-3); font-weight: 600; text-align: right;
+  overflow-wrap: anywhere;
+}
+.rk-page__filtered::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 5px; vertical-align: 1px;
+  border-radius: 50%; background: var(--rk-accent-2);
+}
 .rk-page__num { font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; min-width: 18px; text-align: right; color: var(--rk-ink-2); font-weight: 600; }
 
 /* page proportions: 16:9 widescreen (default) | US Letter landscape | A4 landscape (Report(page_size=...)) */

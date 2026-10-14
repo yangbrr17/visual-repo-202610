@@ -148,6 +148,22 @@
 .rk-qc-ref__n { font: 10.5px/1.3 var(--rk-qc-mono, monospace); color: var(--rk-ink-3); }
 .rk-qc-ref__f { flex: none; max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 10px var(--rk-qc-mono, monospace); color: var(--rk-ink-3); }
 .rk-qc-tag { flex: none; min-width: 26px; height: 17px; padding: 0 4px; border-radius: 3px; background: color-mix(in srgb, var(--rk-accent-3) 12%, var(--rk-paper)); color: var(--rk-accent-3); font: 600 9.5px/17px var(--rk-qc-mono, monospace); text-align: center; }
+/* "My metrics": the client's saved formulas (accent-2 tag), each with a remove button */
+.rk-qc-tag--my, .rk-qc-ref__item.is-user .rk-qc-tag { background: color-mix(in srgb, var(--rk-accent-2) 16%, var(--rk-paper)); color: var(--rk-accent-2-ink, var(--rk-accent-2)); }
+.rk-qc-my { position: relative; display: flex; align-items: center; }
+.rk-qc-my .rk-qc-ref__item { padding-right: 28px; }
+.rk-qc-my.is-other .rk-qc-ref__t { color: var(--rk-ink-2); }
+.rk-qc-my.is-inactive .rk-qc-ref__t { color: var(--rk-ink-3); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--rk-ink-3) 60%, transparent); }
+.rk-qc-my .rk-qc-ref__item:disabled { cursor: default; }
+.rk-qc-my__rm {
+  position: absolute; right: 4px; top: 50%; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin-top: -10px;
+  padding: 0; border: 0; border-radius: 50%; background: none; color: var(--rk-ink-3); cursor: pointer; opacity: .55;
+  transition: opacity var(--rk-dur-fast), color var(--rk-dur-fast), background var(--rk-dur-fast);
+}
+.rk-qc-my:hover .rk-qc-my__rm, .rk-qc-my__rm:focus-visible { opacity: 1; }
+.rk-qc-my__rm:hover, .rk-qc-my__rm:focus-visible { color: var(--rk-neg); background: color-mix(in srgb, var(--rk-neg) 12%, transparent); outline: none; }
+.rk-qc-my .rk-qc-ref__f { margin-right: 2px; }
+.rk-qc-my__empty { margin: 0; padding: 2px 6px 4px; font-size: 10.5px; line-height: 1.4; color: var(--rk-ink-3); }
 .rk-qc-ref__fns { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 2px; }
 .rk-qc-fn { height: 22px; padding: 0 7px; border: 1px solid var(--rk-rule); border-radius: 3px; background: var(--rk-paper); color: var(--rk-accent); font: 11px var(--rk-qc-mono, monospace); cursor: pointer; }
 [data-rk-theme="ink"] .rk-qc-fn { color: var(--rk-seq-6); }

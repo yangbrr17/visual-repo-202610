@@ -117,9 +117,13 @@ def as_list(value: Any) -> list:
 _LABELS = {
     "en": {"source": "Source", "sources": "Sources", "note": "Note", "notes": "Notes",
            "print": "Print / PDF", "theme": "Colour theme", "contents": "Contents",
-           "filters": "Filters"},
+           "filters": "Filters", "excel": "Excel", "excel_title": "Download every dataset as an Excel workbook",
+           "unit": "Unit", "as_of": "As of", "computed": "Calculated live in the report (not in this sheet)",
+           "fields": "fields"},
     "zh": {"source": "来源", "sources": "来源", "note": "注", "notes": "注",
-           "print": "打印 / PDF", "theme": "配色主题", "contents": "目录", "filters": "筛选"},
+           "print": "打印 / PDF", "theme": "配色主题", "contents": "目录", "filters": "筛选",
+           "excel": "Excel 数据", "excel_title": "下载全部数据集（Excel 工作簿）",
+           "unit": "单位", "as_of": "数据截至", "computed": "报告中实时计算的字段（本表未包含）", "fields": "字段"},
 }
 
 

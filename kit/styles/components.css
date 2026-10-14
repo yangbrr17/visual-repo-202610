@@ -37,6 +37,35 @@
 }
 .rk-iconbtn:hover { background: var(--rk-surface); color: var(--rk-accent); border-color: var(--rk-rule); }
 
+/* head status badges: "Filtered" (+ clear) and "Selection not in this view" (runtime, Block.updateStatus) */
+.rk-block__status { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; align-self: center; min-width: 0; }
+.rk-badge {
+  display: inline-flex; align-items: center; gap: 4px; height: 19px; padding: 0 7px;
+  border: 1px solid var(--rk-rule); border-radius: 999px;
+  font-family: var(--rk-font-sans); font-size: 10.5px; font-weight: 500; line-height: 1; letter-spacing: .01em;
+  color: var(--rk-ink-2); background: var(--rk-surface); white-space: nowrap; cursor: default;
+}
+.rk-badge--filtered { color: var(--rk-accent-3); border-color: color-mix(in srgb, var(--rk-accent-3) 38%, transparent); background: color-mix(in srgb, var(--rk-accent-3) 8%, var(--rk-paper)); padding-right: 2px; }
+.rk-badge__icon { display: inline-flex; }
+.rk-badge__icon svg { width: 11px; height: 11px; }
+.rk-badge__clear {
+  display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; margin-left: 1px; padding: 0;
+  border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 13px; line-height: 1; cursor: pointer;
+  transition: background var(--rk-dur-fast), color var(--rk-dur-fast);
+}
+.rk-badge__clear:hover, .rk-badge__clear:focus-visible { background: color-mix(in srgb, var(--rk-accent-3) 16%, transparent); color: var(--rk-accent); }
+.rk-badge--soft { color: var(--rk-ink-3); background: transparent; border-style: dashed; font-style: italic; }
+
+/* metric / dimension pickers (options.choices) */
+.rk-block__choices { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; align-self: center; min-width: 0; }
+.rk-block__choice-wrap { display: inline-flex; align-items: center; gap: 5px; }
+.rk-block__choice-label { font-size: var(--rk-fs-xs); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--rk-ink-3); }
+.rk-select.rk-select--sm { height: 23px; max-width: 220px; padding: 0 22px 0 7px; font-size: 11.5px; text-overflow: ellipsis; background-position: calc(100% - 11px) 50%, calc(100% - 7px) 50%; }
+
+/* RK.runtime.printFit(): nested scroll containers of a block being fitted for print take their natural size
+   (!important: components that re-lay out during print must not clamp them again) */
+.rk-pf-unclamp { overflow: visible !important; max-height: none !important; height: auto !important; max-width: none !important; }
+
 /* messages */
 .rk-block__msg {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center;

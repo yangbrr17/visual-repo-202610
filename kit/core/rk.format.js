@@ -33,6 +33,11 @@
     daysLong: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
     compactUnits: [[1e12, 'tn'], [1e9, 'bn'], [1e6, 'm'], [1e3, 'k']]
   };
+  /** Compact ('auto') units per language; RK.i18n picks one (zh-CN: 亿 = 1e8, 万 = 1e4). */
+  var COMPACT_UNITS = {
+    en: [[1e12, 'tn'], [1e9, 'bn'], [1e6, 'm'], [1e3, 'k']],
+    zh: [[1e8, '亿'], [1e4, '万']]
+  };
 
   // Lookup tables have no prototype and are read with has(): "constructor", "toString", "__proto__" ... are never presets.
   function has(obj, key) { return obj != null && Object.prototype.hasOwnProperty.call(obj, key); }
@@ -388,7 +393,7 @@
       return v;
     }
     if (v instanceof Date) return isNaN(v) ? ((opts && opts.na != null) ? opts.na : config.na) : compile(spec || 'date')(v);
-    if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+    if (typeof v === 'boolean') return RK.i18n ? RK.i18n.t(v ? 'yes' : 'no', v ? 'Yes' : 'No') : (v ? 'Yes' : 'No');
     if (!isFinite(v)) return (opts && opts.nm != null) ? opts.nm : config.nm;
     return compile(spec)(v);
   }
@@ -414,6 +419,18 @@
   };
   format.presets = presets;
   format.config = config;
+  format.compactUnits = COMPACT_UNITS;
+  /**
+   * Locale-dependent settings (compact units) for an RK.i18n locale. Runs on load and on 'i18n:changed'.
+   * A page that set config.compactUnits itself keeps them (only the kit's own defaults are swapped).
+   */
+  format.applyLocale = function (locale) {
+    var lang = String(locale || (RK.i18n && RK.i18n.locale) || 'en').split('-')[0].toLowerCase();
+    var known = Object.keys(COMPACT_UNITS).some(function (k) { return config.compactUnits === COMPACT_UNITS[k]; }) || config._defaultUnits === config.compactUnits;
+    if (!known) return;
+    config.compactUnits = has(COMPACT_UNITS, lang) ? COMPACT_UNITS[lang] : COMPACT_UNITS.en;
+    config._defaultUnits = config.compactUnits;
+  };
   format.toDate = toDate;
   format.isDateCode = isDateCode;
   /** Number of decimals a format code shows — useful for axis label precision. */
@@ -424,4 +441,7 @@
   };
 
   RK.format = format;
+  config._defaultUnits = config.compactUnits;
+  format.applyLocale();
+  if (RK.bus) RK.bus.on('i18n:changed', function (l) { format.applyLocale(l); });
 })(typeof window !== 'undefined' ? window : this);
