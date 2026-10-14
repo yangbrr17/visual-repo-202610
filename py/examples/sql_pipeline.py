@@ -997,11 +997,11 @@ def build_report(a: Analysis, available: set[str]) -> Report:
     target_terms = {"shares_out": t["shares_out"], "adj_net_debt": round(adj_net_debt, 1),
                     "ltm_ebitda": t["ltm_ebitda"], "ntm_ebitda": t["ntm_ebitda"]}
     r.dataset("offer", [
-        {"reference": "Current share price", "ref_price": t["price"], **target_terms},
+        {"reference": "Current price", "ref_price": t["price"], **target_terms},
         {"reference": "30-day VWAP", "ref_price": t["vwap_30d"], **target_terms},
         {"reference": "52-week high", "ref_price": t["high_52w"], **target_terms},
     ], title="Illustrative offer at a premium to reference prices", source=SRC_ANALYSIS, unit="USD m",
-        fields={"reference": "Reference price",
+        fields={"reference": "Reference",
                 "ref_price": {"title": "Reference price", "format": USD_PS, "unit": "USD"},
                 "shares_out": {"title": "Diluted shares", "format": "#,##0.0", "unit": "m"},
                 "adj_net_debt": {"title": "Net debt & minorities", "format": USD_M, "unit": "USD m"},
@@ -1128,29 +1128,35 @@ def build_report(a: Analysis, available: set[str]) -> Report:
             options={"regression": True, "tooltipFields": ["ebitda_margin_ltm", "mkt_cap"]})
 
     gap_tsr = t["tsr_1y"] - med["tsr_1y"]
+    tsr_bar = dict(encode={"x": "company", "y": "tsr_1y"},
+                   options={"orientation": "horizontal", "sort": "desc", "highlight": name,
+                            "refLines": [{"value": med["tsr_1y"], "label": "Peer median"}]})
     p = r.page(f"{short} shares {'lagged' if gap_tsr < 0 else 'outperformed'} the peer median by "
                f"{abs(gap_tsr) * 100:.0f} pts over the last year", kicker="Trading performance",
-               subtitle="Total shareholder return; rolling 30-day volatility, annualised")
+               subtitle="Share price performance and total shareholder return", source=SRC_MARKET)
     if has("line"):
-        p.block("line", data="perf", span=7, height=330, title="Share price, rebased to 100",
+        p.block("line", data="perf", span=7, height=360, title="Share price, rebased to 100",
                 subtitle=f"Weekly closes since {PRICE_START:%d-%b-%Y}; peer median of rebased prices",
-                encode={"x": "date", "y": "perf_index", "series": "series"},
-                options={"highlight": name, "refLines": [{"value": 100, "label": "Start = 100"}]})
-        p.block("bar", data="comps", span=5, height=330, title="1-year total shareholder return",
-                encode={"x": "company", "y": "tsr_1y"},
-                options={"orientation": "horizontal", "sort": "desc", "highlight": name,
-                         "refLines": [{"value": med["tsr_1y"], "label": "Peer median"}]})
-        p.block("line", data="vol", span=12, height=230, title="Rolling 30-day volatility (annualised)",
-                encode={"x": "date", "y": "vol_30d", "series": "series"}, options={"highlight": name})
+                encode={"x": "date", "y": "perf_index", "series": "series"}, options={"highlight": name})
+        p.block("bar", data="comps", span=5, height=360, title="1-year total shareholder return",
+                subtitle="Price change plus dividends", **tsr_bar)
     else:
-        p.block("bar", data="comps", span=6, height=360, title="1-year total shareholder return",
-                encode={"x": "company", "y": "tsr_1y"},
-                options={"orientation": "horizontal", "sort": "desc", "highlight": name,
-                         "refLines": [{"value": med["tsr_1y"], "label": "Peer median"}]})
-        p.block("bar", data="comps", span=6, height=360, title="30-day volatility (annualised)",
-                encode={"x": "company", "y": "vol_30d"},
-                options={"orientation": "horizontal", "sort": "desc", "highlight": name,
-                         "refLines": [{"value": med["vol_30d"], "label": "Peer median"}]})
+        p.block("bar", data="comps", span=12, height=360, title="1-year total shareholder return",
+                subtitle="Price change plus dividends", **tsr_bar)
+
+    gap_vol = t["vol_30d"] - med["vol_30d"]
+    p = r.page(f"{short}'s 30-day volatility of {_pct(t['vol_30d'], 0)} is "
+               f"{abs(gap_vol) * 100:.0f} pts {'above' if gap_vol > 0 else 'below'} the peer median",
+               kicker="Trading risk", subtitle="Rolling 30-day volatility of daily log returns, annualised",
+               source=SRC_MARKET)
+    if has("line"):
+        p.block("line", data="vol", span=8, height=360, title="Rolling 30-day volatility",
+                subtitle="Weekly sample; peer median of the peers' volatilities",
+                encode={"x": "date", "y": "vol_30d", "series": "series"}, options={"highlight": name})
+    p.block("bar", data="comps", span=4 if has("line") else 12, height=360, title="Current 30-day volatility",
+            subtitle=f"As of {AS_OF:%d-%b-%Y}", encode={"x": "company", "y": "vol_30d"},
+            options={"orientation": "horizontal", "sort": "desc", "highlight": name,
+                     "refLines": [{"value": med["vol_30d"], "label": "Peer median"}]})
 
     lev = t["net_debt"] / t["ltm_ebitda"]
     p = r.page(f"Enterprise value of ${t['ev'] / 1000:,.1f}bn with net leverage of {lev:.1f}x LTM EBITDA",
@@ -1193,11 +1199,12 @@ def build_report(a: Analysis, available: set[str]) -> Report:
     p = r.page(f"Buyers paid a median {_pct(d_1d.median, 0)} premium to the undisturbed price "
                f"({_pct(d_30.median, 0)} to the 30-day VWAP)", kicker="Premiums paid",
                subtitle="Offer price vs. last undisturbed close and 30-day VWAP before announcement")
-    p.block("beeswarm", data="premiums", span=7, height=300, title="Premium distribution",
+    p.block("beeswarm", data="premiums", span=6, height=300, title="Premium distribution",
             encode={"label": "target", "value": "premium", "group": "measure"},
             options={"labels": "extremes", "refLines": [
                 {"value": BASE_PREMIUM, "label": f"Illustrative offer {BASE_PREMIUM:.0%}"}]})
-    p.block("donut", data="consideration_mix", span=5, height=300, title="Deal value by consideration",
+    p.block("donut", data="consideration_mix", span=6, height=300, title="Deal value by consideration",
+            subtitle="USD m, all precedents",
             encode={"label": "consideration", "value": "deal_value"}, options={"centerLabel": "Deal value"})
 
     offer_ntm = (t["price"] * (1 + BASE_PREMIUM) * t["shares_out"] + adj_net_debt) / t["ntm_ebitda"]
@@ -1220,9 +1227,14 @@ def build_report(a: Analysis, available: set[str]) -> Report:
                 {"field": "offer_ev_ltm", "title": "EV / EBITDA LTM"},
                 {"field": "offer_ev_ntm", "title": "EV / EBITDA NTM"}]})
 
-    p = r.page("Appendix: how the numbers were built", kicker="Appendix",
+    p = r.page("Appendix: how the numbers were built", kicker="Methodology",
                subtitle="Raw tables → SQL views → Python → ReportKit datasets", source=SRC_ANALYSIS)
-    p.block("text-block", span=12, title="Methodology", options={"variant": "prose", "text": DEFINITIONS})
+    p.block("text-block", span=12, title="Metric definitions",
+            options={"variant": "prose", "columns": 2, "text": DEFINITIONS})
+
+    p = r.page("Appendix: every dataset traces back to a raw table", kicker="Data lineage",
+               subtitle="One file per dataset in data/datasets/; open the CSV export from any chart toolbar",
+               source=SRC_ANALYSIS)
     p.block("comps-table", data="lineage", title="Data lineage",
             subtitle=(f"Raw: {f['n_prices']:,} daily prices, {f['n_financials']} financial years, "
                       f"{f['n_dividends']} dividends, {f['n_deals']} deals with {f['n_deal_prices']:,} "

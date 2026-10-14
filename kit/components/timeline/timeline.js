@@ -137,9 +137,14 @@
         evs.forEach(function (ev, i) { var j = order.indexOf(ev.t + '|' + ev.label); ev.n = j >= 0 ? j + 1 : i + 1; });
         // kinds: stable order from all rows so colours do not shift when filtering
         var kinds = RK.util.unique(c.allRows.map(function (r) { return enc.kind && r[enc.kind] != null ? String(r[enc.kind]) : null; }).filter(function (k) { return k != null; }));
-        var cat = RK.theme.categorical(kinds);
         var kc = o.kindColors || {}, ks = o.kindShapes || {};
-        var colorOf = function (k) { return k == null ? t.accent : (tokenColor(t, kc[k]) || cat(k)); };
+        // automatic colours skip any colour already claimed by a kindColors override (e.g. accent2 == cat-2 in some themes)
+        var taken = Object.keys(kc).map(function (k) { return String(tokenColor(t, kc[k]) || '').toLowerCase(); });
+        var pal = t.cat.filter(function (col) { return taken.indexOf(col.toLowerCase()) < 0; });
+        if (!pal.length) pal = t.cat;
+        var auto = {};
+        kinds.filter(function (k) { return !tokenColor(t, kc[k]); }).forEach(function (k, i) { auto[k] = pal[i % pal.length]; });
+        var colorOf = function (k) { return k == null ? t.accent : (tokenColor(t, kc[k]) || auto[k] || t.neutral); };
         var shapeOf = function (k) { return o.marker === 'dot' ? 'circle' : (ks[k] || SHAPES[Math.max(0, kinds.indexOf(k)) % SHAPES.length]); };
         var selField = o.selectBy ? enc[o.selectBy] : null;
         var sel = selField ? c.selected(selField) : [];
