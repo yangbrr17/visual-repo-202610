@@ -23,6 +23,14 @@
     var s = RK.format(Math.abs(v), fmt);
     return v > 0 ? '+' + s : v < 0 && /[1-9]/.test(s) ? MINUS + s : s;
   }
+  /** Axis tick format: the value format with no more decimals than the tick step needs. */
+  function tickFmt(fmt, step) {
+    var code = RK.format.presets[fmt] || fmt;
+    if (typeof code !== 'string' || !/[0#]/.test(code) || RK.format.isDateCode(code)) return fmt;
+    var v = Math.abs(step) * (/%/.test(code.replace(/"[^"]*"/g, '')) ? 100 : 1), dec = 0;
+    while (dec < 4 && Math.abs(Math.round(v * Math.pow(10, dec)) - v * Math.pow(10, dec)) > 1e-6) dec++;
+    return code.replace(/([0#])\.([0#]+)/g, function (m, a, d) { var n = Math.min(dec, d.length); return a + (n ? '.' + d.slice(0, n) : ''); });
+  }
   var measureCtx = null;
   function textW(s, font) {
     if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
@@ -89,12 +97,14 @@
     var nBands = Math.max.apply(null, items.map(function (d) { return d.thr.length; }).concat([0])) + 1;
 
     // ---- scale: shared axis, or every row to its own max (axis hidden) ----
-    var gmax = 0;
+    var gmax = 0, gmin = 0;
     items.forEach(function (d) {
       d.max = Math.max.apply(null, [d.value, d.target].concat(d.thr).filter(isNum).concat([0])) * 1.08 || 1;
       gmax = Math.max(gmax, d.max);
+      if (!rowScale && d.value != null && d.value < 0) gmin = Math.min(gmin, d.value * 1.08);
     });
-    var step = util.niceStep(gmax, 5), axMax = rowScale ? 1 : Math.ceil(gmax / step) * step;
+    var step = util.niceStep(gmax - gmin, 5), axMax = rowScale ? 1 : Math.ceil(gmax / step) * step;
+    var axMin = rowScale ? 0 : Math.floor(gmin / step) * step;   // negative actuals (e.g. net cash) extend the first band
     items.forEach(function (d) {
       var k = rowScale ? 1 / d.max : 1, end = rowScale ? 1 : axMax;
       d.s = function (v) { return v == null ? null : v * k; };
@@ -103,7 +113,7 @@
 
     // ---- colours ----
     var shades = [];
-    for (var k = 0; k < nBands; k++) shades.push(RK.theme.mix(t.ink3, t.paper, 0.6 + 0.3 * (nBands > 1 ? k / (nBands - 1) : 1)));
+    for (var k = 0; k < nBands; k++) shades.push(RK.theme.mix(t.ink3, t.paper, 0.42 + 0.42 * (nBands > 1 ? k / (nBands - 1) : 1)));
     if (!up) shades.reverse();
     function barColor(d) {
       if (d.hi) return t.accent2;
@@ -131,15 +141,19 @@
     if (hiIdx.length && o.highlightBand !== false) series.push(rowBand(ctx, hiIdx));
 
     // qualitative bands: stacked segments, the last one runs to the end of the scale
+    if (axMin < 0) {
+      series.push({ id: 'band-base', type: 'bar', stack: 'bands', stackStrategy: 'all', yAxisIndex: 0, barWidth: '62%', silent: true,
+        itemStyle: { color: 'transparent' }, emphasis: { disabled: true }, tooltip: { show: false }, data: items.map(function () { return axMin; }) });
+    }
     for (var b = 0; b < nBands; b++) {
       series.push({
-        id: 'band-' + b, name: bandNames[b], type: 'bar', stack: 'bands', yAxisIndex: 0, barWidth: '62%', z: 1,
+        id: 'band-' + b, name: bandNames[b], type: 'bar', stack: 'bands', stackStrategy: 'all', yAxisIndex: 0, barWidth: '62%', z: 1,
         silent: true, emphasis: { disabled: true }, tooltip: { show: false },
         itemStyle: { color: shades[b] },
         animationDelay: function (i) { return i * stagger * 0.5; },
         data: items.map((function (bi) {
           return function (d) {
-            var lo = bi === 0 ? 0 : d.thr[bi - 1], hi = bi < d.thr.length ? d.thr[bi] : (bi === d.thr.length ? d.end / (rowScale ? d.s(1) : 1) : null);
+            var lo = bi === 0 ? axMin : d.thr[bi - 1], hi = bi < d.thr.length ? d.thr[bi] : (bi === d.thr.length ? (rowScale ? d.max : axMax) : null);
             if (lo == null || hi == null) return 0;
             lo = Math.min(d.s(lo), d.end); hi = Math.min(d.s(hi), d.end);
             return Math.max(0, hi - lo);
@@ -229,13 +243,19 @@
       }
     };
     var valAxis = {
-      type: 'value', min: 0, max: axMax, interval: rowScale ? undefined : step, show: !rowScale,
-      axisLabel: { formatter: C.axisFmt(baseFmt), hideOverlap: true },
+      type: 'value', min: axMin, max: axMax, interval: rowScale ? undefined : step, show: !rowScale,
+      axisLabel: { formatter: C.axisFmt(tickFmt(baseFmt, step)), hideOverlap: true },
       splitLine: { show: false }
     };
 
     var legendData = bandNames.map(function (n, i) { return { name: n, icon: 'rect', itemStyle: { color: shades[i] } }; });
-    legendData.push({ name: actualName, icon: 'rect', itemStyle: { color: t.accent } });
+    if (o.colorByTarget) {
+      // two swatches explain the pos / neg bar colours; they map to empty series
+      var okName = o.metLabel || 'Meets target', koName = o.missLabel || 'Misses target';
+      series.push({ id: 'lg-ok', name: okName, type: 'bar', data: [], itemStyle: { color: t.pos } },
+        { id: 'lg-ko', name: koName, type: 'bar', data: [], itemStyle: { color: t.neg } });
+      legendData.push({ name: okName, icon: 'rect', itemStyle: { color: t.pos } }, { name: koName, icon: 'rect', itemStyle: { color: t.neg } });
+    } else legendData.push({ name: actualName, icon: 'rect', itemStyle: { color: t.accent } });
     if (items.some(function (d) { return d.target != null; })) legendData.push({ name: targetName, icon: 'path://M0,0 h3 v14 h-3 z', itemStyle: { color: t.ink } });
     var showLegend = o.legend !== false;
 
@@ -285,6 +305,8 @@
       valueTitle: null,           // column headers
       varianceTitle: null,
       colorByTarget: false,       // actual bar in pos / neg depending on meeting the target
+      metLabel: null,             // legend names with colorByTarget (default 'Meets target' / 'Misses target')
+      missLabel: null,
       highlight: null,
       highlightBand: true,
       format: null,

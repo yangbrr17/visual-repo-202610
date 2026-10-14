@@ -76,3 +76,4 @@
   .rk-comps__scroll { height: auto; overflow: visible; }
   .rk-comps thead, .rk-comps tfoot { position: static; }
 }
+[data-rk-theme="ink"] .rk-comps .rk-table tr.is-target td { background-color: color-mix(in srgb, var(--rk-accent-2) 22%, var(--rk-paper)); }

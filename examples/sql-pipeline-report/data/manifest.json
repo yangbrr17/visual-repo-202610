@@ -1,0 +1,80 @@
+{
+  "reportkit": "0.1",
+  "report": {
+    "title": "Project Kestrel",
+    "subtitle": "Valuation perspectives on Kestrel Automation",
+    "client": "Board of Directors, Kestrel Automation",
+    "date": "2026-10-14",
+    "confidentiality": "Strictly private & confidential",
+    "locale": "en-US",
+    "firm": "Northbridge Partners · Investment Banking",
+    "theme": "navy"
+  },
+  "datasets": {
+    "comps": {
+      "path": "datasets/comps.json",
+      "title": "Trading comparables",
+      "rows": 10
+    },
+    "deals": {
+      "path": "datasets/deals.json",
+      "title": "Precedent transactions",
+      "rows": 14
+    },
+    "premiums": {
+      "path": "datasets/premiums.json",
+      "title": "Premiums paid (long format)",
+      "rows": 28
+    },
+    "consideration_mix": {
+      "path": "datasets/consideration_mix.json",
+      "title": "Deal value by consideration",
+      "rows": 3
+    },
+    "perf": {
+      "path": "datasets/perf.json",
+      "title": "Share price performance, rebased to 100 (weekly)",
+      "rows": 210
+    },
+    "vol": {
+      "path": "datasets/vol.json",
+      "title": "Rolling 30-day volatility (weekly)",
+      "rows": 198
+    },
+    "kpis": {
+      "path": "datasets/kpis.json",
+      "title": "Headline metrics",
+      "rows": 6
+    },
+    "valuation": {
+      "path": "datasets/valuation.json",
+      "title": "Valuation summary: implied value per share",
+      "rows": 6
+    },
+    "ev_bridge": {
+      "path": "datasets/ev_bridge.json",
+      "title": "Kestrel Automation: market cap to enterprise value",
+      "rows": 5
+    },
+    "offer": {
+      "path": "datasets/offer.json",
+      "title": "Illustrative offer at a premium to reference prices",
+      "rows": 3
+    },
+    "lineage": {
+      "path": "datasets/lineage.json",
+      "title": "Data lineage",
+      "rows": 7
+    }
+  },
+  "params": {
+    "premium": {
+      "value": 0.3,
+      "min": 0.1,
+      "max": 0.5,
+      "step": 0.025,
+      "format": "0.0%",
+      "title": "Offer premium"
+    }
+  }
+}

@@ -73,14 +73,35 @@
         map.on('mouseout', function () { map.scrollWheelZoom.disable(); });
       }
     }
-    function fit(target, pad) {
-      if (target !== undefined) { st.target = target; st.pad = pad == null ? 16 : pad; }
-      var b = st.target;
+    /** Legend box in container px, with the corner it sits in. */
+    function legendBox() {
+      var lg = el.querySelector('.leaflet-control-container .rk-map-legend');
+      if (!lg) return null;
+      var r = lg.getBoundingClientRect(), c = el.getBoundingClientRect(), x = r.left - c.left, y = r.top - c.top;
+      return { x: x, y: y, w: r.width, h: r.height, left: x + r.width / 2 < c.width / 2, top: y + r.height / 2 < c.height / 2 };
+    }
+    /** Fit bounds; if the legend would cover data (avoid() -> [{ll, r}]), reserve a column or band for it — whichever zooms less. */
+    function fit(target, pad, avoid) {
+      if (target !== undefined) { st.target = target; st.pad = pad == null ? 16 : pad; st.avoid = avoid || null; }
+      var b = st.target, p = st.pad, mz = o.fitMaxZoom || 6;
       if (!b) return;
       st.fitting = true;
       try {
         if (b.center) map.setView(b.center, b.zoom != null ? b.zoom : 2, { animate: false });
-        else map.fitBounds(b, { padding: [st.pad, st.pad], maxZoom: o.fitMaxZoom || 6, animate: false });
+        else {
+          map.fitBounds(b, { padding: [p, p], maxZoom: mz, animate: false });
+          var lg = st.avoid && legendBox();
+          var hit = lg && st.avoid().some(function (q) {
+            var c = map.latLngToContainerPoint(q.ll), r = (q.r || 0) + 4;
+            return c.x + r > lg.x && c.x - r < lg.x + lg.w && c.y + r > lg.y && c.y - r < lg.y + lg.h;
+          });
+          if (hit) {
+            var gx = lg.w + 14, gy = lg.h + 14;
+            var A = [L.point(lg.left ? gx : p, p), L.point(lg.left ? p : gx, p)], B = [L.point(p, lg.top ? gy : p), L.point(p, lg.top ? p : gy)];
+            var zA = map.getBoundsZoom(b, false, A[0].add(A[1])), zB = map.getBoundsZoom(b, false, B[0].add(B[1])), best = zA >= zB ? A : B;
+            map.fitBounds(b, { paddingTopLeft: best[0], paddingBottomRight: best[1], maxZoom: mz, animate: false });
+          }
+        }
       } catch (e) { /* zero-sized container: refit on the next resize */ }
       st.fitting = false;
     }
@@ -111,9 +132,9 @@
     return L.latLngBounds(WORLD);
   }
 
-  /** Collision-aware HTML labels in the 'rk-labels' pane: the top `max` visible items by priority that fit. */
+  /** Collision-aware HTML labels in the 'rk-labels' pane: per group, the top `max` visible items by priority that fit. */
   function labelLayer(map) {
-    var L = window.L, group = L.layerGroup().addTo(map), items = [], max = Infinity;
+    var L = window.L, group = L.layerGroup().addTo(map), items = [], max = {}, circles = [];
     function overlap(a, b) { return a.x < b.x + b.w + 2 && a.x + a.w + 2 > b.x && a.y < b.y + b.h + 1 && a.y + a.h + 1 > b.y; }
     function place() {
       var size = map.getSize(), box0 = map.getContainer().getBoundingClientRect();
@@ -122,31 +143,35 @@
         var r = c.getBoundingClientRect();
         return { x: r.left - box0.left, y: r.top - box0.top, w: r.width, h: r.height };
       });
-      var shown = 0;
+      // bubbles are soft obstacles: a label prefers the side that covers the fewest of them
+      var soft = circles.map(function (q) { var c = map.latLngToContainerPoint(q.ll), r = q.r || 0; return { x: c.x - r, y: c.y - r, w: 2 * r, h: 2 * r }; });
+      var shown = {};
       items.slice().sort(function (a, b) { return b.it.prio - a.it.prio; }).forEach(function (x) {
-        var icon = x.m.getElement();
+        var icon = x.m.getElement(), gk = x.it.group || '_', cap = max[gk] == null ? Infinity : max[gk];
         if (!icon) return;
-        if (shown >= max) { icon.firstChild.classList.add('is-hidden'); return; }
+        if ((shown[gk] || 0) >= cap) { icon.firstChild.classList.add('is-hidden'); return; }
         var span = icon.firstChild, w = span.offsetWidth, ht = span.offsetHeight, r = x.it.r || 0, g = 3;
-        var p = map.latLngToContainerPoint(x.it.latlng), hit = null;
-        (x.it.pos || ['r', 'l', 't', 'b']).some(function (k) {
+        var p = map.latLngToContainerPoint(x.it.latlng), hit = null, hitBox = null, best = Infinity;
+        (x.it.pos || ['r', 'l', 't', 'b']).forEach(function (k) {
           var d = k === 'c' ? [-w / 2, -ht / 2] : k === 'r' ? [r + g, -ht / 2] : k === 'l' ? [-r - g - w, -ht / 2] : k === 't' ? [-w / 2, -r - g - ht] : [-w / 2, r + g];
           var b = { x: p.x + d[0], y: p.y + d[1], w: w, h: ht };
-          if (b.x < 2 || b.y < 2 || b.x + w > size.x - 2 || b.y + ht > size.y - 2) return false;
-          if (placed.some(function (q) { return overlap(b, q); })) return false;
-          placed.push(b); hit = d;
-          return true;
+          if (b.x < 2 || b.y < 2 || b.x + w > size.x - 2 || b.y + ht > size.y - 2) return;
+          if (placed.some(function (q) { return overlap(b, q); })) return;
+          var score = soft.filter(function (q) { return overlap(b, q); }).length;
+          if (score < best) { best = score; hit = d; hitBox = b; }
         });
+        if (hitBox) placed.push(hitBox);
         span.style.transform = hit ? 'translate(' + Math.round(hit[0]) + 'px,' + Math.round(hit[1]) + 'px)' : '';
         span.classList.toggle('is-hidden', !hit);
-        if (hit) shown++;
+        if (hit) shown[gk] = (shown[gk] || 0) + 1;
       });
     }
     map.on('zoomend moveend resize', place);
     return {
-      /** list: [{latlng, html, r, prio, pos, cls}]; n: max labels shown at once */
-      set: function (list, n) {
-        max = n == null ? Infinity : n;
+      /** list: [{latlng, html, r, prio, pos, cls, group}]; n: max shown (number, or {group: max}); soft: [{ll, r}] marks to avoid covering */
+      set: function (list, n, soft) {
+        max = n == null ? {} : typeof n === 'number' ? { _: n } : n;
+        circles = soft || [];
         group.clearLayers();
         items = list.map(function (it) {
           var m = L.marker(it.latlng, {
@@ -191,7 +216,7 @@
   /** Nested reference circles (bottom-aligned, leader lines) for a sqrt size scale. */
   function sizeLegendEl(values, rOf, fmt, ink) {
     var vs = values.filter(function (v) { return v > 0; }).sort(function (a, b) { return b - a; }), kept = [];
-    vs.forEach(function (v) { var last = kept[kept.length - 1]; if (!last || 2 * (rOf(last) - rOf(v)) >= 11) kept.push(v); });
+    vs.forEach(function (v) { var last = kept[kept.length - 1]; if (!last || 2 * (rOf(last) - rOf(v)) >= 12) kept.push(v); });
     if (!kept.length) return null;
     var R = rOf(kept[0]), H = Math.ceil(2 * R + 4), W = Math.ceil(2 * R + 64), e = RK.util.escapeHTML, out = '';
     kept.forEach(function (v) {
@@ -207,7 +232,7 @@
     if (!(max > 0)) return [];
     var m = Math.pow(10, Math.floor(Math.log10(max))), top = m;
     [1, 1.5, 2, 2.5, 3, 4, 5, 6, 7.5, 8].forEach(function (k) { if (k * m <= max) top = k * m; });
-    return RK.util.unique([top, niceRound(top / 3), niceRound(top / 10)]);
+    return RK.util.unique([top, niceRound(top / 2.5), niceRound(top / 10)]);
   }
   /** Field title with its unit, e.g. "Revenue 2025A (USD m)". */
   function fieldTitle(ctx, f) {
@@ -225,6 +250,19 @@
   /** Is a row inside every active self-selection on the given fields? (false -> draw dimmed) */
   function isOn(ctx, row, fields) {
     return fields.every(function (f) { if (!f) return true; var s = ctx.selected(f); return !s.length || s.indexOf(row[f]) >= 0; });
+  }
+  /** Categorical palette; with a highlight in play, drop colours too close to accent-2 so the target stays unique. */
+  function palette(t, avoidAccent2) {
+    if (!avoidAccent2) return t.cat;
+    var a = RK.theme.parseColor(t.accent2);
+    var out = t.cat.filter(function (c) { var x = RK.theme.parseColor(c); return Math.sqrt(Math.pow(x[0] - a[0], 2) + Math.pow(x[1] - a[1], 2) + Math.pow(x[2] - a[2], 2)) > 70; });
+    return out.length >= 3 ? out : t.cat;
+  }
+  /** Stable category -> colour map over a palette. */
+  function catScale(values, pal, t) {
+    var m = {};
+    values.forEach(function (v, i) { m[v] = pal[i % pal.length]; });
+    return function (v) { return m[v] || t.neutral; };
   }
   /** Sequential stops without the palest steps (they vanish against the land colour). */
   function seqStops(t) { return t.seq.length >= 6 ? t.seq.slice(2) : t.seq; }
@@ -496,7 +534,7 @@
         if (first) {
           var pts = [];
           S.list.forEach(function (x) { pts = pts.concat(mainBounds(x.f)); });
-          view.fit(fitTarget(o.fit, pts), 12);
+          view.fit(fitTarget(o.fit, pts), 12, function () { return S.list.map(function (x) { return { ll: RK.geo.centroid(x.f) || [0, 0], r: 6 }; }); });
           labels.place();
         }
       }

@@ -1,0 +1,51 @@
+{
+  "id": "pivot-table",
+  "name": "Pivot Table",
+  "name_zh": "数据透视表",
+  "category": "table",
+  "engine": "dom",
+  "deps": [],
+  "summary": "Lightweight pivot: nested, collapsible row groups × one column dimension with any aggregate, totals, CAGR, % of row / column and heat colouring.",
+  "summary_zh": "轻量数据透视表：可折叠的多级行分组 × 一个列维度，任意聚合函数，合计行 / 列、CAGR、行 / 列占比与热力着色。",
+  "description_zh": "把长表数据按 rows（外层→内层，可多级）和 cols 两个维度交叉汇总，value 用 sum / avg / median / count 等 RK 聚合函数计算；维度也可以是 RK 公式（如 year(date)）。采用紧凑布局：分组行直接显示小计并可折叠展开，底部合计行在滚动时固定，可加合计列和首末列 CAGR，也可切换为占行 / 列 / 总计百分比并用热力色突出结构。适合分部 × 地区 × 年份收入、按行业统计交易数量或中位倍数等结构分析，点击行标签或列头可交叉筛选其他图表。",
+  "best_for": ["Segment × region revenue by year with subtotals and CAGR", "Deal counts or median multiples by sector × year / consideration", "Mix analysis (% of column total) with heat colouring"],
+  "avoid_when": ["More than ~12 columns (use a chart or data-grid)", "A single flat list (use comps-table or data-grid)"],
+  "channels": {
+    "rows": {"type": "string[]", "required": true, "desc": "options.rows — row dimensions, outer to inner (fields or RK formulas)", "default": "segment"},
+    "cols": {"type": "string", "required": false, "desc": "options.cols — column dimension (field or RK formula, e.g. year(date))", "default": "year"},
+    "value": {"type": "number", "required": false, "desc": "options.value — measure field or row formula (omit with agg 'count' to count rows)", "default": "revenue"}
+  },
+  "options": {
+    "rows": {"type": "string[]", "default": ["segment"], "desc": "Row dimensions, outer to inner (fields or RK formulas)"},
+    "cols": {"type": "string", "default": "year", "desc": "Column dimension (field or RK formula); null = a single value column"},
+    "value": {"type": "string", "default": "revenue", "desc": "Measure field or row formula; null with agg 'count' counts rows"},
+    "agg": {"type": "string", "default": "sum", "desc": "sum | avg | median | min | max | count | countd | stdev | first | last (RK.expr aggregates)"},
+    "format": {"type": "string", "default": null, "desc": "Value format (defaults to the measure format; '#,##0' for counts)"},
+    "show": {"type": "string", "default": "value", "desc": "value | pctRow | pctCol | pctTotal"},
+    "totalRow": {"type": "boolean", "default": true, "desc": "Totals row at the bottom (sticky while scrolling)"},
+    "totalCol": {"type": "boolean", "default": false, "desc": "Totals column at the right"},
+    "cagr": {"type": "boolean", "default": false, "desc": "CAGR column from the first to the last column (assumes evenly spaced periods)"},
+    "collapsible": {"type": "boolean", "default": true, "desc": "Chevrons to collapse / expand outer row groups"},
+    "collapsed": {"type": "boolean", "default": false, "desc": "Start with outer row groups collapsed"},
+    "sort": {"type": "string", "default": null, "desc": "null (data order) | 'label' | 'total-desc' | 'total-asc' — applied at every level"},
+    "colSort": {"type": "string", "default": "asc", "desc": "asc | desc | null (data order) for the column dimension"},
+    "heat": {"type": "boolean|string", "default": false, "desc": "false | 'seq' | 'div' — colour the leaf cells"},
+    "heatIntensity": {"type": "number", "default": 0.5, "desc": "0–1 strength of heat tints"},
+    "titles": {"type": "object", "default": {}, "desc": "{\"<field or formula>\": \"Display title\"} — e.g. {\"year(date)\": \"Year announced\"}"},
+    "valueTitle": {"type": "string", "default": null, "desc": "Measure label in the header corner (defaults to e.g. 'Median EV/LTM EBITDA' or 'Number of records')"},
+    "scroll": {"type": "boolean", "default": true, "desc": "true: fixed block height with sticky header, label column and totals; false: grow to content"},
+    "tooltip": {"type": "boolean", "default": true, "desc": "Hover tooltip with value, shares and record count"},
+    "crossFilter": {"type": "boolean", "default": true, "desc": "Click a row label or column header to cross-filter (plain-field dimensions only)"}
+  },
+  "interactions": ["Collapse / expand row groups", "Hover tooltip with % of column / row and record count", "Click a row label or column header to cross-filter", "Sticky header, label column and totals row", "Numbers tween when filters change"],
+  "samples": [
+    {"title": "Revenue by segment and region (USD m)", "data": "segment_revenue", "height": 560,
+     "options": {"rows": ["segment", "region"], "cols": "year", "value": "revenue", "agg": "sum", "format": "#,##0", "cagr": true, "sort": "total-desc"}},
+    {"title": "Segment mix — % of annual revenue", "data": "segment_revenue", "height": 200, "span": 8,
+     "options": {"rows": ["segment"], "cols": "year", "value": "revenue", "show": "pctCol", "heat": "seq", "sort": "total-desc"}},
+    {"title": "Precedents — median EV / EBITDA by sector and consideration", "data": "precedents", "height": 190, "span": 8,
+     "options": {"rows": ["sector"], "cols": "consideration", "value": "ev_ebitda", "agg": "median", "totalCol": true, "heat": "seq", "colSort": null}},
+    {"title": "Precedents — number of deals by year announced", "data": "precedents", "height": 190, "span": 10,
+     "options": {"rows": ["sector"], "cols": "year(date)", "value": null, "agg": "count", "totalCol": true, "valueTitle": "Number of transactions", "titles": {"year(date)": "Year announced"}}}
+  ]
+}

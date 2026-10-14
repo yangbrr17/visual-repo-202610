@@ -1,0 +1,25 @@
+{
+  "id": "offer",
+  "title": "Illustrative offer at a premium to reference prices",
+  "schema": {"fields": [
+    {"name": "reference", "type": "string", "title": "Reference price"},
+    {"name": "ref_price", "type": "number", "title": "Reference price", "format": "$#,##0.00", "unit": "USD"},
+    {"name": "shares_out", "type": "number", "title": "Diluted shares", "format": "#,##0.0", "unit": "m"},
+    {"name": "adj_net_debt", "type": "number", "title": "Net debt & minorities", "format": "$#,##0", "unit": "USD m"},
+    {"name": "ltm_ebitda", "type": "number", "title": "EBITDA LTM", "format": "$#,##0", "unit": "USD m"},
+    {"name": "ntm_ebitda", "type": "number", "title": "EBITDA NTM", "format": "$#,##0", "unit": "USD m"}
+  ]},
+  "data": [
+    {"reference": "Current share price", "ref_price": 23.95, "shares_out": 182.0, "adj_net_debt": 1265.0, "ltm_ebitda": 535.7, "ntm_ebitda": 585.8},
+    {"reference": "30-day VWAP", "ref_price": 23.93, "shares_out": 182.0, "adj_net_debt": 1265.0, "ltm_ebitda": 535.7, "ntm_ebitda": 585.8},
+    {"reference": "52-week high", "ref_price": 36.61, "shares_out": 182.0, "adj_net_debt": 1265.0, "ltm_ebitda": 535.7, "ntm_ebitda": 585.8}
+  ],
+  "meta": {"source": "Northbridge Partners analysis", "unit": "USD m"},
+  "computed": [
+    {"name": "offer_price", "formula": "ref_price * (1 + @premium)", "title": "Offer price", "format": "$#,##0.00"},
+    {"name": "offer_equity", "formula": "offer_price * shares_out", "title": "Offer equity value", "format": "$#,##0"},
+    {"name": "offer_ev", "formula": "offer_equity + adj_net_debt", "title": "Implied EV", "format": "$#,##0"},
+    {"name": "offer_ev_ltm", "formula": "offer_ev / ltm_ebitda", "title": "EV / EBITDA LTM", "format": "0.0x"},
+    {"name": "offer_ev_ntm", "formula": "offer_ev / ntm_ebitda", "title": "EV / EBITDA NTM", "format": "0.0x"}
+  ]
+}

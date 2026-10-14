@@ -1,0 +1,41 @@
+{
+  "id": "premiums",
+  "title": "Premiums paid (long format)",
+  "schema": {"fields": [
+    {"name": "target", "type": "string", "title": "Target"},
+    {"name": "acquirer_type", "type": "string", "title": "Acquirer type"},
+    {"name": "measure", "type": "string", "title": "Measure"},
+    {"name": "premium", "type": "number", "title": "Premium", "format": "0.0%"}
+  ]},
+  "data": [
+    {"target": "Nethercott Sensing", "acquirer_type": "Sponsor", "measure": "1-day", "premium": 0.390201},
+    {"target": "Merrin Robotics", "acquirer_type": "Strategic", "measure": "1-day", "premium": 0.223244},
+    {"target": "Larkspur Software", "acquirer_type": "Strategic", "measure": "1-day", "premium": 0.397188},
+    {"target": "Kelbourne Motion Systems", "acquirer_type": "Sponsor", "measure": "1-day", "premium": 0.395111},
+    {"target": "Jessop Automation", "acquirer_type": "Strategic", "measure": "1-day", "premium": 0.445511},
+    {"target": "Ivers Optics", "acquirer_type": "Strategic", "measure": "1-day", "premium": 0.196498},
+    {"target": "Harwell Controls", "acquirer_type": "Sponsor", "measure": "1-day", "premium": 0.308939},
+    {"target": "Glenhaven Software", "acquirer_type": "Strategic", "measure": "1-day", "premium": 0.311022},
+    {"target": "Fenmoor Instruments", "acquirer_type": "Strategic", "measure": "1-day", "premium": 0.335485},
+    {"target": "Elstree Robotics", "acquirer_type": "Sponsor", "measure": "1-day", "premium": 0.34375},
+    {"target": "Dunmore Drives", "acquirer_type": "Strategic", "measure": "1-day", "premium": 0.32987},
+    {"target": "Corwen Vision", "acquirer_type": "Strategic", "measure": "1-day", "premium": 0.171139},
+    {"target": "Bellcrest Motion", "acquirer_type": "Sponsor", "measure": "1-day", "premium": 0.411303},
+    {"target": "Arvane Systems", "acquirer_type": "Strategic", "measure": "1-day", "premium": 0.315008},
+    {"target": "Nethercott Sensing", "acquirer_type": "Sponsor", "measure": "30-day VWAP", "premium": 0.436496},
+    {"target": "Merrin Robotics", "acquirer_type": "Strategic", "measure": "30-day VWAP", "premium": 0.212078},
+    {"target": "Larkspur Software", "acquirer_type": "Strategic", "measure": "30-day VWAP", "premium": 0.534899},
+    {"target": "Kelbourne Motion Systems", "acquirer_type": "Sponsor", "measure": "30-day VWAP", "premium": 0.394721},
+    {"target": "Jessop Automation", "acquirer_type": "Strategic", "measure": "30-day VWAP", "premium": 0.421426},
+    {"target": "Ivers Optics", "acquirer_type": "Strategic", "measure": "30-day VWAP", "premium": 0.182301},
+    {"target": "Harwell Controls", "acquirer_type": "Sponsor", "measure": "30-day VWAP", "premium": 0.361605},
+    {"target": "Glenhaven Software", "acquirer_type": "Strategic", "measure": "30-day VWAP", "premium": 0.139799},
+    {"target": "Fenmoor Instruments", "acquirer_type": "Strategic", "measure": "30-day VWAP", "premium": 0.403054},
+    {"target": "Elstree Robotics", "acquirer_type": "Sponsor", "measure": "30-day VWAP", "premium": 0.322832},
+    {"target": "Dunmore Drives", "acquirer_type": "Strategic", "measure": "30-day VWAP", "premium": 0.182792},
+    {"target": "Corwen Vision", "acquirer_type": "Strategic", "measure": "30-day VWAP", "premium": 0.320787},
+    {"target": "Bellcrest Motion", "acquirer_type": "Sponsor", "measure": "30-day VWAP", "premium": 0.458563},
+    {"target": "Arvane Systems", "acquirer_type": "Strategic", "measure": "30-day VWAP", "premium": 0.380917}
+  ],
+  "meta": {"source": "Synthetic precedent transactions 2019–2026 and pre-announcement trading"}
+}

@@ -1,0 +1,68 @@
+{
+  "id": "timeline",
+  "name": "Milestone Timeline",
+  "name_zh": "里程碑时间线",
+  "category": "timeline",
+  "engine": "dom",
+  "deps": [],
+  "summary": "Dated events on a time axis with labels alternating above and below, collision-free leader lines, kind-based marker shapes and colours; switches to a vertical layout in narrow blocks.",
+  "summary_zh": "按时间轴排列的事件里程碑：标签上下交替并自动分层避免重叠，引线不交叉，按事件类型区分形状与颜色；窄版块自动切换为纵向布局。",
+  "description_zh": "展示公司重大事件（业绩发布、指引调整、并购、评级变化）或交易流程关键节点。数据为每行一个事件：日期（encode.date）、标题（encode.label）、类型（encode.kind，决定标记形状/颜色与图例）、说明（encode.detail，显示在提示框或纵向布局的正文中）。横向布局按真实时间比例定位，标签在轴上下交替，拥挤时自动分层且保证引线不穿过其他标签，底部为季度/年份刻度，可加“今天”虚线；版块较窄（< 560px）或 orientation 为 vertical 时改为“日期列 | 轴 | 标题+说明”的纵向列表，并以年份胶囊分隔。点击事件或图例按类型交叉筛选（例如让股价图只显示业绩类事件），筛选变化时标签平滑移动到新位置。也可配合 where 只显示交易时间表中的里程碑。",
+  "best_for": [
+    "Share price event history next to a price chart",
+    "Key dates of a transaction process (milestones only)",
+    "Company history / corporate milestones",
+    "Regulatory or financing calendar"
+  ],
+  "avoid_when": [
+    "More than ~20 events in one block (use a table or a Gantt)",
+    "Tasks with durations (use gantt)",
+    "Events that need a value axis (annotate a line chart instead)"
+  ],
+  "channels": {
+    "date": {"type": "date", "required": true, "desc": "Event date (ISO YYYY-MM-DD)", "default": "date"},
+    "label": {"type": "string", "required": true, "desc": "Short event title", "default": "label"},
+    "kind": {"type": "string", "required": false, "desc": "Event type — marker shape / colour, legend and click-to-filter", "default": "kind"},
+    "detail": {"type": "string", "required": false, "desc": "Longer description: tooltip, and under the label in vertical layout", "default": "detail"}
+  },
+  "options": {
+    "orientation": {"type": "string", "default": "auto", "desc": "auto (vertical when the block is narrower than 560px) | horizontal | vertical"},
+    "side": {"type": "string", "default": "both", "desc": "Horizontal label placement: both (alternate above / below) | above | below"},
+    "labelStyle": {"type": "string", "default": "flag", "desc": "flag (text beside the leader, flips at the right edge) | center (text centred on the leader)"},
+    "labelWidth": {"type": "number", "default": 160, "desc": "Maximum label width in px (horizontal; narrowed automatically when lanes do not fit)"},
+    "marker": {"type": "string", "default": "shape", "desc": "shape (shape per kind) | number (numbered discs in date order, for footnote references) | dot"},
+    "kindColors": {"type": "object", "default": null, "desc": "{kind: colour token} e.g. {\"m&a\": \"accent2\", \"guidance\": \"neg\"}; tokens: accent, accent2, accent3, pos, neg, ink2, cat1..cat8 or an index"},
+    "kindShapes": {"type": "object", "default": null, "desc": "{kind: circle | diamond | square | triangle | hexagon}"},
+    "kindLabels": {"type": "object", "default": null, "desc": "{kind: display name} for the legend and tooltip (default: capitalised kind)"},
+    "showDetail": {"type": "boolean|string", "default": "auto", "desc": "Show the detail text under each label: true | false | 'auto' (vertical layout, only when it fits the block height)"},
+    "dateFormat": {"type": "string", "default": "d mmm yy", "desc": "Date format on the labels (tooltip uses the field format)"},
+    "spacing": {"type": "string", "default": "even", "desc": "Vertical layout: even (rows with year markers) | time (proportional, labels dodged with elbow leaders)"},
+    "domain": {"type": "array", "default": null, "desc": "[start, end] fixed time window for the horizontal axis"},
+    "today": {"type": "string", "default": null, "desc": "Dashed 'today' marker ('YYYY-MM-DD' or 'now'); null hides it"},
+    "todayLabel": {"type": "string", "default": "Today", "desc": "Label under the today marker (date is appended)"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Event label(s) to emphasise (bold title, accent-2 date, larger marker)"},
+    "selectBy": {"type": "string", "default": "kind", "desc": "Click-to-filter channel: kind | label | null"},
+    "legend": {"type": "boolean", "default": true, "desc": "Kind legend top-left (click to filter)"}
+  },
+  "interactions": [
+    "Hover an event for a tooltip with date, type and detail",
+    "Click an event or a legend entry to cross-filter by type (others dim)",
+    "Staggered reveal: axis draws, markers pop, leaders draw, labels rise",
+    "Labels glide to their new lanes when filters change; layout re-flows on resize",
+    "Keyboard: events are focusable, Enter toggles the filter"
+  ],
+  "samples": [
+    {"title": "Helios Industrial — selected share price events", "data": "price_events", "height": 300,
+     "options": {"kindLabels": {"m&a": "M&A", "earnings": "Earnings", "guidance": "Guidance", "rating": "Credit rating"},
+                 "kindColors": {"m&a": "accent2"}, "highlight": "Press reports of sponsor interest", "today": "2026-10-14"}},
+    {"title": "Project Atlas — key milestones (numbered)", "data": "deal_timeline", "height": 230,
+     "options": {"where": "milestone == true", "encode": {"date": "start", "label": "task", "kind": "phase", "detail": "owner"},
+                 "marker": "number", "today": "2026-10-14", "selectBy": "label", "legend": true}},
+    {"title": "Guidance, M&A and rating events — vertical layout with details", "data": "price_events", "height": 600, "span": 5,
+     "options": {"orientation": "vertical", "where": "kind in [\"m&a\", \"guidance\", \"rating\"]", "kindLabels": {"m&a": "M&A", "earnings": "Earnings", "guidance": "Guidance", "rating": "Credit rating"},
+                 "kindColors": {"m&a": "accent2"}}},
+    {"title": "Process milestones — proportional vertical spacing", "data": "deal_timeline", "height": 520, "span": 4,
+     "options": {"where": "milestone == true", "encode": {"date": "start", "label": "task", "kind": "workstream", "detail": "owner"},
+                 "orientation": "vertical", "spacing": "time", "marker": "dot"}}
+  ]
+}

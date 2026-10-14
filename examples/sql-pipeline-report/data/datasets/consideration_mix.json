@@ -1,0 +1,15 @@
+{
+  "id": "consideration_mix",
+  "title": "Deal value by consideration",
+  "schema": {"fields": [
+    {"name": "consideration", "type": "string", "title": "Consideration"},
+    {"name": "deals", "type": "number", "title": "Deals", "format": "0"},
+    {"name": "deal_value", "type": "number", "title": "Deal value", "format": "$#,##0", "unit": "USD m"}
+  ]},
+  "data": [
+    {"consideration": "Cash", "deals": 9, "deal_value": 85678.6},
+    {"consideration": "Cash & stock", "deals": 3, "deal_value": 36013.8},
+    {"consideration": "Stock", "deals": 2, "deal_value": 8221.5}
+  ],
+  "meta": {"source": "Synthetic precedent transactions 2019–2026 and pre-announcement trading", "unit": "USD m"}
+}

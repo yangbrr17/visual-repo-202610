@@ -1,0 +1,12 @@
+/* treemap — drill-down breadcrumb (HTML, above the chart's reserved top band) */
+.rk-treemap__crumbs {
+  position: absolute; left: 0; top: 0; z-index: 2; max-width: 62%;
+  display: flex; align-items: center; gap: 6px; height: 20px; overflow: hidden;
+  font-size: var(--rk-fs-sm); line-height: 20px; white-space: nowrap;
+}
+.rk-treemap__crumb { border: 0; padding: 0; background: none; font: inherit; color: var(--rk-accent-3); cursor: pointer; }
+.rk-treemap__crumb:hover, .rk-treemap__crumb:focus-visible { color: var(--rk-accent); text-decoration: underline; text-underline-offset: 2px; outline: none; }
+.rk-treemap__crumb.is-current { color: var(--rk-ink); font-weight: 600; cursor: default; }
+.rk-treemap__sep { color: var(--rk-ink-3); }
+.rk-treemap__hint { margin-left: 8px; color: var(--rk-ink-3); font-size: var(--rk-fs-xs); }
+@media print { .rk-treemap__hint { display: none; } }

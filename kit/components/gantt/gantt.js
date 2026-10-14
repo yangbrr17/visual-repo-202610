@@ -280,8 +280,14 @@
           if (p.grid) kids.push({ type: 'line', silent: true, shape: { x1: x0, y1: cs.y, x2: x0, y2: cs.y + cs.height }, style: { stroke: t.grid, lineWidth: 1 } });
         }
         var font = p.tier ? '10px ' + t.fontNum : '600 10.5px ' + t.fontSans;
-        if (p.text && textWidth(p.text, font) + 6 <= cx1 - cx0) {
-          kids.push({ type: 'text', silent: true, x: (cx0 + cx1) / 2, y: yTop + TIER / 2 + 1,
+        var tw = p.text ? textWidth(p.text, font) : 0, tx = (cx0 + cx1) / 2;
+        if (p.tier && todayTs != null) {
+          // keep lower-tier text clear of the today marker on the header edge
+          var xt = api.coord([todayTs, 0])[0];
+          if (Math.abs(xt - tx) < tw / 2 + 6) tx = xt + 6 + tw / 2 + 2 <= cx1 ? xt + 6 + tw / 2 : xt - 6 - tw / 2;
+        }
+        if (p.text && tw + 6 <= cx1 - cx0 && tx - tw / 2 >= cx0 - 1 && tx + tw / 2 <= cx1 + 1) {
+          kids.push({ type: 'text', silent: true, x: tx, y: yTop + TIER / 2 + 1,
             style: { text: p.text, fill: p.tier ? t.ink3 : t.ink2, font: font, align: 'center', verticalAlign: 'middle' } });
         }
         return { type: 'group', children: kids };

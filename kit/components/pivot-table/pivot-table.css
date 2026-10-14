@@ -1,0 +1,85 @@
+/* pivot-table — extends the shared .rk-table pitchbook styles */
+.rk-pivot { position: relative; height: 100%; }
+.rk-pivot.is-auto { height: auto; }
+.rk-pivot__scroll { height: 100%; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--rk-rule) transparent; }
+.rk-pivot.is-auto .rk-pivot__scroll { height: auto; overflow-y: visible; }
+
+.rk-pivot__table { border-collapse: separate; border-spacing: 0; line-height: 1.3; }
+.rk-pivot thead { position: sticky; top: 0; z-index: 3; }
+.rk-pivot tfoot { position: sticky; bottom: 0; z-index: 2; }
+.rk-pivot.is-auto thead, .rk-pivot.is-auto tfoot { position: static; }
+.rk-pivot thead th { background: var(--rk-paper); white-space: nowrap; }
+.rk-pivot .is-sticky { position: sticky; left: 0; z-index: 1; background-color: var(--rk-paper); }
+.rk-pivot thead .is-sticky { z-index: 4; }
+
+/* header */
+.rk-pivot thead tr.rk-table__group th { border-bottom: 0; padding-bottom: 0; }
+.rk-pivot thead tr.rk-table__group th[rowspan] { border-bottom: 1.5px solid var(--rk-accent); padding-bottom: 5px; text-transform: none; letter-spacing: 0; font-size: var(--rk-fs-sm); color: var(--rk-ink-2); }
+.rk-pivot thead tr.rk-table__group th.is-num[rowspan] { text-align: right; }
+.rk-pivot th.rk-pivot__coltitle > span { display: block; padding-bottom: 3px; border-bottom: 1px solid var(--rk-rule); }
+.rk-pivot .rk-table thead th.rk-pivot__corner { text-align: left; vertical-align: bottom; min-width: 180px; }
+.rk-pivot__measure { display: block; font-size: var(--rk-fs-xs); font-weight: 500; color: var(--rk-ink-3); margin-bottom: 2px; text-transform: none; letter-spacing: 0; }
+.rk-pivot__dims { display: block; font-size: var(--rk-fs-sm); font-weight: 600; color: var(--rk-ink-2); text-transform: none; letter-spacing: 0; }
+.rk-pivot th.rk-pivot__ch { min-width: 64px; transition: color var(--rk-dur-fast), opacity var(--rk-dur-fast); }
+.rk-pivot th.rk-pivot__ch.is-clickable { cursor: pointer; }
+.rk-pivot th.rk-pivot__ch.is-clickable:hover { color: var(--rk-accent); }
+.rk-pivot th.rk-pivot__ch.is-selected { color: var(--rk-accent); box-shadow: inset 0 -2px 0 var(--rk-accent); }
+.rk-pivot th.rk-pivot__ch.is-dim { opacity: .5; }
+.rk-pivot__sub { display: block; font-size: var(--rk-fs-xs); font-weight: 500; color: var(--rk-ink-3); }
+
+/* totals / CAGR columns */
+.rk-pivot .rk-table td.rk-pivot__tot, .rk-pivot .rk-table th.rk-pivot__tot { font-weight: 600; border-left: 1px solid var(--rk-rule); }
+.rk-pivot .rk-table td.rk-pivot__cagr, .rk-pivot .rk-table th.rk-pivot__cagr { color: var(--rk-ink-2); font-style: italic; border-left: 1px solid var(--rk-rule); }
+.rk-pivot .rk-table th.rk-pivot__cagr { font-style: normal; }
+
+/* rows */
+.rk-pivot tbody tr { transition: opacity var(--rk-dur-fast); }
+.rk-pivot tbody tr.is-hidden { display: none; }
+.rk-pivot .rk-table tr.is-group td { font-weight: 600; color: var(--rk-ink); border-top: 1px solid var(--rk-rule); }
+.rk-pivot .rk-table tbody tr.is-group:first-child td { border-top: 0; }
+.rk-pivot .rk-table tr.is-leaf td.rk-pivot__label { color: var(--rk-ink-2); }
+.rk-pivot .rk-table tr.is-leaf.is-l1 td, .rk-pivot .rk-table tr.is-leaf.is-l2 td { border-bottom-color: color-mix(in srgb, var(--rk-grid) 70%, transparent); }
+.rk-pivot .rk-table tbody tr:hover td:not(.is-heat) { background-color: var(--rk-surface); }
+.rk-pivot td.rk-pivot__v.is-heat { font-weight: 500; }
+.rk-pivot td.is-coldim { opacity: .4; }
+.rk-pivot tr.is-dim td { opacity: .38; }
+.rk-pivot tr.is-selected td.rk-pivot__label { box-shadow: inset 3px 0 0 var(--rk-accent); }
+.rk-pivot__name.is-clickable { cursor: pointer; }
+.rk-pivot__name.is-clickable:hover { color: var(--rk-accent); text-decoration: underline; text-decoration-color: var(--rk-rule); text-underline-offset: 3px; }
+
+/* collapse toggle: a small chevron that rotates */
+.rk-pivot__tg, .rk-pivot__tg-sp { display: inline-block; width: 16px; height: 16px; margin: -2px 4px -2px -2px; vertical-align: -3px; }
+.rk-pivot__tg { position: relative; padding: 0; border: 0; border-radius: 3px; background: transparent; cursor: pointer; color: var(--rk-ink-3); }
+.rk-pivot__tg::before {
+  content: ""; position: absolute; left: 5px; top: 4px; width: 5px; height: 5px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg); transition: transform var(--rk-dur-fast) var(--rk-ease);
+}
+.rk-pivot__tg[aria-expanded="false"]::before { transform: translate(-1px, 2px) rotate(-45deg); }
+.rk-pivot__tg:hover { background: var(--rk-surface-2); color: var(--rk-accent); }
+
+/* totals row (sticky footer) */
+.rk-pivot .rk-table tfoot td { border-bottom: 0; }
+.rk-pivot .rk-table tr.is-stat td { background: var(--rk-surface); font-weight: 600; color: var(--rk-ink); }
+.rk-pivot .rk-table tr.is-stat.is-stat-first td { border-top: 1.5px solid var(--rk-accent); }
+
+/* tooltip */
+.rk-pivot__tip {
+  position: absolute; left: 0; top: 0; z-index: 6; pointer-events: none;
+  padding: 8px 10px; border: 1px solid var(--rk-rule); border-radius: 6px;
+  background: var(--rk-tooltip-bg); color: var(--rk-tooltip-ink); box-shadow: 0 8px 24px rgba(15, 23, 42, .14);
+  opacity: 0; transition: opacity 120ms, transform 160ms var(--rk-ease); white-space: nowrap;
+}
+.rk-pivot__tip.is-on { opacity: 1; }
+
+/* motion */
+.rk-pivot tr.is-in { animation: rk-pivot-in 420ms var(--rk-ease) both; animation-delay: calc(var(--rk-i, 0) * 20ms + 60ms); }
+.rk-pivot tr.is-enter { animation: rk-pivot-in 320ms var(--rk-ease) both; }
+@keyframes rk-pivot-in { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .rk-pivot tr.is-in, .rk-pivot tr.is-enter { animation: none; } }
+@media print {
+  .rk-pivot tr.is-in, .rk-pivot tr.is-enter { animation: none; }
+  .rk-pivot__scroll { height: auto; overflow: visible; }
+  .rk-pivot thead, .rk-pivot tfoot { position: static; }
+  .rk-pivot__tip { display: none; }
+}

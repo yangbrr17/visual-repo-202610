@@ -21,6 +21,7 @@
   },
   "options": {
     "timeField": {"type": "string", "default": null, "desc": "Period field (year, quarter): one frame per period with a play button"},
+    "startAt": {"type": "string", "default": "last", "desc": "'last' | 'first' — period shown before playing; play on the last period replays from the first (print shows the last)"},
     "autoPlay": {"type": "boolean", "default": false, "desc": "Start playing the timeline when rendered (never in print / reduced motion)"},
     "playInterval": {"type": "number", "default": 1600, "desc": "Milliseconds per period"},
     "loop": {"type": "boolean", "default": false, "desc": "Loop the timeline"},

@@ -16,14 +16,19 @@
     return measure.measureText(String(s)).width;
   }
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
-  /** Categorical palette without colours too close to accent-2 (reserved for the target). */
+  /**
+   * Categorical palette for peers: drops colours too close to accent-2 (reserved for the target)
+   * and near-duplicates of a colour already kept, so adjacent series stay distinguishable.
+   */
   function paletteFor(t) {
-    var a = RK.theme.parseColor(t.accent2);
-    var pal = t.cat.filter(function (c) {
-      var b = RK.theme.parseColor(c), d = Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
-      return d > 64;
-    });
-    return pal.length ? pal : t.cat;
+    function dist(x, y) {
+      var a = RK.theme.parseColor(x), b = RK.theme.parseColor(y);
+      return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
+    }
+    var base = t.cat.filter(function (c) { return dist(c, t.accent2) > 64; });
+    var pal = [];
+    base.forEach(function (c) { if (pal.every(function (k) { return dist(c, k) > 48; })) pal.push(c); });
+    return pal.length >= 3 ? pal : (base.length ? base : t.cat);
   }
 
   /** Summary stats of a numeric array (sorted copy, quartiles by linear interpolation). */
@@ -122,10 +127,12 @@
       var pal = paletteFor(t);
       var peerColor = t.accent3 || t.cat[1];
       var colorField = o.colorBy && o.colorBy !== 'single' && o.colorBy !== 'group' && ctx.dataset && ctx.dataset.has(o.colorBy) ? o.colorBy : null;
-      var cats = colorField ? util.unique(rows.map(function (r) { return r[colorField]; })) : [];
+      // colour order from the unfiltered rows so colours stay put while cross-filters change
+      var cats = colorField ? util.unique(ctx.allRows.map(function (r) { return r[colorField]; })) : [];
+      var groupOrder = util.unique(ctx.allRows.map(groupOf));
       var colorOf = function (r) {
         if (colorField) return pal[cats.indexOf(r[colorField]) % pal.length];
-        if (o.colorBy === 'group') return pal[groups.indexOf(groupOf(r)) % pal.length];
+        if (o.colorBy === 'group') return pal[groupOrder.indexOf(groupOf(r)) % pal.length];
         return peerColor;
       };
 
@@ -174,8 +181,7 @@
         L.key = key;
         L.pos = [];
         var bandPx = horiz ? api.size([0, 1])[1] : api.size([1, 0])[0];
-        var half = Math.max(4, bandPx * 0.42);
-        L.half = half;
+        var half = Math.max(4, bandPx * 0.42), widest = 0;
         L.labels = [];
         var byGroup = {};
         rows.forEach(function (r, i) {
@@ -191,12 +197,15 @@
           var need = 0;
           pts.forEach(function (p) { need = Math.max(need, Math.abs(p.o) + p.r); });
           var k = need > half ? Math.max(0.15, (half - 3) / Math.max(1, need - 3)) : 1;
+          widest = Math.max(widest, need * k);
           pts.forEach(function (p) {
             p.o *= k;
             p.x = horiz ? p.v : p.center + p.o;
             p.y = horiz ? p.center + p.o : p.v;
           });
         });
+        // bands / median ticks hug the widest swarm (same thickness for every group), box-plot style
+        L.half = Math.min(half, Math.max(12, widest + 7));
         placeLabels(cs);
         return L;
       }
@@ -290,7 +299,8 @@
       } : null;
 
       // one points series per colour category (so the legend can toggle them); layout is shared
-      var buckets = colorField ? cats.map(function (c) { return { name: String(c), test: function (r) { return r[colorField] === c; } }; })
+      var present = colorField ? cats.filter(function (c) { return rows.some(function (r) { return r[colorField] === c; }); }) : [];
+      var buckets = colorField ? present.map(function (c) { return { name: String(c), color: pal[cats.indexOf(c) % pal.length], test: function (r) { return r[colorField] === c; } }; })
         : [{ name: ctx.title(vf), test: function () { return true; } }];
       var pointSeries = buckets.map(function (b, bi) {
         var idx = [];
@@ -300,7 +310,7 @@
         return {
           id: 'pts-' + bi, name: b.name, type: 'custom', z: 3, clip: false,
           encode: { x: 0, y: 1 },
-          itemStyle: { color: colorField ? pal[bi % pal.length] : peerColor },
+          itemStyle: { color: b.color || peerColor },
           data: idx.map(function (i) {
             var r = rows[i], g = gIndex[groupOf(r)];
             return { name: String(r[lf]) + '\u0001' + i, value: horiz ? [r[vf], g, i] : [g, r[vf], i] };

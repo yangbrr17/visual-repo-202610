@@ -1,0 +1,21 @@
+{
+  "id": "lineage",
+  "title": "Data lineage",
+  "schema": {"fields": [
+    {"name": "dataset", "type": "string", "title": "Dataset"},
+    {"name": "sql", "type": "string", "title": "SQL object"},
+    {"name": "raw", "type": "string", "title": "Raw tables"},
+    {"name": "rows", "type": "number", "title": "Rows", "format": "#,##0"},
+    {"name": "python", "type": "string", "title": "Python step"}
+  ]},
+  "data": [
+    {"dataset": "comps", "sql": "comps ← v_market, v_fundamentals, v_tsr, v_vol", "raw": "companies, prices, dividends, financials", "rows": 10, "python": "is_target 0/1 → boolean; computed net_leverage, ebitda_growth_ntm"},
+    {"dataset": "deals", "sql": "v_deals", "raw": "transactions, deal_prices", "rows": 14, "python": "announced → date; undisclosed EBITDA stays null (n.a.)"},
+    {"dataset": "premiums", "sql": "v_deals", "raw": "transactions, deal_prices", "rows": 28, "python": "melt 1-day / 30-day columns to long format; drop nulls"},
+    {"dataset": "consideration_mix", "sql": "v_deals + GROUP BY", "raw": "transactions", "rows": 3, "python": "—"},
+    {"dataset": "perf / vol", "sql": "weekly sample of v_vol", "raw": "prices, companies", "rows": 408, "python": "peer median per week; target vs. peers long format"},
+    {"dataset": "valuation", "sql": "comps, v_deals", "raw": "all", "rows": 6, "python": "peer / deal quartiles applied to target EBITDA, EPS and price"},
+    {"dataset": "kpis, ev_bridge, offer", "sql": "comps, v_peer_stats", "raw": "all", "rows": 14, "python": "presentation rows; offer uses @premium computed fields"}
+  ],
+  "meta": {"source": "Northbridge Partners analysis"}
+}

@@ -102,7 +102,6 @@
         d.headerFilterPlaceholder = 'Filter';
         d.headerFilterParams = { elementAttributes: { title: c.num ? 'Number filter: >10, <=2.5, =7, 5-10' + (/%/.test(String(fmt)) ? ', 30%' : '') : 'Contains text' } };
         d.headerFilterFunc = c.num ? numFilter(/%/.test(String(fmt)), fmt) : 'like';
-        d.headerFilterLiveFilterDelay = 200;
       }
       if (i < frozenN && !c.group) d.frozen = true;
       return d;
@@ -175,6 +174,7 @@
         columns: columnDefs(ctx, specs),
         layout: o.layout,
         renderVertical: 'virtual',
+        headerFilterLiveFilterDelay: 200,
         initialSort: sorts,
         placeholder: 'No matching rows',
         headerSortClickElement: 'header',

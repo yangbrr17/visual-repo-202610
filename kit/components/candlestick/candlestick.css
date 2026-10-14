@@ -1,0 +1,20 @@
+/* candlestick: date-range selector overlay (top-right of the plot) and event rows in the tooltip */
+.rk-cs-range {
+  position: absolute; top: -2px; right: 0; z-index: 2;
+  padding: 1px;
+}
+.rk-cs-range button {
+  height: 20px; padding: 0 7px;
+  font-size: 10.5px; font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; letter-spacing: .02em;
+  color: var(--rk-ink-3);
+}
+.rk-cs-range button:hover { color: var(--rk-accent); }
+.rk-cs-range button:focus-visible { outline: 2px solid var(--rk-accent-3); outline-offset: -2px; }
+@media print { .rk-cs-range { display: none; } }
+
+.rk-tip .rk-cs-tip-event {
+  max-width: 290px; white-space: normal; line-height: 1.4;
+  margin-top: 6px; padding-top: 5px; border-top: 1px solid var(--rk-rule);
+}
+.rk-tip .rk-cs-tip-event b { color: var(--rk-tooltip-ink); font-weight: 600; }
+.rk-tip .rk-cs-tip-kind { font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--rk-ink-3); }

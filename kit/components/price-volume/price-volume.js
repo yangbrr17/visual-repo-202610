@@ -40,14 +40,23 @@
       var selector = rangeSelector(ctx, state, inst);
 
       var refit = util.rafThrottle(function () {
-        if (inst.isDisposed()) return;
+        if (inst.isDisposed() || !state.model || !state.model.n) return;
+        var patch = {};
         var ax = axesFor(current, state);
-        if (!ax || sameAxes(ax, state.axes)) return;
-        state.axes = ax;
-        inst.setOption({ yAxis: [
-          { id: 'yp', min: ax.p.min, max: ax.p.max, interval: ax.p.interval },
-          { id: 'yv', min: 0, max: ax.v.max, interval: ax.v.interval }
-        ] });
+        if (ax && !sameAxes(ax, state.axes)) {
+          state.axes = ax;
+          patch.yAxis = [
+            { id: 'yp', min: ax.p.min, max: ax.p.max, interval: ax.p.interval },
+            { id: 'yv', min: 0, max: ax.v.max, interval: ax.v.interval }
+          ];
+        } else if (ax) state.axes.first = ax.first;
+        var tk = dateTicks(windowOf(state.model, state.zoom), state.plotW);
+        if (tk.key !== state.ticks.key) {
+          state.ticks = tk;
+          patch.xAxis = [{ id: 'xp', axisLabel: tickLabel(tk), axisTick: { customValues: tk.values } },
+            { id: 'xv', axisLabel: tickLabel(tk), axisTick: { customValues: tk.values } }];
+        }
+        if (patch.yAxis || patch.xAxis) inst.setOption(patch);
       });
       inst.on('datazoom', function () {
         var dz = (inst.getOption().dataZoom || [])[0];
@@ -55,7 +64,9 @@
         selector.sync();
         refit();
       });
-      inst.on('legendselectchanged', function (p) { state.legendSel = util.merge({}, p.selected); refit(); });
+      ['legendselectchanged', 'legendselected', 'legendunselected', 'legendselectall', 'legendinverseselect'].forEach(function (ev) {
+        inst.on(ev, function (p) { state.legendSel = util.merge({}, p.selected); refit(); });
+      });
       selector.sync();
 
       return {
@@ -244,7 +255,7 @@
     var slider = useZoom && o.zoomSlider !== false && !ctx.print;
     var hasLegend = o.legend !== false;
     var H = state.h = inst.getHeight();
-    var top = hasLegend ? 34 : 14, gap = 10, xLab = 22, bottom = slider ? 32 : 4;
+    var top = hasLegend ? 34 : 14, gap = 16, xLab = 22, bottom = slider ? 32 : 4;
     var avail = Math.max(120, H - top - gap - xLab - bottom);
     var hasVol = m.vol.length > 0;
     var volH = hasVol ? Math.max(36, Math.round(avail * util.clamp(o.volumeShare || 0.24, 0.1, 0.5))) : 0;
@@ -258,6 +269,8 @@
       textWidth(RK.format(-ax.p.max, fmt), t) * 0.92,
       hasVol ? textWidth(RK.format(ax.v.max, 'auto'), t) : 0)) + 14;
     var right = o.lastPrice ? Math.ceil(textWidth(RK.format(m.close[m.n - 1], fmt), t, '600 10.5px ') + 18) : 14;
+    state.plotW = Math.max(120, inst.getWidth() - left - right);
+    var tk = state.ticks = dateTicks(windowOf(m, state.zoom), state.plotW);
 
     var priceColor = t.accent;
     var pal = palette(t, [priceColor, t.accent2]);
@@ -303,7 +316,8 @@
 
     var xBase = {
       type: 'time', min: 'dataMin', max: 'dataMax', splitLine: { show: false },
-      axisLine: { show: true, lineStyle: { color: t.axis } }, axisTick: { show: false },
+      axisLine: { show: true, lineStyle: { color: t.axis } },
+      axisTick: { show: true, length: 3, lineStyle: { color: t.axis }, customValues: tk.values },
       axisPointer: { label: { formatter: function (p) { return RK.format(new Date(p.value), 'dd mmm yyyy'); } } }
     };
     var dz = [];
@@ -329,8 +343,9 @@
         formatter: function (ps) { return tooltip(ctx, inst, state, ps); }
       },
       xAxis: [
-        util.merge({ id: 'xp', gridIndex: 0, axisLabel: { show: !hasVol, formatter: timeLabel, hideOverlap: true, rich: richYear(t) } }, xBase),
-        util.merge({ id: 'xv', gridIndex: 1, show: hasVol, axisLabel: { formatter: timeLabel, hideOverlap: true, rich: richYear(t) } }, xBase)
+        util.merge({}, xBase, { id: 'xp', gridIndex: 0, axisLabel: util.merge({ show: !hasVol }, tickLabel(tk)), axisTick: { show: !hasVol },
+          axisPointer: { label: { show: !hasVol } } }),
+        util.merge({}, xBase, { id: 'xv', gridIndex: 1, show: hasVol, axisLabel: tickLabel(tk) })
       ],
       yAxis: [
         { id: 'yp', gridIndex: 0, type: 'value', min: ax.p.min, max: ax.p.max, interval: ax.p.interval,
@@ -428,8 +443,8 @@
    * ------------------------------------------------------------------ */
   function tooltip(ctx, inst, state, ps) {
     var m = state.model, fmt = m.fmt, t = ctx.theme;
-    var p0 = ps.filter(function (p) { return p.seriesId === 'price' || p.seriesId === 'volume'; })[0];
-    if (!p0) return '';
+    var p0 = ps.filter(function (p) { return (p.seriesId === 'price' || p.seriesId === 'volume') && Array.isArray(p.value); })[0];
+    if (!p0 || m.close[p0.value[2]] == null) return '';
     var i = p0.value[2];
     var c = m.close[i], prev = i > 0 ? m.close[i - 1] : null;
     var rows = [{ color: t.accent, label: ctx.title(ctx.enc.close) || 'Close', value: RK.format(c, fmt), bold: true }];
@@ -522,13 +537,38 @@
     return function (v) { return RK.format(v, Math.abs(v - Math.round(v)) < 1e-9 && !/%/.test(code) ? intFmt : fmt); };
   }
 
-  function timeLabel(v) {
-    var d = new Date(v);
-    if (d.getMonth() === 0 && d.getDate() === 1) return '{y|' + d.getFullYear() + '}';
-    if (d.getDate() === 1) return RK.format(d, 'mmm');
-    return RK.format(d, 'd mmm');
+  /**
+   * Pitchbook date ticks for a window [a, b] (ms): month multiples aligned to quarters / halves / years
+   * ("Jan-25", "Apr-25"), weeks or days ("5 Aug"), about one label per 80px.
+   */
+  var STEPS = [[1, 'd'], [2, 'd'], [7, 'w'], [14, 'w'], [1, 'm'], [2, 'm'], [3, 'm'], [6, 'm'], [12, 'm'], [24, 'm'], [60, 'm']];
+  function dateTicks(win, width) {
+    var a = win[0], b = win[1], target = util.clamp(Math.floor((width || 600) / 100), 3, 12);
+    var days = (b - a) / DAY, step = STEPS[STEPS.length - 1];
+    for (var k = 0; k < STEPS.length; k++) {
+      var approx = STEPS[k][1] === 'm' ? STEPS[k][0] * 30.44 : STEPS[k][0];
+      if (days / approx <= target) { step = STEPS[k]; break; }
+    }
+    var vals = [], d = new Date(a), n = step[0];
+    if (step[1] === 'm') {
+      d = new Date(d.getFullYear(), d.getMonth(), 1);
+      if (d.getTime() < a) d.setMonth(d.getMonth() + 1);
+      while ((d.getMonth() % Math.min(n, 12)) !== 0) d.setMonth(d.getMonth() + 1);
+      if (n > 12) while (d.getFullYear() % (n / 12) !== 0) d.setFullYear(d.getFullYear() + 1);
+      for (; d.getTime() <= b; d.setMonth(d.getMonth() + n)) vals.push(d.getTime());
+    } else {
+      d = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      if (d.getTime() < a) d.setDate(d.getDate() + 1);
+      if (step[1] === 'w') while (d.getDay() !== 1) d.setDate(d.getDate() + 1);
+      for (; d.getTime() <= b; d.setDate(d.getDate() + n)) vals.push(d.getTime());
+    }
+    var unit = step[1] === 'm' ? (n >= 12 ? 'y' : 'm') : 'd';
+    return { values: vals, unit: unit, key: unit + n + ':' + vals[0] + ':' + vals.length };
   }
-  function richYear(t) { return { y: { fontWeight: 600, color: t.ink2, fontSize: 11, fontFamily: t.fontNum } }; }
+  function tickLabel(tk) {
+    var f = tk.unit === 'y' ? 'yyyy' : tk.unit === 'm' ? 'mmm-yy' : 'd mmm';
+    return { customValues: tk.values, hideOverlap: true, formatter: function (v) { return RK.format(new Date(v), f); } };
+  }
 
   var measureCtx = null;
   function textWidth(str, t, weight) {

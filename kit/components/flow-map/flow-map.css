@@ -1,0 +1,48 @@
+/* flow-map */
+
+/* ---- geo kit (identical block in every RK geo component css) ---- */
+.rk-geo .leaflet-control-zoom a { font-size: 15px; }
+.rk-geo .leaflet-interactive { cursor: pointer; }
+.rk-geo .rk-map-legend { max-width: 340px; box-shadow: none; padding: 7px 9px; font-size: 10.5px; }
+.rk-geo-leg.is-row { display: flex; align-items: flex-start; gap: 18px; }
+.rk-geo-leg.is-row > .rk-geo-leg__sec + .rk-geo-leg__sec { margin-top: 0; }
+.rk-geo-leg__sec + .rk-geo-leg__sec, .rk-geo-leg__sec + .rk-geo-leg__item { margin-top: 8px; }
+.rk-geo-leg__items { display: flex; flex-direction: column; gap: 2px; }
+.rk-geo-leg__item { display: flex; align-items: center; gap: 7px; white-space: nowrap; font-variant-numeric: tabular-nums; transition: opacity var(--rk-dur-fast); }
+.rk-geo-leg__item.is-click { cursor: pointer; }
+.rk-geo-leg__item.is-click:hover span { color: var(--rk-ink); }
+.rk-geo-leg__item.is-off { opacity: .38; }
+.rk-geo-leg__sw { flex: none; width: 9px; height: 9px; border-radius: 50%; }
+.rk-geo-leg__sw.is-square { width: 12px; height: 10px; border-radius: 1px; }
+.rk-geo-leg__sw.is-line { width: 16px; height: 3px; border-radius: 2px; }
+.rk-geo-leg__n { margin-left: auto; padding-left: 10px; color: var(--rk-ink-3); font-size: 10px; }
+.rk-geo-leg__ramp .rk-legend__ramp { width: 150px; }
+.rk-geo-label-anchor { pointer-events: none; }
+.rk-geo-label {
+  position: absolute; left: 0; top: 0; white-space: nowrap; pointer-events: none;
+  padding: 0 3px; border-radius: 2px; background: color-mix(in srgb, var(--rk-paper) 80%, transparent);
+  font-size: 10.5px; line-height: 1.35; color: var(--rk-ink); font-variant-numeric: tabular-nums;
+}
+.rk-geo-label.is-hidden { visibility: hidden; }
+.rk-geo.is-motion .rk-geo-label { transition: opacity var(--rk-dur) var(--rk-ease); }
+@media print { .rk-geo .leaflet-control-zoom, .rk-geo .rk-geo-toggle { display: none; } }
+/* ---- end geo kit ---- */
+
+.rk-flow__arc, .rk-flow__dots, .rk-flow__arrow { transition: stroke-opacity var(--rk-dur-fast), opacity var(--rk-dur-fast); }
+.rk-flow.is-focus .rk-flow__arc:not(.is-hot) { stroke-opacity: .08; }
+.rk-flow.is-focus .rk-flow__dots:not(.is-hot) { stroke-opacity: 0; }
+.rk-flow.is-focus .rk-flow__arrow:not(.is-hot) { opacity: .08 !important; }
+.rk-flow.is-focus .rk-flow__arc.is-hot { stroke-opacity: .95; }
+.rk-flow .rk-flow__arc.is-sel { stroke-opacity: .9; }
+.rk-flow__arrow { pointer-events: none; }
+.rk-flow__arrow-svg { position: absolute; left: 0; top: 0; overflow: visible; display: block; max-width: none !important; max-height: none !important; }
+.rk-flow.is-motion .rk-flow__dots { animation: rk-flow-travel 1.6s linear infinite; }
+.rk-flow.is-motion .is-enter { animation: rk-flow-fade 500ms var(--rk-ease) var(--rk-d, 0ms) both; }
+.rk-flow.is-motion .rk-flow__dots.is-enter { animation: rk-flow-fade 500ms var(--rk-ease) var(--rk-d, 0ms) both, rk-flow-travel 1.6s linear infinite; }
+@keyframes rk-flow-travel { to { stroke-dashoffset: -40; } }
+@keyframes rk-flow-fade { from { opacity: 0; } }
+.rk-flow .rk-geo-label b { font-weight: 600; }
+.rk-flow__vlabel { font-weight: 600; color: var(--rk-ink-2); }
+.rk-flow__wsw { flex: none; width: 22px; border-radius: 2px; }
+@media (prefers-reduced-motion: reduce) { .rk-flow .rk-flow__dots, .rk-flow .is-enter { animation: none !important; } }
+@media print { .rk-flow .rk-flow__dots { display: none; } }

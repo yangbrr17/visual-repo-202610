@@ -9,14 +9,19 @@
   var C = RK.chart, util = RK.util;
 
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
-  /** Categorical palette without colours too close to accent-2 (reserved for the target). */
+  /**
+   * Categorical palette for peers: drops colours too close to accent-2 (reserved for the target)
+   * and near-duplicates of a colour already kept, so adjacent series stay distinguishable.
+   */
   function paletteFor(t) {
-    var a = RK.theme.parseColor(t.accent2);
-    var pal = t.cat.filter(function (c) {
-      var b = RK.theme.parseColor(c), d = Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
-      return d > 64;
-    });
-    return pal.length ? pal : t.cat;
+    function dist(x, y) {
+      var a = RK.theme.parseColor(x), b = RK.theme.parseColor(y);
+      return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
+    }
+    var base = t.cat.filter(function (c) { return dist(c, t.accent2) > 64; });
+    var pal = [];
+    base.forEach(function (c) { if (pal.every(function (k) { return dist(c, k) > 48; })) pal.push(c); });
+    return pal.length >= 3 ? pal : (base.length ? base : t.cat);
   }
   var DASH_ICON = 'path://M0,4h5v2H0z M7.5,4h5v2h-5z M15,4h5v2h-5z';   // dashed legend swatch for the median
   function median(vals) {
@@ -105,11 +110,12 @@
 
     /* ---------- colours ---------- */
     var pal = paletteFor(t);
+    var order = util.unique(ctx.allRows.map(function (r) { return r[sf]; })).filter(function (n) { return !isHL(n); });   // stable colours
     var sel = ctx.selected(sf);
     var colorOf = function (n) {
       if (isHL(n)) return t.accent2;
       if (o.peers === 'muted') return RK.theme.mix(t.ink3, t.paper, 0.25);
-      return pal[peers.indexOf(n) % pal.length];
+      return pal[Math.max(0, order.indexOf(n)) % pal.length];
     };
     var dimmed = function (n) { return sel.length && sel.indexOf(n) < 0; };
 

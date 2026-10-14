@@ -22,7 +22,7 @@
   },
   "options": {
     "nodesData": {"type": "string", "default": null, "desc": "Dataset id of the node table (one row per node); nodes are derived from edges when null"},
-    "layout": {"type": "string", "default": "force", "desc": "force | circular"},
+    "layout": {"type": "string", "default": "force", "desc": "force: deterministic spring layout solved before paint (print-identical) | circular: categories on a ring, dominant highlighted hub in the centre | physics: live ECharts force simulation"},
     "highlight": {"type": "string|string[]", "default": null, "desc": "Node id(s) or name(s) drawn in accent2 (e.g. the target company)"},
     "categoryColors": {"type": "object", "default": {}, "desc": "{category: colour} — theme token ('accent', 'cat3' …) or CSS colour"},
     "labels": {"type": "boolean|string", "default": "auto", "desc": "auto: label the largest nodes (+ highlighted) | true | false; all labels show on hover"},
@@ -34,8 +34,7 @@
     "edgeCurve": {"type": "number", "default": 0.08, "desc": "Edge curvature for the force layout (circular uses 0.25)"},
     "dashedTypes": {"type": "string[]", "default": [], "desc": "Edge types drawn dashed (e.g. ['Competition'])"},
     "arrows": {"type": "boolean", "default": false, "desc": "Arrowheads at the target end"},
-    "force": {"type": "object", "default": {}, "desc": "Force overrides {repulsion, edgeLength, gravity, friction}; defaults scale with the container and node count"},
-    "animateLayout": {"type": "boolean", "default": false, "desc": "Animate the force simulation; by default it is solved before the first paint (calm, print-identical)"},
+    "force": {"type": "object", "default": {}, "desc": "layout 'physics' only: ECharts force overrides {repulsion, edgeLength, gravity, friction}; defaults scale with the container and node count"},
     "roam": {"type": "boolean", "default": true, "desc": "Wheel zoom + pan"},
     "draggable": {"type": "boolean", "default": true, "desc": "Drag nodes"},
     "hideIsolated": {"type": "boolean", "default": true, "desc": "With nodesData: drop nodes left without edges by the current filters"},
@@ -48,7 +47,7 @@
   "samples": [
     {"title": "Helios ecosystem — customers, suppliers, competitors and partners (USD m)", "data": "network_edges", "height": 480,
      "options": {"nodesData": "network_nodes", "encode": {"source": "source", "target": "target", "value": "value", "edgeType": "type", "id": "id", "name": "name", "category": "type", "size": "size"},
-                 "highlight": "helios-industrial", "dashedTypes": ["Competition"], "labelTop": 14}},
+                 "highlight": "helios-industrial", "dashedTypes": ["Competition"], "labelTop": 24}},
     {"title": "Circular layout — relationships by counterparty type", "data": "network_edges", "height": 440, "span": 7,
      "options": {"nodesData": "network_nodes", "layout": "circular", "highlight": "helios-industrial", "labels": true, "edgeColor": "source", "arrows": true, "edgeOpacity": 0.35}}
   ]

@@ -10,14 +10,19 @@
   var C = RK.chart, util = RK.util;
 
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
-  /** Categorical palette without colours too close to accent-2 (reserved for the highlight). */
+  /**
+   * Categorical palette for peers: drops colours too close to accent-2 (reserved for the target)
+   * and near-duplicates of a colour already kept, so adjacent series stay distinguishable.
+   */
   function paletteFor(t) {
-    var a = RK.theme.parseColor(t.accent2);
-    var pal = t.cat.filter(function (c) {
-      var b = RK.theme.parseColor(c), d = Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
-      return d > 64;
-    });
-    return pal.length ? pal : t.cat;
+    function dist(x, y) {
+      var a = RK.theme.parseColor(x), b = RK.theme.parseColor(y);
+      return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
+    }
+    var base = t.cat.filter(function (c) { return dist(c, t.accent2) > 64; });
+    var pal = [];
+    base.forEach(function (c) { if (pal.every(function (k) { return dist(c, k) > 48; })) pal.push(c); });
+    return pal.length >= 3 ? pal : (base.length ? base : t.cat);
   }
   function richKey(i) { return 'c' + i; }
 
@@ -97,9 +102,8 @@
       var inView = function (r) { return util.isNum(r) && r >= 1 && r <= N; };
       entities = entities.filter(function (e) { return rank[e].some(inView); });
       var last = periods.length - 1;
-      var rankAtEnd = function (e, j) { return inView(rank[e][j]) ? rank[e][j] : Infinity; };
-      // stable colour order: by last-period rank
-      var byEnd = entities.slice().sort(function (a, b) { return rankAtEnd(a, last) - rankAtEnd(b, last); });
+      // colour order: entity order in the unfiltered data (colours stay put while filters change)
+      var colorOrder = util.unique(ctx.allRows.map(function (r) { return r[sf]; }));
 
       /* ---------- colours ---------- */
       var hl = o.highlight == null ? [] : [].concat(o.highlight);
@@ -110,7 +114,7 @@
       var sel = ctx.selected(sf);
       var colorOf = function (e) {
         if (isHL(e)) return t.accent2;
-        return muted ? mutedColor : pal[byEnd.indexOf(e) % pal.length];
+        return muted ? mutedColor : pal[Math.max(0, colorOrder.indexOf(e)) % pal.length];
       };
       var dimmed = function (e) { return sel.length && sel.indexOf(e) < 0; };
       var nameColor = function (e) {

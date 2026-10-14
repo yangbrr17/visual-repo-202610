@@ -1,0 +1,51 @@
+{
+  "id": "heatmap",
+  "name": "Heatmap Matrix",
+  "name_zh": "热力矩阵图",
+  "category": "distribution",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Categorical x × y matrix coloured by value — correlation matrices, monthly return tables, peer scorecards — with cell labels and a colour legend.",
+  "summary_zh": "按数值着色的类别矩阵：相关系数矩阵、月度收益表、同业评分卡；单元格内直接标注数值并带色阶图例。",
+  "description_zh": "长表数据（x 类别、y 类别、数值，每行一个单元格）绘制成矩阵，颜色深浅表示数值大小。跨越中点（默认 0）的数据自动使用发散色阶（负值红、正值蓝），否则使用顺序色阶；单元格内的数字按字段格式显示，文字颜色根据底色自动切换以保证可读。相关系数矩阵可只显示下三角并去掉对角线；月度收益表可把月份数字映射为 Jan–Dec，并在右侧追加按行汇总列（合计、平均或复利年度收益）。可按名称或均值排序、高亮目标公司，点击某行/列可交叉筛选。",
+  "best_for": ["Share-price return correlation matrix", "Monthly / annual return tables (seasonality)", "Peer scorecards (company × metric percentile)", "Any two-category matrix up to ~25 × 25"],
+  "avoid_when": ["Continuous x / y (use scatter or a density chart)", "Exact comparison of a few values (use bar or table)", "More than ~30 categories per axis (labels become unreadable)"],
+  "channels": {
+    "x": {"type": "string|number", "required": true, "desc": "Column category (ticker, month, metric)", "default": "x"},
+    "y": {"type": "string|number", "required": true, "desc": "Row category (ticker, year, company)", "default": "y"},
+    "value": {"type": "number", "required": true, "desc": "Cell value (duplicates are averaged)", "default": "value"}
+  },
+  "options": {
+    "scale": {"type": "string", "default": "auto", "desc": "'auto' | 'sequential' | 'diverging' (auto: diverging when values straddle mid)"},
+    "mid": {"type": "number", "default": 0, "desc": "Diverging midpoint"},
+    "min": {"type": "number", "default": null, "desc": "Colour domain minimum (default: data minimum; diverging is symmetric around mid)"},
+    "max": {"type": "number", "default": null, "desc": "Colour domain maximum"},
+    "triangle": {"type": "boolean|string", "default": false, "desc": "false | 'lower' | 'upper' — hide the mirrored half of a symmetric matrix"},
+    "diagonal": {"type": "boolean", "default": true, "desc": "Show the x == y cells"},
+    "sortX": {"type": "string|array", "default": null, "desc": "null (data order) | 'asc' | 'desc' | 'value' (by mean) | explicit order"},
+    "sortY": {"type": "string|array", "default": null, "desc": "Row order, same choices as sortX"},
+    "xLabels": {"type": "string|object", "default": null, "desc": "null | 'months' (1–12 -> Jan–Dec) | {value: label}"},
+    "yLabels": {"type": "string|object", "default": null, "desc": "Row label mapping, same choices as xLabels"},
+    "labels": {"type": "boolean|string", "default": "auto", "desc": "Cell value labels: true | false | 'auto' (when cells are wide enough)"},
+    "format": {"type": "string", "default": null, "desc": "Value format (defaults to the value field format)"},
+    "summary": {"type": "string", "default": null, "desc": "null | 'sum' | 'mean' | 'compound' — extra column summarising each row"},
+    "summaryLabel": {"type": "string", "default": null, "desc": "Summary column header (default Total / Average / Year)"},
+    "xPosition": {"type": "string", "default": "bottom", "desc": "'bottom' | 'top' column labels"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Category value(s) emphasised on both axes (e.g. the target ticker)"},
+    "select": {"type": "string", "default": null, "desc": "null | 'x' | 'y' — click a cell to cross-filter on that column / row field"},
+    "cellGap": {"type": "number", "default": 2, "desc": "White rule between cells (px)"},
+    "legend": {"type": "boolean", "default": true, "desc": "Colour legend (top-left); hover a value to highlight matching cells"}
+  },
+  "interactions": ["Hover tooltip (row · column: value)", "Hover the colour legend to highlight cells in that range", "Optional click a cell to cross-filter its row or column", "Animated transitions when filters change", "PNG / CSV export"],
+  "samples": [
+    {"title": "Daily return correlation — 1 year", "data": "corr_matrix", "height": 380, "span": 6,
+     "options": {"encode": {"x": "x", "y": "y", "value": "value"}, "triangle": "lower", "diagonal": false,
+                 "scale": "diverging", "min": -1, "max": 1, "highlight": "HLX"}},
+    {"title": "Peer scorecard (percentile, higher = better)", "data": "peer_scores", "height": 380, "span": 6,
+     "options": {"encode": {"x": "metric", "y": "company", "value": "score"}, "scale": "sequential", "xPosition": "top",
+                 "sortY": "value", "highlight": "Helios Industrial", "select": "y", "summary": "mean", "summaryLabel": "Avg."}},
+    {"title": "Monthly total shareholder return", "data": "monthly_returns", "height": 240,
+     "options": {"encode": {"x": "month", "y": "year", "value": "return"}, "xLabels": "months",
+                 "summary": "compound", "summaryLabel": "Year / YTD", "scale": "diverging"}}
+  ]
+}

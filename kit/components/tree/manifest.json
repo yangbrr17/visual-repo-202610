@@ -1,0 +1,46 @@
+{
+  "id": "tree",
+  "name": "Structure Chart (Tree)",
+  "name_zh": "股权 / 组织结构图",
+  "category": "flow",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Legal-entity or group structure from an (id, parent) table — entity boxes by type, orthogonal connectors with ownership %, collapse / expand, zoom; top-down, left-to-right or radial.",
+  "summary_zh": "由 (id, parent) 表生成的法律实体 / 集团结构图：按实体类型着色的方框、带持股比例的直角连线、可折叠展开与缩放；支持自上而下、从左到右与放射状布局。",
+  "description_zh": "每行数据是一个实体：id、上级 parent（最终母公司为空）、名称、注册国家、上级对其的直接持股比例和实体类型。组件计算紧凑的树形布局，方框内显示实体名称与国家，颜色区分上市母公司 / 控股公司 / 运营子公司 / 合资企业等，持股比例标注在每条下行连线上，低于 50% 的少数股权可用虚线表示；悬停显示直接与穿透（有效）持股比例。点击方框折叠或展开其下属实体，滚轮缩放、拖动平移。适用于交易结构图、集团法律实体图、组织架构和分部层级，15–80 个节点为宜。",
+  "best_for": ["Legal entity structure / group chart in a deal or financing", "Pre- and post-transaction structure", "Organisation charts", "Segment / reporting-unit hierarchies"],
+  "avoid_when": ["More than ~120 visible entities (start collapsed with initialDepth)", "Networks with multiple parents per entity (use network)", "Value-weighted hierarchies (use treemap / sunburst)"],
+  "channels": {
+    "id": {"type": "string", "required": true, "desc": "Entity id", "default": "id"},
+    "parent": {"type": "string", "required": true, "desc": "Parent entity id; empty / null for the ultimate parent", "default": "parent"},
+    "name": {"type": "string", "required": true, "desc": "Entity name (wrapped to two lines in the box)", "default": "name"},
+    "country": {"type": "string", "required": false, "desc": "Jurisdiction shown under the name", "default": "country"},
+    "pct": {"type": "number", "required": false, "desc": "Direct ownership by the parent (0–1) — label on the connector", "default": "ownership_pct"},
+    "category": {"type": "string", "required": false, "desc": "Entity type → box colour + legend", "default": "entity_type"}
+  },
+  "options": {
+    "layout": {"type": "string", "default": "orthogonal", "desc": "orthogonal (boxes + right-angle connectors) | radial"},
+    "orient": {"type": "string", "default": "TB", "desc": "TB (top-down) | LR (left-to-right); orthogonal layout only"},
+    "pctLabels": {"type": "string|boolean", "default": "all", "desc": "Ownership labels on connectors: all | partial (only below 100%) | false"},
+    "dashMinority": {"type": "boolean", "default": true, "desc": "Dashed connector for holdings below 50%"},
+    "initialDepth": {"type": "number", "default": null, "desc": "Collapse entities at this depth and deeper on first render (null = fully expanded)"},
+    "collapsible": {"type": "boolean", "default": true, "desc": "Click an entity (or its '+n' badge) to collapse / expand its subsidiaries"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Entity id(s) or name(s) outlined in accent2 (e.g. the issuer or the entity being sold)"},
+    "categoryColors": {"type": "object", "default": {}, "desc": "{entity type: colour} — theme token ('accent', 'cat3' …) or CSS colour"},
+    "rootFilled": {"type": "boolean", "default": true, "desc": "Draw the ultimate parent(s) as a solid box"},
+    "boxWidth": {"type": "number", "default": null, "desc": "Box width in px; null fits the container (96–176 TB, 120–200 LR)"},
+    "roam": {"type": "boolean", "default": true, "desc": "Wheel zoom + pan"},
+    "legend": {"type": "boolean", "default": true, "desc": "Entity-type key, top-left"},
+    "format": {"type": "string", "default": null, "desc": "Ownership format; defaults to the pct field's format"}
+  },
+  "interactions": ["Hover an entity: country, type, parent, direct and effective (look-through) ownership", "Click an entity or its '+n' badge to collapse / expand (animated re-layout)", "Wheel zoom and pan", "Re-lays out on resize", "PNG / CSV export"],
+  "samples": [
+    {"title": "Simplified legal entity structure — Helios Industrial", "data": "org_structure", "height": 440,
+     "options": {"encode": {"id": "id", "parent": "parent", "name": "name", "country": "country", "pct": "ownership_pct", "category": "entity_type"},
+                 "highlight": "jv"}},
+    {"title": "Left-to-right, international holding collapsed", "data": "org_structure", "height": 400, "span": 7,
+     "options": {"orient": "LR", "initialDepth": 2, "pctLabels": "partial"}},
+    {"title": "Radial view — partial holdings labelled", "data": "org_structure", "height": 440,
+     "options": {"layout": "radial", "pctLabels": "partial", "legend": false}}
+  ]
+}

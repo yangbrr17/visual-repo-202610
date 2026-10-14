@@ -219,7 +219,7 @@
       paintActive(false);
       if (footEl) {
         var cur = s === null ? values.length : s.length;
-        footEl.firstChild.textContent = multi ? cur + ' of ' + values.length + ' selected' : (s === null ? allLabel : '1 selected');
+        footEl.firstChild.textContent = multi ? cur + ' of ' + values.length + ' selected' : (s === null ? allLabel : s.length + ' selected');
       }
     }
     function paintActive(scroll) {
@@ -303,14 +303,14 @@
     function show(v) { return isDate ? RK.format(toISO(v), fmt) : RK.format(v, fmt); }
     function out(v) { return isDate ? toISO(v) : v; }
     var lo = d0, hi = d1, dragging = null, timer = null;
-    var BINS = 24;
+    var BINS = Math.max(10, Math.min(28, Math.round(Math.sqrt(nums.length) * 4)));
 
     function snap(v) { return +RK.util.clamp(Math.round((v - d0) / step) * step + d0, d0, d1).toFixed(10); }
     function pct(v) { return (v - d0) / (d1 - d0) * 100; }
 
     var loText = h('span.rk-num'), hiText = h('span.rk-num');
     var vals = h('span.rk-fb-range__vals', loText, h('span.rk-fb-range__sep', '–'), hiText);
-    var hist = env.hist ? h('div.rk-fb-range__hist', { 'aria-hidden': 'true' }) : null;
+    var hist = env.hist || env.inline ? h('div.rk-fb-range__hist', { 'aria-hidden': 'true' }) : null;   // inline: shown in the popover
     var fill = h('div.rk-fb-range__fill');
     function thumb(which) {
       return h('div.rk-fb-range__thumb', {

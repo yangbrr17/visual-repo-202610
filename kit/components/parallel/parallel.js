@@ -9,14 +9,19 @@
   var C = RK.chart, util = RK.util;
 
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
-  /** Categorical palette without colours too close to accent-2 (reserved for the target). */
+  /**
+   * Categorical palette for peers: drops colours too close to accent-2 (reserved for the target)
+   * and near-duplicates of a colour already kept, so adjacent series stay distinguishable.
+   */
   function paletteFor(t) {
-    var a = RK.theme.parseColor(t.accent2);
-    var pal = t.cat.filter(function (c) {
-      var b = RK.theme.parseColor(c), d = Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
-      return d > 64;
-    });
-    return pal.length ? pal : t.cat;
+    function dist(x, y) {
+      var a = RK.theme.parseColor(x), b = RK.theme.parseColor(y);
+      return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
+    }
+    var base = t.cat.filter(function (c) { return dist(c, t.accent2) > 64; });
+    var pal = [];
+    base.forEach(function (c) { if (pal.every(function (k) { return dist(c, k) > 48; })) pal.push(c); });
+    return pal.length >= 3 ? pal : (base.length ? base : t.cat);
   }
   var NONE = '\u0000(no match)';   // filter value that matches nothing (brush selected zero rows)
   var DASH_ICON = 'path://M0,4h5v2H0z M7.5,4h5v2h-5z M15,4h5v2h-5z';   // dashed legend swatch for median lines
@@ -148,10 +153,11 @@
 
     // colour groups (one series each so the legend toggles them)
     var cf = enc.color && ctx.dataset && ctx.dataset.has(enc.color) ? enc.color : null;
-    var cats = cf ? util.unique(peers.map(function (r) { return r[cf]; })) : [null];
+    var allCats = cf ? util.unique(ctx.allRows.map(function (r) { return r[cf]; })) : [null];   // stable colour order
+    var cats = cf ? allCats.filter(function (c) { return peers.some(function (r) { return r[cf] === c; }); }) : [null];
     var lineBase = { width: 1.25, opacity: o.opacity, cap: 'round', join: 'round' };
-    var series = cats.map(function (c, i) {
-      var color = cf ? pal[i % pal.length] : peerColor;
+    var series = cats.map(function (c) {
+      var i = allCats.indexOf(c), color = cf ? pal[i % pal.length] : peerColor;
       return {
         id: 'p-' + i, name: cf ? String(c) : 'Peers', type: 'parallel', smooth: o.smooth ? 0.2 : false,
         lineStyle: util.merge({ color: color }, lineBase),

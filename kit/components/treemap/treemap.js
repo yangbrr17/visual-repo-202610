@@ -86,6 +86,8 @@
     return { roots: roots, total: total, rootName: rootName };
   }
 
+  var OTHERS = /^(others?|other .+|rest of .+|all other.*)$/i;
+
   function leaves(list, out) {
     out = out || [];
     list.forEach(function (n) { if (n.children.length) leaves(n.children, out); else out.push(n); });
@@ -110,18 +112,22 @@
       legend: true             // colour scale legend (metric mode)
     },
     render: function (ctx) {
-      var state = { ctx: ctx, tree: null, view: [], inst: null };
+      var state = { ctx: ctx, tree: null, view: [], inst: null, nav: RK.util.h('nav.rk-treemap__crumbs', { 'aria-label': 'Treemap level' }) };
       var base = C(function (c, inst) { state.ctx = c; state.inst = inst; return build(c, inst, state); }, {
         on: { click: function (p) { click(p, state); } }
       })(ctx);
+      ctx.el.appendChild(state.nav);
+      paintCrumbs(state);
       // keep the drill level across updates (cross-filter / global filters re-set the series)
-      var update = base.update;
+      var update = base.update, destroy = base.destroy;
       base.update = function (c) {
         update(c);
         var id = state.view[state.view.length - 1];
-        if (id && chainOf(state.tree.roots, id).length) zoom(state, id, true);
-        else if (id) { state.view = []; paintCrumbs(state); }
+        if (id && !chainOf(state.tree.roots, id).length) state.view = [];
+        else if (id) zoom(state, id, true);
+        paintCrumbs(state);
       };
+      base.destroy = function () { state.nav.remove(); destroy(); };
       return base;
     }
   });
@@ -141,60 +147,41 @@
     return out;
   }
 
-  /** Zoom to a node id (null = back to the top) and redraw the breadcrumb. */
+  /** Drill to a node id (null = back to the top) and redraw the breadcrumb. */
   function zoom(state, id, quiet) {
     var inst = state.inst;
     state.view = id ? chainOf(state.tree.roots, id).map(function (n) { return n.id; }) : [];
-    if (id) inst.dispatchAction({ type: 'treemapZoomToNode', seriesId: 'tm', targetNodeId: id });
+    if (id) inst.dispatchAction({ type: 'treemapRootToNode', seriesId: 'tm', targetNodeId: id });
     else {
       var root = null;
       try { root = inst.getModel().getSeriesByIndex(0).getData().tree.root; } catch (e) { /* ignore */ }
-      if (root) inst.dispatchAction({ type: 'treemapZoomToNode', seriesId: 'tm', targetNode: root });
+      if (root) inst.dispatchAction({ type: 'treemapRootToNode', seriesId: 'tm', targetNode: root });
     }
     if (!quiet) paintCrumbs(state);
   }
 
+  /**
+   * Breadcrumb: Root › Segment › … as HTML buttons (keyboard accessible). Kept out of the ECharts
+   * option on purpose: any setOption — even graphic-only — resets the treemap's drill level.
+   */
   function paintCrumbs(state) {
-    state.inst.setOption({ graphic: { elements: crumbs(state) } });
-  }
-
-  var measurer = null;
-  function textWidth(s, font) {
-    try {
-      measurer = measurer || document.createElement('canvas').getContext('2d');
-      measurer.font = font;
-      return measurer.measureText(String(s)).width;
-    } catch (e) { return String(s).length * 6.2; }
-  }
-
-  /** Breadcrumb as graphic text: Root › Segment › … (ancestors clickable). Fixed ids so merges update in place. */
-  function crumbs(state) {
-    var ctx = state.ctx, o = ctx.options, t = ctx.theme, els = [];
+    var ctx = state.ctx, o = ctx.options, nav = state.nav, h = RK.util.h;
+    nav.innerHTML = '';
+    if (o.drill === false) return;
     var items = [{ id: null, name: o.rootName || state.tree.rootName || 'Total' }].concat(state.view.map(function (id) {
       var ch = chainOf(state.tree.roots, id);
       return { id: id, name: ch.length ? ch[ch.length - 1].name : id };
     }));
-    var x = 0, MAX = 6, fontLink = '11px ' + t.fontSans, fontCur = '600 11px ' + t.fontSans;
+    items.forEach(function (it, i) {
+      var last = i === items.length - 1;
+      if (i) nav.appendChild(h('span.rk-treemap__sep', { 'aria-hidden': 'true' }, '›'));
+      nav.appendChild(last
+        ? h('span.rk-treemap__crumb.is-current', { 'aria-current': 'location' }, it.name)
+        : h('button.rk-treemap__crumb', { type: 'button', on: { click: function () { zoom(state, it.id); } } }, it.name));
+    });
     var deep = state.tree.roots.some(function (n) { return n.children.length; });
-    for (var i = 0; i < MAX; i++) {
-      var it = items[i], last = i === items.length - 1;
-      if (!it || o.drill === false) {
-        els.push({ id: 'bc-' + i, type: 'text', invisible: true, silent: true, style: { text: '' } }, { id: 'bs-' + i, type: 'text', invisible: true, silent: true, style: { text: '' } });
-        continue;
-      }
-      var font = last ? fontCur : fontLink;
-      els.push({
-        id: 'bc-' + i, type: 'text', x: x, y: 10, invisible: false, silent: last, cursor: last ? 'default' : 'pointer',
-        style: { text: it.name, fill: last ? t.ink : t.accent3 || t.accent, font: font, textVerticalAlign: 'middle', textAlign: 'left' },
-        onclick: last ? null : (function (id) { return function () { zoom(state, id); }; })(it.id)
-      });
-      x += textWidth(it.name, font);
-      var sep = last ? (deep && items.length === 1 ? '   Click a group to zoom in' : (items.length > 1 ? '   Click the header to go up' : '')) : '  ›  ';
-      els.push({ id: 'bs-' + i, type: 'text', x: x, y: 10, invisible: !sep, silent: true,
-        style: { text: sep, fill: last ? t.ink3 : t.ink3, font: last ? '10.5px ' + t.fontSans : fontLink, textVerticalAlign: 'middle', textAlign: 'left' } });
-      x += textWidth(sep, fontLink);
-    }
-    return els;
+    var hint = items.length > 1 ? 'Click the header to go up' : (deep ? 'Click a group to zoom in' : '');
+    if (hint) nav.appendChild(h('span.rk-treemap__hint', hint));
   }
 
   function click(p, state) {
@@ -244,16 +231,17 @@
     function toData(list, parentColor, depth) {
       return list.slice().sort(function (a, b) { return o.sort === 'asc' ? a.value - b.value : b.value - a.value; }).map(function (n, i) {
         var kids = n.children.length > 0;
-        var color;
+        var color, isHl = hl.indexOf(n.name) >= 0;
         if (byMetric) color = kids ? (t.surface2 || t.surface) : scale(n.metric);
         else if (depth === 1) color = pal[tree.roots.indexOf(n) % pal.length];
+        else if (isHl && !kids) color = t.accent2;                                  // the client stands out across groups
+        else if (OTHERS.test(n.name)) color = RK.theme.mix(t.neutral, t.paper, 0.2); // residual buckets recede
         else color = RK.theme.mix(parentColor, t.paper, [0.0, 0.16, 0.3, 0.42][i % 4]);
         var fill = !kids && isDim(n) ? RK.theme.mix(color, t.paper, 0.72) : color;
-        var isHl = hl.indexOf(n.name) >= 0;
         var item = {
           id: n.id, name: n.name, value: n.value, metric: n.metric, field: n.field,
-          itemStyle: { color: fill, borderColor: isHl ? t.accent2 : undefined, borderWidth: isHl ? 2 : undefined },
-          label: { color: RK.theme.onColor(fill, t.ink, '#fff') }
+          itemStyle: { color: fill, borderColor: isHl && byMetric ? t.accent2 : undefined, borderWidth: isHl && byMetric ? 2 : undefined },
+          label: { color: RK.theme.luminance(fill) > 0.3 ? (t.dark ? t.paper : t.ink) : '#ffffff' }   // dark text on mid/light fills (any theme)
         };
         if (kids) item.children = toData(n.children, color, depth + 1);
         return item;
@@ -349,7 +337,7 @@
           return C.tip(trail.join(' › ') || d.name, rows, d.children && d.children.length && o.drill ? 'Click to drill down' : null);
         }
       },
-      graphic: graphic.concat(crumbs(state)),
+      graphic: graphic,
       series: [series]
     };
   }

@@ -18,11 +18,14 @@
     if (ext[1] <= 0 && hi > 0) hi = 0;
     return { min: +lo.toPrecision(12), max: +hi.toPrecision(12), step: step };
   }
-  /** Log axis bounds: whole powers of ten around the positive data. */
+  /** Log axis bounds on the 1-2-5 ladder around the positive data (tighter than whole decades). */
   function logExtent(vals) {
     var ext = util.extent(vals.filter(function (v) { return v > 0; }));
     if (!(ext[0] > 0)) return { min: 1, max: 10 };
-    return { min: Math.pow(10, Math.floor(Math.log10(ext[0]))), max: Math.pow(10, Math.ceil(Math.log10(ext[1]))) };
+    var lo = ext[0] / 1.12, hi = ext[1] * 1.12;
+    var mlo = Math.pow(10, Math.floor(Math.log10(lo))), mhi = Math.pow(10, Math.floor(Math.log10(hi)));
+    var nlo = lo / mlo, nhi = hi / mhi;
+    return { min: (nlo >= 5 ? 5 : nlo >= 2 ? 2 : 1) * mlo, max: (nhi <= 1 ? 1 : nhi <= 2 ? 2 : nhi <= 5 ? 5 : 10) * mhi };
   }
   /** Largest "nice" number (1, 2, 2.5, 5 × 10^k) not above v — size-key reference values. */
   function niceBelow(v) {
@@ -30,17 +33,31 @@
     var mag = Math.pow(10, Math.floor(Math.log10(v))), n = v / mag;
     return (n >= 5 ? 5 : n >= 2.5 ? 2.5 : n >= 2 ? 2 : 1) * mag;
   }
-  /** Category palette that skips colours too close to accent2, which is reserved for the target. */
+  function cdist(a, b) {
+    a = RK.theme.parseColor(a); b = RK.theme.parseColor(b);
+    return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
+  }
+  /**
+   * Category palette: theme order, but skipping colours close to accent2 (reserved for the target)
+   * or close to a colour already picked, so neighbouring categories stay distinguishable.
+   */
   function catPalette(values, t) {
-    var a = RK.theme.parseColor(t.accent2);
-    var pool = t.cat.filter(function (c) {
-      var b = RK.theme.parseColor(c);
-      return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2)) > 60;
+    var pool = [];
+    t.cat.forEach(function (c) {
+      if (cdist(c, t.accent2) > 60 && pool.every(function (p) { return cdist(c, p) > 60; })) pool.push(c);
     });
+    t.cat.forEach(function (c) { if (pool.indexOf(c) < 0 && cdist(c, t.accent2) > 60) pool.push(c); });  // reuse the rest if needed
     if (!pool.length) pool = t.cat;
     var map = {};
     values.forEach(function (v, i) { map[v] = pool[i % pool.length]; });
     return function (v) { return map[v] || t.neutral; };
+  }
+  /** Axis tick formatter: the field format, but whole ticks >= 100 (any whole tick on a log axis) drop ".0" — "$1,800" not "$1,800.0". */
+  function axisFmt(fmt, log) {
+    return function (v) {
+      var s = RK.format(v, fmt);
+      return Math.round(v) === v && (log || Math.abs(v) >= 100) ? s.replace(/\.0+(?=\D*$)/, '') : s;
+    };
   }
   function textW(s, px) { return String(s).length * (px || 11) * 0.58; }
   function sortPeriods(list) {
@@ -143,7 +160,8 @@
     var continuous = cType === 'sequential' || cType === 'diverging';
     var cDom = cExt.slice();
     if (cType === 'diverging') { var m = Math.max(Math.abs(cExt[0] - o.mid), Math.abs(cExt[1] - o.mid)) || 1; cDom = [o.mid - m, o.mid + m]; }
-    var stops = cType === 'diverging' ? t.div : t.seq;
+    // sequential: drop the two lightest stops — near-paper bubbles would vanish
+    var stops = cType === 'diverging' ? t.div : (t.seq.length > 4 ? t.seq.slice(2) : t.seq);
     var cScale = continuous ? RK.theme.sequential(cDom, stops) : null;   // identical ramp to the visualMap -> label contrast
     var groups = cType === 'category' ? util.unique(allRows.map(function (r) { return r[colorF]; }).filter(function (v) { return v != null; })) : [];
     var palette = catPalette(groups.length ? groups : [0], t);
@@ -276,8 +294,10 @@
     var graphic = [];
     var top0 = 34;
     if (showKey) {
-      var kids = [{ type: 'text', x: 0, y: 0, style: { text: o.sizeTitle || ctx.title(sizeF), fill: t.ink3, font: '600 10px ' + t.fontSans, width: gutter, overflow: 'break' } }];
-      var base = 18 + dMax;
+      var sTitle = o.sizeTitle || ctx.title(sizeF);
+      var lines = Math.max(1, Math.ceil(textW(sTitle, 10) / gutter));
+      var kids = [{ type: 'text', x: 0, y: 0, style: { text: sTitle, fill: t.ink3, font: '600 10px ' + t.fontSans, width: gutter, overflow: 'break', lineHeight: 12 } }];
+      var base = 6 + 12 * lines + dMax;
       keyVals.forEach(function (v) {
         var r = diam(v) / 2, ty = base - 2 * r;
         kids.push({ type: 'circle', shape: { cx: dMax / 2, cy: base - r, r: r }, style: { fill: 'none', stroke: t.ink3, lineWidth: 0.8 } });
@@ -293,10 +313,10 @@
     if (continuous) {
       var cTitle = o.colorTitle || ctx.title(colorF);
       var tw = textW(cTitle, 10.5) + 10;
-      graphic.push({ type: 'text', id: 'rk-ctitle', left: 0, top: 3, silent: true, style: { text: cTitle, fill: t.ink2, font: '600 10.5px ' + t.fontSans } });
+      graphic.push({ type: 'text', id: 'rk-ctitle', left: 0, top: 16, silent: true, style: { text: cTitle, fill: t.ink2, font: '600 10.5px ' + t.fontSans } });
       visualMap = {
         type: 'continuous', dimension: 3, seriesIndex: bubbleIdx, min: cDom[0], max: cDom[1],
-        orient: 'horizontal', left: tw + 34, top: 0, itemWidth: 10, itemHeight: 120, calculable: !ctx.print, realtime: true,
+        orient: 'horizontal', left: tw + 30, top: 1, itemWidth: 9, itemHeight: 110, calculable: false, hoverLink: true,
         text: [RK.format(cDom[1], cFmt), RK.format(cDom[0], cFmt)], textGap: 6, textStyle: { color: t.ink3, fontSize: 10 },
         inRange: { color: stops }, outOfRange: { color: t.grid, opacity: 0.35 },
         formatter: function (v) { return RK.format(v, cFmt); },
@@ -314,7 +334,10 @@
     var axisBase = function (isX, ext, fmt, scale, title) {
       var a = {
         type: scale === 'log' ? 'log' : 'value', min: ext.min, max: ext.max, name: title, nameLocation: 'middle',
-        axisLabel: { formatter: C.axisFmt(fmt), hideOverlap: true, showMinLabel: !zoomed, showMaxLabel: !zoomed },
+        axisLabel: {
+          formatter: axisFmt(fmt, scale === 'log'),
+          hideOverlap: true, showMinLabel: !zoomed, showMaxLabel: !zoomed
+        },
         splitLine: { show: true, lineStyle: { color: t.grid } },
         axisLine: { show: isX, onZero: false, lineStyle: { color: t.axis } }
       };
@@ -342,10 +365,12 @@
         return C.tip(title, tr, tf ? ctx.title(tf) + ': ' + r[tf] : (isTarget(r) ? 'Target' : null));
       }
     };
-    var gridTop = (showLegend || continuous || interactive ? 30 : 10) + (hasXRef ? 14 : 0);
+    var gridTop = (continuous ? 42 : showLegend || interactive ? 30 : 10) + (hasXRef ? 14 : 0);
     var common = {
       legend: C.legend(ctx, { show: showLegend, data: legendNames, right: (interactive ? 92 : 0) + gutter, icon: 'circle', itemWidth: 9, itemHeight: 9 }),
-      grid: C.grid(ctx, { top: gridTop, right: gutter ? gutter + 14 : 8, left: 2, bottom: timeline ? 56 : 2, containLabel: false }),
+      // containLabel:false -> ECharts 6 keeps axis labels + names inside outerBounds (above the timeline)
+      grid: C.grid(ctx, { top: gridTop, right: gutter ? gutter + 14 : 8, left: 2, bottom: timeline ? 50 : 2, containLabel: false,
+        outerBounds: { left: 0, right: 0, top: 0, bottom: timeline ? 48 : 0 } }),
       tooltip: tooltip,
       xAxis: xAxis,
       yAxis: yAxis,
@@ -366,9 +391,9 @@
 
     /* timeline: base option + one option per period (series matched by id -> animated transitions) */
     var idx = timelineIndex(inst);
-    if (idx == null || idx >= periods.length) idx = ctx.print ? periods.length - 1 : 0;
+    if (idx == null || idx >= periods.length) idx = ctx.print || o.startAt !== 'first' ? periods.length - 1 : 0;
     var wm = function (p) {
-      return { type: 'text', id: 'rk-wm', right: (gutter ? gutter + 28 : 20), bottom: 96, silent: true, z: 0,
+      return { type: 'text', id: 'rk-wm', right: (gutter ? gutter + 26 : 18), bottom: 106, silent: true, z: 0,
         style: { text: String(p), fill: RK.theme.alpha(t.ink, t.dark ? 0.12 : 0.08), font: '700 46px ' + t.fontNum, align: 'right' } };
     };
     var dur = Math.round(o.playInterval * 0.7);
@@ -392,7 +417,7 @@
     });
     return {
       baseOption: baseOption,
-      options: periods.map(function (p, i) { return { series: [ref].concat(frames[i]), graphic: [wm(p)] }; })
+      options: periods.map(function (p, i) { return { series: [ref].concat(frames[i]), graphic: graphic.concat(wm(p)) }; })
     };
   }
 
@@ -410,6 +435,13 @@
           RK.store.clearFilter(inst.__rk.ctx.id + ':' + inst.__rk.selField);
         }
       });
+      inst.on('timelineplaychanged', function (e) {
+        // pressing play on the last period replays from the first one
+        var tl = inst.getOption().timeline;
+        if (e.playState && tl && tl[0] && !tl[0].loop && tl[0].currentIndex >= tl[0].data.length - 1) {
+          inst.dispatchAction({ type: 'timelineChange', currentIndex: 0 });
+        }
+      });
       inst.on('datazoom', function () {
         var z = zoomState(inst).some(function (d) { return d.start > 0 || d.end < 100; });
         var lab = { axisLabel: { showMinLabel: !z, showMaxLabel: !z } };
@@ -424,6 +456,7 @@
     defaults: {
       encode: { x: 'x', y: 'y', size: 'size', color: null, label: 'label', name: null, target: 'is_target' },
       timeField: null,         // field with periods (year, quarter) -> animated timeline with play button
+      startAt: 'last',         // 'last' | 'first' — period shown before playing (print always shows the last)
       autoPlay: false,         // start playing when rendered (never in print / reduced motion)
       playInterval: 1600,      // ms per period
       loop: false,

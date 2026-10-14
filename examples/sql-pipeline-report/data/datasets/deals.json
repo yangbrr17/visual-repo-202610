@@ -1,0 +1,39 @@
+{
+  "id": "deals",
+  "title": "Precedent transactions",
+  "schema": {"fields": [
+    {"name": "deal_id", "type": "string", "title": "Deal"},
+    {"name": "announced", "type": "date", "title": "Announced", "format": "mmm yyyy"},
+    {"name": "target", "type": "string", "title": "Target"},
+    {"name": "acquirer", "type": "string", "title": "Acquirer"},
+    {"name": "sector", "type": "string", "title": "Sector"},
+    {"name": "acquirer_type", "type": "string", "title": "Acquirer type"},
+    {"name": "consideration", "type": "string", "title": "Consideration"},
+    {"name": "offer_price", "type": "number", "title": "Offer price", "format": "$#,##0.00", "unit": "USD"},
+    {"name": "unaffected_price", "type": "number", "title": "Unaffected price", "format": "$#,##0.00", "unit": "USD"},
+    {"name": "vwap_30d", "type": "number", "title": "30-day VWAP", "format": "$#,##0.00", "unit": "USD"},
+    {"name": "equity_value", "type": "number", "title": "Equity value", "format": "$#,##0", "unit": "USD m"},
+    {"name": "deal_ev", "type": "number", "title": "Deal EV", "format": "$#,##0", "unit": "USD m"},
+    {"name": "ev_ltm_revenue", "type": "number", "title": "EV / Revenue LTM", "format": "0.0x"},
+    {"name": "ev_ltm_ebitda", "type": "number", "title": "EV / EBITDA LTM", "format": "0.0x"},
+    {"name": "premium_1d", "type": "number", "title": "Premium 1-day", "format": "0.0%"},
+    {"name": "premium_30d_vwap", "type": "number", "title": "Premium 30-day VWAP", "format": "0.0%"}
+  ]},
+  "data": [
+    {"deal_id": "D14", "announced": "2026-03-30", "target": "Nethercott Sensing", "acquirer": "Highmoor Partners", "sector": "Sensors & Vision", "acquirer_type": "Sponsor", "consideration": "Cash", "offer_price": 47.67, "unaffected_price": 34.29, "vwap_30d": 33.18, "equity_value": 10172.8, "deal_ev": 9784.6, "ev_ltm_revenue": 2.047325, "ev_ltm_ebitda": 13.396191, "premium_1d": 0.390201, "premium_30d_vwap": 0.436496},
+    {"deal_id": "D13", "announced": "2025-05-12", "target": "Merrin Robotics", "acquirer": "Vedrix Robotics", "sector": "Automation", "acquirer_type": "Strategic", "consideration": "Cash", "offer_price": 37.26, "unaffected_price": 30.46, "vwap_30d": 30.74, "equity_value": 7388.7, "deal_ev": 8109.4, "ev_ltm_revenue": 1.553249, "ev_ltm_ebitda": 11.583142, "premium_1d": 0.223244, "premium_30d_vwap": 0.212078},
+    {"deal_id": "D12", "announced": "2024-08-19", "target": "Larkspur Software", "acquirer": "Cardwell Software", "sector": "Industrial Software", "acquirer_type": "Strategic", "consideration": "Cash & stock", "offer_price": 68.56, "unaffected_price": 49.07, "vwap_30d": 44.67, "equity_value": 4778.6, "deal_ev": 6064.8, "ev_ltm_revenue": 1.792261, "ev_ltm_ebitda": 11.836128, "premium_1d": 0.397188, "premium_30d_vwap": 0.534899},
+    {"deal_id": "D11", "announced": "2024-02-26", "target": "Kelbourne Motion Systems", "acquirer": "Ashgrove Equity", "sector": "Motion Control", "acquirer_type": "Sponsor", "consideration": "Cash", "offer_price": 38.24, "unaffected_price": 27.41, "vwap_30d": 27.42, "equity_value": 8049.5, "deal_ev": 9750.0, "ev_ltm_revenue": 1.935027, "ev_ltm_ebitda": 9.458692, "premium_1d": 0.395111, "premium_30d_vwap": 0.394721},
+    {"deal_id": "D10", "announced": "2023-09-11", "target": "Jessop Automation", "acquirer": "Orvanta Controls", "sector": "Automation", "acquirer_type": "Strategic", "consideration": "Cash", "offer_price": 85.82, "unaffected_price": 59.37, "vwap_30d": 60.38, "equity_value": 6084.6, "deal_ev": 6269.7, "ev_ltm_revenue": 1.614372, "ev_ltm_ebitda": null, "premium_1d": 0.445511, "premium_30d_vwap": 0.421426},
+    {"deal_id": "D09", "announced": "2023-04-03", "target": "Ivers Optics", "acquirer": "Lumeno Optics", "sector": "Sensors & Vision", "acquirer_type": "Strategic", "consideration": "Stock", "offer_price": 49.2, "unaffected_price": 41.12, "vwap_30d": 41.61, "equity_value": 5756.4, "deal_ev": 6261.5, "ev_ltm_revenue": 2.31137, "ev_ltm_ebitda": 10.130238, "premium_1d": 0.196498, "premium_30d_vwap": 0.182301},
+    {"deal_id": "D08", "announced": "2022-10-10", "target": "Harwell Controls", "acquirer": "Saltmarsh Capital", "sector": "Automation", "acquirer_type": "Sponsor", "consideration": "Cash", "offer_price": 28.26, "unaffected_price": 21.59, "vwap_30d": 20.75, "equity_value": 878.9, "deal_ev": 925.6, "ev_ltm_revenue": 3.046695, "ev_ltm_ebitda": 14.350171, "premium_1d": 0.308939, "premium_30d_vwap": 0.361605},
+    {"deal_id": "D07", "announced": "2022-05-23", "target": "Glenhaven Software", "acquirer": "Nexory Industrial Software", "sector": "Industrial Software", "acquirer_type": "Strategic", "consideration": "Cash & stock", "offer_price": 78.15, "unaffected_price": 59.61, "vwap_30d": 68.56, "equity_value": 8197.9, "deal_ev": 8751.6, "ev_ltm_revenue": 2.065575, "ev_ltm_ebitda": 15.605626, "premium_1d": 0.311022, "premium_30d_vwap": 0.139799},
+    {"deal_id": "D06", "announced": "2022-01-18", "target": "Fenmoor Instruments", "acquirer": "Brookwick Instruments", "sector": "Sensors & Vision", "acquirer_type": "Strategic", "consideration": "Cash", "offer_price": 55.85, "unaffected_price": 41.82, "vwap_30d": 39.81, "equity_value": 3574.4, "deal_ev": 4347.5, "ev_ltm_revenue": 2.677692, "ev_ltm_ebitda": 10.368471, "premium_1d": 0.335485, "premium_30d_vwap": 0.403054},
+    {"deal_id": "D05", "announced": "2021-07-26", "target": "Elstree Robotics", "acquirer": "Highmoor Partners", "sector": "Automation", "acquirer_type": "Sponsor", "consideration": "Cash", "offer_price": 36.12, "unaffected_price": 26.88, "vwap_30d": 27.31, "equity_value": 3651.7, "deal_ev": 4340.6, "ev_ltm_revenue": 3.549748, "ev_ltm_ebitda": 13.836889, "premium_1d": 0.34375, "premium_30d_vwap": 0.322832},
+    {"deal_id": "D04", "announced": "2021-03-08", "target": "Dunmore Drives", "acquirer": "Torvald Drives", "sector": "Motion Control", "acquirer_type": "Strategic", "consideration": "Stock", "offer_price": 25.6, "unaffected_price": 19.25, "vwap_30d": 21.64, "equity_value": 1515.5, "deal_ev": 1960.0, "ev_ltm_revenue": 1.611064, "ev_ltm_ebitda": 9.894094, "premium_1d": 0.32987, "premium_30d_vwap": 0.182792},
+    {"deal_id": "D03", "announced": "2020-09-21", "target": "Corwen Vision", "acquirer": "Prisane Sensing", "sector": "Sensors & Vision", "acquirer_type": "Strategic", "consideration": "Cash & stock", "offer_price": 79.86, "unaffected_price": 68.19, "vwap_30d": 60.46, "equity_value": 16906.4, "deal_ev": 21197.4, "ev_ltm_revenue": 2.316728, "ev_ltm_ebitda": 13.832786, "premium_1d": 0.171139, "premium_30d_vwap": 0.320787},
+    {"deal_id": "D02", "announced": "2019-11-04", "target": "Bellcrest Motion", "acquirer": "Saltmarsh Capital", "sector": "Motion Control", "acquirer_type": "Sponsor", "consideration": "Cash", "offer_price": 95.39, "unaffected_price": 67.59, "vwap_30d": 65.4, "equity_value": 17609.0, "deal_ev": 20171.9, "ev_ltm_revenue": 3.013159, "ev_ltm_ebitda": 12.839344, "premium_1d": 0.411303, "premium_30d_vwap": 0.458563},
+    {"deal_id": "D01", "announced": "2019-06-17", "target": "Arvane Systems", "acquirer": "Orvanta Controls", "sector": "Automation", "acquirer_type": "Strategic", "consideration": "Cash", "offer_price": 98.31, "unaffected_price": 74.76, "vwap_30d": 71.19, "equity_value": 19524.4, "deal_ev": 21979.3, "ev_ltm_revenue": 3.112329, "ev_ltm_ebitda": 11.594274, "premium_1d": 0.315008, "premium_30d_vwap": 0.380917}
+  ],
+  "meta": {"notes": ["Premiums vs. the last undisturbed close and the 30-day VWAP before announcement.", "Illustrative only: fictional companies and synthetic data."], "source": "Synthetic precedent transactions 2019–2026 and pre-announcement trading", "unit": "USD m"}
+}

@@ -1,0 +1,17 @@
+{
+  "id": "ev_bridge",
+  "title": "Kestrel Automation: market cap to enterprise value",
+  "schema": {"fields": [
+    {"name": "step", "type": "string", "title": "Step"},
+    {"name": "value", "type": "number", "title": "USD m", "format": "$#,##0", "unit": "USD m"},
+    {"name": "kind", "type": "string", "title": "Kind"}
+  ]},
+  "data": [
+    {"step": "Market cap", "value": 4358.9, "kind": "total"},
+    {"step": "Total debt", "value": 1650.0, "kind": "delta"},
+    {"step": "Minorities", "value": 35.0, "kind": "delta"},
+    {"step": "Cash", "value": -420.0, "kind": "delta"},
+    {"step": "Enterprise value", "value": 5623.9, "kind": "total"}
+  ],
+  "meta": {"source": "Synthetic market data (sqlite3 pipeline, random.Random(7)); prices to 13-Oct-2026", "unit": "USD m"}
+}

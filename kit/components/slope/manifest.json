@@ -1,0 +1,44 @@
+{
+  "id": "slope",
+  "name": "Slope Chart",
+  "name_zh": "斜率图（两期对比）",
+  "category": "trend",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Two-period slope chart — each line joins an item's value in period A to period B, with labels on both sides, up/down colouring and the target highlighted.",
+  "summary_zh": "两期斜率图：每条线连接同一对象在两个时点的数值，两侧标注名称和数值，按升降着色并突出目标公司。",
+  "description_zh": "用来展示“从 A 到 B 发生了什么变化”：如同业 EV/EBITDA 从 2025E 到 2026E 的变化、投行排名的升降、各业务板块收入的增长。支持宽表（encode.from / encode.to 两个字段）或长表（encode.period + encode.value，取两期）。线的斜率即变化方向和幅度；两侧标签自动避让并用引线连接，目标公司用 accent2 突出，可加中位数虚线作为同业基准。适合 4–20 个对象。",
+  "best_for": ["Peer multiples 2025E vs. 2026E (re-rating / earnings growth)", "League-table rank movement (inverse axis)", "Segment or region growth between two years", "Before / after (pre- vs. post-deal) comparisons"],
+  "avoid_when": ["More than ~20 items (labels become unreadable — use a dot plot or table)", "More than two periods (use a line chart or small multiples)", "Values in different units on each side"],
+  "channels": {
+    "label": {"type": "string", "required": true, "desc": "Item name (company, bank, segment)", "default": "company"},
+    "from": {"type": "number", "required": false, "desc": "Wide data: value in the first period", "default": "ev_ebitda_25e"},
+    "to": {"type": "number", "required": false, "desc": "Wide data: value in the second period", "default": "ev_ebitda_26e"},
+    "period": {"type": "string", "required": false, "desc": "Long data: period field (use with value; two periods are compared)"},
+    "value": {"type": "number", "required": false, "desc": "Long data: value field (rows per label and period are summed)"},
+    "highlight": {"type": "boolean", "required": false, "desc": "Boolean flag marking the target row(s), drawn in accent2", "default": "is_target"},
+    "group": {"type": "string", "required": false, "desc": "Optional group for colorBy 'category' and the tooltip"}
+  },
+  "options": {
+    "periods": {"type": "array", "default": null, "desc": "Long data: [fromPeriod, toPeriod]; default = first and last distinct period"},
+    "headers": {"type": "array", "default": null, "desc": "[left, right] column headers; default = period values, or field titles minus their common words"},
+    "colorBy": {"type": "string", "default": "direction", "desc": "direction (increase / decrease) | neutral (grey; target in accent) | category"},
+    "good": {"type": "string", "default": "up", "desc": "Direction mode: which way is favourable — 'up' or 'down' (e.g. ranks)"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Label value(s) to emphasise in addition to encode.highlight rows"},
+    "median": {"type": "boolean", "default": false, "desc": "Dashed median line across both periods"},
+    "change": {"type": "boolean", "default": false, "desc": "Append the % change to the right-hand labels"},
+    "labels": {"type": "string", "default": "both", "desc": "both = names on both sides | right = names on the right only | values = no names"},
+    "inverse": {"type": "boolean", "default": false, "desc": "Reverse the value axis (rank 1 at the top)"},
+    "format": {"type": "string", "default": null, "desc": "Value format; defaults to the from / value field format"},
+    "labelWidth": {"type": "number", "default": 170, "desc": "Maximum name width in px before truncation"}
+  },
+  "interactions": ["Hover a line to focus it (others fade) with a tooltip of both values and the change", "Click a line to cross-filter on the label", "Selected items stay bright, others dim", "Lines draw from left to right on entry; morph on filter changes", "PNG / CSV export"],
+  "samples": [
+    {"title": "EV / EBITDA: 2025E vs. 2026E", "data": "peers", "height": 460, "span": 7,
+     "options": {"encode": {"label": "company", "from": "ev_ebitda_25e", "to": "ev_ebitda_26e", "highlight": "is_target"}, "colorBy": "neutral", "median": true}},
+    {"title": "M&A league table — rank movement", "data": "league_table", "height": 360, "span": 5,
+     "options": {"encode": {"label": "bank", "from": "prior_rank", "to": "rank", "highlight": null}, "inverse": true, "good": "down", "format": "\"#\"0", "headers": ["Prior year", "LTM Sep-26"], "highlight": "Northbridge Capital"}},
+    {"title": "Segment revenue, 2021A to 2026E", "data": "segment_revenue", "height": 260, "span": 6,
+     "options": {"encode": {"label": "segment", "period": "year", "value": "revenue", "from": null, "to": null, "highlight": null}, "periods": ["2021A", "2026E"], "colorBy": "category", "change": true, "labels": "right", "format": "$#,##0"}}
+  ]
+}

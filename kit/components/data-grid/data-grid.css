@@ -101,3 +101,4 @@
 @keyframes rk-dgrid-in { from { opacity: 0; transform: translateY(6px); } }
 @media (prefers-reduced-motion: reduce) { .rk-dgrid.is-in .tabulator-tableholder { animation: none; } }
 @media print { .rk-dgrid__bar, .rk-dgrid .tabulator-header-filter { display: none !important; } .rk-dgrid.is-in .tabulator-tableholder { animation: none; } }
+[data-rk-theme="ink"] .rk-dgrid .tabulator-row.is-target { background-color: color-mix(in srgb, var(--rk-accent-2) 22%, var(--rk-paper)); }

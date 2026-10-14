@@ -146,7 +146,7 @@
           barGap: '14%', barCategoryGap: groups > 1 ? '30%' : '36%',
           z: 2,
           label: showBarLabels ? C.label(ctx, bfmt, o.barStack ? {
-            position: 'inside', fontSize: 10, color: RK.theme.onColor(base, t.ink, '#fff'),
+            position: 'inside', fontSize: 10, color: textOn(base, t),
             formatter: function (p) { return U.isNum(p.value) && Math.abs(p.value) >= (hi - lo) * 0.07 ? RK.format(p.value, bfmt) : ''; }
           } : { position: 'top', distance: 4, fontSize: 10.5, color: t.ink2 }) : { show: false },
           data: b.values.map(function (v, i) {
@@ -419,4 +419,7 @@
       return num(a) === num(b) ? b : a;
     };
   }
+
+  /** Readable text on a fill in any theme (dark themes have a light ink, so "dark text" is the paper colour). */
+  function textOn(fill, t) { return RK.theme.onColor(fill, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#fff'); }
 })();

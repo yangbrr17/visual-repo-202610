@@ -40,17 +40,31 @@
     var a = Math.abs(v);
     return RK.format(v, a >= 100 ? '#,##0' : a >= 10 ? '0.0' : a >= 1 ? '0.00' : '0.000');
   }
-  /** Category palette that skips colours too close to accent2, which is reserved for the target. */
+  function cdist(a, b) {
+    a = RK.theme.parseColor(a); b = RK.theme.parseColor(b);
+    return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
+  }
+  /**
+   * Category palette: theme order, but skipping colours close to accent2 (reserved for the target)
+   * or close to a colour already picked, so neighbouring categories stay distinguishable.
+   */
   function catPalette(values, t) {
-    var a = RK.theme.parseColor(t.accent2);
-    var pool = t.cat.filter(function (c) {
-      var b = RK.theme.parseColor(c);
-      return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2)) > 60;
+    var pool = [];
+    t.cat.forEach(function (c) {
+      if (cdist(c, t.accent2) > 60 && pool.every(function (p) { return cdist(c, p) > 60; })) pool.push(c);
     });
+    t.cat.forEach(function (c) { if (pool.indexOf(c) < 0 && cdist(c, t.accent2) > 60) pool.push(c); });  // reuse the rest if needed
     if (!pool.length) pool = t.cat;
     var map = {};
     values.forEach(function (v, i) { map[v] = pool[i % pool.length]; });
     return function (v) { return map[v] || t.neutral; };
+  }
+  /** Axis tick formatter: the field format, but whole ticks >= 100 (any whole tick on a log axis) drop ".0" — "$1,800" not "$1,800.0". */
+  function axisFmt(fmt, log) {
+    return function (v) {
+      var s = RK.format(v, fmt);
+      return Math.round(v) === v && (log || Math.abs(v) >= 100) ? s.replace(/\.0+(?=\D*$)/, '') : s;
+    };
   }
   /** Rough rendered width (px) of an axis label — used to space the rotated y-axis name. */
   function textW(s, px) { return String(s).length * (px || 11) * 0.58; }
@@ -295,13 +309,13 @@
       xAxis: {
         type: 'value', min: xe.min, max: xe.max, splitNumber: Math.round((xe.max - xe.min) / xe.step), name: o.xTitle || ctx.title(enc.x), nameLocation: 'middle', nameGap: 26,
         axisLine: { show: true, onZero: false, lineStyle: { color: t.axis } },
-        axisLabel: { formatter: C.axisFmt(xFmt), hideOverlap: true, showMinLabel: !zoomed, showMaxLabel: !zoomed },
+        axisLabel: { formatter: axisFmt(xFmt), hideOverlap: true, showMinLabel: !zoomed, showMaxLabel: !zoomed },
         splitLine: { show: true, lineStyle: { color: t.grid } }
       },
       yAxis: {
         type: 'value', min: ye.min, max: ye.max, splitNumber: Math.round((ye.max - ye.min) / ye.step), name: o.yTitle || ctx.title(enc.y), nameLocation: 'middle', nameGap: Math.round(yLabW + 14),
         axisLine: { show: false, onZero: false },
-        axisLabel: { formatter: C.axisFmt(yFmt), showMinLabel: !zoomed, showMaxLabel: !zoomed },
+        axisLabel: { formatter: axisFmt(yFmt), showMinLabel: !zoomed, showMaxLabel: !zoomed },
         splitLine: { show: true, lineStyle: { color: t.grid } }
       },
       toolbox: { show: false },  // the brush is driven from the HTML toolbar

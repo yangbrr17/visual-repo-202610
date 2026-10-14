@@ -1,0 +1,41 @@
+{
+  "id": "league-table",
+  "name": "League Table",
+  "name_zh": "排行榜（League Table）",
+  "category": "table",
+  "engine": "dom",
+  "deps": [],
+  "summary": "Ranked adviser / acquirer / investor list with rank change, inline value bars, market share and deal count; highlight your own name.",
+  "summary_zh": "财务顾问 / 收购方 / 投资人排名表：名次变化箭头、行内数值条、市场份额与交易数量，可高亮自家机构。",
+  "description_zh": "投行 credentials 页的标准 League Table：每行一家机构，按 rank（或按数值重新排名）排列，显示较上期名次变化（▲/▼/–/New）、行内横条表示交易金额并在条尾标注数值，右侧为市场份额和交易数。highlight 指定的机构用强调色标出，即使不在前 N 名也会在虚线下方保留显示；点击 Value / Share / Deals 表头可重新排序（行平滑移动），点击行可交叉筛选。适合 5–20 家机构的排名展示。",
+  "best_for": ["M&A / ECM / DCM adviser league tables", "Top acquirers or investors by deal value", "Any ranked list where one name must stand out"],
+  "avoid_when": ["More than ~20 names (use bar or data-grid)", "Values without a ranking meaning"],
+  "channels": {
+    "rank": {"type": "number", "required": false, "desc": "Rank (computed from value when missing or rerank: true)", "default": "rank"},
+    "name": {"type": "string", "required": true, "desc": "Adviser / company name; cross-filter field", "default": "bank"},
+    "value": {"type": "number", "required": true, "desc": "Ranking value drawn as the inline bar", "default": "deal_value_bn"},
+    "share": {"type": "number", "required": false, "desc": "Market share", "default": "market_share"},
+    "count": {"type": "number", "required": false, "desc": "Number of deals", "default": "deals"},
+    "prior": {"type": "number", "required": false, "desc": "Prior-period rank for the change arrow (null = New)", "default": "prior_rank"}
+  },
+  "options": {
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Name(s) drawn in the highlight accent (e.g. your bank)"},
+    "top": {"type": "number", "default": 10, "desc": "Show the top-N rows; null = all"},
+    "pinHighlight": {"type": "boolean", "default": true, "desc": "Keep highlighted names visible below the top-N cut"},
+    "rerank": {"type": "boolean", "default": false, "desc": "Rank by value instead of the rank field"},
+    "format": {"type": "string", "default": null, "desc": "Value format (defaults to the value field format)"},
+    "shareFormat": {"type": "string", "default": null, "desc": "Share format (defaults to the field format, else 0.0%)"},
+    "countFormat": {"type": "string", "default": null, "desc": "Count format (defaults to the field format, else #,##0)"},
+    "sortable": {"type": "boolean", "default": true, "desc": "Click the value / share / count headers to re-order (third click restores rank order)"},
+    "showChange": {"type": "boolean", "default": true, "desc": "Rank change vs prior rank column"},
+    "titles": {"type": "object", "default": {}, "desc": "{rank, change, name, value, share, count} header overrides"},
+    "crossFilter": {"type": "boolean", "default": true, "desc": "Click a row to cross-filter other blocks on the name field"}
+  },
+  "interactions": ["Bars grow with a stagger while values count up", "Click a metric header to re-order (FLIP row animation)", "Click a row to cross-filter (others dim)", "Bars re-scale smoothly when filters change"],
+  "samples": [
+    {"title": "Global industrials M&A — financial advisers (LTM Sep-2026)", "data": "league_table", "height": 360, "span": 8,
+     "options": {"highlight": "Kingsgate Advisory", "titles": {"value": "Deal value (USD bn)", "count": "Deals"}}},
+    {"title": "Top 5 with our bank pinned below the cut", "data": "league_table", "height": 220, "span": 7,
+     "options": {"top": 5, "highlight": "Montclair Hayes", "showChange": false, "titles": {"name": "Financial adviser", "count": "Deals"}}}
+  ]
+}

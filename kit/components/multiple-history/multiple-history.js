@@ -132,7 +132,7 @@
                 style: { stroke: l.kind === 'pill' ? l.bg : t.rule, lineWidth: 1, fill: null } });
             }
             var st2 = l.kind === 'pill'
-              ? { text: l.text, fill: RK.theme.onColor(l.bg, t.ink, '#fff'), backgroundColor: l.bg, padding: [2, 5], borderRadius: 2, font: font }
+              ? { text: l.text, fill: textOn(l.bg, t), backgroundColor: l.bg, padding: [2, 5], borderRadius: 2, font: font }
               : { text: l.text, fill: l.kind === 'mean' ? RK.theme.mix(meanColor, t.ink, t.dark ? 0 : 0.3) : (l.kind === 'cmean' ? cColor : t.ink3),
                 font: l.kind === 'sd' ? '10px ' + t.fontNum : font };
             st2.align = 'left'; st2.verticalAlign = 'middle';
@@ -261,4 +261,7 @@
     var whole = trimmed !== code && step != null && num(RK.format(step, code)) === num(RK.format(step, trimmed));
     return function (v) { return RK.format(v, whole ? trimmed : code); };
   }
+
+  /** Readable text on a fill in any theme (dark themes have a light ink, so "dark text" is the paper colour). */
+  function textOn(fill, t) { return RK.theme.onColor(fill, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#fff'); }
 })();

@@ -1,0 +1,46 @@
+/* cluster-map */
+
+/* ---- geo kit (identical block in every RK geo component css) ---- */
+.rk-geo .leaflet-control-zoom a { font-size: 15px; }
+.rk-geo .leaflet-interactive { cursor: pointer; }
+.rk-geo .rk-map-legend { max-width: 340px; box-shadow: none; padding: 7px 9px; font-size: 10.5px; }
+.rk-geo-leg.is-row { display: flex; align-items: flex-start; gap: 18px; }
+.rk-geo-leg.is-row > .rk-geo-leg__sec + .rk-geo-leg__sec { margin-top: 0; }
+.rk-geo-leg__sec + .rk-geo-leg__sec, .rk-geo-leg__sec + .rk-geo-leg__item { margin-top: 8px; }
+.rk-geo-leg__items { display: flex; flex-direction: column; gap: 2px; }
+.rk-geo-leg__item { display: flex; align-items: center; gap: 7px; white-space: nowrap; font-variant-numeric: tabular-nums; transition: opacity var(--rk-dur-fast); }
+.rk-geo-leg__item.is-click { cursor: pointer; }
+.rk-geo-leg__item.is-click:hover span { color: var(--rk-ink); }
+.rk-geo-leg__item.is-off { opacity: .38; }
+.rk-geo-leg__sw { flex: none; width: 9px; height: 9px; border-radius: 50%; }
+.rk-geo-leg__sw.is-square { width: 12px; height: 10px; border-radius: 1px; }
+.rk-geo-leg__sw.is-line { width: 16px; height: 3px; border-radius: 2px; }
+.rk-geo-leg__n { margin-left: auto; padding-left: 10px; color: var(--rk-ink-3); font-size: 10px; }
+.rk-geo-leg__ramp .rk-legend__ramp { width: 150px; }
+.rk-geo-label-anchor { pointer-events: none; }
+.rk-geo-label {
+  position: absolute; left: 0; top: 0; white-space: nowrap; pointer-events: none;
+  padding: 0 3px; border-radius: 2px; background: color-mix(in srgb, var(--rk-paper) 80%, transparent);
+  font-size: 10.5px; line-height: 1.35; color: var(--rk-ink); font-variant-numeric: tabular-nums;
+}
+.rk-geo-label.is-hidden { visibility: hidden; }
+.rk-geo.is-motion .rk-geo-label { transition: opacity var(--rk-dur) var(--rk-ease); }
+@media print { .rk-geo .leaflet-control-zoom, .rk-geo .rk-geo-toggle { display: none; } }
+/* ---- end geo kit ---- */
+
+.rk-cluster__icon { background: none; border: 0; }
+.rk-cluster__icon svg, .rk-cluster__key svg { display: block; overflow: visible; max-width: none !important; max-height: none !important; }
+.rk-cluster__icon text { font-family: var(--rk-font-num); font-weight: 600; font-variant-numeric: tabular-nums; }
+.rk-cluster__icon svg { transition: transform var(--rk-dur-fast) var(--rk-ease); transform-origin: 50% 50%; }
+.rk-cluster__icon:hover svg { transform: scale(1.06); }
+.rk-cluster__pt-icon { background: none; border: 0; }
+.rk-cluster__pt {
+  display: block; width: 100%; height: 100%; box-sizing: border-box; border-radius: 50%;
+  border: 1.5px solid var(--rk-paper); outline: 0.5px solid color-mix(in srgb, var(--rk-ink) 35%, transparent);
+  transition: transform var(--rk-dur-fast) var(--rk-ease);
+}
+.rk-cluster__pt-icon:hover .rk-cluster__pt { transform: scale(1.35); }
+.rk-cluster__key { flex: none; display: inline-block; width: 20px; height: 20px; }
+.rk-cluster.is-motion .rk-cluster__icon, .rk-cluster.is-motion .rk-cluster__pt-icon { animation: rk-cluster-in 420ms var(--rk-ease) both; }
+@keyframes rk-cluster-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .rk-cluster .leaflet-marker-icon { animation: none !important; } }

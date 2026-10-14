@@ -3,7 +3,9 @@
 /* ---- geo kit (identical block in every RK geo component css) ---- */
 .rk-geo .leaflet-control-zoom a { font-size: 15px; }
 .rk-geo .leaflet-interactive { cursor: pointer; }
-.rk-geo .rk-map-legend { max-width: 240px; box-shadow: none; }
+.rk-geo .rk-map-legend { max-width: 340px; box-shadow: none; padding: 7px 9px; font-size: 10.5px; }
+.rk-geo-leg.is-row { display: flex; align-items: flex-start; gap: 18px; }
+.rk-geo-leg.is-row > .rk-geo-leg__sec + .rk-geo-leg__sec { margin-top: 0; }
 .rk-geo-leg__sec + .rk-geo-leg__sec, .rk-geo-leg__sec + .rk-geo-leg__item { margin-top: 8px; }
 .rk-geo-leg__items { display: flex; flex-direction: column; gap: 2px; }
 .rk-geo-leg__item { display: flex; align-items: center; gap: 7px; white-space: nowrap; font-variant-numeric: tabular-nums; transition: opacity var(--rk-dur-fast); }
@@ -18,8 +20,8 @@
 .rk-geo-label-anchor { pointer-events: none; }
 .rk-geo-label {
   position: absolute; left: 0; top: 0; white-space: nowrap; pointer-events: none;
-  font-size: 10.5px; line-height: 1.2; color: var(--rk-ink); font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 2px var(--rk-paper), 0 0 2px var(--rk-paper), 0 0 3px var(--rk-paper);
+  padding: 0 3px; border-radius: 2px; background: color-mix(in srgb, var(--rk-paper) 80%, transparent);
+  font-size: 10.5px; line-height: 1.35; color: var(--rk-ink); font-variant-numeric: tabular-nums;
 }
 .rk-geo-label.is-hidden { visibility: hidden; }
 .rk-geo.is-motion .rk-geo-label { transition: opacity var(--rk-dur) var(--rk-ease); }

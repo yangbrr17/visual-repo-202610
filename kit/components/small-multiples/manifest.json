@@ -1,0 +1,41 @@
+{
+  "id": "small-multiples",
+  "name": "Small Multiples",
+  "name_zh": "小多图（分面趋势）",
+  "category": "trend",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "A grid of mini line / area / bar charts — one panel per segment, region or series — on a shared or independent scale, with last-value labels and a linked crosshair.",
+  "summary_zh": "分面小多图：每个业务板块 / 地区 / 序列一个迷你折线、面积或柱状图，可共享或独立 y 轴，末值标签，十字准线跨面板联动。",
+  "description_zh": "当一张图里有 4 条以上的线互相缠绕时，把它们拆成按 facet 字段分面的小图更易读。数据为长表（x + y + facet），同一 facet 与 x 的多行会按 agg 汇总（如按地区汇总的板块收入）。共享 y 轴时可直接比较规模，独立 y 轴时比较各自的形态；每个面板标题显示期间涨跌幅，ghost 选项在每个面板中以淡灰线显示其他序列作为参照，baseline 可画出 100 等基准线。所有面板在一个 ECharts 实例中，悬停时十字准线联动。",
+  "best_for": ["Segment or region revenue trends side by side", "Rebased share-price performance vs. indices (with ghost context)", "KPI trends across business units", "Any 3–12 series that overlap in a single line chart"],
+  "avoid_when": ["One or two series (use line or combo)", "More than ~12 facets (panels become too small)", "When the exact cross-series comparison at each point matters most (use a single line chart)"],
+  "channels": {
+    "x": {"type": "string|date", "required": true, "desc": "Period (category) or date (time axis)", "default": "year"},
+    "y": {"type": "number", "required": true, "desc": "Value field", "default": "revenue"},
+    "facet": {"type": "string", "required": true, "desc": "One panel per distinct value", "default": "segment"}
+  },
+  "options": {
+    "type": {"type": "string", "default": "area", "desc": "line | area | bar"},
+    "columns": {"type": "number", "default": null, "desc": "Panels per row (null = auto from the available width, rows balanced)"},
+    "sharedY": {"type": "boolean", "default": true, "desc": "One y scale for every panel (compare levels) or independent scales (compare shapes)"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Facet value(s) drawn in accent2 (e.g. the target company)"},
+    "ghost": {"type": "boolean", "default": false, "desc": "Draw every other facet as a faint context line in each panel"},
+    "baseline": {"type": "number", "default": null, "desc": "Dashed horizontal reference, e.g. 100 for rebased prices"},
+    "lastLabel": {"type": "boolean", "default": true, "desc": "Label the last value of each panel"},
+    "showChange": {"type": "boolean", "default": true, "desc": "First → last % change in each panel header (green / red)"},
+    "sort": {"type": "string", "default": null, "desc": "Panel order: null (data order) | 'last-desc' | 'last-asc' | 'name'"},
+    "agg": {"type": "string", "default": "sum", "desc": "Aggregation of duplicate rows per facet and x: sum | avg | last"},
+    "format": {"type": "string", "default": null, "desc": "Value format; defaults to the y field format"},
+    "dateFormat": {"type": "string", "default": "mmm yy", "desc": "Time-axis label format when x is a date field"}
+  },
+  "interactions": ["Crosshair linked across every panel; tooltip lists all facets at that x", "Click a panel's series to cross-filter on the facet", "Non-selected facets dim", "Layout recomputed on resize; animated updates on filter changes", "PNG / CSV export"],
+  "samples": [
+    {"title": "Revenue by segment, 2021A–2026E (USD m)", "data": "segment_revenue", "height": 300,
+     "options": {"encode": {"x": "year", "y": "revenue", "facet": "segment"}, "type": "area", "format": "$#,##0"}},
+    {"title": "Share price performance, rebased to 100", "data": "price_perf", "height": 380,
+     "options": {"encode": {"x": "date", "y": "value", "facet": "series"}, "type": "line", "columns": 2, "ghost": true, "baseline": 100, "highlight": "Helios Industrial", "format": "0.0"}},
+    {"title": "Revenue by region (independent scales)", "data": "segment_revenue", "height": 260,
+     "options": {"encode": {"x": "year", "y": "revenue", "facet": "region"}, "type": "bar", "sharedY": false, "sort": "last-desc", "format": "$#,##0"}}
+  ]
+}

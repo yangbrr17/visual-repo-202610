@@ -1,0 +1,50 @@
+{
+  "id": "flow-map",
+  "name": "Flow Map",
+  "name_zh": "流向地图",
+  "category": "geo",
+  "engine": "leaflet",
+  "deps": ["leaflet", "topojson-client", "geo-world"],
+  "summary": "Origin -> destination flows as curved arcs: width by value, colour by category, arrowheads, nodes sized by total flow, travelling-dot animation.",
+  "summary_zh": "以弧线展示起点到终点的流向：线宽表示金额，颜色区分类别，箭头指向目的地，节点大小表示总流量，带流动光点动画。",
+  "description_zh": "适合展示跨境并购、资本流动、贸易或客户迁移等“从哪里到哪里”的关系。每行一条流（起点/终点名称和经纬度、数值、可选笔数和类别）；相同起终点+类别的行自动合并。弧线宽度与数值成正比、箭头指向目标国，节点圆按流入+流出总额缩放并标注前 N 个国家。悬停某条弧线会突出该流并显示金额、笔数和占比；悬停国家节点会突出它的全部进出流量并显示净流出。点击弧线或图例按类别（如行业）交叉筛选其他图表。",
+  "best_for": ["Cross-border M&A by acquirer -> target country", "Capital / trade / supply flows between regions", "Client or revenue migration between markets"],
+  "avoid_when": ["More than ~60 flows (aggregate first or set maxFlows)", "Flows without a meaningful geography (use sankey or chord)"],
+  "channels": {
+    "from": {"type": "string", "required": true, "desc": "Origin name (node key)", "default": "from_country"},
+    "to": {"type": "string", "required": true, "desc": "Destination name (node key)", "default": "to_country"},
+    "fromLat": {"type": "number", "required": true, "desc": "Origin latitude", "default": "from_lat"},
+    "fromLon": {"type": "number", "required": true, "desc": "Origin longitude", "default": "from_lon"},
+    "toLat": {"type": "number", "required": true, "desc": "Destination latitude", "default": "to_lat"},
+    "toLon": {"type": "number", "required": true, "desc": "Destination longitude", "default": "to_lon"},
+    "value": {"type": "number", "required": true, "desc": "Flow size (arc width)", "default": "value"},
+    "count": {"type": "number", "required": false, "desc": "Number of deals / transactions shown in tooltips", "default": "deals"},
+    "color": {"type": "string", "required": false, "desc": "Category for arc colour and the clickable legend", "default": "sector"}
+  },
+  "options": {
+    "basemap": {"type": "string", "default": "world-110m", "desc": "Registered basemap name"},
+    "widthRange": {"type": "number[]", "default": [1, 9], "desc": "Stroke width (px) of the smallest / largest flow, linear in value"},
+    "curvature": {"type": "number", "default": 0.25, "desc": "Arc bend (0 = straight); long arcs are flattened to stay on the map, parallel flows fan out"},
+    "opacity": {"type": "number", "default": 0.72, "desc": "Arc opacity"},
+    "arrows": {"type": "boolean", "default": true, "desc": "Arrowheads at the destination (direction survives print)"},
+    "animate": {"type": "boolean", "default": true, "desc": "Travelling dots along each arc (CSS; off for print / reduced motion)"},
+    "nodes": {"type": "boolean", "default": true, "desc": "Country circles sized by inbound + outbound total"},
+    "nodeSizeRange": {"type": "number[]", "default": [3, 11], "desc": "Min / max node radius in px"},
+    "labels": {"type": "number", "default": 6, "desc": "Label the top N countries by total flow (0 = none)"},
+    "flowLabels": {"type": "number", "default": 0, "desc": "Value labels at the apex of the top N flows (0 = none)"},
+    "maxFlows": {"type": "number", "default": null, "desc": "Keep only the N largest flows"},
+    "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field format"},
+    "tooltip": {"type": "string[]", "default": [], "desc": "Extra fields listed in the flow tooltip"},
+    "fit": {"type": "string|array|object", "default": "data", "desc": "Initial view: 'data' | 'world' | [[south, west], [north, east]] | {center: [lat, lon], zoom}"},
+    "legend": {"type": "boolean", "default": true, "desc": "Show the category + width legend"},
+    "legendPosition": {"type": "string", "default": "bottomleft", "desc": "Leaflet control corner"},
+    "filterField": {"type": "string", "default": null, "desc": "Field used for click-to-filter; defaults to encode.color, else encode.from"},
+    "scrollZoom": {"type": "boolean|string", "default": "click", "desc": "Mouse-wheel zoom: true | false | 'click' (armed after clicking the map)"}
+  },
+  "interactions": ["Hover a flow to isolate it (tooltip: from -> to, value, deals, share)", "Hover a country to isolate its inbound / outbound flows (tooltip: in, out, net)", "Click a flow or legend category to cross-filter", "Arcs draw in on render; travelling dots show direction", "Zoom / pan", "PNG export"],
+  "samples": [
+    {"title": "Cross-border M&A by sector — acquirer to target country (USD bn)", "data": "deal_flows", "height": 480, "options": {}},
+    {"title": "Top 10 flows — single colour with value labels", "data": "deal_flows", "height": 420, "span": 7,
+     "options": {"encode": {"color": null}, "maxFlows": 10, "flowLabels": 4, "labels": 6, "widthRange": [1.5, 10], "curvature": 0.3}}
+  ]
+}

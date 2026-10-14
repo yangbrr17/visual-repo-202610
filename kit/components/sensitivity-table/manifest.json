@@ -42,7 +42,7 @@
      "options": {"encode": {"row": "wacc", "col": "tgr", "value": "value"}, "colTitle": "Terminal growth rate", "base": {"row": "@wacc", "col": "@tgr"}}},
     {"title": "LBO — sponsor IRR vs entry / exit multiple", "data": "sensitivity_lbo", "height": 300, "span": 6,
      "options": {"encode": {"row": "entry_multiple", "col": "exit_multiple", "value": "irr"}, "rowTitle": "Entry multiple", "colTitle": "Exit multiple", "mid": 0.2, "base": {"row": 10, "col": 10}}},
-    {"title": "DCF — change vs base case", "data": "sensitivity_dcf", "height": 300, "span": 6,
-     "options": {"mode": "delta", "heat": "seq", "toggle": false, "rowOrder": "desc", "colTitle": "Terminal growth rate"}}
+    {"title": "DCF — change vs base case (print style, no heat)", "data": "sensitivity_dcf", "height": 300, "span": 6,
+     "options": {"mode": "delta", "heat": false, "toggle": false, "colTitle": "Terminal growth rate", "base": {"row": 0.09, "col": 0.025}}}
   ]
 }

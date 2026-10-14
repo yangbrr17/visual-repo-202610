@@ -1,0 +1,43 @@
+{
+  "id": "diverging-bar",
+  "name": "Diverging Bar",
+  "name_zh": "正负偏差条形图",
+  "category": "bridge",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Positive / negative bars around zero or a baseline (peer median) — beat / miss vs. consensus, TSR, variance to budget.",
+  "summary_zh": "以 0 或基准值（如同业中位数）为中轴的正负条形图：业绩超预期/不及预期、股东总回报、预算差异。",
+  "description_zh": "每个类别一根从 0 出发的条，正值用 pos 色、负值用 neg 色，带符号的数值标签放在条的外端，可排序并以 accent-2 高亮目标公司。baseline 设为 'median' 时条长表示相对同业中位数的超额 / 落后（相对 TSR、相对估值折溢价）。横向适合排名，纵向适合按季度看 beat / miss；zeroLabels 把类别名放在零轴另一侧，形成紧凑的龙卷风式排名。",
+  "best_for": ["Quarterly beat / (miss) vs. consensus", "1-year TSR or relative TSR vs. peer median", "Variance to budget / plan by business unit", "Premium / (discount) to peer median multiple"],
+  "avoid_when": ["All values share one sign and the level matters (use bar / lollipop)", "Before / after levels are needed (use dumbbell)", "Cumulative walks between two totals (use waterfall)"],
+  "channels": {
+    "label": {"type": "string", "required": true, "desc": "Category (company, quarter, business unit)", "default": "label"},
+    "value": {"type": "number", "required": true, "desc": "Signed value (or level compared with the baseline)", "default": "value"},
+    "highlight": {"type": "boolean", "required": false, "desc": "Boolean field marking the target row(s)", "default": "is_target"}
+  },
+  "options": {
+    "orientation": {"type": "string", "default": "horizontal", "desc": "horizontal (ranked rows) | vertical (columns, e.g. quarters)"},
+    "sort": {"type": "string", "default": "desc", "desc": "'desc' | 'asc' | null (keep data order)"},
+    "baseline": {"type": "number|string", "default": 0, "desc": "Number | 'median' | 'mean' — bars show value − baseline"},
+    "baselineExcludeHighlight": {"type": "boolean", "default": true, "desc": "Median / mean baseline computed without the highlighted (target) rows"},
+    "baselineLabel": {"type": "string", "default": null, "desc": "Zero-line label (default 'Median' / 'Mean' + value when the baseline is not 0)"},
+    "colorBy": {"type": "string", "default": "sign", "desc": "sign (pos / neg colours) | single"},
+    "goodDirection": {"type": "string", "default": "up", "desc": "'up' | 'down' — which sign gets the pos colour"},
+    "zeroLabels": {"type": "boolean", "default": false, "desc": "Horizontal only: category names at the zero line, on the side opposite each bar"},
+    "labels": {"type": "boolean", "default": true, "desc": "Signed value labels outside the bar ends"},
+    "valueAxis": {"type": "boolean", "default": false, "desc": "Show the value axis and gridlines"},
+    "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] reference lines in value units"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Label value(s) to emphasise in addition to the highlight channel"},
+    "highlightBand": {"type": "boolean", "default": true, "desc": "Tinted row / column behind highlighted categories"},
+    "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field's format (signed automatically)"}
+  },
+  "interactions": ["Hover tooltip (value, baseline, difference)", "Click a bar to cross-filter", "Bars grow from zero; smooth re-sort on filter change", "PNG / CSV export"],
+  "samples": [
+    {"title": "Revenue beat / (miss) vs. consensus", "data": "quarterly", "height": 300, "span": 6,
+     "options": {"encode": {"label": "quarter", "value": "beat_miss_pct"}, "orientation": "vertical", "sort": null}},
+    {"title": "1-year TSR relative to peer median", "data": "peers", "height": 460, "span": 6,
+     "options": {"encode": {"label": "company", "value": "tsr_1y"}, "baseline": "median", "baselineLabel": "Peer median", "zeroLabels": true}},
+    {"title": "1-year total shareholder return", "data": "peers", "height": 440,
+     "options": {"encode": {"label": "company", "value": "tsr_1y"}, "valueAxis": true}}
+  ]
+}

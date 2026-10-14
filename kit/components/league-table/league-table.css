@@ -1,0 +1,63 @@
+/* league-table */
+.rk-league { position: relative; }
+.rk-league__table { border-collapse: separate; border-spacing: 0; line-height: 1.3; table-layout: auto; }
+.rk-league__table th, .rk-league__table td { padding-top: 6px; padding-bottom: 6px; }
+.rk-league__table thead th { vertical-align: bottom; white-space: normal; }
+.rk-league__table thead th.is-sortable { cursor: pointer; user-select: none; }
+.rk-league__table thead th.is-sortable:hover, .rk-league__table thead th.is-sorted { color: var(--rk-ink); }
+.rk-league__table thead th .rk-sort { width: 9px; margin-left: 3px; font-size: 8px; color: var(--rk-accent-3); vertical-align: 1px; }
+
+/* columns */
+.rk-league__table .rk-league__rank { width: 1%; padding-right: 4px; color: var(--rk-ink-2); font-weight: 600; text-align: right; }
+.rk-league__table td.rk-league__rank { font-size: 12.5px; color: var(--rk-ink); }
+.rk-league__table .rk-league__chg { width: 1%; padding-left: 6px; padding-right: 10px; text-align: left; font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; font-size: 11px; white-space: nowrap; }
+.rk-league__table td.rk-league__chg.is-up { color: var(--rk-pos); }
+.rk-league__table td.rk-league__chg.is-down { color: var(--rk-neg); }
+.rk-league__table td.rk-league__chg.is-flat { color: var(--rk-ink-3); }
+.rk-league__table td.rk-league__chg.is-new { color: var(--rk-accent-3); font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.rk-league__arr { display: inline-block; margin-right: 2px; font-size: 7.5px; vertical-align: 1px; }
+.rk-league__table .rk-league__name { width: 26%; max-width: 260px; overflow: hidden; text-overflow: ellipsis; color: var(--rk-ink); }
+.rk-league__table .rk-league__bar { width: 46%; padding-right: 16px; }
+.rk-league__table .rk-league__share, .rk-league__table .rk-league__count { width: 1%; padding-left: 14px; white-space: nowrap; }
+
+/* inline bar: the lane leaves room for the value label, which rides on the bar end */
+.rk-league__track { position: relative; height: 16px; }
+.rk-league__lane { position: absolute; left: 0; top: 0; bottom: 0; right: 68px; }
+.rk-league__fill {
+  position: absolute; left: 0; top: 2px; height: 12px; width: 0; border-radius: 1px;
+  background: color-mix(in srgb, var(--rk-accent) 82%, var(--rk-paper));
+  transition: width 650ms var(--rk-ease), background-color var(--rk-dur-fast);
+}
+.rk-league__val {
+  position: absolute; top: 0; left: 6px; line-height: 16px; white-space: nowrap;
+  font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; font-size: 11.5px; color: var(--rk-ink-2);
+  transition: left 650ms var(--rk-ease);
+}
+.rk-league.is-first .rk-league__fill { transition: width 950ms var(--rk-ease) calc(var(--rk-i, 0) * 45ms + 80ms), background-color var(--rk-dur-fast); }
+.rk-league.is-first .rk-league__val { transition: left 950ms var(--rk-ease) calc(var(--rk-i, 0) * 45ms + 80ms); }
+
+/* highlight (your bank) */
+.rk-league__table tr.is-target td { background-color: color-mix(in srgb, var(--rk-accent-2) 15%, var(--rk-paper)); font-weight: 600; }
+.rk-league__table tr.is-target td:first-child { box-shadow: inset 3px 0 0 var(--rk-accent-2); }
+.rk-league__table tr.is-target .rk-league__fill { background: var(--rk-accent-2); }
+.rk-league__table tr.is-target .rk-league__val { color: var(--rk-ink); font-weight: 600; }
+.rk-league__table tr.is-pinned td { border-top: 1px dashed var(--rk-rule); }
+
+/* rows / interaction */
+.rk-league__table tbody tr { transition: transform 460ms var(--rk-ease), opacity var(--rk-dur-fast); }
+.rk-league__table tbody tr.is-clickable { cursor: pointer; }
+.rk-league__table tbody tr:focus-visible { outline: 2px solid var(--rk-accent-3); outline-offset: -2px; }
+.rk-league__table tbody tr:hover td { background-color: var(--rk-surface); }
+.rk-league__table tbody tr.is-target:hover td { background-color: color-mix(in srgb, var(--rk-accent-2) 22%, var(--rk-paper)); }
+.rk-league__table tbody tr:hover .rk-league__fill { background: var(--rk-accent); }
+.rk-league__table tbody tr.is-target:hover .rk-league__fill { background: var(--rk-accent-2); }
+.rk-league.has-sel tbody tr:not(.is-selected) td { opacity: .38; }
+.rk-league__table tr.is-selected td:first-child { box-shadow: inset 3px 0 0 var(--rk-accent); }
+.rk-league__table tbody td { transition: opacity var(--rk-dur-fast), background-color var(--rk-dur-fast); }
+.rk-league__table tr.is-enter { animation: rk-league-in 360ms var(--rk-ease) both; }
+@keyframes rk-league-in { from { opacity: 0; transform: translateY(6px); } }
+
+.rk-league.no-chg .rk-league__rank { padding-right: 12px; }
+@media (prefers-reduced-motion: reduce) { .rk-league__fill, .rk-league__val, .rk-league.is-first .rk-league__fill, .rk-league.is-first .rk-league__val { transition: none; } .rk-league__table tr.is-enter { animation: none; } }
+@media print { .rk-league__fill, .rk-league__val { transition: none !important; } }
+[data-rk-theme="ink"] .rk-league__table tr.is-target td { background-color: color-mix(in srgb, var(--rk-accent-2) 22%, var(--rk-paper)); }

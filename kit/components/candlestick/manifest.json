@@ -1,0 +1,43 @@
+{
+  "id": "candlestick",
+  "name": "Candlestick (OHLC) & Volume",
+  "name_zh": "K 线图（OHLC）与成交量",
+  "category": "trend",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Daily OHLC candles over an up / down coloured volume panel with moving averages, event pins and a zoom that opens on the last six months.",
+  "summary_zh": "日 K 线（开高低收）+ 按涨跌着色的成交量副图，叠加移动均线与事件标注，默认显示最近 6 个月并可缩放。",
+  "description_zh": "展示每个交易日的开盘、最高、最低、收盘价：实体颜色取主题的 pos（收涨）/ neg（收跌），影线为当日高低区间；下方成交量柱按当日涨跌着色。交易日放在类别轴上，周末与节假日不留空隙；默认显示最近约 6 个月，可滚轮/拖动缩放或用右上角 1M/3M/6M/YTD/1Y/All 切换，纵轴随可见 K 线自动重算。十字准星提示框给出 OHLC、较前收盘的涨跌额与涨跌幅、成交量和均线值；绑定 price_events 可在 K 线上方显示编号事件。适合交易层面的价格行为分析，不适合多只股票对比。",
+  "best_for": ["Recent trading behaviour of a stock (gaps, intraday ranges, reversals)", "Price reaction around results, guidance or M&A news", "Liquidity review alongside price action"],
+  "avoid_when": ["Comparing several stocks (use line with rebase: 100)", "Long multi-year history where daily detail is noise (use price-volume)", "Audiences unfamiliar with OHLC conventions"],
+  "channels": {
+    "x": {"type": "date", "required": true, "desc": "Trading date (one row per day)", "default": "date"},
+    "open": {"type": "number", "required": true, "desc": "Open price", "default": "open"},
+    "high": {"type": "number", "required": true, "desc": "High price", "default": "high"},
+    "low": {"type": "number", "required": true, "desc": "Low price", "default": "low"},
+    "close": {"type": "number", "required": true, "desc": "Close price", "default": "close"},
+    "volume": {"type": "number", "required": false, "desc": "Traded volume; the panel is hidden when missing or volume: false", "default": "volume"}
+  },
+  "options": {
+    "ma": {"type": "number[]", "default": [20, 50], "desc": "Simple moving averages of the close in trading days; [] for none"},
+    "volume": {"type": "boolean", "default": true, "desc": "Volume panel with bars coloured by the day's direction"},
+    "lastPrice": {"type": "boolean", "default": true, "desc": "Last close tag on the right axis, coloured by the day's move"},
+    "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] horizontal price lines"},
+    "eventsData": {"type": "string", "default": null, "desc": "Dataset id of events (date, label, kind, detail) drawn as numbered pins above the candles"},
+    "eventsEncode": {"type": "object", "default": {"date": "date", "label": "label", "kind": "kind", "detail": "detail"}, "desc": "Field mapping of the events dataset"},
+    "range": {"type": "string|number", "default": "6m", "desc": "Initial window: '1m' | '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'all' | number of days"},
+    "rangeSelector": {"type": "boolean|string[]", "default": true, "desc": "Quick range buttons (top-right); true or a subset such as ['1m','3m','6m','all']"},
+    "volumeShare": {"type": "number", "default": 0.22, "desc": "Share of the plot height used by the volume panel (0.1–0.5)"},
+    "format": {"type": "string", "default": null, "desc": "Price format (defaults to the close field format)"},
+    "volumeFormat": {"type": "string", "default": null, "desc": "Volume format in the tooltip (defaults to the volume field format)"},
+    "zoom": {"type": "boolean", "default": true, "desc": "Wheel / pinch and slider zoom shared by both panels; the price axis re-fits to the visible candles"},
+    "legend": {"type": "boolean", "default": true, "desc": "Legend top-left (moving averages and volume)"}
+  },
+  "interactions": ["Crosshair tooltip: OHLC, change vs. prior close, volume, MAs", "Hover near a pin to read the event", "Wheel / pinch / slider zoom shared by candles and volume", "1M / 3M / 6M / YTD / 1Y / All range buttons", "Legend toggles MAs / volume", "PNG / CSV export"],
+  "samples": [
+    {"title": "Helios Industrial daily OHLC — last 6 months (USD)", "data": "price_ohlc", "height": 420,
+     "options": {"eventsData": "price_events"}},
+    {"title": "Last 3 months, 10/20-day MA", "data": "price_ohlc", "height": 340, "span": 7,
+     "options": {"range": "3m", "ma": [10, 20], "volumeShare": 0.2, "rangeSelector": ["1m", "3m", "6m", "all"]}}
+  ]
+}

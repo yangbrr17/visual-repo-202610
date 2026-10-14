@@ -47,14 +47,20 @@
 
       /* ---------------- horizontal layout: label columns + centred slope area ---------------- */
       var fName = '11px ' + t.fontSans, fNameB = '600 11px ' + t.fontSans, fVal = '600 11px ' + t.fontNum;
-      var W = inst.getWidth();
-      var maxName = Math.min(o.labelWidth || 170, Math.max(60, (W - 220) / 2 - 60));
-      items.forEach(function (it) { it.name = truncate(String(it.label), it.hl || it.median ? fNameB : fName, maxName); });
-      var nameW = o.labels === 'values' ? 0 : Math.max.apply(null, items.map(function (it) { return measure(it.name, it.hl || it.median ? fNameB : fName); }).concat([0]));
+      var W = inst.getWidth(), MIN_SLOPE = 180;
+      function nameFont(it) { return it.hl || it.median ? fNameB : fName; }
       var valAW = Math.max.apply(null, items.map(function (it) { return measure(it.ta, fVal); }).concat([0]));
       var valBW = Math.max.apply(null, items.map(function (it) { return measure(it.tb, fVal); }).concat([0]));
-      var leftW = 12 + valAW + (o.labels === 'both' ? 8 + nameW : 0);
-      var rightW = 12 + valBW + (o.labels !== 'values' ? 8 + nameW : 0);
+      var fullW = Math.min(o.labelWidth || 170, Math.max.apply(null, items.map(function (it) { return measure(String(it.label), nameFont(it)); }).concat([0])));
+      // names on both sides only when they fit; otherwise fall back to names on the right
+      var mode = o.labels === 'values' ? 'values' : o.labels === 'right' ? 'right' : 'both';
+      if (mode === 'both' && 24 + valAW + valBW + MIN_SLOPE + 2 * (fullW + 8) > W) mode = 'right';
+      var sides = mode === 'both' ? 2 : mode === 'right' ? 1 : 0;
+      var maxName = sides ? Math.max(48, Math.min(fullW, (W - 24 - valAW - valBW - MIN_SLOPE - sides * 8) / sides)) : 0;
+      items.forEach(function (it) { it.name = truncate(String(it.label), nameFont(it), maxName); });
+      var nameW = sides ? Math.max.apply(null, items.map(function (it) { return measure(it.name, nameFont(it)); }).concat([0])) : 0;
+      var leftW = 12 + valAW + (mode === 'both' ? 8 + nameW : 0);
+      var rightW = 12 + valBW + (mode !== 'values' ? 8 + nameW : 0);
       var slopeW = Math.max(120, Math.min(MAX_SLOPE_W, W - leftW - rightW - 8));
       var extra = Math.max(0, W - leftW - rightW - slopeW);
       var gridLeft = leftW + extra / 2, gridRight = rightW + extra / 2;
@@ -86,20 +92,23 @@
         return (o.good === 'down' ? !up : up) ? t.pos : t.neg;
       }
 
+      // values sit in fixed-width columns (right-aligned on the left side) so names line up
       function labelText(it, side) {
         var v = side === 'a' ? it.ta : it.tb;
-        var named = o.labels === 'both' || (o.labels === 'right' && side === 'b');
+        var named = mode === 'both' || (mode === 'right' && side === 'b');
         var key = it.hl ? 'h' : it.median ? 'm' : '';
-        if (!named) return '{v' + key + '|' + esc(v) + '}';
-        return side === 'a' ? '{n' + key + '|' + esc(it.name) + '}  {v' + key + '|' + esc(v) + '}'
-          : '{v' + key + '|' + esc(v) + '}  {n' + key + '|' + esc(it.name) + '}';
+        var val = '{v' + key + side + '|' + esc(v) + '}';
+        if (!named) return val;
+        return side === 'a' ? '{n' + key + '|' + esc(it.name) + '}  ' + val : val + '  {n' + key + '|' + esc(it.name) + '}';
       }
       var hlInk = t.dark ? t.accent2 : RK.theme.mix(t.accent2, t.ink, 0.35);
       var rich = {
-        n: { font: fName, fill: t.ink2 }, v: { font: fVal, fill: t.ink },
-        nh: { font: fNameB, fill: hlInk }, vh: { font: fVal, fill: hlInk },
-        nm: { font: fNameB, fill: t.ink }, vm: { font: fVal, fill: t.ink }
+        n: { font: fName, fill: t.ink2 }, nh: { font: fNameB, fill: hlInk }, nm: { font: fNameB, fill: t.ink }
       };
+      [['', t.ink], ['h', hlInk], ['m', t.ink]].forEach(function (k) {
+        rich['v' + k[0] + 'a'] = { font: fVal, fill: k[1], width: valAW, align: 'right' };
+        rich['v' + k[0] + 'b'] = { font: fVal, fill: k[1], width: valBW, align: 'left' };
+      });
 
       var series = [{
         id: 'slope', type: 'custom', clip: false,
@@ -163,7 +172,7 @@
             ];
             if (U.isNum(it.a) && U.isNum(it.b)) {
               rows.push({ label: 'Change', value: RK.format(it.b - it.a, signed(fmt)), bold: true });
-              if (it.a) rows.push({ label: '% change', value: RK.format(it.b / it.a - 1, '+0.0%;−0.0%;0.0%') });
+              if (it.a && !o.inverse) rows.push({ label: '% change', value: RK.format(it.b / it.a - 1, '+0.0%;−0.0%;0.0%') });
             }
             return C.tip(it.label, rows, it.median ? 'Median of the ' + (items.length - 1) + ' items shown' : (it.group != null ? String(it.group) : null));
           }
@@ -282,9 +291,10 @@
   /** Rich-text markup characters must not leak from data into ECharts' "{style|text}" syntax. */
   function esc(s) { return String(s).replace(/[{}|]/g, ' '); }
 
+  /** Signed variant of a format for differences; a leading literal ("#" for ranks) is dropped. */
   function signed(code) {
-    code = RK.format.presets[code] || code || 'auto';
-    if (code === 'auto' || String(code).indexOf(';') >= 0) return code;
+    code = String(RK.format.presets[code] || code || 'auto').replace(/^"[^"]*"/, '');
+    if (code === 'auto' || code.indexOf(';') >= 0) return code;
     return '+' + code + ';−' + code + ';' + code;
   }
 })();

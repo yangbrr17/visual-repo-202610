@@ -39,9 +39,9 @@
   "samples": [
     {"title": "Global footprint — sites by floor area", "data": "assets_locations", "height": 460,
      "options": {"encode": {"lat": "lat", "lon": "lon", "size": "capacity", "color": "type", "label": "name"}, "labels": 6, "tooltip": ["city", "country", "utilization", "opened"]}},
-    {"title": "Revenue 2025A by country — size = revenue, colour = growth", "data": "revenue_by_country", "height": 440, "span": 8,
+    {"title": "Revenue 2025A by country — size = revenue, colour = growth", "data": "revenue_by_country", "height": 400, "span": 6,
      "options": {"encode": {"lat": "lat", "lon": "lon", "size": "revenue", "color": "growth", "label": "country"}, "labels": 6, "sizeRange": [3, 30], "tooltip": ["employees"]}},
-    {"title": "Peer headquarters by market cap", "data": "peers", "height": 440, "span": 4,
+    {"title": "Peer headquarters by market cap", "data": "peers", "height": 400, "span": 6,
      "options": {"encode": {"lat": "lat", "lon": "lon", "size": "mkt_cap", "color": "sector", "label": "company"}, "highlight": "Helios Industrial", "labels": 3, "labelValue": false, "tooltip": ["hq_city", "ev_ebitda_25e"]}}
   ]
 }

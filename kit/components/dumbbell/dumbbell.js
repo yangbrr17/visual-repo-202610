@@ -136,7 +136,7 @@
         var w = range ? Math.min(9, api.size([0, 1])[1] * 0.42) : 3;
         return {
           type: 'line', shape: { x1: a[0], y1: a[1], x2: b[0], y2: b[1] },
-          style: { stroke: RK.theme.alpha(c, range ? 0.26 : 0.5), lineWidth: w, lineCap: 'butt' },
+          style: { stroke: RK.theme.alpha(c, range ? (t.dark ? 0.42 : 0.26) : (t.dark ? 0.6 : 0.5)), lineWidth: w, lineCap: 'butt' },
           enterFrom: { shape: { x2: a[0] } }
         };
       },

@@ -1,0 +1,16 @@
+/* sunburst — centre readout (total / drilled node / hovered node); a button to go back up when drilled */
+.rk-sunburst__centre {
+  position: absolute; z-index: 2; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  border-radius: 50%; background: var(--rk-paper); text-align: center; padding: 6px;
+  cursor: default; user-select: none;
+  transition: box-shadow var(--rk-dur-fast) var(--rk-ease);
+}
+.rk-sunburst__centre.is-drilled { cursor: pointer; box-shadow: inset 0 0 0 1px var(--rk-rule); }
+.rk-sunburst__centre.is-drilled:hover { box-shadow: inset 0 0 0 1.5px var(--rk-accent-3); }
+.rk-sunburst__name { max-width: 90%; font-size: 11px; font-weight: 600; color: var(--rk-ink-2); line-height: 1.25; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.rk-sunburst__value { font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; font-size: var(--rk-sb-v, 20px); font-weight: 600; color: var(--rk-ink); line-height: 1.15; }
+.rk-sunburst__sub { max-width: 92%; font-size: 10px; color: var(--rk-ink-3); line-height: 1.3; }
+.rk-sunburst__centre.is-hover .rk-sunburst__value { color: var(--rk-accent); }
+[data-rk-theme="ink"] .rk-sunburst__centre.is-hover .rk-sunburst__value { color: var(--rk-ink); }
+@media print { .rk-sunburst__sub { display: none; } }

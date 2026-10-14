@@ -94,6 +94,7 @@
       heat: false,           // false | 'seq' | 'div' — colour leaf cells
       heatIntensity: 0.5,
       titles: {},            // {"<field or formula>": "Display title"}
+      valueTitle: null,      // measure label in the corner (default e.g. "Median EV/LTM EBITDA")
       scroll: true,          // fixed block height with sticky header / totals; false = grow to content
       tooltip: true,
       crossFilter: true
@@ -121,7 +122,8 @@
         var ckeys = Array.from(tree.cells.keys());
         if (col && o.colSort) { ckeys.sort(cmp); if (o.colSort === 'desc') ckeys.reverse(); }
 
-        function agg(list) { return list && list.length ? fn(list) : null; }
+        var counting = o.agg === 'count' || o.agg === 'countd';
+        function agg(list) { return list && list.length ? fn(list) : (counting ? 0 : null); }
         function cell(n, ck) { return agg(n.cells.get(ck)); }
         function total(n) { return agg(n.all); }
         // sort siblings at every level
@@ -137,7 +139,8 @@
         var colTotals = {};
         ckeys.forEach(function (k) { colTotals[k] = cell(tree, k); });
         var grand = total(tree);
-        var vfmt = o.format || (o.agg === 'count' || o.agg === 'countd' ? '#,##0' : (val && val.format) || '#,##0.0');
+        // counts show empty cells as an en dash; other measures as n.a.
+        var vfmt = o.format || (counting ? '#,##0;-#,##0;"–"' : (val && val.format) || '#,##0.0');
         var pct = o.show && o.show !== 'value' && SHOW[o.show] !== undefined;
         function shown(n, ck) {
           var v = ck === '\u0002' ? total(n) : cell(n, ck);
@@ -157,7 +160,8 @@
 
       function measureLabel(m) {
         var o = m.o, a = AGG_LABEL[o.agg] != null ? AGG_LABEL[o.agg] : o.agg, s;
-        if (!m.val) s = 'Number of records';
+        if (o.valueTitle) s = o.valueTitle;
+        else if (!m.val) s = 'Number of records';
         else if (o.agg === 'count' || o.agg === 'countd') s = a + ' of ' + m.val.title;
         else s = a ? a + ' ' + m.val.title : m.val.title;
         return m.pct ? s + ' — ' + SHOW[o.show] : s;

@@ -86,7 +86,7 @@
 .rk-fb-range__vals.is-active { color: var(--rk-accent); }
 [data-rk-theme="ink"] .rk-fb-range__vals.is-active { color: var(--rk-ink); }
 .rk-fb-range__sep { color: var(--rk-ink-3); font-weight: 400; }
-.rk-fb-range__hist { display: flex; align-items: flex-end; gap: 1px; height: 18px; margin-bottom: -5px; }
+.rk-fb-range__hist { display: flex; align-items: flex-end; gap: 1px; height: 14px; margin-bottom: -4px; }
 .rk-fb-range__hist i { flex: 1; min-height: 0; background: var(--rk-grid); border-radius: 1px 1px 0 0; transition: background var(--rk-dur-fast); }
 .rk-fb-range__hist i.is-in { background: color-mix(in srgb, var(--rk-accent-3) 42%, var(--rk-paper)); }
 .rk-fb-range__track { position: relative; height: 22px; cursor: pointer; touch-action: none; }

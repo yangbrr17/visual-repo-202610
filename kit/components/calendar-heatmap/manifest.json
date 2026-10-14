@@ -1,0 +1,41 @@
+{
+  "id": "calendar-heatmap",
+  "name": "Calendar Heatmap",
+  "name_zh": "日历热力图",
+  "category": "trend",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Values on a calendar: one cell per day (trading activity, volumes) with a sequential scale, or a year × month grid of monthly returns with diverging colours and a compounded full-year column.",
+  "summary_zh": "日历热力图：按日（交易活跃度、成交量，顺序色）或按年 × 月网格（月度回报，发散色、单元格标注百分比、复利全年列）展示时间数据。",
+  "description_zh": "daily 模式使用 ECharts 日历坐标系，每天一个格子（周一至周日为行、周为列），适合看交易活跃度、成交量、事件密度的季节性与异常日；颜色为主题顺序色，数据偏态时自动改用 5 档分位数图例（scale = auto）。monthly 模式是基金/股票“月度回报表”：行是年份、列是月份，以 0 为中点的发散色着色并在格中标注数值，右侧为按月复利的全年（未满一年为 YTD）列，可加各月平均行看季节性。图例可拖动筛选数值区间。",
+  "best_for": ["Daily trading volume / activity patterns", "Monthly TSR or fund returns table with full-year compounding", "Seasonality and anomaly spotting"],
+  "avoid_when": ["Fewer than ~2 months of daily data", "Values where the exact level matters more than the pattern (use a line chart)", "More than ~3 years in daily mode (cells get too small)"],
+  "channels": {
+    "date": {"type": "date", "required": false, "desc": "Daily mode: ISO date", "default": "date"},
+    "value": {"type": "number", "required": true, "desc": "Value to colour (daily value or monthly return)", "default": "value"},
+    "year": {"type": "number|string", "required": false, "desc": "Monthly mode: year", "default": "year"},
+    "month": {"type": "number|string", "required": false, "desc": "Monthly mode: month as 1–12 or Jan–Dec", "default": "month"}
+  },
+  "options": {
+    "mode": {"type": "string", "default": "daily", "desc": "daily (calendar of days) | monthly (year × month grid)"},
+    "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field format"},
+    "scale": {"type": "string", "default": "auto", "desc": "Daily colour scale: auto | linear (draggable continuous legend) | quantile (5 buckets); auto picks quantile for skewed data"},
+    "range": {"type": "array", "default": null, "desc": "Daily: [from, to] ISO dates; default = whole months spanned by the data"},
+    "yearTotal": {"type": "boolean", "default": true, "desc": "Monthly: full-year column (YTD for partial years)"},
+    "compound": {"type": "boolean", "default": true, "desc": "Monthly: compound monthly returns into the year column (false = simple sum)"},
+    "totalLabel": {"type": "string", "default": "Year", "desc": "Monthly: header of the full-year column"},
+    "avgRow": {"type": "boolean", "default": false, "desc": "Monthly: bottom row with the average of each calendar month"},
+    "labels": {"type": "boolean", "default": true, "desc": "Monthly: print formatted values in the cells"},
+    "yearOrder": {"type": "string", "default": "desc", "desc": "Monthly: 'desc' (latest year on top) | 'asc'"},
+    "legend": {"type": "boolean", "default": true, "desc": "Top-left colour legend (visualMap)"}
+  },
+  "interactions": ["Hover tooltip (weekday, date, value vs. period average; or month / YTD details)", "Drag the legend handles or toggle legend buckets to filter cells", "Cells fade in as a diagonal wave (monthly)", "PNG / CSV export"],
+  "samples": [
+    {"title": "Daily trading activity, 2026 YTD (volume index)", "data": "daily_activity", "height": 250,
+     "options": {"mode": "daily"}},
+    {"title": "Helios Industrial monthly TSR", "data": "monthly_returns", "height": 280,
+     "options": {"mode": "monthly", "encode": {"year": "year", "month": "month", "value": "return"}, "avgRow": true}},
+    {"title": "Monthly TSR heat strip (oldest first, no labels)", "data": "monthly_returns", "height": 190, "span": 7,
+     "options": {"mode": "monthly", "encode": {"year": "year", "month": "month", "value": "return"}, "yearOrder": "asc", "labels": false, "totalLabel": "FY"}}
+  ]
+}

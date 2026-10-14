@@ -51,9 +51,19 @@
 
       // zoom / legend changes: re-fit the value axis to what is visible, then move the end labels
       var refit = util.rafThrottle(function () {
-        if (inst.isDisposed()) return;
-        var y = yAxisFor(current, state, visibleX(inst, state.model));
-        if (!sameAxis(y, state.yAxis)) { state.yAxis = y; inst.setOption({ yAxis: [{ id: 'y', min: y.min, max: y.max, interval: y.interval }] }); }
+        var model = state.model;
+        if (inst.isDisposed() || !model) return;
+        var patch = {};
+        var y = yAxisFor(current, state);
+        if (!sameAxis(y, state.yAxis)) { state.yAxis = y; patch.yAxis = [{ id: 'y', min: y.min, max: y.max, interval: y.interval }]; }
+        if (model.isTime) {
+          var tk = dateTicks(windowFromZoom(model, state.zoom), state.plotW);
+          if (!state.ticks || tk.key !== state.ticks.key) {
+            state.ticks = tk;
+            patch.xAxis = [{ id: 'x', axisLabel: tickLabel(tk), axisTick: { customValues: tk.values } }];
+          }
+        }
+        if (patch.yAxis || patch.xAxis) inst.setOption(patch);
         layoutEndLabels(inst, current, state, 'instant');
       });
       inst.on('datazoom', function () {
@@ -61,7 +71,9 @@
         if (dz) state.zoom = { start: dz.start, end: dz.end };
         refit();
       });
-      inst.on('legendselectchanged', function (p) { state.legendSel = util.merge({}, p.selected); refit(); });
+      ['legendselectchanged', 'legendselected', 'legendunselected', 'legendselectall', 'legendinverseselect'].forEach(function (ev) {
+        inst.on(ev, function (p) { state.legendSel = util.merge({}, p.selected); refit(); });
+      });
 
       layoutEndLabels(inst, ctx, state, 'enter');
       return {
@@ -272,6 +284,9 @@
     var model = state.model = prepare(ctx);
     var fmt = model.fmt;
     var n = model.xs.length;
+    // a new x extent (e.g. a date filter) resets the zoom window
+    var extentKey = n ? model.xs[0] + ':' + model.xs[n - 1] + ':' + n : '';
+    if (state.extentKey !== extentKey) { state.zoom = null; state.extentKey = extentKey; }
     var useZoom = o.zoom === 'auto' ? model.isTime && n > 12 : !!o.zoom;
     var showLabels = o.labels === 'auto' ? model.isCat && n <= 12 && model.series.length <= 3 && !model.stacked : !!o.labels;
     var showSymbols = o.symbols === 'auto' ? model.isCat && n <= 24 : !!o.symbols;
@@ -294,6 +309,8 @@
     var bottom = slider ? 34 : 4;
     var h = inst.getHeight ? inst.getHeight() : 300;
     state.gridH = Math.max(80, h - top - bottom - 24);
+    state.plotW = Math.max(120, (inst.getWidth ? inst.getWidth() : 600) - right - 56);
+    var tk = state.ticks = model.isTime && n ? dateTicks(windowFromZoom(model, state.zoom), state.plotW) : null;
 
     var y = state.yAxis = yAxisFor(ctx, state);
 
@@ -359,9 +376,8 @@
       id: 'x', type: model.isTime ? 'time' : 'value', min: 'dataMin', max: 'dataMax',
       splitLine: { show: false },
       axisLine: { show: true, lineStyle: { color: t.axis } },
-      axisTick: { show: model.isValue },
-      axisLabel: model.isTime ? { hideOverlap: true, formatter: timeLabel, rich: { y: { fontWeight: 600, color: t.ink2, fontSize: 11, fontFamily: t.fontNum } } }
-        : { formatter: C.axisFmt(o.xFormat || ctx.fmtOf(ctx.enc.x) || 'auto') },
+      axisTick: model.isTime ? { show: true, length: 3, lineStyle: { color: t.axis }, customValues: tk.values } : { show: true },
+      axisLabel: model.isTime ? tickLabel(tk) : { formatter: C.axisFmt(o.xFormat || ctx.fmtOf(ctx.enc.x) || 'auto') },
       axisPointer: { show: true, type: 'line', label: { show: false } }
     };
 
@@ -414,11 +430,38 @@
     return function (v) { return RK.format(v, Math.abs(v - Math.round(v)) < 1e-9 && !/%/.test(String(RK.format.presets[fmt] || fmt)) ? intFmt : fmt); };
   }
 
-  function timeLabel(v) {
-    var d = new Date(v);
-    if (d.getMonth() === 0 && d.getDate() === 1) return '{y|' + d.getFullYear() + '}';
-    if (d.getDate() === 1) return RK.format(d, 'mmm');
-    return RK.format(d, 'd mmm');
+  /**
+   * Pitchbook date ticks for a window [a, b] (ms): month multiples aligned to quarters / halves / years
+   * ("Jan-25", "Apr-25"), weeks or days ("5 Aug"), about one label per 100px.
+   */
+  var DAY = 864e5;
+  var STEPS = [[1, 'd'], [2, 'd'], [7, 'w'], [14, 'w'], [1, 'm'], [2, 'm'], [3, 'm'], [6, 'm'], [12, 'm'], [24, 'm'], [60, 'm']];
+  function dateTicks(win, width) {
+    var a = win[0], b = win[1], target = util.clamp(Math.floor((width || 600) / 100), 3, 12);
+    var days = (b - a) / DAY, step = STEPS[STEPS.length - 1];
+    for (var k = 0; k < STEPS.length; k++) {
+      var approx = STEPS[k][1] === 'm' ? STEPS[k][0] * 30.44 : STEPS[k][0];
+      if (days / approx <= target) { step = STEPS[k]; break; }
+    }
+    var vals = [], d = new Date(a), n = step[0];
+    if (step[1] === 'm') {
+      d = new Date(d.getFullYear(), d.getMonth(), 1);
+      if (d.getTime() < a) d.setMonth(d.getMonth() + 1);
+      while ((d.getMonth() % Math.min(n, 12)) !== 0) d.setMonth(d.getMonth() + 1);
+      if (n > 12) while (d.getFullYear() % (n / 12) !== 0) d.setFullYear(d.getFullYear() + 1);
+      for (; d.getTime() <= b; d.setMonth(d.getMonth() + n)) vals.push(d.getTime());
+    } else {
+      d = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      if (d.getTime() < a) d.setDate(d.getDate() + 1);
+      if (step[1] === 'w') while (d.getDay() !== 1) d.setDate(d.getDate() + 1);
+      for (; d.getTime() <= b; d.setDate(d.getDate() + n)) vals.push(d.getTime());
+    }
+    var unit = step[1] === 'm' ? (n >= 12 ? 'y' : 'm') : 'd';
+    return { values: vals, unit: unit, key: unit + n + ':' + vals[0] + ':' + vals.length };
+  }
+  function tickLabel(tk) {
+    var f = tk.unit === 'y' ? 'yyyy' : tk.unit === 'm' ? 'mmm-yy' : 'd mmm';
+    return { customValues: tk.values, hideOverlap: true, formatter: function (v) { return RK.format(new Date(v), f); } };
   }
 
   function markSeries(ctx, model, fmt) {
@@ -596,12 +639,13 @@
         var s = it.s, id = 'el-' + s.key;
         var vtxt = RK.format(s.values[it.i], model.fmt);
         var rich = {
-          v: { backgroundColor: s.color, color: RK.theme.onColor(s.solid, t.ink, '#ffffff'), padding: [2, 4, 1, 4], borderRadius: 2,
+          // graphic elements take zrender style names: fill (not color)
+          v: { backgroundColor: s.color, fill: RK.theme.onColor(s.solid, t.ink, '#ffffff'), padding: [2, 4, 1, 4], borderRadius: 2,
                fontSize: 10.5, fontWeight: 600, fontFamily: t.fontNum, lineHeight: 14 },
-          n: { color: s.dimmed ? RK.theme.alpha(t.ink2, 0.4) : (s.hl ? t.ink : t.ink2), fontSize: 11, fontWeight: s.hl ? 600 : 400, fontFamily: t.fontSans, padding: [0, 0, 0, 4], lineHeight: 14 }
+          n: { fill: s.dimmed ? RK.theme.alpha(t.ink2, 0.4) : (s.hl ? t.ink : t.ink2), fontSize: 11, fontWeight: s.hl ? 600 : 400, fontFamily: t.fontSans, padding: [0, 0, 0, 4], lineHeight: 14 }
         };
         var text = o.endLabels === 'value' ? '{v|' + vtxt + '}' : o.endLabels === 'name' ? '{n|' + esc(s.name) + '}' : '{v|' + vtxt + '}{n|' + esc(s.name) + '}';
-        if (o.endLabels === 'name') rich.n.color = s.color;
+        if (o.endLabels === 'name') rich.n.fill = s.dimmed ? s.color : (t.dark ? RK.theme.mix(s.solid, t.ink, 0.25) : s.solid);
         var needLeader = Math.abs(it.ly - it.py) > 1.5 || lx - it.px > 10;
         var anim = animFor(ctx, mode);
         elements.push(util.merge({ id: id + '-l', type: 'polyline', z: 8, silent: true, invisible: !needLeader,

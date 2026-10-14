@@ -1,0 +1,46 @@
+{
+  "id": "boxplot",
+  "name": "Box Plot",
+  "name_zh": "箱线图（分组分布）",
+  "category": "distribution",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Distribution of a metric by group from raw rows — quartile box, median, mean, whiskers, outliers and the jittered observations, with the target marked.",
+  "summary_zh": "由原始行数据计算的分组分布：四分位箱体、中位数、均值、须线、离群点与抖动散点，并标出目标公司。",
+  "description_zh": "直接传入明细行（每行一个观测值，如每家可比公司的 EV/EBITDA），组件按 group 字段分组并计算四分位数：箱体为 Q1–Q3，粗线为中位数，菱形为均值，须线默认延伸到 1.5 倍四分位距（超出部分画成空心离群点），也可改为最小/最大值。原始观测值以蜂群式抖动叠加在箱体内，悬停显示公司代码和数值；目标公司用强调色横线和标签标在所属箱体上，虚线为全体（不含目标）中位数。适合比较不同板块/区域/交易类型的估值或溢价区间。",
+  "best_for": ["Valuation multiples by sector or region (comps)", "Transaction multiples / premiums by deal type", "Showing where the target sits within its peer group's range", "3–10 groups with 4+ observations each"],
+  "avoid_when": ["Fewer than ~4 observations per group (show the points or a table)", "A single group (use histogram)", "Audiences unfamiliar with quartiles (use a range bar / football field)"],
+  "channels": {
+    "group": {"type": "string", "required": true, "desc": "Grouping field (sector, region, deal type)", "default": "group"},
+    "value": {"type": "number", "required": true, "desc": "Observed value (one row per observation)", "default": "value"},
+    "label": {"type": "string", "required": false, "desc": "Short label shown on hover (ticker)", "default": "label"},
+    "name": {"type": "string", "required": false, "desc": "Full name for the tooltip title (company)"},
+    "target": {"type": "boolean", "required": false, "desc": "Rows where this field is true are marked as the target", "default": "is_target"}
+  },
+  "options": {
+    "orientation": {"type": "string", "default": "vertical", "desc": "'vertical' (groups along x) | 'horizontal' (groups along y, for long names)"},
+    "whiskers": {"type": "string", "default": "tukey", "desc": "'tukey' (1.5 × IQR; beyond = outliers) | 'minmax'"},
+    "points": {"type": "boolean", "default": true, "desc": "Overlay the raw observations (beeswarm jitter inside the box width)"},
+    "mean": {"type": "boolean", "default": true, "desc": "Mean marker (diamond)"},
+    "valueLabels": {"type": "string|boolean", "default": "median", "desc": "'median' | 'all' (median, quartiles, whiskers) | false"},
+    "showN": {"type": "boolean", "default": true, "desc": "Show 'n = …' under each group label"},
+    "overall": {"type": "string|boolean", "default": "median", "desc": "'median' | 'mean' | false — dashed line across all groups (target excluded)"},
+    "sort": {"type": "string", "default": null, "desc": "null (data order) | 'median' (high to low) | 'asc' | 'desc' (by name)"},
+    "groupColors": {"type": "boolean", "default": false, "desc": "Colour each group's box differently"},
+    "boxWidth": {"type": "number", "default": 0.42, "desc": "Box width as a share of the category band"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Label / name value(s) treated as the target; default uses the target channel"},
+    "format": {"type": "string", "default": null, "desc": "Value format (defaults to the value field format)"},
+    "title": {"type": "string", "default": null, "desc": "Value axis title (defaults to the value field title)"}
+  },
+  "interactions": ["Hover a box for n, quartiles, whiskers, mean and the target value", "Hover an observation for its label and value", "Click a box or point to cross-filter by group", "Animated transitions when filters change", "PNG / CSV export"],
+  "samples": [
+    {"title": "EV / EBITDA 2025E by sector", "data": "peers", "height": 380,
+     "options": {"encode": {"group": "sector", "value": "ev_ebitda_25e", "label": "ticker", "name": "company"}}},
+    {"title": "Precedent transactions — EV / LTM EBITDA by sector", "data": "precedents", "height": 300,
+     "options": {"encode": {"group": "sector", "value": "ev_ebitda", "label": "target", "name": "target"},
+                 "orientation": "horizontal", "valueLabels": "all", "sort": "median"}},
+    {"title": "P / E 2025E by region (min–max whiskers)", "data": "peers", "height": 360, "span": 7,
+     "options": {"encode": {"group": "region", "value": "pe_25e", "label": "ticker", "name": "company"},
+                 "whiskers": "minmax", "groupColors": true, "sort": "median", "overall": "mean"}}
+  ]
+}
