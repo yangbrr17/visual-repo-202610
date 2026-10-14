@@ -937,7 +937,7 @@ def build_report(a: Analysis, available: set[str]) -> Report:
         {"label": "EV / EBITDA NTM", "value": t["ev_ntm_ebitda"], "format": MULT, "delta": round(gap_ntm, 6),
          "delta_format": "+0.0x;-0.0x;0.0x", "period": f"vs. peer median {_x(med['ev_ntm_ebitda'])}",
          "spark": None, "good": "up"},
-        {"label": "Revenue CAGR FY22A–25A", "value": t["rev_cagr_3y"], "format": PCT,
+        {"label": "Revenue CAGR 3y", "value": t["rev_cagr_3y"], "format": PCT,
          "delta": round((t["rev_cagr_3y"] - med["rev_cagr_3y"]) * 10000, 1), "delta_format": BPS,
          "period": f"vs. peer median {_pct(med['rev_cagr_3y'])}", "spark": None, "good": "up"},
         {"label": "30-day volatility", "value": t["vol_30d"], "format": PCT,
@@ -1076,21 +1076,18 @@ def build_report(a: Analysis, available: set[str]) -> Report:
     p.block("football-field", data="valuation", span=7, height=340, title="Valuation summary",
             subtitle="Implied value per share (USD)",
             encode={"label": "method", "low": "low", "high": "high", "group": "group", "note": "basis"},
-            options={"refLines": [
-                {"value": t["price"], "label": f"Current ${t['price']:.2f}"},
-                {"value": round(t["price"] * (1 + BASE_PREMIUM), 2),
-                 "label": f"{BASE_PREMIUM:.0%} premium ${t['price'] * (1 + BASE_PREMIUM):.2f}"}]})
+            options={"refLines": [{"value": t["price"], "label": f"Current ${t['price']:.2f}"}]})
 
     r.section("Trading analysis", subtitle="Peers, multiples, performance and capital structure")
 
-    notes = {}
-    foot = []
-    if a.rows["no_cagr"]:
-        notes.update({c: "(1)" for c in a.rows["no_cagr"]})
-        foot.append("(1) Listed in 2023; no FY22A financials, so CAGR and margin change are n.a.")
-    if a.rows["pe_nm"]:
-        notes.update({c: notes.get(c, "") + "(2)" for c in a.rows["pe_nm"]})
-        foot.append(f"(2) P / E n.m. (≤ 0x or > {PE_NM_MAX:.0f}x).")
+    notes: dict[str, str] = {}      # row label -> footnote marker; the page renders notes as (1), (2) ...
+    foot: list[str] = []
+    for companies, text in ((a.rows["no_cagr"], "Listed in 2023; no FY22A financials, so CAGR and margin "
+                                                 "change are n.a."),
+                            (a.rows["pe_nm"], f"P / E n.m. (≤ 0x or > {PE_NM_MAX:.0f}x).")):
+        if companies:
+            foot.append(text)
+            notes.update({c: notes.get(c, "") + f"({len(foot)})" for c in companies})
     p = r.page(f"{short} trades at {_x(t['ev_ntm_ebitda'])} NTM EBITDA vs. a peer median of "
                f"{_x(med['ev_ntm_ebitda'])}", kicker="Trading comparables",
                subtitle=f"Market data as of {AS_OF:%d-%b-%Y}; USD m unless otherwise stated",
@@ -1176,7 +1173,7 @@ def build_report(a: Analysis, available: set[str]) -> Report:
     p = r.page(f"Precedent transactions were struck at a median {_x(d_ev.median)} LTM EBITDA",
                kicker="Precedent transactions",
                subtitle=f"Selected industrial-technology transactions, {y0}–{y1}; USD m",
-               notes=[f"(1) EBITDA not disclosed: {', '.join(a.rows['undisclosed'])}."] if a.rows["undisclosed"]
+               notes=f"(1) EBITDA not disclosed: {', '.join(a.rows['undisclosed'])}." if a.rows["undisclosed"]
                else None)
     p.block("comps-table", data="deals", title="Selected precedent transactions",
             encode={"label": "target"},

@@ -368,8 +368,10 @@
         // cluster style: leaves on the outer ring, so every leaf label sits on the perimeter
         var f = kids(n).length || (single && n.depth === 0) ? (single ? n.depth : n.depth + 1) / levels : 1;
         n._a = a;
+        n._f = f;
         n._p = [cxr + Math.cos(a) * rx * f, cyr + Math.sin(a) * ry * f];
       });
+      function polar(a, f) { return [cxr + Math.cos(a) * rx * f, cyr + Math.sin(a) * ry * f]; }
       visible.forEach(function (n) {
         var c = catColor[n.cat || 'Entity'], right = Math.cos(n._a) >= -1e-6, center = n.depth === 0 && single;
         nodes.push({
@@ -384,10 +386,24 @@
           },
           cursor: n.children.length && o.collapsible !== false ? 'pointer' : 'default'
         });
-        if (n.parent && !collapsed.has(n.parent.id)) {
-          links.push({ source: 'n:' + n.parent.id, target: 'n:' + n.id, lineStyle: { color: t.axis, width: 1, curveness: 0, type: o.dashMinority && n.pct != null && n.pct < 0.5 ? [4, 3] : 'solid' } });
-          var txt = pctText(n);
-          if (txt) pill('pct:' + n.id, n.parent._p[0] + (n._p[0] - n.parent._p[0]) * 0.6, n.parent._p[1] + (n._p[1] - n.parent._p[1]) * 0.6, txt, null, false);
+        // polar elbow connectors: spoke out to a bus ring half a level beyond the parent, arc along
+        // the ring across the children's angles, spoke out to each child
+        var ks = kids(n);
+        if (ks.length) {
+          var fb = n._f + 0.5 / levels;
+          var pts = [{ a: n._a, id: 'rp:' + n.id }];
+          ks.forEach(function (k) { pts.push({ a: k._a, id: 'rk:' + k.id, child: k }); });
+          var lo = Math.min.apply(null, pts.map(function (q) { return q.a; })), hi2 = Math.max.apply(null, pts.map(function (q) { return q.a; }));
+          for (var a = lo + 0.08; a < hi2 - 0.04; a += 0.08) pts.push({ a: a, id: 'ra:' + n.id + ':' + pts.length });
+          pts.sort(function (p1, p2) { return p1.a - p2.a; });
+          pts.forEach(function (q) { var d = point(q.id), xy = polar(q.a, fb); d.x = xy[0]; d.y = xy[1]; });
+          for (var i = 1; i < pts.length; i++) link(pts[i - 1].id, pts[i].id, null, false);
+          link('n:' + n.id, 'rp:' + n.id, null, false);
+          ks.forEach(function (k) {
+            link('rk:' + k.id, 'n:' + k.id, null, o.dashMinority && k.pct != null && k.pct < 0.5);
+            var txt = pctText(k);
+            if (txt) { var mxy = polar(k._a, (fb + k._f) / 2); pill('pct:' + k.id, mxy[0], mxy[1], txt, null, false); }
+          });
         }
         if (collapsed.has(n.id) && n.children.length) {
           pill('more:' + n.id, n._p[0] + Math.cos(n._a) * 16, n._p[1] + Math.sin(n._a) * 16 + 12, '+' + n.descendants, n.id, true);

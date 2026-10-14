@@ -153,7 +153,7 @@
             var st = isEst(i) ? estStyle(base) : { color: base };
             st.color = C.dim(ctx, enc.x, cats[i], st.color);
             if (o.barStack && isEst(i)) st.color = C.dim(ctx, enc.x, cats[i], RK.theme.mix(base, t.paper, 0.45));
-            return { value: v, itemStyle: st, label: o.barStack && isEst(i) ? { color: t.ink } : undefined };
+            return { value: v, itemStyle: st, label: o.barStack && isEst(i) ? { color: textOn(RK.theme.mix(base, t.paper, 0.45), t) } : undefined };
           })
         });
       });

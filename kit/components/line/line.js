@@ -168,15 +168,16 @@
   }
 
   /**
-   * Series colours. With a highlight, the context series use the calm semantic tokens first
-   * (accent, accent3, ink3) and nothing close to accent2, so gold always means "the target".
+   * Series colours. accent2 is reserved for the highlighted series (the target), so nothing close to it
+   * is used for other lines; with a highlight, the context series use the calm semantic tokens first
+   * (accent, accent3, ink3).
    */
   function palette(t, highlight) {
     var base = highlight ? [t.accent, t.accent3, t.ink3].concat(t.cat) : t.cat.slice();
     var out = [];
     base.forEach(function (c) {
       if (!c) return;
-      if (highlight && colorDist(c, t.accent2) < 72) return;
+      if (colorDist(c, t.accent2) < 72) return;
       if (out.some(function (x) { return colorDist(x, c) < 46; })) return;
       out.push(c);
     });

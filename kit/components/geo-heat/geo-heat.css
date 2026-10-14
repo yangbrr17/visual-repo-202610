@@ -1,0 +1,45 @@
+/* geo-heat */
+
+/* ---- geo kit (identical block in every RK geo component css) ---- */
+.rk-geo .leaflet-control-zoom a { font-size: 15px; }
+.rk-geo .leaflet-interactive { cursor: pointer; }
+.rk-geo .rk-map-legend { max-width: 340px; box-shadow: none; padding: 7px 9px; font-size: 10.5px; }
+.rk-geo-leg.is-row { display: flex; align-items: flex-start; gap: 18px; }
+.rk-geo-leg.is-row > .rk-geo-leg__sec + .rk-geo-leg__sec { margin-top: 0; }
+.rk-geo-leg__sec + .rk-geo-leg__sec, .rk-geo-leg__sec + .rk-geo-leg__item { margin-top: 8px; }
+.rk-geo-leg__items { display: flex; flex-direction: column; gap: 2px; }
+.rk-geo-leg__item { display: flex; align-items: center; gap: 7px; white-space: nowrap; font-variant-numeric: tabular-nums; transition: opacity var(--rk-dur-fast); }
+.rk-geo-leg__item.is-click { cursor: pointer; }
+.rk-geo-leg__item.is-click:hover span { color: var(--rk-ink); }
+.rk-geo-leg__item.is-off { opacity: .38; }
+.rk-geo-leg__sw { flex: none; width: 9px; height: 9px; border-radius: 50%; }
+.rk-geo-leg__sw.is-square { width: 12px; height: 10px; border-radius: 1px; }
+.rk-geo-leg__sw.is-line { width: 16px; height: 3px; border-radius: 2px; }
+.rk-geo-leg__n { margin-left: auto; padding-left: 10px; color: var(--rk-ink-3); font-size: 10px; }
+.rk-geo-leg__ramp .rk-legend__ramp { width: 150px; }
+.rk-geo-label-anchor { pointer-events: none; }
+.rk-geo-label {
+  position: absolute; left: 0; top: 0; white-space: nowrap; pointer-events: none;
+  padding: 0 3px; border-radius: 2px; background: color-mix(in srgb, var(--rk-paper) 80%, transparent);
+  font-size: 10.5px; line-height: 1.35; color: var(--rk-ink); font-variant-numeric: tabular-nums;
+}
+.rk-geo-label.is-hidden { visibility: hidden; }
+.rk-geo.is-motion .rk-geo-label { transition: opacity var(--rk-dur) var(--rk-ease); }
+@media print { .rk-geo .leaflet-control-zoom, .rk-geo .rk-geo-toggle { display: none; } }
+/* ---- end geo kit ---- */
+
+.rk-heat .leaflet-heatmap-layer { pointer-events: none; }
+.rk-heat.is-motion .leaflet-heatmap-layer { animation: rk-heat-in 900ms var(--rk-ease) both; }
+@keyframes rk-heat-in { from { opacity: 0; } }
+.rk-geo-leg__note { margin-top: 6px; color: var(--rk-ink-3); font-size: 10px; font-variant-numeric: tabular-nums; }
+.rk-geo-toggle {
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px;
+  border: 1px solid var(--rk-rule); border-radius: var(--rk-radius); background: var(--rk-paper);
+  color: var(--rk-ink-2); font-size: 11px; font-weight: 500; cursor: pointer;
+  transition: border-color var(--rk-dur-fast), color var(--rk-dur-fast);
+}
+.rk-geo-toggle:hover { border-color: var(--rk-accent-3); color: var(--rk-accent); }
+.rk-geo-toggle__box { width: 10px; height: 10px; border-radius: 2px; border: 1.5px solid var(--rk-ink-3); transition: background var(--rk-dur-fast), border-color var(--rk-dur-fast); }
+.rk-geo-toggle.is-on { color: var(--rk-accent); }
+.rk-geo-toggle.is-on .rk-geo-toggle__box { background: var(--rk-accent); border-color: var(--rk-accent); box-shadow: inset 0 0 0 1.5px var(--rk-paper); }
+@media (prefers-reduced-motion: reduce) { .rk-heat .leaflet-heatmap-layer { animation: none !important; } }

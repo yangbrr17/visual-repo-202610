@@ -1,0 +1,41 @@
+{
+  "id": "marimekko",
+  "name": "Marimekko / Market Map",
+  "name_zh": "马赛克图 / 市场地图",
+  "category": "composition",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Variable-width 100% stacked columns: column width = segment size, stacks = player shares — the classic market map.",
+  "summary_zh": "可变宽度的百分比堆叠柱（市场地图）：柱宽代表细分市场规模，柱内堆叠代表各参与者份额。",
+  "description_zh": "咨询与投行最常用的市场结构图：横向每一列是一个细分市场，列宽与该市场规模成正比；列内自下而上堆叠各参与者在该市场的份额（合计 100%），因此每个格子的面积就是该参与者在整个市场中的规模。数据为长表：x（细分市场）、series（参与者）、value（收入），名为 Others / Other 的行合并为灰色“其他”并置于顶部，超出 maxSeries 的小参与者也归入其中。列顶标注市场名称、规模及占总市场的比例，格子内在空间允许时标注参与者与份额；目标公司用强调色高亮。适合回答“哪些市场大、谁在每个市场领先、客户的位置在哪里”。",
+  "best_for": ["Addressable market by segment and competitor", "Revenue by region × segment (mix and concentration at once)", "Client positioning across end-markets"],
+  "avoid_when": ["More than ~8 segments or ~8 players per column (labels no longer fit)", "Segments of wildly different size (thin columns become unreadable)", "Values can be negative"],
+  "channels": {
+    "x": {"type": "string", "required": true, "desc": "Column / segment field (width = its total)", "default": "segment"},
+    "series": {"type": "string", "required": true, "desc": "Stack / player field (height = share within the column)", "default": "player"},
+    "value": {"type": "number", "required": true, "desc": "Size of each segment × player cell (rows are summed)", "default": "value"}
+  },
+  "options": {
+    "sort": {"type": "string", "default": "desc", "desc": "Column order by segment size: desc | asc | null (data order)"},
+    "maxSeries": {"type": "number", "default": 8, "desc": "Players beyond this (by overall size) are grouped into othersLabel"},
+    "othersLabel": {"type": "string", "default": "Others", "desc": "Name of the grey residual bucket (rows named Others / Other … are merged into it)"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Player(s) drawn in the accent colour, e.g. the client"},
+    "labels": {"type": "string", "default": "auto", "desc": "auto (player + share where it fits, share only in small cells) | share | none"},
+    "showTotals": {"type": "boolean", "default": true, "desc": "Segment name, total and share of market above each column"},
+    "selectBy": {"type": "string", "default": "x", "desc": "Click to cross-filter by the column ('x') or by the player ('series')"},
+    "gap": {"type": "number", "default": 2, "desc": "Gutter between columns (px)"},
+    "format": {"type": "string", "default": null, "desc": "Segment total format; defaults to the value field format"},
+    "shareFormat": {"type": "string", "default": "0%", "desc": "Format of the shares in cells and headers"},
+    "legend": {"type": "boolean", "default": true, "desc": "Player legend (top-left; hover to focus a player)"},
+    "axes": {"type": "boolean", "default": true, "desc": "0–100% axes: left = share of segment, bottom = cumulative share of market"}
+  },
+  "interactions": ["Columns grow in, staggered left to right", "Hover a cell or legend item to focus that player across all segments", "Tooltip: value, share of segment, share of total market, segment total", "Click a cell or column header to cross-filter (by segment or by player)", "Animated re-layout when filters change", "PNG / CSV export"],
+  "samples": [
+    {"title": "Addressable market by segment and player — 2025 (USD m)", "data": "market_share", "height": 420,
+     "options": {"encode": {"x": "segment", "series": "player", "value": "revenue"}, "highlight": "Helios Industrial"}},
+    {"title": "Revenue by region and segment — FY2025A (USD m)", "data": "segment_revenue", "height": 380,
+     "options": {"encode": {"x": "region", "series": "segment", "value": "revenue"}, "where": "year == \"2025A\"", "selectBy": "series"}},
+    {"title": "Peer revenue 2025E by region and sector (USD m)", "data": "peers", "height": 340, "span": 8,
+     "options": {"encode": {"x": "region", "series": "sector", "value": "revenue_25e"}, "labels": "share", "axes": false}}
+  ]
+}
