@@ -224,11 +224,6 @@ const eqJ = (a, b, msg) => assert.strictEqual(J(a), J(b), msg);
   t('Q8 format clause with 15k blanks parses fast', () => within(200, () => Q.parse('company' + blanks + 'format' + blanks + '"x" y')));
 
   // Q9 — computed fields
-  t('Q9 @param change reaches computed fields that depend on computed fields', () => {
-    const d = RK.data.put({ id: 'dep', data: [{ ev: 100 }], computed: [{ name: 'a', formula: 'ev * @wacc' }, { name: 'b', formula: 'a * 2' }] });
-    RK.store.setParam('wacc', 0.5);
-    try { eqJ([d.rows[0].a, d.rows[0].b], [50, 100]); } finally { RK.store.setParam('wacc', 0.09); }
-  });
   t('Q9 redefining a computed field updates its dependents', () => {
     const d = RK.data.put({ id: 'redef', data: [{ ev: 100 }], computed: [{ name: 'a', formula: 'ev * 2' }, { name: 'b', formula: 'a + 1' }] });
     d.addComputed({ name: 'a', formula: 'ev * 10' });
@@ -274,6 +269,10 @@ const eqJ = (a, b, msg) => assert.strictEqual(J(a), J(b), msg);
     const desc = Object.getOwnPropertyDescriptor(d.rows[0], '__proto__');
     assert.ok(desc && desc.value === 2, 'computed value lost');
   });
+
+  // Q14 — query columns built from expressions were always typed 'number'
+  t('Q14 a text expression column is typed string', () => assert.strictEqual(Q('company, if(net_debt < 0, "Net cash", "Net debt") as bs from peers').columns[1].type, 'string'));
+  t('Q14 min(date) column is typed date', () => assert.strictEqual(Q('min(date) from precedents').columns[0].type, 'date'));
 
   const res = done({ verbose: process.argv.includes('--list') });
   if (process.argv.includes('--list')) for (const r of res.failed) console.log('fail', r.name);

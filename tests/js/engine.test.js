@@ -408,6 +408,11 @@ const near = (a, b, eps) => assert.ok(Math.abs(a - b) < (eps || 1e-9), a + ' !~ 
     RK.store.setParam('wacc', 0.1); near(d.rows[0].adj, 110);
     RK.store.setParam('wacc', 0.09);
   });
+  t('data: @param change reaches computed fields that depend on computed fields', () => {
+    const d = RK.data.put({ id: 'dep', data: [{ ev: 100 }], computed: [{ name: 'a', formula: 'ev * @wacc' }, { name: 'b', formula: 'a * 2' }] });
+    RK.store.setParam('wacc', 0.5);
+    try { eqJ([d.rows[0].a, d.rows[0].b], [50, 100]); } finally { RK.store.setParam('wacc', 0.09); }
+  });
   t('data: computed fields may use earlier computed fields', () => { const d = RK.data.put({ id: 'cc', data: [{ x: 1 }], computed: [{ name: 'a', formula: 'x + 1' }, { name: 'b', formula: 'a * 2' }] }); assert.strictEqual(d.rows[0].b, 4); });
   t('data: computed order matters (forward reference fails)', () => throwsExpr(RK, () => RK.data.put({ id: 'fw', data: [{ x: 1 }], computed: [{ name: 'b', formula: 'a * 2' }, { name: 'a', formula: 'x + 1' }] }), /Unknown field "a"/));
   t('data: computed aggregate rejected', () => throwsExpr(RK, () => RK.data.get('peers').addComputed({ name: 'bad', formula: 'sum(ev)' }), /Computed fields must be row formulas/));
