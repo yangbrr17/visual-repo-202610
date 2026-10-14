@@ -102,15 +102,17 @@
           } : undefined
         }
       ];
-      // low / high labels on a ghost series above the reference lines; each label is backed by what is painted
-      // behind it (paper, or the band) so a dashed line never runs through the figures
+      // low / high labels on a ghost series above the reference lines; a label crossed by a reference line is
+      // backed by what is painted behind it (paper, or the band) so the dashed line never runs through the figures
       if (o.showValues) {
         var band = o.refBand ? [Math.min(o.refBand.from, o.refBand.to), Math.max(o.refBand.from, o.refBand.to)] : null;
         var bandFill = RK.theme.mix(t.accent2, t.paper, 0.88), perPx = (axMax - axMin) / plotW, ends = [];
         var end = function (v, i, side) {
           if (!util.isNum(v)) return;
-          var mid = v + side * (8 + C.measure(RK.format(v, fmt), '11px ' + t.fontNum) / 2) * perPx;
-          ends.push({ value: [v, i], label: { position: side < 0 ? 'left' : 'right', backgroundColor: band && mid >= band[0] && mid <= band[1] ? bandFill : t.paper } });
+          var w = C.measure(RK.format(v, fmt), '11px ' + t.fontNum) + 4;
+          var a = v + side * 4 * perPx, b = v + side * (4 + w) * perPx, lo = Math.min(a, b) - 2 * perPx, hi = Math.max(a, b) + 2 * perPx, mid = (a + b) / 2;
+          var crossed = refs.some(function (r) { return r.value >= lo && r.value <= hi; });
+          ends.push({ value: [v, i], label: { position: side < 0 ? 'left' : 'right', backgroundColor: !crossed ? null : band && mid >= band[0] && mid <= band[1] ? bandFill : t.paper } });
         };
         rows.forEach(function (r, i) { end(lows[i], i, -1); end(highs[i], i, 1); });
         series.push({

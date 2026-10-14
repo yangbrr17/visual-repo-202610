@@ -278,21 +278,21 @@
       <header class="rk-page__head">
         <p class="rk-page__kicker">Valuation summary</p>
         <h2 class="rk-page__title">Fundamental analyses support $45–55 per share, a 6–29% premium to the current $42.50</h2>
-        <p class="rk-page__subtitle">Implied value per share (USD)</p>
+        <p class="rk-page__subtitle">USD per share; share price as of 09-Oct-2026</p>
       </header>
       <div class="rk-page__body rk-grid">
-        <figure class="rk-block" style="--rk-span:7" data-rk="football-field" data-rk-data="valuation_ranges" id="valuation-valuation-summary">
+        <figure class="rk-block" style="--rk-span:7" data-rk="football-field" data-rk-data="valuation_ranges" id="valuation-implied-value-per-share-by">
           <figcaption class="rk-block__head">
-            <h3 class="rk-block__title">Valuation summary</h3>
-            <p class="rk-block__subtitle">Shaded: indicative value range of $45–55 per share</p>
+            <h3 class="rk-block__title">Implied value per share by methodology</h3>
+            <p class="rk-block__subtitle">Intrinsic, market and transaction-based ranges</p>
           </figcaption>
           <div class="rk-block__body" style="--rk-h:346px"></div>
-          <script type="application/json" data-rk-options>{"encode": {"label": "method", "low": "low", "high": "high", "group": "group", "note": "basis"}, "refLines": [{"value": 42.5, "label": "Current $42.50"}], "refBand": {"from": 45, "to": 55}}</script>
+          <script type="application/json" data-rk-options>{"encode": {"label": "method", "low": "low", "high": "high", "group": "group", "note": "basis"}, "refLines": [{"value": 42.5, "label": "Current $42.50"}], "refBand": {"from": 45, "to": 55, "label": "Indicative range $45–55"}}</script>
         </figure>
-        <figure class="rk-block" style="--rk-span:5" data-rk="sensitivity-table" data-rk-data="sensitivity_dcf" id="valuation-dcf-sensitivity">
+        <figure class="rk-block" style="--rk-span:5" data-rk="sensitivity-table" data-rk-data="sensitivity_dcf" id="valuation-dcf-sensitivity-value-per-share">
           <figcaption class="rk-block__head">
-            <h3 class="rk-block__title">DCF sensitivity</h3>
-            <p class="rk-block__subtitle">Implied value per share (USD); click a cell to move the base case</p>
+            <h3 class="rk-block__title">DCF sensitivity: value per share</h3>
+            <p class="rk-block__subtitle">Click a cell to move the base case</p>
           </figcaption>
           <div class="rk-block__body" style="--rk-h:346px"></div>
           <script type="application/json" data-rk-options>{"encode": {"row": "wacc", "col": "tgr", "value": "value"}, "rowTitle": "WACC", "colTitle": "Terminal growth rate", "base": {"row": "@wacc", "col": "@tgr"}}</script>

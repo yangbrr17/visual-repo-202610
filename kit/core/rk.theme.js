@@ -195,12 +195,27 @@
     parseColor: parseColor,
     toHex: toHex,
 
+    /**
+     * Register a custom theme (CSS file defining [data-rk-theme="name"] { --rk-* tokens }).
+     * The theme switcher lists registered themes; <meta name="rk:themes" content="navy,bronze,..."> also works.
+     */
+    register: function (name, label) {
+      if (theme.list.indexOf(name) < 0) theme.list.push(name);
+      if (label) theme.labels[name] = label;
+    },
+
     refresh: function () {
       theme.current = readTokens();
       if (global.echarts) global.echarts.registerTheme('rk', echartsTheme(theme.current));
       return theme.current;
     },
-    init: function () { return theme.refresh(); },
+    init: function () {
+      var meta = document.querySelector('meta[name="rk:themes"]');
+      if (meta && meta.content) {
+        theme.list = meta.content.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      }
+      return theme.refresh();
+    },
     tokens: function () { return theme.current || theme.refresh(); },
     echarts: function () { return echartsTheme(theme.tokens()); },
 

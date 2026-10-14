@@ -853,3 +853,21 @@ class SelfReferenceTests(unittest.TestCase):
         r.page("P").block("bar", data="d", options={"encode": {"x": "ev", "y": "ev"}})
         errors, _ = r.check()
         self.assertTrue(any("self-referential" in e for e in errors), errors)
+
+
+class PageSizeTests(unittest.TestCase):
+    def test_letter_page_size(self):
+        import tempfile
+        from pathlib import Path
+        from reportkit import Report
+        root = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as tmp:
+            r = Report("T", page_size="letter")
+            r.dataset("kpis", root / "kit/samples/datasets/kpis.json")
+            r.page("P").block("kpi-tiles", data="kpis", height="auto")
+            out = r.build(Path(tmp) / "a", kit=root)
+            self.assertIn('data-rk-page-size="letter"', (out / "index.html").read_text())
+            self.assertIn("@page { size: 11in 8.5in; margin: 0; }", (out / "assets/css/reportkit.css").read_text())
+            self.assertIn('<meta name="rk:themes"', (out / "index.html").read_text())
+        with self.assertRaises(ValueError):
+            Report("T", page_size="legal")

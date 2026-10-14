@@ -27,12 +27,12 @@
 
   /* categorical — ordered for maximum separation in the first 4 */
   --rk-cat-1: #0b2d5b;
-  --rk-cat-2: #5f8dc4;
-  --rk-cat-3: #9f3960;
-  --rk-cat-4: #008e88;
-  --rk-cat-5: #57873a;
+  --rk-cat-2: #9f3960;
+  --rk-cat-3: #4b99c9;
+  --rk-cat-4: #cb5f31;
+  --rk-cat-5: #008e88;
   --rk-cat-6: #7555a8;
-  --rk-cat-7: #cb5f31;
+  --rk-cat-7: #57873a;
   --rk-cat-8: #8a95a6;
 
   /* sequential (light -> dark) */

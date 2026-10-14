@@ -5,8 +5,6 @@
 (function () {
   'use strict';
   var C = RK.chart, U = RK.util;
-  // house rule: generic fields cross-filter only this block's dataset; business dimensions filter globally
-  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|series|category|group|label|name|key|id|status|variable)$/i;
 
   RK.component({
     id: 'bar',
@@ -101,12 +99,14 @@
       }
 
       var catAxis = { type: 'category', data: cats, axisLabel: { interval: 0, hideOverlap: true, width: horiz ? 140 : 90, overflow: 'truncate' }, inverse: horiz };
-      var scale = valueScale(o, data, cats);
-      var valAxis = { type: 'value', min: scale.min, max: scale.max, interval: scale.step, axisLabel: { formatter: tickFmt(fmt, scale.step) } };
+      var scale = valueScale(o, data, cats), tick = C.tickFmt(fmt, scale.step);
+      var valAxis = { type: 'value', min: scale.min, max: scale.max, interval: scale.step, axisLabel: { formatter: tick } };
+      // horizontal: the last tick label is centred on the plot's right edge, keep room for its right half
+      var right = horiz ? Math.max(12, Math.ceil(C.measure(tick(scale.max), '11px ' + t.fontNum) / 2) + 4) : 12;
 
       return {
         legend: C.legend(ctx, { show: o.legend !== false && data.series.length > 1, data: data.series.map(function (s) { return s.name; }) }),
-        grid: C.grid(ctx, { top: o.legend !== false && data.series.length > 1 ? 32 : 14, bottom: o.zoom && !ctx.print ? 30 : 4 }),
+        grid: C.grid(ctx, { top: o.legend !== false && data.series.length > 1 ? 32 : 14, right: right, bottom: o.zoom && !ctx.print ? 30 : 4 }),
         tooltip: {
           trigger: 'axis',
           axisPointer: { type: 'shadow' },
@@ -129,12 +129,8 @@
         series: series
       };
     }, {
-      select: function (p, ctx) {
-        if (p.seriesId === 's-total' || ctx.options.crossFilter === false) return null;
-        var f = ctx.enc.x;
-        ctx.select(f, p.name, GENERIC.test(f) && !ctx.options.crossFilterScope ? { scope: 'dataset' } : null);
-        return null;
-      }
+      // generic x fields (type, kind ...) are scoped to this dataset by core ctx.select
+      select: function (p, ctx) { return p.seriesId === 's-total' ? null : { field: ctx.enc.x, value: p.name }; }
     })
   });
 
@@ -159,7 +155,7 @@
   function markLines(ctx, o, se, horiz) {
     var t = ctx.theme;
     var lines = (o.refLines || []).map(function (r) {
-      var col = r.color || t.ref;
+      var col = RK.theme.resolve(r.color) || t.ref;          // token names ('pos', 'accent2') or literal colours
       var d = { name: r.label || '', label: { formatter: r.label || '{c}', color: col }, lineStyle: { color: col, type: 'dashed', width: 1.25 } };
       d[horiz ? 'xAxis' : 'yAxis'] = r.value;
       return d;
@@ -174,22 +170,5 @@
     }
     if (!lines.length) return undefined;
     return { silent: true, symbol: ['none', 'none'], label: { position: horiz ? 'start' : 'insideEndTop', fontSize: 10.5 }, data: lines };
-  }
-
-  /**
-   * Axis tick formatter (house style: no decimals when the tick step is whole at display precision,
-   * "$6,000" not "$6,000.0", "20%" not "20.0%"). step: number, function returning the live step,
-   * or an array of tick values; null decides per value.
-   */
-  function tickFmt(code, step) {
-    code = String(RK.format.presets[code] || code || 'auto');
-    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
-    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
-    function whole(v) { return num(v, code) === num(v, trimmed); }
-    return function (v) {
-      var s = typeof step === 'function' ? step() : step;
-      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
-      return RK.format(v, ok ? trimmed : code);
-    };
   }
 })();

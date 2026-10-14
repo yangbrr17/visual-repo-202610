@@ -27,7 +27,7 @@ DCF grid is monotonic (down in WACC, up in TGR) and LBO IRR is monotonic (down i
 the football field (`valuation_ranges`) is derived from peers, precedents and the DCF / LBO grids;
 price jumps in `price_ohlc` line up with `price_events`.
 
-## Datasets (39 files, 2,095 rows)
+## Datasets (41 files, 2,106 rows)
 
 | id | title | rows | fields | feeds |
 |---|---|---:|---|---|
@@ -70,5 +70,7 @@ price jumps in `price_ohlc` line up with `price_events`.
 | `credentials` | Selected transaction credentials | 12 | `date`, `target`, `acquirer`, `deal_value_bn`, `deal_type`, `role`, `sector`, `region`, `description` | Deal credentials / tombstone grid (deal type, parties, value, role), filterable by sector / region |
 | `sources_uses` | Illustrative LBO sources & uses at $52.00 per share | 11 | `side`, `item`, `amount`, `multiple_of_ebitda`, `pct`, `notes` | LBO sources & uses table (two balancing sides, % of total, x EBITDA, footnotes) |
 | `capital_structure` | Pro forma capitalisation at close | 5 | `instrument`, `amount`, `rate`, `maturity`, `multiple_cum` | Pro forma capitalisation table (tranches, rates, maturities, cumulative leverage) |
+| `sotp` | Sum-of-the-parts valuation | 5 | `segment`, `metric_name`, `metric_value`, `multiple_low`, `multiple_high`, `method`, `ebitda`, `note` | Sum-of-the-parts build-up: segment metric x multiple range -> EV -> equity value and value per share |
+| `offer_prices` | Offer price levels for the analysis at various prices | 6 | `price`, `label`, `kind`, `date` | Analysis at various prices (AVP) columns: current price, proposals received, final proposal, levels |
 
 `peer_returns_dist` from the original wish-list is intentionally omitted: bucket `peers.ev_ebitda_25e` client-side.

@@ -241,6 +241,10 @@
  *   RK.format(null, '0.0x')                  -> "n.a."
  *
  * Named presets (RK.format.presets) can be used instead of codes: 'mult', 'pct1', 'usd_m', ...
+ *
+ * Rounding matches Excel: half away from zero on the value's 15-significant-digit decimal digits
+ * (RK.format(10.35, '0.0x') -> "10.4x", RK.format(2.675, '$0.00') -> "$2.68"). Digits are computed on decimal
+ * strings, never with toFixed() or a scaling multiplication, so no binary artefacts reach the output.
  */
 (function (global) {
   'use strict';
@@ -254,10 +258,16 @@
     minus: '-',
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     monthsLong: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+    days: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+    daysLong: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
     compactUnits: [[1e12, 'tn'], [1e9, 'bn'], [1e6, 'm'], [1e3, 'k']]
   };
 
-  var presets = {
+  // Lookup tables have no prototype and are read with has(): "constructor", "toString", "__proto__" ... are never presets.
+  function has(obj, key) { return obj != null && Object.prototype.hasOwnProperty.call(obj, key); }
+  function dict(o) { var d = Object.create(null); for (var k in o) if (has(o, k)) d[k] = o[k]; return d; }
+
+  var presets = dict({
     int: '#,##0',
     num: '#,##0.0',
     num1: '#,##0.0',
@@ -284,7 +294,7 @@
     year: 'yyyy',
     auto: 'auto',
     text: '@'
-  };
+  });
 
   var cache = Object.create(null);
 
@@ -303,7 +313,10 @@
     return out;
   }
 
-  function isNumericCode(code) { return /[0#?]/.test(code.replace(/"[^"]*"/g, '').replace(/\\./g, '')); }
+  /** Text an Excel [...] tag contributes: "$€-407" -> "€", "$USD" -> "USD", "Red" / "$-409" -> "". */
+  function bracketText(tag) { return tag[0] === '$' ? tag.slice(1).split('-')[0] : ''; }
+
+  function isNumericCode(code) { return /[0#?]/.test(code.replace(/"[^"]*"/g, '').replace(/\\./g, '').replace(/\[[^\]]*\]/g, '')); }
 
   /**
    * Parse one numeric section into a template:
@@ -325,7 +338,11 @@
         continue;
       }
       if (c === '\\') { if (numBuf) { flushNum(); numberDone = true; } tokens.push({ t: 'lit', v: sec[i + 1] || '' }); i++; continue; }
-      if (c === '[') { var k = sec.indexOf(']', i); i = k < 0 ? sec.length : k; continue; } // [Red], [$-409] ...
+      if (c === '[') { // [Red], [$-409] are dropped; [$€-407] / [$USD] keep their currency text
+        var k = sec.indexOf(']', i), cur = bracketText(sec.slice(i + 1, k < 0 ? sec.length : k));
+        if (cur) { if (numBuf) { flushNum(); numberDone = true; } tokens.push({ t: 'lit', v: cur }); }
+        i = k < 0 ? sec.length : k; continue;
+      }
       if (c === '_') { if (numBuf) { flushNum(); numberDone = true; } tokens.push({ t: 'lit', v: ' ' }); i++; continue; } // width of next char
       if (c === '*') { i++; continue; } // repeat-fill: ignore
       if (!numberDone && (c === '0' || c === '#' || c === '?' || (c === '.' && !/\./.test(numBuf)) || (c === ',' && (numBuf || seenNumber)))) {
@@ -372,44 +389,116 @@
     return out;
   }
 
-  function renderNum(abs, t) {
-    var v = abs * Math.pow(100, t.percent) / Math.pow(1000, t.scale);
-    var s = v.toFixed(t.maxDec);
-    var parts = s.split('.');
-    var ip = parts[0], dp = parts[1] || '';
+  /* ---------------- decimal rounding (Excel-compatible) ---------------- */
+
+  function zeros(n) { return n > 0 ? '0'.repeat(n) : ''; }
+
+  /**
+   * |v| as decimal digits at 15 significant digits, the precision Excel keeps: |v| = 0.<ds> x 10^p.
+   *   2.675 -> {ds: '2675', p: 1}   0.0705 -> {ds: '705', p: -1}   1.5e300 -> {ds: '15', p: 301}   0 -> {ds: '', p: ...}
+   * toPrecision(15) is exact decimal conversion of the binary value (2.67499999999999982236431605997495353221893310546875
+   * -> "2.67500000000000"); everything after this works on the digit string.
+   */
+  function decimal(v) {
+    var s = Math.abs(v).toPrecision(15), k = s.indexOf('e'), x = 0;
+    if (k >= 0) { x = +s.slice(k + 1); s = s.slice(0, k); }
+    var dot = s.indexOf('.'), p = dot < 0 ? s.length : dot;
+    if (dot >= 0) s = s.slice(0, dot) + s.slice(dot + 1);
+    var a = 0, b = s.length;
+    while (a < b && s.charCodeAt(a) === 48) a++;       // leading zeros of 0.0705
+    while (b > a && s.charCodeAt(b - 1) === 48) b--;   // trailing zeros carry no information
+    return { ds: s.slice(a, b), p: p + x - a };
+  }
+
+  /** "129" -> "130", "999" -> "1000", "" -> "1" */
+  function increment(s) {
+    var i = s.length - 1;
+    while (i >= 0 && s[i] === '9') i--;
+    return (i < 0 ? '1' : s.slice(0, i) + String.fromCharCode(s.charCodeAt(i) + 1)) + zeros(s.length - 1 - i);
+  }
+
+  /**
+   * Integer digits of round(|v| x 10^(shift + d)), half away from zero on the decimal digits. shift moves the decimal
+   * point exactly (+2 per %, -3 per trailing comma) instead of multiplying, so 0.01005 at "0.00%" is 1.01%, not 1.00%.
+   */
+  function scaledDigits(v, d, shift) {
+    var dec = decimal(v), ds = dec.ds, n = dec.p + (shift || 0) + d;
+    if (!ds || n < 0) return '0';
+    if (n >= ds.length) return ds + zeros(n - ds.length);   // nothing to round: 1.5e300 keeps all its digits
+    var kept = ds.slice(0, n);
+    if (ds.charCodeAt(n) >= 53) kept = increment(kept);      // next digit is 5..9
+    return kept || '0';
+  }
+
+  /**
+   * Excel-rounded replacement for |v|.toFixed(d): 10.35 -> "10.4" (toFixed: "10.3"), 2.675 -> "2.68", 1.005 -> "1.01",
+   * 1e21 -> "1000000000000000000000" (toFixed: "1e+21"); any number of decimals (toFixed throws above 100).
+   */
+  function fixed(v, d, shift) {
+    d = d > 0 ? Math.floor(d) : 0;
+    var s = scaledDigits(v, d, shift);
+    if (!d) return s;
+    if (s.length <= d) s = zeros(d + 1 - s.length) + s;
+    return s.slice(0, s.length - d) + '.' + s.slice(s.length - d);
+  }
+
+  /** Excel ROUND(x, d): half away from zero, d may be negative (round(1234.5, -2) = 1200). Used by RK.expr round(). */
+  function round(x, d) {
+    if (typeof x !== 'number' || !isFinite(x)) return x;
+    d = Math.max(-400, Math.min(400, Math.trunc(d) || 0));   // Excel truncates num_digits; beyond ±400 nothing changes
+    var y = +(d >= 0 ? fixed(x, d) : scaledDigits(x, d) + zeros(-d));
+    return y === 0 ? 0 : (x < 0 ? -y : y);                     // never -0
+  }
+
+  /** Rounded digits of |v| for a numeric section: round(|v| x 10^(maxDec + 2 per % - 3 per trailing comma)). */
+  function digitsOf(abs, t) { return scaledDigits(abs, t.maxDec, 2 * t.percent - 3 * t.scale); }
+
+  /** Lay out rounded digits (from digitsOf) with a section template: decimal point, optional #, grouping, literals. */
+  function renderDigits(s, t) {
+    var d = t.maxDec;
+    if (s.length <= d) s = zeros(d + 1 - s.length) + s;
+    var ip = s.slice(0, s.length - d), dp = s.slice(s.length - d);
     // trim optional decimals (#)
-    while (dp.length > t.minDec && dp[dp.length - 1] === '0') dp = dp.slice(0, -1);
+    while (dp.length > t.minDec && dp.charCodeAt(dp.length - 1) === 48) dp = dp.slice(0, -1);
     if (ip === '0' && t.minInt === 0) ip = '';
     while (ip.length < t.minInt) ip = '0' + ip;
     if (t.group) ip = groupDigits(ip);
     return t.prefix + ip + (dp ? config.decimal + dp : '') + t.suffix;
   }
+  function renderNum(abs, t) { return renderDigits(digitsOf(abs, t), t); }
 
   function compileNumeric(code) {
     var secs = splitSections(code);
     var pos = parseNumSection(secs[0]);
     var neg = secs[1] != null && secs[1] !== '' ? parseNumSection(secs[1]) : null;
     var zero = secs[2] != null && secs[2] !== '' ? parseNumSection(secs[2]) : null;
+    var hideZero = secs.length > 2 && secs[2] === '';      // Excel "#,##0;(#,##0);" idiom: blank for zero
     return function (v) {
-      if (v === 0 && zero) return renderNum(0, zero);
-      if (v < 0) {
-        if (neg) return renderNum(-v, neg);
-        var out = renderNum(-v, pos);
-        // do not print "-0.0"
-        return /[1-9]/.test(out) ? config.minus + out : out;
-      }
-      return renderNum(v, pos);
+      if (v === 0) return hideZero ? '' : renderNum(0, zero || pos);
+      var t = v < 0 && neg ? neg : pos, s = digitsOf(Math.abs(v), t);
+      // never "-0.0", "(0.0)" or "+0.0%": a value that rounds to zero at the section's precision (-0.0004 with "0.0%")
+      // is shown as zero: zero section, else the unsigned positive section; blank with an empty zero section
+      if (s === '0') return hideZero ? '' : renderNum(0, zero || pos);
+      return v < 0 && !neg ? config.minus + renderDigits(s, pos) : renderDigits(s, t);
     };
   }
 
   /* ---------------- dates ---------------- */
 
   function toDate(v) {
-    if (v instanceof Date) return v;
-    if (typeof v === 'number') return new Date(v);
+    if (v instanceof Date) return isNaN(v) ? null : v;
+    if (typeof v === 'number') {
+      if (!isFinite(v)) return null;
+      // a bare 4-digit integer is a (fiscal) year, not 2026 ms after 1 Jan 1970
+      return v % 1 === 0 && v >= 1000 && v <= 9999 ? new Date(v, 0, 1) : new Date(v);
+    }
     if (typeof v === 'string') {
       var m = v.match(/^(\d{4})-(\d{2})(?:-(\d{2}))?/);
-      if (m) return new Date(+m[1], +m[2] - 1, +(m[3] || 1));
+      if (m) {
+        var mo = +m[2], day = +(m[3] || 1);
+        if (mo < 1 || mo > 12 || day < 1 || day > new Date(+m[1], mo, 0).getDate()) return null;   // "2026-13-45": no silent roll-over
+        return new Date(+m[1], mo - 1, day);
+      }
       var d = new Date(v);
       return isNaN(d) ? null : d;
     }
@@ -417,7 +506,7 @@
   }
 
   function compileDate(code) {
-    var re = /"[^"]*"|\\.|yyyy|yy|mmmm|mmm|mm|m|dd|d|q/g;
+    var re = /"[^"]*"|\\.|\[[^\]]*\]|yyyy|yy|mmmm|mmm|mm|m|dddd|ddd|dd|d|q/g;
     return function (v) {
       var d = toDate(v);
       if (!d) return String(v);
@@ -429,10 +518,12 @@
           case 'mmm': return config.months[d.getMonth()];
           case 'mm': return ('0' + (d.getMonth() + 1)).slice(-2);
           case 'm': return String(d.getMonth() + 1);
+          case 'dddd': return config.daysLong[d.getDay()];
+          case 'ddd': return config.days[d.getDay()];
           case 'dd': return ('0' + d.getDate()).slice(-2);
           case 'd': return String(d.getDate());
           case 'q': return String(Math.floor(d.getMonth() / 3) + 1);
-          default: return tk[0] === '"' ? tk.slice(1, -1) : tk.slice(1);
+          default: return tk[0] === '"' ? tk.slice(1, -1) : tk[0] === '[' ? bracketText(tk.slice(1, -1)) : tk.slice(1);
         }
       });
     };
@@ -440,14 +531,49 @@
 
   /* ---------------- compact auto ---------------- */
 
+  /** |v| / unit with d decimals: a power-of-ten unit (k, m, bn, 万, 亿 ...) only moves the decimal point. */
+  function inUnit(abs, unit, d) {
+    var e = Math.round(Math.log10(unit));
+    return Math.pow(10, e) === unit ? fixed(abs, d, -e) : fixed(abs / unit, d);
+  }
+
   function compact(v, decimals) {
-    var abs = Math.abs(v), d = decimals == null ? 1 : decimals;
-    for (var i = 0; i < config.compactUnits.length; i++) {
-      var u = config.compactUnits[i];
-      if (abs >= u[0]) return (v < 0 ? config.minus : '') + trimZeros((abs / u[0]).toFixed(d)) + u[1];
+    if (!isFinite(v)) return config.nm;
+    var abs = Math.abs(v), d = decimals == null ? 1 : decimals, units = config.compactUnits, s = null;
+    for (var i = 0; i < units.length && s === null; i++) {
+      var u = units[i];
+      if (abs < u[0]) continue;
+      s = inUnit(abs, u[0], d);
+      // the rounded value reached the next unit: 999,950 -> "1m", not "1000k"
+      if (i > 0 && +s * u[0] >= units[i - 1][0]) { u = units[i - 1]; s = inUnit(abs, u[0], d); }
+      s = trimZeros(s) + u[1];
     }
-    if (abs !== 0 && abs < 1) return (v < 0 ? config.minus : '') + trimZeros(abs.toFixed(Math.max(d, 2)));
-    return (v < 0 ? config.minus : '') + trimZeros(abs.toFixed(abs < 10 ? d : 0));
+    if (s === null) {
+      s = trimZeros(fixed(abs, abs !== 0 && abs < 1 ? Math.max(d, 2) : abs < 10 ? d : 0));
+      var k = units[units.length - 1];
+      if (k && +s >= k[0]) s = trimZeros(inUnit(abs, k[0], d)) + k[1];   // 999.95 -> "1k", not "1000"
+    }
+    return v < 0 && /[1-9]/.test(s) ? config.minus + s : s;              // no "-0"
+  }
+
+  /**
+   * General, the format of every column without one: grouped integers from 10,000, up to 2 decimals below, and
+   * 3 significant digits for small values (0.000123, not "0"; exponent form below 1e-8).
+   */
+  function general(v) {
+    var abs = Math.abs(v), s;
+    if (abs >= 1e4) s = groupDigits(fixed(abs, 0));          // group |v|, then add the sign: not "-,123,456"
+    else if (abs >= 0.01 || abs === 0) s = trimZeros(fixed(abs, 2));
+    else {
+      var p = decimal(abs).p;                                  // |v| = 0.<digits> x 10^p
+      if (p > -8) s = trimZeros(fixed(abs, 3 - p));
+      else {
+        var m = scaledDigits(abs, 3 - p);
+        if (m.length > 3) { m = m.slice(0, 3); p++; }          // 9.995e-9 -> 1e-8
+        s = trimZeros(m[0] + '.' + m.slice(1)) + 'e' + (p - 1);
+      }
+    }
+    return v < 0 && /[1-9]/.test(s) ? config.minus + s : s;    // never "-0"
   }
   function trimZeros(s) { return s.indexOf('.') >= 0 ? s.replace(/\.?0+$/, '') : s; }
 
@@ -456,22 +582,32 @@
   function compile(spec) {
     if (typeof spec === 'function') return spec;
     var code = spec == null || spec === '' ? 'General' : String(spec);
-    if (presets[code]) code = presets[code];
+    if (isPreset(code)) code = presets[code];
     if (cache[code]) return cache[code];
     var fn;
     if (code === 'auto') fn = function (v) { return compact(v, 1); };
-    else if (code === 'General') fn = function (v) { return Math.abs(v) >= 1e4 ? groupDigits(String(Math.round(v))) : trimZeros(v.toFixed(2)); };
+    else if (code === 'General') fn = finite(general);
     else if (code === '@') fn = function (v) { return String(v); };
-    else if (isNumericCode(code)) fn = compileNumeric(code);
-    else if (/[ymdq]/.test(code.replace(/"[^"]*"/g, ''))) fn = compileDate(code);
-    else fn = function (v) { return String(v); };
+    else if (isNumericCode(code)) fn = finite(compileNumeric(code));
+    else if (looksLikeDate(code)) fn = compileDate(code);
+    else fn = finite(general);   // unknown preset name (typo) or plain text: readable number, not a garbled date
     cache[code] = fn;
     return fn;
   }
 
+  /** Compiled number formats called directly (RK.format.compile(code)(v)) show NaN / Infinity as n.m., like RK.format. */
+  function finite(fn) { return function (v) { return typeof v === 'number' && !isFinite(v) ? config.nm : fn(v); }; }
+  function isPreset(name) { return typeof name === 'string' && has(presets, name); }   // not "constructor", "toString" ...
+  function looksLikeDate(code) {
+    var bare = code.replace(/"[^"]*"/g, '').replace(/\\./g, '').replace(/\[[^\]]*\]/g, '');
+    if (!/[ymdq]/.test(bare)) return false;
+    // a bare identifier that is not made only of date tokens ("usd_mn", "pct_1") is a mistyped preset name
+    return !/^[A-Za-z_][A-Za-z0-9_]*$/.test(bare) || /^(?:yyyy|yy|mmmm|mmm|mm|m|dd|d|q)+$/.test(bare);
+  }
+
   function isDateCode(spec) {
-    var code = presets[spec] || spec;
-    return typeof code === 'string' && !isNumericCode(code) && /[ymdq]/.test(code.replace(/"[^"]*"/g, ''));
+    var code = isPreset(spec) ? presets[spec] : spec;
+    return typeof code === 'string' && !isNumericCode(code) && looksLikeDate(code);
   }
 
   function format(v, spec, opts) {
@@ -480,7 +616,7 @@
       if (isDateCode(spec)) return compile(spec)(v);
       return v;
     }
-    if (v instanceof Date) return compile(spec || 'date')(v);
+    if (v instanceof Date) return isNaN(v) ? ((opts && opts.na != null) ? opts.na : config.na) : compile(spec || 'date')(v);
     if (typeof v === 'boolean') return v ? 'Yes' : 'No';
     if (!isFinite(v)) return (opts && opts.nm != null) ? opts.nm : config.nm;
     return compile(spec)(v);
@@ -488,14 +624,21 @@
 
   format.compile = compile;
   format.compact = compact;
+  format.round = round;
+  /** Excel-rounded toFixed() for components: RK.format.fixed(10.35, 1) -> "10.4" (toFixed: "10.3"); never "-0.0". */
+  format.fixed = function (v, d) {
+    if (!isFinite(v)) return String(v);
+    var s = fixed(v, d);
+    return v < 0 && /[1-9]/.test(s) ? config.minus + s : s;
+  };
   format.presets = presets;
   format.config = config;
   format.toDate = toDate;
   format.isDateCode = isDateCode;
   /** Number of decimals a format code shows — useful for axis label precision. */
   format.decimals = function (spec) {
-    var code = presets[spec] || spec;
-    if (!code || !isNumericCode(code)) return null;
+    var code = isPreset(spec) ? presets[spec] : spec;
+    if (typeof code !== 'string' || !isNumericCode(code)) return null;
     return parseNumSection(splitSections(code)[0]).maxDec;
   };
 
@@ -519,6 +662,9 @@
  *
  * String equality is case-insensitive. Division by zero -> NaN (formatted "n.m."),
  * null propagates (formatted "n.a.").
+ *
+ * Hardening: every lookup table has no prototype and is read with has(), so names such as "constructor" or
+ * "__proto__" are ordinary identifiers; nesting depth is bounded (ExprError, never a RangeError / hang).
  */
 (function (global) {
   'use strict';
@@ -537,10 +683,21 @@
   var IDENT_START = /[A-Za-z_À-￿]/;
   var IDENT_PART = /[A-Za-z0-9_À-￿]/;
   var OPS = ['==', '!=', '<>', '<=', '>=', '&&', '||', '+', '-', '*', '/', '^', '<', '>', '=', '!', '(', ')', ',', '?', ':', '[', ']'];
-  var KEYWORDS = { and: 1, or: 1, not: 1, in: 1, true: 1, false: 1, null: 1 };
+  // own-property lookups only: "constructor", "__proto__", "toString" ... must never resolve to Object.prototype members
+  function has(obj, key) { return obj != null && Object.prototype.hasOwnProperty.call(obj, key); }
+  /** Lookup table without a prototype (read it with has()). */
+  function dict(o) { var d = Object.create(null); for (var k in o) if (has(o, k)) d[k] = o[k]; return d; }
+  var KEYWORDS = dict({ and: 1, or: 1, not: 1, in: 1, true: 1, false: 1, null: 1 });
+
+  // Bounds that keep parsing, compiling and evaluating far from the engine's stack limit (~1,000 nested parentheses
+  // overflowed V8 before): parser recursion (parentheses, calls, lists, unary -, not, ^, ?:) and AST depth (long chains
+  // such as a 10,000-term "1+1+...").
+  var MAX_NESTING = 256, MAX_DEPTH = 1024;
+  var TOO_DEEP = 'Formula is too deeply nested or too long — split it into several computed fields';
 
   function tokenize(src) {
     var toks = [], i = 0, n = src.length;
+    var closeAt = -2;   // next "]" after the current "[" (cached: one forward scan in total, not one per "[")
     while (i < n) {
       var c = src[i];
       if (/\s/.test(c)) { i++; continue; }
@@ -583,7 +740,7 @@
         var id = '';
         while (i < n && IDENT_PART.test(src[i])) id += src[i++];
         var low = id.toLowerCase();
-        if (KEYWORDS[low]) toks.push({ t: 'kw', v: low, pos: start });
+        if (has(KEYWORDS, low)) toks.push({ t: 'kw', v: low, pos: start });
         else toks.push({ t: 'id', v: id, pos: start });
         continue;
       }
@@ -591,7 +748,8 @@
       if (c === '[') {
         var prev = toks[toks.length - 1];
         var prevIsOperand = prev && (prev.t === 'num' || prev.t === 'str' || prev.t === 'id' || prev.t === 'param' || (prev.t === 'op' && (prev.v === ')' || prev.v === ']')));
-        var close = src.indexOf(']', i + 1);
+        if (closeAt !== -1 && closeAt <= i) closeAt = src.indexOf(']', i + 1);
+        var close = closeAt;
         var inner = close > 0 ? src.slice(i + 1, close) : '';
         if (!prevIsOperand && close > 0 && !(prev && prev.t === 'kw' && prev.v === 'in') && /^[^\[\],"']+$/.test(inner) && /[A-Za-zÀ-￿]/.test(inner) && !/^\s*-?\d/.test(inner)) {
           toks.push({ t: 'id', v: inner.trim(), quoted: true, pos: start });
@@ -614,7 +772,7 @@
   /* ------------------------------------------------------------------ *
    * Parser (precedence climbing)
    * ------------------------------------------------------------------ */
-  function Parser(toks) { this.toks = toks; this.i = 0; }
+  function Parser(toks) { this.toks = toks; this.i = 0; this.depth = 0; }
   Parser.prototype.peek = function () { return this.toks[this.i]; };
   Parser.prototype.next = function () { return this.toks[this.i++]; };
   Parser.prototype.isOp = function (v) { var t = this.peek(); return t.t === 'op' && t.v === v; };
@@ -625,13 +783,21 @@
     return t;
   };
 
+  /** One level of recursive descent (parenthesis, argument, list item, unary -, not, ^): bounded by MAX_NESTING. */
+  Parser.prototype.nest = function (fn) {
+    if (++this.depth > MAX_NESTING) throw new ExprError(TOO_DEEP, this.peek().pos);
+    var out = fn.call(this);
+    this.depth--;
+    return out;
+  };
   Parser.prototype.parse = function () {
     var e = this.ternary();
     var t = this.peek();
     if (t.t !== 'eof') throw new ExprError('Unexpected "' + (t.v != null ? t.v : t.t) + '"', t.pos);
     return e;
   };
-  Parser.prototype.ternary = function () {
+  Parser.prototype.ternary = function () { return this.nest(this.cond); };
+  Parser.prototype.cond = function () {
     var c = this.or();
     if (this.isOp('?')) {
       this.next();
@@ -653,14 +819,14 @@
     return a;
   };
   Parser.prototype.not = function () {
-    if (this.isKw('not') || this.isOp('!')) { this.next(); return { type: 'un', op: 'not', a: this.not() }; }
+    if (this.isKw('not') || this.isOp('!')) { this.next(); return { type: 'un', op: 'not', a: this.nest(this.not) }; }
     return this.cmp();
   };
-  var CMP = { '==': '==', '=': '==', '!=': '!=', '<>': '!=', '<': '<', '<=': '<=', '>': '>', '>=': '>=' };
+  var CMP = dict({ '==': '==', '=': '==', '!=': '!=', '<>': '!=', '<': '<', '<=': '<=', '>': '>', '>=': '>=' });
   Parser.prototype.cmp = function () {
     var a = this.add();
     var t = this.peek();
-    if (t.t === 'op' && CMP[t.v]) { this.next(); return { type: 'bin', op: CMP[t.v], a: a, b: this.add() }; }
+    if (t.t === 'op' && has(CMP, t.v)) { this.next(); return { type: 'bin', op: CMP[t.v], a: a, b: this.add() }; }
     if (t.t === 'kw' && t.v === 'in') {
       this.next();
       var list;
@@ -698,13 +864,13 @@
     return a;
   };
   Parser.prototype.unary = function () {
-    if (this.isOp('-')) { this.next(); return { type: 'un', op: 'neg', a: this.unary() }; }
-    if (this.isOp('+')) { this.next(); return this.unary(); }
+    if (this.isOp('-')) { this.next(); return { type: 'un', op: 'neg', a: this.nest(this.unary) }; }
+    if (this.isOp('+')) { this.next(); return this.nest(this.unary); }
     return this.pow();
   };
   Parser.prototype.pow = function () {
     var a = this.primary();
-    if (this.isOp('^')) { this.next(); return { type: 'bin', op: '^', a: a, b: this.unary() }; }
+    if (this.isOp('^')) { this.next(); return { type: 'bin', op: '^', a: a, b: this.nest(this.unary) }; }
     return a;
   };
   Parser.prototype.primary = function () {
@@ -754,9 +920,14 @@
     if (typeof a === 'string' && typeof b === 'string') return a.toLowerCase() === b.toLowerCase();
     return a == b; // eslint-disable-line eqeqeq
   }
+  // case-insensitive text ordering, like eq(), so "a" >= "A" agrees with "a" == "A". One shared collator:
+  // localeCompare(b, locale, options) builds a new one per call (80x slower on a 250k-row filter).
+  var collator = typeof Intl !== 'undefined' && Intl.Collator ? new Intl.Collator(undefined, { sensitivity: 'accent' }) : null;
   function cmp(a, b) {
-    if (typeof a === 'string' && typeof b === 'string') return a.localeCompare(b);
-    return num(a) - num(b);
+    if (typeof a === 'string' && typeof b === 'string') return collator ? collator.compare(a, b) : a.toLowerCase().localeCompare(b.toLowerCase());
+    var x = num(a), y = num(b);
+    // text that is not a number ("n.a.", "NM", "2021-03-18") is not comparable with a number: NaN makes <, >, <=, >= false
+    return x === null || y === null ? NaN : x - y;
   }
   function arith(op, a, b) {
     if (op === '+' && (typeof a === 'string' || typeof b === 'string')) return String(isNull(a) ? '' : a) + String(isNull(b) ? '' : b);
@@ -775,6 +946,16 @@
     for (var i = 0; i < vals.length; i++) { var v = num(vals[i]); if (v !== null && !isNaN(v)) out.push(v); }
     return out;
   }
+  /** min (dir -1) / max (dir 1) without Function.apply (RangeError above ~120k rows); all-text columns
+   *  such as ISO dates ("2019-03-18") compare as text so min(date) / max(date) work. */
+  function extreme(vals, dir) {
+    var a = numbers(vals), best = null, i;
+    if (!a.length) {
+      for (i = 0; i < vals.length; i++) if (typeof vals[i] === 'string' && vals[i] !== '') a.push(vals[i]);
+    }
+    for (i = 0; i < a.length; i++) if (best === null || (dir < 0 ? a[i] < best : a[i] > best)) best = a[i];
+    return best;
+  }
   function quantile(sorted, p) {
     if (!sorted.length) return null;
     var idx = (sorted.length - 1) * p, lo = Math.floor(idx), hi = Math.ceil(idx);
@@ -782,9 +963,24 @@
   }
   function toDate(v) { return RK.format && RK.format.toDate ? RK.format.toDate(v) : new Date(v); }
 
-  var SCALAR = {
+  /**
+   * Excel ROUND(): half away from zero on the 15-significant-digit decimal value, num_digits truncated, never -0.
+   * round(1.005, 2) = 1.01 and round(-2.5) = -3 (Math.round: 1 and -2). Shares RK.format's decimal-string rounding so
+   * a rounded value and its display always agree; the fallback only runs if rk.format.js is not loaded.
+   */
+  function excelRound(x, d) {
+    if (RK.format && RK.format.round) return RK.format.round(x, d);
+    d = Math.trunc(d) || 0;
+    var f = Math.pow(10, d), y = Math.abs(x) * f;
+    if (!isFinite(y)) return x;
+    y = Math.round(+y.toPrecision(15));
+    y = d >= 0 ? y / f : y * Math.pow(10, -d);
+    return y === 0 ? 0 : (x < 0 ? -y : y);
+  }
+
+  var SCALAR = dict({
     abs: function (x) { x = num(x); return x === null ? null : Math.abs(x); },
-    round: function (x, d) { x = num(x); if (x === null) return null; var f = Math.pow(10, num(d) || 0); return Math.round(x * f) / f; },
+    round: function (x, d) { x = num(x); return x === null ? null : excelRound(x, num(d) || 0); },
     floor: function (x) { x = num(x); return x === null ? null : Math.floor(x); },
     ceil: function (x) { x = num(x); return x === null ? null : Math.ceil(x); },
     sqrt: function (x) { x = num(x); return x === null ? null : (x < 0 ? NaN : Math.sqrt(x)); },
@@ -794,7 +990,13 @@
     log: function (x, b) { x = num(x); if (x === null) return null; if (x <= 0) return NaN; return b == null ? Math.log10(x) : Math.log(x) / Math.log(num(b)); },
     log10: function (x) { x = num(x); return x === null ? null : (x <= 0 ? NaN : Math.log10(x)); },
     sign: function (x) { x = num(x); return x === null ? null : Math.sign(x); },
-    clamp: function (x, lo, hi) { x = num(x); return x === null ? null : Math.max(num(lo), Math.min(num(hi), x)); },
+    clamp: function (x, lo, hi) {
+      x = num(x); lo = num(lo); hi = num(hi);              // a null / missing bound means "no bound"
+      if (x === null) return null;
+      if (lo !== null && x < lo) x = lo;
+      if (hi !== null && x > hi) x = hi;
+      return x;
+    },
     div: function (a, b) { a = num(a); b = num(b); return a === null || b === null || b === 0 ? null : a / b; },
     pct_change: function (a, b) { a = num(a); b = num(b); return a === null || b === null ? null : (b === 0 ? NaN : a / b - 1); },
     cagr: function (end, start, years) {
@@ -805,28 +1007,28 @@
     },
     coalesce: function () { for (var i = 0; i < arguments.length; i++) if (!isNull(arguments[i]) && !(typeof arguments[i] === 'number' && isNaN(arguments[i]))) return arguments[i]; return null; },
     isnull: function (x) { return isNull(x) || (typeof x === 'number' && isNaN(x)); },
-    between: function (x, lo, hi) { x = num(x); return x !== null && x >= num(lo) && x <= num(hi); },
+    between: function (x, lo, hi) { x = num(x); lo = num(lo); hi = num(hi); return x !== null && (lo === null || x >= lo) && (hi === null || x <= hi); },
     number: function (x) { return num(x); },
     text: function (x, f) { return f != null && RK.format ? RK.format(x, f) : (isNull(x) ? '' : String(x)); },
     len: function (s) { return isNull(s) ? 0 : String(s).length; },
     lower: function (s) { return isNull(s) ? s : String(s).toLowerCase(); },
     upper: function (s) { return isNull(s) ? s : String(s).toUpperCase(); },
     concat: function () { return [].slice.call(arguments).map(function (v) { return isNull(v) ? '' : String(v); }).join(''); },
-    contains: function (s, sub) { return !isNull(s) && String(s).toLowerCase().indexOf(String(sub).toLowerCase()) >= 0; },
-    startswith: function (s, p) { return !isNull(s) && String(s).toLowerCase().indexOf(String(p).toLowerCase()) === 0; },
-    endswith: function (s, p) { if (isNull(s)) return false; s = String(s).toLowerCase(); p = String(p).toLowerCase(); return s.slice(-p.length) === p; },
+    contains: function (s, sub) { return !isNull(s) && sub != null && String(s).toLowerCase().indexOf(String(sub).toLowerCase()) >= 0; },
+    startswith: function (s, p) { return !isNull(s) && p != null && String(s).toLowerCase().indexOf(String(p).toLowerCase()) === 0; },
+    endswith: function (s, p) { if (isNull(s) || p == null) return false; s = String(s).toLowerCase(); p = String(p).toLowerCase(); return !p.length || s.slice(-p.length) === p; },
     year: function (d) { d = toDate(d); return d ? d.getFullYear() : null; },
     month: function (d) { d = toDate(d); return d ? d.getMonth() + 1 : null; },
     quarter: function (d) { d = toDate(d); return d ? Math.floor(d.getMonth() / 3) + 1 : null; }
-  };
-  var LAZY = { if: true, iif: true };
+  });
+  var LAZY = dict({ if: true, iif: true });
 
-  var AGG = {
+  var AGG = dict({
     sum: function (v) { var a = numbers(v); return a.length ? a.reduce(function (s, x) { return s + x; }, 0) : null; },
     avg: function (v) { var a = numbers(v); return a.length ? a.reduce(function (s, x) { return s + x; }, 0) / a.length : null; },
     median: function (v) { var a = numbers(v).sort(function (x, y) { return x - y; }); return quantile(a, 0.5); },
-    min: function (v) { var a = numbers(v); return a.length ? Math.min.apply(null, a) : null; },
-    max: function (v) { var a = numbers(v); return a.length ? Math.max.apply(null, a) : null; },
+    min: function (v) { return extreme(v, -1); },
+    max: function (v) { return extreme(v, 1); },
     count: function (v) { var c = 0; for (var i = 0; i < v.length; i++) if (!isNull(v[i])) c++; return c; },
     countd: function (v) { var s = new Set(); for (var i = 0; i < v.length; i++) if (!isNull(v[i])) s.add(v[i]); return s.size; },
     stdev: function (v) {
@@ -836,32 +1038,41 @@
     },
     first: function (v) { for (var i = 0; i < v.length; i++) if (!isNull(v[i])) return v[i]; return null; },
     last: function (v) { for (var i = v.length - 1; i >= 0; i--) if (!isNull(v[i])) return v[i]; return null; }
-  };
+  });
   AGG.mean = AGG.avg;
   AGG.average = AGG.avg;
   AGG.stddev = AGG.stdev;
   // aggregates with extra arguments
-  var AGG_EXTRA = {
+  var AGG_EXTRA = dict({
     pctl: function (vals, p) { var a = numbers(vals).sort(function (x, y) { return x - y; }); return quantile(a, num(p)); },
     wavg: function (vals, weights) {
       var s = 0, w = 0;
       for (var i = 0; i < vals.length; i++) {
         var x = num(vals[i]), y = num(weights[i]);
-        if (x === null || y === null || isNaN(x)) continue;
+        if (x === null || y === null || isNaN(x) || isNaN(y)) continue;
         s += x * y; w += y;
       }
       return w ? s / w : null;
     }
-  };
+  });
   AGG_EXTRA.percentile = AGG_EXTRA.pctl;
 
   function isAggCall(node) {
     if (node.type !== 'call') return false;
-    if (AGG_EXTRA[node.name]) return true;
-    if (!AGG[node.name]) return false;
+    if (has(AGG_EXTRA, node.name)) return true;
+    if (!has(AGG, node.name)) return false;
     // min/max with 2+ args are scalar
     if ((node.name === 'min' || node.name === 'max') && node.args.length > 1) return false;
     return true;
+  }
+  // allowed argument counts [min, max] of aggregate functions (default: exactly 1)
+  var AGG_ARITY = dict({ count: [0, 1], wavg: [2, 2], pctl: [1, 2], percentile: [1, 2] });
+  function usesField(node) {
+    if (!node || typeof node !== 'object') return false;
+    if (node.type === 'field') return true;
+    var kids = [node.a, node.b, node.c].concat(node.args || [], node.items || []);
+    for (var i = 0; i < kids.length; i++) if (kids[i] && usesField(kids[i])) return true;
+    return false;
   }
   function containsAgg(node) {
     if (!node || typeof node !== 'object') return false;
@@ -895,10 +1106,13 @@
       if (f.title) byKey[norm(f.title)] = byKey[norm(f.title)] || name;
     });
     return function (name, pos) {
-      if (Object.prototype.hasOwnProperty.call(byKey, norm(name))) return byKey[norm(name)];
-      var sugg = names.map(function (n) { return [n, levenshtein(norm(name), norm(n))]; })
+      var key = norm(name);
+      if (has(byKey, key)) return byKey[key];
+      // edit distance is O(len^2): no suggestions for absurdly long names (pasted text), and the message is truncated
+      var sugg = key.length > 64 ? [] : names.map(function (n) { return [n, levenshtein(key, norm(n).slice(0, 64))]; })
         .sort(function (x, y) { return x[1] - y[1]; }).slice(0, 3).map(function (x) { return x[0]; });
-      throw new ExprError('Unknown field "' + name + '"' + (sugg.length ? ' — did you mean ' + sugg.join(', ') + '?' : ''), pos);
+      var shown = name.length > 80 ? name.slice(0, 77) + '...' : name;
+      throw new ExprError('Unknown field "' + shown + '"' + (sugg.length ? ' — did you mean ' + sugg.join(', ') + '?' : ''), pos);
     };
   }
 
@@ -909,6 +1123,7 @@
     this.resolve = makeResolver(opts.fields);
     this.fieldsUsed = [];
     this.paramsUsed = [];
+    this.seen = { f: Object.create(null), p: Object.create(null) };   // dedupe in O(1), not indexOf per reference
   }
 
   Compiler.prototype.row = function (node) {
@@ -917,14 +1132,15 @@
       case 'lit': return function () { return node.v; };
       case 'field': {
         var name = this.resolve(node.name, node.pos);
-        if (this.fieldsUsed.indexOf(name) < 0) this.fieldsUsed.push(name);
-        return function (row) { return row ? row[name] : null; };
+        node.resolved = name;   // schema name of the field ([Enterprise value] -> "ev"), for callers that inspect the AST
+        if (!has(this.seen.f, name)) { this.seen.f[name] = 1; this.fieldsUsed.push(name); }
+        return function (row) { return has(row, name) ? row[name] : null; };
       }
       case 'param': {
-        if (this.paramsUsed.indexOf(node.name) < 0) this.paramsUsed.push(node.name);
+        if (!has(this.seen.p, node.name)) { this.seen.p[node.name] = 1; this.paramsUsed.push(node.name); }
         return function (row, env) {
           var p = env && env.params ? env.params : (RK.store ? RK.store.params() : {});
-          if (!(node.name in p)) throw new ExprError('Unknown parameter @' + node.name, node.pos);
+          if (!has(p, node.name)) throw new ExprError('Unknown parameter @' + node.name, node.pos);
           return p[node.name];
         };
       }
@@ -972,18 +1188,19 @@
 
   Compiler.prototype.scalarCall = function (node, args) {
     var name = node.name;
-    if (LAZY[name]) {
+    if (has(LAZY, name)) {
       if (args.length < 2) throw new ExprError('if(condition, then, else) needs at least 2 arguments', node.pos);
       return function (r, e) { return args[0](r, e) ? args[1](r, e) : (args[2] ? args[2](r, e) : null); };
     }
     if (name === 'min' || name === 'max') {
-      var mm = Math[name];
+      var dir = name === 'min' ? -1 : 1;
       return function (r, e) {
-        var vals = numbers(args.map(function (f) { return f(r, e); }));
-        return vals.length ? mm.apply(null, vals) : null;
+        var vals = numbers(args.map(function (f) { return f(r, e); })), best = null;   // a loop: no apply() argument limit
+        for (var i = 0; i < vals.length; i++) if (best === null || (dir < 0 ? vals[i] < best : vals[i] > best)) best = vals[i];
+        return best;
       };
     }
-    var fn = SCALAR[name];
+    var fn = has(SCALAR, name) ? SCALAR[name] : null;
     if (!fn) throw new ExprError('Unknown function ' + name + '()', node.pos);
     return function (r, e) { return fn.apply(null, args.map(function (f) { return f(r, e); })); };
   };
@@ -992,10 +1209,19 @@
   Compiler.prototype.agg = function (node) {
     var self = this;
     if (isAggCall(node)) {
-      var name = node.name;
+      var name = node.name, ar = has(AGG_ARITY, name) ? AGG_ARITY[name] : [1, 1], argc = node.args.length;
+      if (argc < ar[0] || argc > ar[1]) {
+        throw new ExprError(name + '() expects ' + (ar[0] === ar[1] ? ar[0] : ar[0] + '-' + ar[1]) + ' argument' + (ar[0] === 1 && ar[1] === 1 ? '' : 's') + ', got ' + argc, node.pos);
+      }
+      if (name !== 'wavg' && argc === 2 && usesField(node.args[1])) {
+        throw new ExprError(name + '() percentile must be a number or @param (e.g. 0.9 or 90%), not a field', node.pos);
+      }
+      for (var ni = 0; ni < argc; ni++) {
+        if (containsAgg(node.args[ni])) throw new ExprError('Aggregates cannot be nested: ' + name + '() contains another aggregate — compute the inner value in its own column or computed field', node.pos);
+      }
       if (name === 'count' && node.args.length === 0) return function (rows) { return rows.length; };
       var inner = node.args.map(function (n) { return self.row(n); });
-      if (AGG_EXTRA[name]) {
+      if (has(AGG_EXTRA, name)) {
         var fx = AGG_EXTRA[name];
         if (name === 'wavg') {
           return function (rows, env) {
@@ -1034,7 +1260,39 @@
   /* ------------------------------------------------------------------ *
    * Public API
    * ------------------------------------------------------------------ */
-  var cache = new Map();
+  // compile() results for schema-less formulas (filters, text placeholders), keyed by source text. Bounded: a long
+  // session typing distinct expressions into a filter must not grow it forever (oldest entries are dropped).
+  var cache = new Map(), CACHE_MAX = 500;
+
+  /** Depth of the AST without recursion: a 100,000-term "1+1+..." is a 100,000-deep left chain. */
+  function checkDepth(ast) {
+    var stack = [ast], depths = [1];
+    while (stack.length) {
+      var node = stack.pop(), d = depths.pop();
+      if (d > MAX_DEPTH) throw new ExprError(TOO_DEEP, node.pos != null ? node.pos : -1);
+      var kids = [node.a, node.b, node.c].concat(node.args || [], node.items || []);
+      for (var i = 0; i < kids.length; i++) if (kids[i] && typeof kids[i] === 'object') { stack.push(kids[i]); depths.push(d + 1); }
+    }
+  }
+
+  // Backstop for the bounds above: a stack overflow still surfaces as an ExprError, not a RangeError (V8 /
+  // JavaScriptCore) or InternalError "too much recursion" (Firefox), e.g. when a formula is evaluated deep inside a
+  // component's own call stack.
+  function tooDeep(e) {
+    var overflow = e && (e instanceof RangeError || e.name === 'InternalError') && /stack|recursion/i.test(e.message);
+    return overflow ? new ExprError(TOO_DEEP) : e;
+  }
+  // an aggregate formula needs the rows of a group: say so instead of "TypeError: rows.map is not a function"
+  function asRows(fn, src) {
+    var shown = src.length > 80 ? src.slice(0, 77) + '...' : src;
+    return function (rows, env) {
+      if (!Array.isArray(rows)) throw new ExprError('"' + shown + '" is an aggregate formula (sum, avg, ...): evaluate it on an array of rows, not a single record');
+      return fn(rows, env);
+    };
+  }
+  function guardDepth(fn) {
+    return function (x, env) { try { return fn(x, env); } catch (e) { throw tooDeep(e); } };
+  }
 
   /**
    * compile(src, {fields}) -> { src, aggregate, fields, params, eval(row|rows, env) }
@@ -1042,14 +1300,21 @@
    */
   function compile(src, opts) {
     opts = opts || {};
-    var key = opts.fields ? null : src;
-    if (key && cache.has(key)) return cache.get(key);
-    var ast = new Parser(tokenize(String(src))).parse();
-    var c = new Compiler(opts);
-    var aggregate = containsAgg(ast);
-    var fn = aggregate ? c.agg(ast) : c.row(ast);
+    var key = opts.fields ? null : String(src);
+    if (key !== null && cache.has(key)) { var hit = cache.get(key); cache.delete(key); cache.set(key, hit); return hit; }   // LRU
+    var ast, c, aggregate, fn;
+    try {
+      ast = new Parser(tokenize(String(src))).parse();
+      checkDepth(ast);
+      c = new Compiler(opts);
+      aggregate = containsAgg(ast);
+      fn = guardDepth(aggregate ? asRows(c.agg(ast), String(src)) : c.row(ast));
+    } catch (e) { throw tooDeep(e); }
     var out = { src: src, ast: ast, aggregate: aggregate, fields: c.fieldsUsed, params: c.paramsUsed, eval: fn };
-    if (key) cache.set(key, out);
+    if (key !== null) {
+      if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value);
+      cache.set(key, out);
+    }
     return out;
   }
 
@@ -1112,12 +1377,24 @@
   var RK = global.RK || (global.RK = {});
   var util = RK.util;
 
+  /* Prototype-safe access. Field names, filter keys and param names come from data and users, so lookup tables have
+   * no prototype (Object.create(null)) or are read with has(), and records are read with get() / written with put():
+   * a field called "constructor" never reads Object.prototype.constructor, and "__proto__" stays an ordinary key. */
+  function has(obj, key) { return obj != null && Object.prototype.hasOwnProperty.call(obj, key); }
+  function get(row, key) { return has(row, key) ? row[key] : undefined; }
+  /** obj[key] = v that also works for a field literally named "__proto__" (assignment would swap the prototype and drop the value). */
+  function put(obj, key, v) {
+    if (key === '__proto__') Object.defineProperty(obj, key, { value: v, writable: true, enumerable: true, configurable: true });
+    else obj[key] = v;
+  }
+  function dict(o) { var d = Object.create(null); for (var k in o) if (has(o, k)) d[k] = o[k]; return d; }
+
   /* ------------------------------------------------------------------ *
    * Dataset
    * ------------------------------------------------------------------ */
   function inferType(rows, name) {
     for (var i = 0; i < Math.min(rows.length, 50); i++) {
-      var v = rows[i][name];
+      var v = get(rows[i], name);
       if (v == null || v === '') continue;
       if (typeof v === 'number') return 'number';
       if (typeof v === 'boolean') return 'boolean';
@@ -1138,7 +1415,7 @@
     if (data.length && Array.isArray(data[0]) && fields) {
       data = data.map(function (arr) {
         var o = {};
-        for (var i = 0; i < fields.length; i++) o[fields[i].name] = arr[i];
+        for (var i = 0; i < fields.length; i++) put(o, fields[i].name, arr[i]);
         return o;
       });
     }
@@ -1157,28 +1434,59 @@
     var self = this;
     this.fields.forEach(function (f) { self._index[f.name] = f; });
     this.computed = [];
+    this._rev = 0;   // schema revision: bumped when computed fields change (per-dataset caches compare it)
     (json.computed || []).forEach(function (c) { self.addComputed(c, true); });
   }
 
   Dataset.prototype.field = function (name) { return this._index[name] || null; };
   Dataset.prototype.has = function (name) { return !!this._index[name]; };
   Dataset.prototype.fieldNames = function () { return this.fields.map(function (f) { return f.name; }); };
-  Dataset.prototype.values = function (name) { return this.rows.map(function (r) { return r[name]; }); };
+  Dataset.prototype.values = function (name) { return this.rows.map(function (r) { return get(r, name); }); };
   Dataset.prototype.distinct = function (name) { return util.unique(this.values(name).filter(function (v) { return v != null && v !== ''; })); };
   Dataset.prototype.format = function (name) { var f = this._index[name]; return f && f.format; };
 
   /**
-   * Add a derived field computed by an RK.expr formula. Values are materialised on each row and
-   * recomputed automatically when a referenced @param changes.
+   * Computed fields in evaluation order: definition order, except that a field always runs after the computed fields
+   * it reads (a redefinition may read a field defined after it). A cycle (a -> b -> a) is an ExprError.
+   */
+  function orderComputed(list) {
+    var at = Object.create(null), state = Object.create(null), out = [], path = [];
+    list.forEach(function (x, i) { at[x.def.name] = i; });
+    function visit(x) {
+      var name = x.def.name;
+      if (state[name] === 2) return;
+      if (state[name] === 1) {
+        var loop = path.slice(path.indexOf(name)).concat(name);
+        throw new RK.expr.ExprError('Computed fields cannot reference each other in a loop (' + loop.join(' -> ') + ') — give the result a new name');
+      }
+      state[name] = 1; path.push(name);
+      x.compiled.fields.forEach(function (f) { if (f !== name && has(at, f)) visit(list[at[f]]); });
+      path.pop(); state[name] = 2;
+      out.push(x);
+    }
+    list.forEach(visit);
+    return out;
+  }
+
+  /**
+   * Add (or redefine) a derived field computed by an RK.expr formula. Values are materialised on each row and
+   * recomputed automatically when a referenced @param, or a computed field it reads, changes. A redefinition keeps
+   * its place, so the fields that read it are recomputed after it. A formula may not read its own field: x = x * 1.1
+   * would compound on every recompute (every slider move).
    */
   Dataset.prototype.addComputed = function (spec, silent) {
     var c = RK.expr.compile(spec.formula, { fields: this.fields });
     if (c.aggregate) throw new RK.expr.ExprError('Computed fields must be row formulas (no sum/avg/...)');
+    if (c.fields.indexOf(spec.name) >= 0) throw new RK.expr.ExprError('Computed field "' + spec.name + '" cannot reference itself — give the result a new name');
     var def = { name: spec.name, title: spec.title || spec.name, type: spec.type || 'number', format: spec.format, formula: spec.formula, computed: true };
+    var entry = { def: def, compiled: c }, list = this.computed.slice(), i = list.length;
+    while (i-- > 0) if (list[i].def.name === def.name) break;
+    if (i >= 0) list[i] = entry; else list.push(entry);
+    list = orderComputed(list);   // throws on a loop before anything has changed
     var existing = this._index[def.name];
     if (existing) util.merge(existing, def); else { this.fields.push(def); this._index[def.name] = def; }
-    this.computed = this.computed.filter(function (x) { return x.def.name !== def.name; });
-    this.computed.push({ def: def, compiled: c });
+    this.computed = list;
+    this._rev++;
     this._materialize(def.name);
     if (!silent) RK.bus.emit('data:changed', { dataset: this.id, field: def.name });
     return def;
@@ -1188,6 +1496,7 @@
     this.computed = this.computed.filter(function (x) { return x.def.name !== name; });
     this.fields = this.fields.filter(function (f) { return f.name !== name; });
     delete this._index[name];
+    this._rev++;
     this.rows.forEach(function (r) { delete r[name]; });
     RK.bus.emit('data:changed', { dataset: this.id, field: name });
   };
@@ -1195,15 +1504,17 @@
   Dataset.prototype._materialize = function (onlyName, paramName) {
     var env = { params: RK.store.params() };
     var rows = this.rows;
-    var dirty = {};   // computed fields recomputed in this pass: dependants are recomputed too (definition order)
+    // computed fields recomputed in this pass; the fields that read them are recomputed too, in evaluation order
+    var dirty = Object.create(null);
+    function readsDirty(c) { return c.compiled.fields.some(function (f) { return has(dirty, f); }); }
     this.computed.forEach(function (c) {
-      if (onlyName && c.def.name !== onlyName && !c.compiled.fields.some(function (f) { return dirty[f]; })) return;
-      if (paramName && c.compiled.params.indexOf(paramName) < 0 && !c.compiled.fields.some(function (f) { return dirty[f]; })) return;
+      if (onlyName && c.def.name !== onlyName && !readsDirty(c)) return;
+      if (paramName && c.compiled.params.indexOf(paramName) < 0 && !readsDirty(c)) return;
       dirty[c.def.name] = true;
       for (var i = 0; i < rows.length; i++) {
         var v;
         try { v = c.compiled.eval(rows[i], env); } catch (e) { v = null; }
-        rows[i][c.def.name] = v;
+        put(rows[i], c.def.name, v);
       }
     });
   };
@@ -1225,7 +1536,7 @@
       return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     }
     var lines = [fields.map(function (f) { return esc(f.title || f.name); }).join(',')];
-    rows.forEach(function (r) { lines.push(fields.map(function (f) { return esc(r[f.name]); }).join(',')); });
+    rows.forEach(function (r) { lines.push(fields.map(function (f) { return esc(get(r, f.name)); }).join(',')); });
     return '﻿' + lines.join('\n');
   };
 
@@ -1235,7 +1546,8 @@
    * Store: filters, params, generic state
    * ------------------------------------------------------------------ */
   var store = RK.store = (function () {
-    var filters = {}, params = {}, state = {}, subs = [], pending = [], scheduled = false;
+    // keyed by user / data supplied names: no prototype ("constructor", "toString" are ordinary keys)
+    var filters = Object.create(null), params = Object.create(null), state = Object.create(null), subs = [], pending = [], scheduled = false;
 
     function notify(change) {
       pending.push(change);
@@ -1267,7 +1579,7 @@
         notify({ type: 'filter', key: key, spec: spec });
       },
       clearFilter: function (key) {
-        if (!(key in filters)) return;
+        if (!has(filters, key)) return;
         var prev = filters[key];
         delete filters[key];
         notify({ type: 'filter', key: key, spec: null, prev: prev });
@@ -1277,7 +1589,7 @@
       },
       /** toggle a value inside an 'in' filter (used by click-to-filter / cross-filter). */
       toggleValue: function (key, field, value, source, extra) {
-        var cur = filters[key];
+        var cur = get(filters, key);
         var vals = cur && cur.values ? cur.values.slice() : [];
         var i = vals.indexOf(value);
         if (i >= 0) vals.splice(i, 1); else vals.push(value);
@@ -1297,13 +1609,13 @@
         if (extra.datasets) spec.datasets = extra.datasets;
         store.setFilter(key, spec);
       },
-      filter: function (key) { return filters[key] || null; },
+      filter: function (key) { return get(filters, key) || null; },
       filters: function () { return filters; },
 
       params: function () { return params; },
-      param: function (name) { return params[name]; },
+      param: function (name) { return get(params, name); },
       setParam: function (name, value) {
-        if (params[name] === value) return;
+        if (has(params, name) && params[name] === value) return;
         params[name] = value;
         RK.data.ids().forEach(function (id) {
           var ds = RK.data.get(id);
@@ -1314,12 +1626,12 @@
       defineParams: function (defs) {
         Object.keys(defs || {}).forEach(function (k) {
           var d = defs[k];
-          params[k] = util.isObj(d) ? d.value : d;
+          put(params, k, util.isObj(d) ? d.value : d);
         });
       },
 
-      get: function (k) { return state[k]; },
-      set: function (k, v) { if (state[k] === v) return; state[k] = v; notify({ type: 'state', key: k, value: v }); },
+      get: function (k) { return get(state, k); },
+      set: function (k, v) { if (has(state, k) && state[k] === v) return; state[k] = v; notify({ type: 'state', key: k, value: v }); },
 
       subscribe: function (fn) {
         subs.push(fn);
@@ -1337,11 +1649,27 @@
     return a - b;
   }
 
+  /**
+   * expr filters compile against each dataset's schema, so titles ([Enterprise value]), `names with spaces` and
+   * case variants resolve as in queries; null when the formula does not fit this dataset (a field it lacks), and the
+   * filter then does not apply to it. Compiled once per (filter, dataset, schema revision).
+   */
+  var exprMemo = new WeakMap();
+  function exprFor(spec, ds) {
+    var memo = exprMemo.get(spec);
+    if (!memo) exprMemo.set(spec, memo = Object.create(null));
+    var m = has(memo, ds.id) ? memo[ds.id] : null;
+    if (!m || m.ds !== ds || m.rev !== ds._rev || m.expr !== spec.expr) {
+      var c = null;
+      try { c = RK.expr.compile(spec.expr, { fields: ds.fields }); } catch (e) { c = null; }
+      m = memo[ds.id] = { ds: ds, rev: ds._rev, expr: spec.expr, c: c };
+    }
+    return m.c;
+  }
+
   function filterApplies(spec, ds) {
     if (spec.datasets && spec.datasets.indexOf(ds.id) < 0) return false;
-    if (spec.op === 'expr') {
-      return spec._compiled && spec._compiled.fields.every(function (f) { return ds.has(f); });
-    }
+    if (spec.op === 'expr') return !!(spec._compiled && exprFor(spec, ds));
     if (spec.op === 'search') return !spec.field || ds.has(spec.field);
     return ds.has(spec.field);
   }
@@ -1351,15 +1679,15 @@
     switch (spec.op) {
       case 'in': {
         var set = new Set(spec.values.map(function (v) { return typeof v === 'string' ? v.toLowerCase() : v; }));
-        return function (r) { var v = r[f]; return set.has(typeof v === 'string' ? v.toLowerCase() : v); };
+        return function (r) { var v = get(r, f); return set.has(typeof v === 'string' ? v.toLowerCase() : v); };
       }
-      case 'not_in': {
-        var nset = new Set(spec.values);
-        return function (r) { return !nset.has(r[f]); };
+      case 'not_in': {   // case-insensitive, like 'in' and RK.expr ==
+        var nset = new Set((spec.values || []).map(function (v) { return typeof v === 'string' ? v.toLowerCase() : v; }));
+        return function (r) { var v = get(r, f); return !nset.has(typeof v === 'string' ? v.toLowerCase() : v); };
       }
-      case 'eq': return function (r) { return r[f] === spec.value; };
+      case 'eq': return function (r) { return get(r, f) === spec.value; };
       case 'between': return function (r) {
-        var v = r[f];
+        var v = get(r, f);
         if (v == null || v === '') return false;
         if (spec.min != null && cmpVal(v, spec.min, type) < 0) return false;
         if (spec.max != null && cmpVal(v, spec.max, type) > 0) return false;
@@ -1369,12 +1697,13 @@
         var q = String(spec.text).toLowerCase();
         var cols = f ? [f] : ds.fields.filter(function (x) { return x.type === 'string'; }).map(function (x) { return x.name; });
         return function (r) {
-          for (var i = 0; i < cols.length; i++) { var v = r[cols[i]]; if (v != null && String(v).toLowerCase().indexOf(q) >= 0) return true; }
+          for (var i = 0; i < cols.length; i++) { var v = get(r, cols[i]); if (v != null && String(v).toLowerCase().indexOf(q) >= 0) return true; }
           return false;
         };
       }
       case 'expr': {
-        var c = spec._compiled, env = { params: store.params() };
+        var c = exprFor(spec, ds), env = { params: store.params() };
+        if (!c) return function () { return false; };
         return function (r) { try { return !!c.eval(r, env); } catch (e) { return false; } };
       }
     }
@@ -1438,16 +1767,17 @@
   function aggregate(rows, spec) {
     var by = spec.by || [];
     var measures = (spec.measures || []).map(function (m) {
-      var src = m.expr || (m.op ? m.op + '(' + m.field + ')' : m.field);
-      return { name: m.name || src, c: RK.expr.compile(src, { fields: spec.fields }) };
+      var ref = m.field == null ? '' : '`' + m.field + '`';            // field names may contain spaces
+      var src = m.expr || (m.op ? m.op + '(' + ref + ')' : ref);
+      return { name: m.name || m.expr || (m.op ? m.op + '(' + (m.field == null ? '' : m.field) + ')' : m.field), c: RK.expr.compile(src, { fields: spec.fields }) };
     });
     var env = { params: store.params() };
-    var groups = by.length ? util.groupBy(rows, function (r) { return by.map(function (b) { return r[b]; }).join('\u0001'); }) : new Map([['', rows]]);
+    var groups = by.length ? util.groupBy(rows, function (r) { return by.map(function (b) { return get(r, b); }).join('\u0001'); }) : new Map([['', rows]]);
     var out = [];
     groups.forEach(function (g) {
       var rec = {};
-      by.forEach(function (b) { rec[b] = g[0][b]; });
-      measures.forEach(function (m) { rec[m.name] = m.c.aggregate ? m.c.eval(g, env) : m.c.eval(g[0], env); });
+      by.forEach(function (b) { put(rec, b, get(g[0], b)); });
+      measures.forEach(function (m) { put(rec, m.name, m.c.aggregate ? m.c.eval(g, env) : m.c.eval(g[0], env)); });
       out.push(rec);
     });
     return out;
@@ -1457,20 +1787,23 @@
    * Query engine (client "type your own metric" console)
    * ------------------------------------------------------------------ *
    * Text syntax:
-   *   <items> [from <dataset>] [by <fields>] [where <expr>] [sort <column> [asc|desc]] [top <n>]
+   *   <items> [from <dataset>] [by <fields>] [where <expr>] [sort [by] <column> [asc|desc]] [top <n>]
    *   items := expr [as "Label"] [format "0.0x"], ...      (* = all fields)
    * Examples:
    *   median(ev_ebitda_25e), avg(ebitda_margin) by sector
    *   company, ev / ebitda_25e as "EV/EBITDA" format "0.0x" where region == "Asia" sort 2 desc top 5
    *   sum(revenue) as "Revenue" by region, year where year >= 2024
    */
-  var CLAUSES = ['group by', 'order by', 'from', 'by', 'where', 'sort', 'top', 'limit'];
+  // clause keywords, longest first ("sort by" before "sort" and "by"); blanks or a line break inside "group by" etc.
+  var CLAUSE_RE = /(group\s+by|order\s+by|sort\s+by|from|by|where|sort|top|limit)(?=\s|$)/iy;
+  // clauses that may appear once: "order by" and "sort by" are "sort", "group by" is "by", "limit" is "top"
+  var CLAUSE_KIND = dict({ 'group by': 'by', 'order by': 'sort', 'sort by': 'sort', limit: 'top' });
 
   function splitTopLevel(text, sepFn) {
     var parts = [], depth = 0, q = null, start = 0;
     for (var i = 0; i < text.length; i++) {
       var c = text[i];
-      if (q) { if (c === q) q = null; continue; }
+      if (q) { if (c === '\\' && q !== '`') i++; else if (c === q) q = null; continue; }   // "a \" b": same escapes as RK.expr
       if (c === '"' || c === "'" || c === '`') { q = c; continue; }
       if (c === '(' || c === '[') depth++;
       else if (c === ')' || c === ']') depth--;
@@ -1489,60 +1822,90 @@
     var found = [];
     splitTopLevel(src, function (t, i) {
       if (i > 0 && !/\s/.test(t[i - 1])) return 0;
-      for (var k = 0; k < CLAUSES.length; k++) {
-        var kw = CLAUSES[k];
-        var seg = t.substr(i, kw.length).toLowerCase();
-        if (seg === kw && (i + kw.length >= t.length || /\s/.test(t[i + kw.length]))) {
-          found.push({ kw: kw, at: i, len: kw.length });
-          return kw.length;
-        }
-      }
-      return 0;
+      CLAUSE_RE.lastIndex = i;
+      var m = CLAUSE_RE.exec(t);
+      if (!m) return 0;
+      found.push({ kw: m[1].toLowerCase().replace(/\s+/, ' '), at: i, len: m[0].length });
+      return m[0].length;
     });
     var spec = { select: [], by: [], where: null, sort: [], limit: null, from: null };
     var headEnd = found.length ? found[0].at : src.length;
     var head = src.slice(0, headEnd).trim();
+    var seen = Object.create(null);
     found.forEach(function (f, idx) {
       var end = idx + 1 < found.length ? found[idx + 1].at : src.length;
       var body = src.slice(f.at + f.len, end).trim();
+      var kind = has(CLAUSE_KIND, f.kw) ? CLAUSE_KIND[f.kw] : f.kw;
+      if (seen[kind]) throw new RK.expr.ExprError('"' + f.kw + '" appears more than once — combine conditions with "and", or list several columns separated by commas');
+      seen[kind] = true;
       switch (f.kw) {
         case 'from': spec.from = body.replace(/^[`"']|[`"']$/g, ''); break;
         case 'by': case 'group by':
-          spec.by = splitTopLevel(body, function (t, i) { return t[i] === ',' ? 1 : 0; }).map(function (p) { return p.text.trim().replace(/^`|`$/g, ''); }).filter(Boolean);
+          spec.by = splitTopLevel(body, function (t, i) { return t[i] === ',' ? 1 : 0; }).map(function (p) { return p.text.trim(); }).filter(Boolean);   // keep `quotes`: "HQ city" is two tokens
           break;
         case 'where': spec.where = body; break;
-        case 'sort': case 'order by':
+        case 'sort': case 'sort by': case 'order by':
           spec.sort = splitTopLevel(body, function (t, i) { return t[i] === ',' ? 1 : 0; }).map(function (p) {
-            var m = p.text.trim().match(/^(.*?)(?:\s+(asc|desc))?$/i);
-            return { key: m[1].trim().replace(/^["'`]|["'`]$/g, ''), dir: (m[2] || 'desc').toLowerCase() };
+            var txt = p.text.trim(), m = txt.match(/\s(asc|desc)$/i);
+            return { key: (m ? txt.slice(0, m.index) : txt).trim().replace(/^["'`]|["'`]$/g, ''), dir: (m ? m[1] : 'desc').toLowerCase() };
           });
           break;
-        case 'top': case 'limit': spec.limit = parseInt(body, 10) || null; break;
+        case 'top': case 'limit':
+          // "top -3" used to drop the last 3 rows, "top 0" / "top ten" silently returned everything
+          if (!/^\d+$/.test(body) || +body < 1) throw new RK.expr.ExprError('"' + f.kw + '" expects a whole number of rows, e.g. top 10 (got "' + body + '")');
+          spec.limit = +body;
+          break;
       }
     });
     if (head) {
       spec.select = splitTopLevel(head, function (t, i) { return t[i] === ',' ? 1 : 0; }).map(function (p) {
         var item = p.text.trim(), fmt = null, label = null;
-        var fm = item.match(/\s+format\s+("([^"]*)"|'([^']*)'|(\S+))\s*$/i);
-        if (fm) { fmt = fm[2] || fm[3] || fm[4]; item = item.slice(0, fm.index).trim(); }
-        var am = item.match(/\s+as\s+("([^"]*)"|'([^']*)'|`([^`]*)`|([\wÀ-￿]+))\s*$/i);
-        if (am) { label = am[2] || am[3] || am[4] || am[5]; item = item.slice(0, am.index).trim(); }
+        for (var pass = 0; pass < 2; pass++) {   // "as" and "format" may come in either order
+          // single \s before the keyword + trimmed item: linear time (\s+...\s*$ backtracked O(n^2) on long blanks)
+          var fm = fmt === null && item.match(/\sformat\s+("([^"]*)"|'([^']*)'|(\S+))$/i);
+          if (fm) { fmt = fm[2] || fm[3] || fm[4]; item = item.slice(0, fm.index).trim(); }
+          var am = label === null && item.match(/\sas\s+("([^"]*)"|'([^']*)'|`([^`]*)`|([\wÀ-￿]+))$/i);
+          if (am) { label = am[2] || am[3] || am[4] || am[5]; item = item.slice(0, am.index).trim(); }
+        }
         return { expr: item, as: label, format: fmt };
       }).filter(function (s) { return s.expr; });
     }
     return spec;
   }
 
-  function guessFormat(c, ds) {
-    // single field or aggregate over a single field -> inherit that field's format
-    var ast = c.ast;
-    if (ast.type === 'field' && ds.field(c.fields[0])) return ds.field(c.fields[0]).format;
-    if (ast.type === 'call' && ast.args.length && ast.args[0].type === 'field' && ast.name !== 'count' && ast.name !== 'countd') {
-      var f = ds.field(c.fields[0]);
-      return f && f.format;
+  // functions whose result has the unit of their first argument (sum(ev) is in dollars like ev) ...
+  var SAME_UNIT = dict({ sum: 1, avg: 1, mean: 1, average: 1, median: 1, min: 1, max: 1, first: 1, last: 1, pctl: 1, percentile: 1,
+    wavg: 1, stdev: 1, stddev: 1, abs: 1, round: 1, floor: 1, ceil: 1, clamp: 1, coalesce: 1 });
+  // ... and functions with a unit of their own: pct_change(revenue, ...) is a %, not "$0"; year(date) is 2019, not a date
+  var RESULT_FORMAT = dict({ count: '#,##0', countd: '#,##0', pct_change: '0.0%', cagr: '0.0%', year: '0', month: '0', quarter: '0' });
+
+  /** Two formats that must agree; undefined (a number literal or null) fits either. */
+  function agree(a, b) { return a === undefined ? b : (b === undefined || a === b ? a : null); }
+
+  /**
+   * Display format of a query column, inferred from the formula: the result keeps the format of the field it is
+   * computed from when it keeps that field's unit. ev, sum(ev), -ev, round(avg(ev), 1), ev_26e - ev_25e and
+   * sum(if(x, ev, 0)) keep ev's format; count() is "#,##0", pct_change() / cagr() "0.0%", year() "0"; ratios,
+   * products, text and other functions get null (General). Returns undefined for a number literal / null.
+   */
+  function inferFormat(node, ds) {
+    switch (node.type) {
+      case 'field': { var f = ds.field(node.resolved || node.name); return f && f.format != null ? f.format : null; }
+      case 'lit': return node.v === null || typeof node.v === 'number' ? undefined : null;
+      case 'un': return node.op === 'neg' ? inferFormat(node.a, ds) : null;
+      case 'cond': return agree(inferFormat(node.a, ds), inferFormat(node.b, ds));
+      case 'bin': return node.op === '+' || node.op === '-' ? agree(inferFormat(node.a, ds), inferFormat(node.b, ds)) : null;
+      case 'call':
+        if (has(RESULT_FORMAT, node.name)) return RESULT_FORMAT[node.name];
+        if (node.name === 'if' || node.name === 'iif') return node.args.length < 2 ? null : agree(inferFormat(node.args[1], ds), node.args[2] ? inferFormat(node.args[2], ds) : undefined);
+        if (has(SAME_UNIT, node.name) && node.args.length) return inferFormat(node.args[0], ds);
+        return null;
     }
-    if (ast.type === 'call' && (ast.name === 'count' || ast.name === 'countd')) return '#,##0';
     return null;
+  }
+  function guessFormat(c, ds) {
+    var f = inferFormat(c.ast, ds);
+    return f === undefined ? null : f;
   }
 
   /**
@@ -1566,6 +1929,7 @@
       rows = rows.filter(function (r) { return !!w.eval(r, env); });
     }
     var by = (spec.by || []).map(function (b) {
+      if (ds.has(b)) return b;                                   // spec objects may pass raw names with spaces
       var c = RK.expr.compile(b, { fields: fields });
       if (c.ast.type !== 'field') throw new RK.expr.ExprError('"by" expects field names, got "' + b + '"');
       return c.fields[0];
@@ -1585,29 +1949,38 @@
         title: it.as || (single ? single.title : it.expr),
         format: it.format || guessFormat(c, ds),
         compiled: c,
-        type: single ? single.type : 'number'
+        type: single ? single.type : null      // expressions: typed from their values below
       };
     });
     var isAgg = by.length > 0 || cols.some(function (c) { return c.compiled.aggregate; });
     var outRows;
     if (isAgg) {
       var keyCols = by.filter(function (b) { return !cols.some(function (c) { return c.name === b; }); });
-      var groups = by.length ? util.groupBy(rows, function (r) { return by.map(function (b) { return r[b]; }).join('\u0001'); }) : new Map([['', rows]]);
+      var groups = by.length ? util.groupBy(rows, function (r) { return by.map(function (b) { return get(r, b); }).join('\u0001'); }) : new Map([['', rows]]);
       outRows = [];
       groups.forEach(function (g) {
         var rec = {};
-        keyCols.forEach(function (b) { rec[b] = g[0][b]; });
-        cols.forEach(function (c) { rec[c.name] = c.compiled.aggregate ? c.compiled.eval(g, env) : c.compiled.eval(g[0], env); });
+        keyCols.forEach(function (b) { put(rec, b, get(g[0], b)); });
+        cols.forEach(function (c) { put(rec, c.name, c.compiled.aggregate ? c.compiled.eval(g, env) : c.compiled.eval(g[0], env)); });
         outRows.push(rec);
       });
       cols = keyCols.map(function (b) { var f = ds.field(b); return { name: b, title: f.title, format: f.format, type: f.type }; }).concat(cols);
     } else {
       outRows = rows.map(function (r) {
         var rec = {};
-        cols.forEach(function (c) { rec[c.name] = c.compiled.eval(r, env); });
+        cols.forEach(function (c) { put(rec, c.name, c.compiled.eval(r, env)); });
         return rec;
       });
     }
+    // if(..., "Net cash", "Net debt") is text, min(date) a date: type expression columns by their first value
+    cols.forEach(function (c) {
+      if (c.type) return;
+      c.type = 'number';
+      for (var i = 0; i < outRows.length; i++) {
+        var v = outRows[i][c.name];
+        if (v != null && v !== '') { c.type = inferType([outRows[i]], c.name); break; }
+      }
+    });
     (spec.sort || []).slice().reverse().forEach(function (s) {
       var col = null;
       if (/^\d+$/.test(s.key)) col = cols[parseInt(s.key, 10) - 1];
@@ -1621,7 +1994,7 @@
         return (typeof x === 'string' ? x.localeCompare(y) : x - y) * dir;
       });
     });
-    if (spec.limit) outRows = outRows.slice(0, spec.limit);
+    if (spec.limit > 0) outRows = outRows.slice(0, Math.floor(spec.limit));   // spec objects: a non-positive limit is no limit
     return {
       dataset: ds.id,
       aggregate: isAgg,
@@ -1659,6 +2032,9 @@
     view: view,
     affected: affected,
     applies: filterApplies,
+    /** Column names too generic to cross-filter across datasets (see ctx.select scope). */
+    GENERIC_FIELDS: /^(type|kind|source|target|step|stage|metric|category|group|name|label|id|parent|value|series|status|item|node|link|bucket|class|level)$/i,
+    isGenericField: function (field) { return !!field && RK.data.GENERIC_FIELDS.test(String(field)); },
     aggregate: aggregate,
 
     adapter: function (name, fn) { adapters[name] = fn; },
@@ -1960,6 +2336,15 @@
       RK.bus.emit('theme:changed', theme.current);
     },
 
+    /** Resolve a token name ('accent2', 'cat3', 'ref', 'seq5', 'ink-2') or pass a literal colour through. */
+    resolve: function (c) {
+      if (!c || typeof c !== 'string') return c;
+      var t = theme.tokens(), k = c.replace(/^--rk-/, '').replace(/-(\w)/g, function (_, x) { return x.toUpperCase(); });
+      var m = k.match(/^(cat|seq|div|ord)(\d+)$/);
+      if (m) return t[m[1]][+m[2] - 1] || c;
+      return typeof t[k] === 'string' && t[k] ? t[k] : c;
+    },
+
     /** Readable label colour on top of a data fill, correct in light and dark themes. */
     textOn: function (fill) {
       var t = theme.tokens();
@@ -2058,6 +2443,11 @@
       var renderer = ctx.options.renderer || (ctx.print ? 'svg' : 'svg');
       var inst = global.echarts.init(ctx.el, 'rk', { renderer: renderer, locale: ctx.options.locale || 'EN' });
       var current = ctx;
+      // ECharts' roam/inside-zoom controller calls preventDefault on every wheel event before checking
+      // zoomOnMouseWheel:'ctrl', which swallows page scrolling. Keep plain wheel for the report; let
+      // Ctrl/Cmd + wheel (and trackpad pinch, which sends ctrlKey) through to ECharts.
+      function onWheel(e) { if (!e.ctrlKey && !e.metaKey) e.stopPropagation(); }
+      if (ctx.options.wheelZoom !== true) ctx.el.addEventListener('wheel', onWheel, { capture: true });
 
       function apply(c, first) {
         current = c;
@@ -2081,7 +2471,7 @@
       if (hooks.select) {
         inst.on('click', function (params) {
           var sel = hooks.select(params, current, inst);
-          if (sel && sel.field != null && current.options.crossFilter !== false) current.select(sel.field, sel.value);
+          if (sel && sel.field != null && current.options.crossFilter !== false) current.select(sel.field, sel.value, sel.opt);
         });
       }
       if (hooks.on) {
@@ -2098,7 +2488,7 @@
           inst.resize();
           if (hooks.rebuildOnResize) apply(current, false);   // width-dependent layouts (tick density, label widths)
         },
-        destroy: function () { inst.dispose(); },
+        destroy: function () { ctx.el.removeEventListener('wheel', onWheel, { capture: true }); inst.dispose(); },
         exportImage: function () { return exportPNG(inst, current); },
         exportSVG: function () {
           return inst.renderToSVGString ? inst.renderToSVGString() : null;
@@ -2259,24 +2649,54 @@
 
   /**
    * Spread 1-D label positions so neighbours are at least `gap` apart, staying within [lo, hi].
-   * items: array of desired positions; returns adjusted positions in the same order.
+   * Exact cluster-merge: overlapping labels form clusters centred on the mean of their desired
+   * positions; clusters merge until none overlap. Returns adjusted positions in input order.
    */
   chart.spreadLabels = function (items, gap, lo, hi) {
-    var idx = items.map(function (y, i) { return i; }).sort(function (a, b) { return items[a] - items[b]; });
-    var pos = idx.map(function (i) { return items[i]; });
-    for (var iter = 0; iter < 50; iter++) {
-      var moved = false;
-      for (var k = 1; k < pos.length; k++) {
-        var d = pos[k] - pos[k - 1];
-        if (d < gap) { var shift = (gap - d) / 2; pos[k - 1] -= shift; pos[k] += shift; moved = true; }
+    var order = items.map(function (y, i) { return i; }).sort(function (a, b) { return items[a] - items[b]; });
+    var clusters = [];
+    order.forEach(function (i) {
+      clusters.push({ ids: [i], sum: items[i], start: items[i] });
+      // merge backwards while the new cluster overlaps its predecessor
+      while (clusters.length > 1) {
+        var b = clusters[clusters.length - 1], a = clusters[clusters.length - 2];
+        if (a.start + (a.ids.length - 1) * gap + gap <= b.start + 1e-9) break;
+        var ids = a.ids.concat(b.ids), sum = a.sum + b.sum;
+        clusters.splice(-2, 2, { ids: ids, sum: sum, start: sum / ids.length - (ids.length - 1) * gap / 2 });
       }
-      if (lo != null && pos.length && pos[0] < lo) { var dl = lo - pos[0]; pos = pos.map(function (p) { return p + dl; }); }
-      if (hi != null && pos.length && pos[pos.length - 1] > hi) { var dh = pos[pos.length - 1] - hi; pos = pos.map(function (p) { return p - dh; }); }
-      if (!moved) break;
+    });
+    // clamp to the band, shifting whole clusters (and re-merging if clamping causes overlap)
+    var out = new Array(items.length), cursor = lo != null ? lo : -Infinity;
+    clusters.forEach(function (c) {
+      var start = Math.max(c.start, cursor);
+      c.ids.forEach(function (id, k) { out[id] = start + k * gap; });
+      cursor = start + c.ids.length * gap;
+    });
+    if (hi != null) {
+      var limit = hi;
+      for (var ci = clusters.length - 1; ci >= 0; ci--) {
+        var c = clusters[ci], first = out[c.ids[0]], last = first + (c.ids.length - 1) * gap;
+        if (last > limit) { var d = last - limit; c.ids.forEach(function (id) { out[id] -= d; }); }
+        limit = out[c.ids[0]] - gap;
+      }
     }
-    var out = new Array(items.length);
-    idx.forEach(function (i, k) { out[i] = pos[k]; });
     return out;
+  };
+
+  /**
+   * Axis tick formatter that drops decimals when every tick (or the step) is whole:
+   * "$6,000" not "$6,000.0", "5x" not "5.0x". step: number, array of tick values, or a function.
+   */
+  chart.tickFmt = function (code, step) {
+    code = String(RK.format.presets[code] || code || 'auto');
+    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
+    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
+    function whole(v) { return num(v, code) === num(v, trimmed); }
+    return function (v) {
+      var s = typeof step === 'function' ? step() : step;
+      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
+      return RK.format(v, ok ? trimmed : code);
+    };
   };
 
   RK.chart = chart;
@@ -2553,7 +2973,6 @@
     el.classList.add('rk-geo');
     if (cls) el.classList.add(cls);
     if (ctx.motion) el.classList.add('is-motion');
-    map.createPane('rk-labels').style.zIndex = 640;
     map.on('dragstart', function () { st.moved = true; });
     map.on('zoomstart', function () { if (!st.fitting) st.moved = true; });
     if (wheel === 'click') {   // plain-wheel zoom armed by a click on the map, disarmed when the pointer leaves it
@@ -2642,7 +3061,7 @@
   }
 
   /**
-   * Collision-aware HTML labels in the 'rk-labels' pane (created by RK.geo.view): per group, the top `max`
+   * Collision-aware HTML labels in an 'rk-labels' pane above all marks: per group, the top `max`
    * items by priority that fit next to their mark without overlapping controls or each other.
    *   var lab = RK.geo.labels(map);
    *   lab.set([{latlng, html, r, prio, pos: ['r','l','t','b','c'], cls, group}], maxOrPerGroup, soft);   // soft: [{ll, r}] marks to avoid covering
@@ -3159,9 +3578,11 @@
     var self = this;
     var opts = this.options();
     var ds = this.datasetId ? RK.data.get(this.datasetId) : null;
-    function selExtra(opt) {
+    function selExtra(opt, field) {
       opt = opt || {};
-      var scope = opt.scope || opts.crossFilterScope || 'global';
+      // generic column names (type, source, step...) mean different things in different datasets:
+      // their selections stay within this block's dataset unless a scope is given explicitly
+      var scope = opt.scope || opts.crossFilterScope || (RK.data.isGenericField(field) ? 'dataset' : 'global');
       var extra = { either: opt.either, allowEmpty: opt.allowEmpty };
       if (opt.datasets) extra.datasets = opt.datasets;
       else if (scope === 'dataset' && ds) extra.datasets = [ds.id];
@@ -3199,11 +3620,11 @@
        * Block option crossFilterScope sets the default scope.
        */
       select: function (field, value, opt) {
-        RK.store.toggleValue(self.id + ':' + field, field, value, self.id, selExtra(opt));
+        RK.store.toggleValue(self.id + ':' + field, field, value, self.id, selExtra(opt, field));
       },
       /** Replace the whole selection on `field` (brush / lasso). Empty array clears it unless opt.allowEmpty. */
       setSelection: function (field, values, opt) {
-        RK.store.setValues(self.id + ':' + field, field, values, self.id, selExtra(opt));
+        RK.store.setValues(self.id + ':' + field, field, values, self.id, selExtra(opt, field));
       },
       selected: function (field) { var f = RK.store.filter(self.id + ':' + field); return f && f.values ? f.values : []; },
       clearSelection: function () { RK.store.clearFilters(self.id); },

@@ -170,7 +170,7 @@
   --rk-ord-3: #9a6b35;
   --rk-ord-4: #c49a60;
   --rk-ord-5: #dfc7a3;
-  --rk-ref: #8f2c47;
+  --rk-ref: #b3261e;
 }
 
 /* ==== kit/styles/themes/slate.css ==== */
@@ -251,7 +251,7 @@
   --rk-accent-3: #5f8fcb;
   --rk-highlight: #d6b47a;
   --rk-pos: #5fb3a2;
-  --rk-neg: #e58f9c;
+  --rk-neg: #f0716b;
   --rk-neutral: #5d6b80;
   --rk-tooltip-bg: #1c2a40;
   --rk-tooltip-ink: #e8edf4;
@@ -723,6 +723,7 @@ textarea.rk-input { height: auto; padding: 8px 10px; line-height: 1.45; resize: 
 .rk-block:hover .rk-xy-tools, .rk-xy-tools:focus-within, .rk-xy-tools.has-on { opacity: 1; }
 .rk-xy-tools .rk-iconbtn.is-on { color: var(--rk-accent); background: var(--rk-surface); border-color: var(--rk-rule); }
 @media (hover: none) { .rk-xy-tools { opacity: 1; } }
+.rk-xy-tools[hidden] { display: none; }   /* ctx.print refresh */
 @media print { .rk-xy-tools { display: none; } }
 
 /* ==== kit/components/bubble-map/bubble-map.css ==== */
@@ -1624,6 +1625,7 @@ textarea.rk-input { height: auto; padding: 8px 10px; line-height: 1.45; resize: 
 .rk-block:hover .rk-xy-tools, .rk-xy-tools:focus-within, .rk-xy-tools.has-on { opacity: 1; }
 .rk-xy-tools .rk-iconbtn.is-on { color: var(--rk-accent); background: var(--rk-surface); border-color: var(--rk-rule); }
 @media (hover: none) { .rk-xy-tools { opacity: 1; } }
+.rk-xy-tools[hidden] { display: none; }   /* ctx.print refresh */
 @media print { .rk-xy-tools { display: none; } }
 
 /* ==== kit/components/sensitivity-table/sensitivity-table.css ==== */

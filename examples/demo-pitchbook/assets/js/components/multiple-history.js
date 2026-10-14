@@ -171,7 +171,7 @@
           axisLabel: { formatter: function (v) { return RK.format(new Date(v), dfmt); }, hideOverlap: true },
           splitLine: { show: false }
         },
-        yAxis: { type: 'value', min: yMin, max: yMax, interval: step, axisLabel: { formatter: tickFmt(fmt, step) } },
+        yAxis: { type: 'value', min: yMin, max: yMax, interval: step, axisLabel: { formatter: C.tickFmt(fmt, step) } },
         dataZoom: o.zoom !== false ? C.zoom(ctx, 'x') : [],
         series: series
       };
@@ -208,22 +208,5 @@
     code = RK.format.presets[code] || code;
     if (String(code).indexOf(';') >= 0) return code;
     return '+' + code + ';−' + code + ';' + code;
-  }
-
-  /**
-   * Axis tick formatter (house style: no decimals when the tick step is whole at display precision,
-   * "$6,000" not "$6,000.0", "20%" not "20.0%"). step: number, function returning the live step,
-   * or an array of tick values; null decides per value.
-   */
-  function tickFmt(code, step) {
-    code = String(RK.format.presets[code] || code || 'auto');
-    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
-    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
-    function whole(v) { return num(v, code) === num(v, trimmed); }
-    return function (v) {
-      var s = typeof step === 'function' ? step() : step;
-      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
-      return RK.format(v, ok ? trimmed : code);
-    };
   }
 })();

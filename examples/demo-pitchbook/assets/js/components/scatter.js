@@ -52,9 +52,6 @@
   function axisStep(inst, axis, dflt) {
     try { return inst.getModel().getComponent(axis, 0).axis.scale.getInterval() || dflt; } catch (e) { return dflt; }
   }
-  /** Generic field names cross-filter only this block's dataset; business dimensions (company, sector …) stay global. */
-  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
-  function scoped(ctx, f) { return GENERIC.test(f) ? { scope: ctx.options.crossFilterScope || 'dataset' } : null; }
 
   /* ---------------- label placement (greedy, think-cell style) ---------------- */
   function gridRect(inst) {
@@ -189,7 +186,7 @@
     var vals = st.points.filter(function (p) {
       return p.x >= xr[0] && p.x <= xr[1] && p.y >= yr[0] && p.y <= yr[1];
     }).map(function (p) { return p.key; });
-    st.ctx.setSelection(st.selField, util.unique(vals), scoped(st.ctx, st.selField));   // empty box clears
+    st.ctx.setSelection(st.selField, util.unique(vals));   // empty box clears; generic fields stay in this dataset (core)
   }
 
   var build = function (ctx, inst) {
@@ -346,9 +343,8 @@
     inst.__rk = { ctx: ctx, points: points, selField: selField };
     inst.__rkCanBrush = !!selField && o.brush !== false && o.crossFilter !== false;
 
-    var yTick = ticks(yFmt, function () { return axisStep(inst, 'yAxis', ye.step); });
-    var labFont = '11px ' + t.fontNum;
-    var yLabW = Math.max(C.measure(ticks(yFmt, ye.step)(ye.min), labFont), C.measure(ticks(yFmt, ye.step)(ye.max), labFont));
+    var yLab = ticks(yFmt, ye.step), labFont = '11px ' + t.fontNum;
+    var yLabW = Math.max(C.measure(yLab(ye.min), labFont), C.measure(yLab(ye.max), labFont));
     var legendNames = layers.map(function (L) { return L.name; });
     if (fit) legendNames.push({ name: fitName, icon: 'path://M0 4.2h18v1.6H0z', itemWidth: 16, itemHeight: 9 });
     var showLegend = legendOn && legendNames.length > 1;
@@ -384,7 +380,7 @@
       yAxis: {
         type: 'value', min: ye.min, max: ye.max, splitNumber: Math.round((ye.max - ye.min) / ye.step), name: o.yTitle || ctx.title(enc.y), nameLocation: 'middle', nameGap: Math.round(yLabW + 14),
         axisLine: { show: false, onZero: false },
-        axisLabel: { formatter: yTick, showMinLabel: !zoomed, showMaxLabel: !zoomed },
+        axisLabel: { formatter: ticks(yFmt, function () { return axisStep(inst, 'yAxis', ye.step); }), showMinLabel: !zoomed, showMaxLabel: !zoomed },
         splitLine: { show: true, lineStyle: { color: t.grid } }
       },
       toolbox: { show: false },  // the brush is driven from the HTML toolbar
@@ -401,13 +397,10 @@
   };
 
   var base = C(build, {
-    on: {
-      // click a point -> toggle it in the cross-filter on the label (or name) field
-      click: function (p, ctx, inst) {
-        var f = inst.__rk && inst.__rk.selField;
-        if (p.componentType !== 'series' || !p.data || !p.data.row || !f || ctx.options.crossFilter === false) return;
-        ctx.select(f, p.data.row[f], scoped(ctx, f));
-      }
+    // click a point -> toggle it in the cross-filter on the label (or name) field
+    select: function (p, ctx, inst) {
+      var f = inst.__rk && inst.__rk.selField;
+      return p.componentType === 'series' && p.data && p.data.row && f ? { field: f, value: p.data.row[f] } : null;
     },
     init: function (inst) {
       inst.on('brushEnd', function (params) { onBrushEnd(params, inst); });
@@ -450,13 +443,14 @@
     },
     render: function (ctx) {
       var api = base(ctx), inst = api.chart;
-      var bar = !ctx.print && ctx.options.zoom !== false ? toolbar(ctx, inst) : null;
+      var bar = ctx.options.zoom !== false ? toolbar(ctx, inst) : null;
+      if (bar) bar.hidden = !!ctx.print;   // print: no buttons (also re-checked on every print refresh)
       var relabel = util.rafThrottle(function () { layoutLabels(inst); });
       layoutLabels(inst);
       inst.on('datazoom', relabel);
       inst.on('legendselectchanged', relabel);
       var update = api.update, resize = api.resize, destroy = api.destroy;
-      api.update = function (c) { update(c); layoutLabels(inst); };
+      api.update = function (c) { update(c); layoutLabels(inst); if (bar) bar.hidden = !!c.print; };
       api.resize = function () { resize(); layoutLabels(inst); };
       api.destroy = function () { if (bar) bar.remove(); destroy(); };
       return api;

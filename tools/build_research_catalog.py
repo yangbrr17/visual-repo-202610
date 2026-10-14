@@ -57,7 +57,9 @@ def main() -> None:
     libs = list(merged.values())
     for lib in libs:
         npm = str(lib.get("npm", "")).lower()
-        lib["in_kit"] = npm in vendored or norm(lib["name"]) in vendored_names
+        name_n = norm(lib["name"])
+        lib["in_kit"] = (npm in vendored or name_n in vendored_names
+                         or any(name_n.startswith(f) for f in ("inter", "sourceserif4", "sourceserif")) and "font" in json.dumps(lib).lower())
     libs.sort(key=lambda l: (str(l.get("category", "zz")), VERDICT_RANK.get(l.get("verdict"), 9), l["name"].lower()))
     counts = {}
     for l in libs:

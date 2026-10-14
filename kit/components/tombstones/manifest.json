@@ -1,0 +1,52 @@
+{
+  "id": "tombstones",
+  "name": "Deal Tombstones",
+  "name_zh": "交易业绩墓碑卡",
+  "category": "layout",
+  "engine": "dom",
+  "deps": [],
+  "summary": "Deal credentials grid: one tombstone card per transaction with deal type, parties in pitchbook wording, monogram tiles, value, date and role; sector / region chips cross-filter.",
+  "summary_zh": "交易业绩（tombstone）网格：每笔交易一张卡片，展示交易类型、按投行措辞排列的交易双方、首字母标识、交易金额、日期与本行角色；行业 / 地区筛选片可交叉筛选。",
+  "description_zh": "投行 pitchbook 的“credentials / tombstones”页：每行数据是一笔交易，卡片顶部为交易类型，中间按交易类型自动生成措辞（卖方并购“X has been acquired by Y”、买方并购“Y has acquired X”、收购融资、合并、IPO 等），下方为交易金额、公告日期和本行角色；标识用双方名称首字母生成的方块代替外部 logo，离线可用。卡片在响应式网格中等高排列（columns 控制每行最多卡片数，窄屏自动换行），highlight 指定的公司（如目标公司或本行客户）用强调色 accent2 标出。顶部的行业 / 地区筛选片会对报告中所有含 sector / region 字段的数据集做交叉筛选，未选中的卡片变淡；全局筛选变化时卡片平滑重排。适合 4–16 笔精选交易的业绩展示页。",
+  "best_for": ["Credentials / selected transactions page", "Relevant experience in a sector or region", "Deal team or adviser track record in a pitch"],
+  "avoid_when": ["More than ~16 deals (use data-grid or a precedents table)", "When deal multiples must be compared (use comps-table / scatter)"],
+  "channels": {
+    "date": {"type": "date", "required": true, "desc": "Announcement / closing date (sort key, shown as 'August 2026')", "default": "date"},
+    "target": {"type": "string", "required": true, "desc": "Target / issuer / divested business", "default": "target"},
+    "acquirer": {"type": "string", "required": false, "desc": "Acquirer / borrower / merger partner (empty for IPOs and offerings)", "default": "acquirer"},
+    "value": {"type": "number", "required": false, "desc": "Deal value (missing = n.a., or options.missingValue)", "default": "deal_value_bn"},
+    "type": {"type": "string", "required": true, "desc": "Deal type; drives the wording (Sell-side M&A, Buy-side M&A, Acquisition financing, Merger, Divestiture, IPO, Follow-on offering ...)", "default": "deal_type"},
+    "role": {"type": "string", "required": false, "desc": "The bank's role, e.g. 'Exclusive financial advisor'", "default": "role"},
+    "sector": {"type": "string", "required": false, "desc": "Sector (facet chip / cross-filter field)", "default": "sector"},
+    "region": {"type": "string", "required": false, "desc": "Region (facet chip / cross-filter field)", "default": "region"},
+    "description": {"type": "string", "required": false, "desc": "One-line deal description (tooltip; on the card with showDescription)", "default": "description"}
+  },
+  "options": {
+    "columns": {"type": "number", "default": null, "desc": "Maximum cards per row; wraps to fewer columns when a card would be narrower than minCardWidth. null = auto-fill"},
+    "minCardWidth": {"type": "number", "default": 180, "desc": "Minimum card width in px"},
+    "variant": {"type": "string", "default": "classic", "desc": "classic (framed, centred tombstone) | minimal (top rule, left-aligned)"},
+    "sort": {"type": "string", "default": "newest", "desc": "newest | oldest | value | null (data order)"},
+    "max": {"type": "number", "default": null, "desc": "Show only the first N cards after sorting"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Company name(s); cards where either party matches get the accent2 cap, tint and monogram"},
+    "facets": {"type": "string[]", "default": ["sector", "region"], "desc": "Chip rows above the grid (channel or field names) that cross-filter; [] hides them"},
+    "selectionMode": {"type": "string", "default": "dim", "desc": "dim | hide — cards outside the chip selection"},
+    "monogram": {"type": "string|boolean", "default": "accent", "desc": "accent (lead party filled with the theme accent) | palette (colour hashed per company) | false (no tiles)"},
+    "showDescription": {"type": "boolean", "default": false, "desc": "Show the description on the card (it is always in the tooltip)"},
+    "showRole": {"type": "boolean", "default": true, "desc": "Role line at the foot of the card"},
+    "format": {"type": "string", "default": null, "desc": "Value format (defaults to the value field format)"},
+    "dateFormat": {"type": "string", "default": null, "desc": "Date format (defaults to the date field format, else 'mmmm yyyy')"},
+    "missingValue": {"type": "string", "default": null, "desc": "Text for a missing deal value, e.g. 'Undisclosed' (default n.a.)"},
+    "wording": {"type": "object", "default": {}, "desc": "{'<deal type>': {lead: 'target'|'acquirer', verb, party, solo}} overrides of the built-in wording rules"},
+    "tooltip": {"type": "boolean", "default": true, "desc": "Hover / focus tooltip with type, value, date, sector, region, role and description"},
+    "crossFilterScope": {"type": "string", "default": "global", "desc": "global: chips filter every dataset with the facet field (peers, precedents ...) | dataset: only this dataset"}
+  },
+  "interactions": ["Sector / region chips cross-filter the report (non-matching cards dim)", "Hover / keyboard focus lifts the card and shows a detail tooltip", "Cards re-flow with a 2-D FLIP glide when global filters change", "Staggered entry on reveal; static in print"],
+  "samples": [
+    {"title": "Selected credentials", "data": "credentials", "height": 520,
+     "options": {"columns": 4, "max": 8, "highlight": "Helios Industrial"}},
+    {"title": "All transactions by size — minimal, six across", "data": "credentials", "height": 520,
+     "options": {"columns": 6, "sort": "value", "variant": "minimal", "facets": ["sector"], "missingValue": "Undisclosed"}},
+    {"title": "Recent sector credentials with descriptions", "data": "credentials", "height": 360, "span": 8,
+     "options": {"columns": 3, "max": 3, "monogram": "palette", "showDescription": true, "facets": []}}
+  ]
+}

@@ -185,7 +185,7 @@
 | Numeric | 一个数值 / 两个 / 三个 / 多个 | `histogram`、`beeswarm` / `scatter` / `bubble` / `parallel`、`heatmap`（相关矩阵）、`boxplot` |
 | Categoric | 一个类别 / 嵌套 / 邻接 / 多个独立列表 | `bar`、`lollipop`、`donut`、`waffle` / `treemap`、`sunburst` / `chord`、`sankey` / ✗（Venn，P3） |
 | Num & Cat | 每类一个值 / 每类多个观测 / 多类一个值 / 多个数值 | `bar`、`lollipop`、`bullet`、`diverging-bar` / `boxplot`、`beeswarm` / 分组或堆叠 `bar`、`marimekko`、`heatmap` / `radar`、`dumbbell`、`comps-table` |
-| Maps | GPS 无值 / GPS 有值 / 区域有值 / 连接 | `cluster-map` / `bubble-map`、`geo-heat` / `choropleth`、`china-tilemap`（开发中） / `flow-map` |
+| Maps | GPS 无值 / GPS 有值 / 区域有值 / 连接 | `cluster-map` / `bubble-map`、`geo-heat` / `choropleth`、`china-tilemap` / `flow-map` |
 | Network | 邻接矩阵 / 层级 | `network`、`chord`、`sankey` / `tree`、`treemap`、`sunburst` |
 | Time series | 一条 / 多条 | `line`、`bar`、`calendar-heatmap`、`candlestick`、`price-volume`、`multiple-history` / `line`、`small-multiples`、`bump`、`slope` |
 
@@ -193,7 +193,7 @@
 
 | caveat | 对应的 kit 规则 |
 |---|---|
-| cut the Y axis? | 只有 `waterfall`、`football-field` 的 `axisBreak` 允许断轴，而且必须显示断轴标记 |
+| cut the Y axis? | 只有 `waterfall` 的 `axisBreak` 允许断轴（`football-field` 没有断轴选项），而且必须显示断轴标记 |
 | pie chart | `donut` 超出阈值的类别自动归入"其他" |
 | spaghetti chart | 线超过 5 条时提示改用 `small-multiples` |
 | overplotting | 用 `beeswarm` 或 jitter |
@@ -239,7 +239,7 @@
 
 | 插件 | 版本 · 许可 | kit 组件 | 备注 |
 |---|---|---|---|
-| Leaflet core | 1.9.4 · BSD-2 | 5 个 geo 组件 | Leaflet 2.0 还是 alpha.1，DB 里 0 个插件标为兼容 v2 |
+| Leaflet core | 1.9.4 · BSD-2 | 5 个 Leaflet 地图组件（geo 类的 `china-tilemap` 用 ECharts，不依赖 Leaflet） | Leaflet 2.0 还是 alpha.1，DB 里 0 个插件标为兼容 v2 |
 | Leaflet.markercluster | 1.5.3 · MIT | `cluster-map` | 外环按类别分段，效果等于 DonutCluster，不需要额外插件 |
 | Leaflet.heat | 0.2.0 · BSD-2（npm 的 license 字段缺失，以 LICENSE 文件为准） | `geo-heat` | 必须设 `maxZoom` |
 | topojson-client + world-atlas | 3.1.0 ISC / 2.0.2 ISC | 底图 | 经 `tools/build_geo.py` 包成 classic script |
@@ -349,9 +349,9 @@
   │       meta.source 写明"合成数据"；建议给 meta 加 shape 标签（data-to-viz 形态）
   │
   ├─⑦  构建与测试 ─ python3 tools/build_catalog.py --strict
-  │                 （生成 kit/catalog.json、gallery/catalog.js、docs/component-catalog.md）
+  │                 （生成 kit/catalog.json、gallery/catalog.js、gallery/samples.js、docs/component-catalog.md）
   │                 bash tools/check.sh（vendor 文件 / Python / JS / catalog / 浏览器冒烟）
-  │                 截图 tests/screens/<id>.png 和 <id>-ink.png（暗色），再打印 PDF 看矢量和分页
+  │                 截图 tests/screens/<id>.png 和 <id>-ink.png（暗色，加 --theme ink），再打印 PDF 看矢量和分页
   │
   └─⑧  回写 ────── 更新 landscape §3 的覆盖矩阵（✗ → ✓）
                    新依赖要在 research/catalog.json 里有 verdict，并标 in_kit
@@ -359,7 +359,7 @@
 
 ### 3.2 建议给 manifest 加的 `refs` 字段
 
-`tools/build_catalog.py` 只校验 `id`、`category` 和 `<id>.js` 是否存在，额外字段会原样进入 `kit/catalog.json` 和 `gallery/catalog.js`。所以加 `refs` 不需要改构建脚本。它有三个用途：
+`tools/build_catalog.py` 对 manifest 顶层只校验 `id`、`category` 和 `<id>.js` 是否存在；另外会 lint 每个 sample（option 和 encode 通道名是否在 manifest 里声明、引用的样例数据集是否存在）。顶层的额外字段会原样进入 `kit/catalog.json` 和 `gallery/catalog.js`，所以加 `refs` 不需要改构建脚本。它有三个用途：
 - gallery 可以显示"参考实现"链接；
 - Step 2 的 LLM 可以按 FT 类别或数据形态检索组件（这正是 07 §10 R1 的建议）；
 - 许可审计可以追溯到出处。

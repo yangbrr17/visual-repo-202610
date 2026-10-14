@@ -547,6 +547,34 @@
    ],
    "path": "datasets/capital_structure.json",
    "purpose": "Pro forma capitalisation table (tranches, rates, maturities, cumulative leverage)"
+  },
+  "sotp": {
+   "title": "Sum-of-the-parts valuation",
+   "rows": 5,
+   "fields": [
+    "segment",
+    "metric_name",
+    "metric_value",
+    "multiple_low",
+    "multiple_high",
+    "method",
+    "ebitda",
+    "note"
+   ],
+   "path": "datasets/sotp.json",
+   "purpose": "Sum-of-the-parts build-up: segment metric x multiple range -> EV -> equity value and value per share"
+  },
+  "offer_prices": {
+   "title": "Offer price levels for the analysis at various prices",
+   "rows": 6,
+   "fields": [
+    "price",
+    "label",
+    "kind",
+    "date"
+   ],
+   "path": "datasets/offer_prices.json",
+   "purpose": "Analysis at various prices (AVP) columns: current price, proposals received, final proposal, levels"
   }
  }
 }

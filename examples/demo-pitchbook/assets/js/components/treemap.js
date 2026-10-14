@@ -139,8 +139,6 @@
     }
   });
 
-  /** Generic node fields ('name', 'category' …) cross-filter only this block's dataset; business dimensions stay global. */
-  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
 
   /* ---------------- drill-down + breadcrumb ---------------- */
 
@@ -207,9 +205,7 @@
       var ch = chainOf(state.tree.roots, node.id);
       if (ch[viewDepth]) { zoom(state, ch[viewDepth].id); return; }
     }
-    if (ctx.options.crossFilter !== false && node.field) {
-      ctx.select(node.field, node.name, GENERIC.test(node.field) ? { scope: ctx.options.crossFilterScope || 'dataset' } : null);
-    }
+    if (ctx.options.crossFilter !== false && node.field) ctx.select(node.field, node.name);   // 'name' etc. stay in this dataset (core)
   }
 
   function build(ctx, inst, state) {

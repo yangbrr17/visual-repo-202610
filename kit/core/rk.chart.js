@@ -34,6 +34,8 @@
         current = c;
         var opt = build(c, inst) || {};
         if (!c.motion) opt.animation = false;
+        // screen readers get an auto-generated description of every chart (ECharts aria); no decal patterns
+        if (opt.aria === undefined && c.options.aria !== false) opt.aria = { enabled: true, decal: { show: false } };
         if (first) { inst.setOption(opt, { notMerge: true }); return; }
         // keep the user's zoom window across filter / param updates
         if (hooks.keepZoom !== false && opt.dataZoom) {

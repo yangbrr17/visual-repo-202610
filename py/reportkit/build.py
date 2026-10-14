@@ -241,7 +241,12 @@ def build(report: "Report", out_dir: str | os.PathLike, *, clean: bool = True, v
 
     # assets/js + assets/css
     _write(out / "assets/js/reportkit.js", _concat_js(kit, p))
-    _write(out / "assets/css/reportkit.css", _concat_css(kit, p))
+    css = _concat_css(kit, p)
+    page_size = getattr(report, "page_size", "16:9")
+    if page_size != "16:9":
+        from .report import PAGE_SIZES
+        css += f"\n/* ==== page size: {page_size} ==== */\n@page {{ size: {PAGE_SIZES[page_size]}; margin: 0; }}\n"
+    _write(out / "assets/css/reportkit.css", css)
     for cid in p.components:
         src = kit.component_js(cid)
         if not src.is_file():

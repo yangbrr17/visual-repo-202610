@@ -38,7 +38,7 @@
 | 查询语言 `RK.query`（RKQL）+ 解析结果 `RK.query.parse(text)` → `{from, select[{expr,as,format}], by, where, sort, limit}` | `kit/core/rk.data.js`，`docs/formula-language.md` §10 | ✅ |
 | 交叉筛选 `RK.store`：组件不会被自己发出的筛选影响（crossfilter 语义） | `rk.data.js` | ✅ |
 | 客户自助：`query-console`（Builder + RKQL 编辑器 + "Add as metric" 写回 `computed[]`） | `kit/components/query-console` | ✅ |
-| 52 个组件的 manifest（channels / options / best_for / avoid_when / samples）→ `kit/catalog.json` | `tools/build_catalog.py` | ✅ |
+| 53 个组件的 manifest（channels / options / best_for / avoid_when / samples）→ `kit/catalog.json` | `tools/build_catalog.py` | ✅ |
 | JSON layout spec（`reportkit` / `report` / `datasets` / `pages[].blocks[]`）与 `reportkit validate` | `py/README.md` | ✅ |
 | 函数注册表 `RK.expr.register`、严格 CSP、`RK.skills`、`RK.ai`、companion server | — | ⬜ |
 
@@ -169,7 +169,7 @@ comps-valuation/                # = skill name（小写连字符，Agent Skills 
 - [ ] manifest 和资源里不能有远程 URL，资源必须内联。AntV 的 `chart-visualization` skill 会把数据发到 AntV 云端渲染（07 §0-8），这种行为必须拒绝。
 - [ ] 加命名空间：skill 贡献的名字带前缀（`comps-valuation.ev_to`），避免覆盖内置函数或数据集字段。
 - [ ] 完整性：`integrity.sha256` 和实际内容一致。银行内部分发时可以加签名 ⬜。
-- [ ] 供应链：skill 不能带 npm 依赖；kit 的 vendor 一律精确锁定版本，用 `npm pack --ignore-scripts` 获取，并记录 sha256（AntV 投毒事件教训，06 §2）。
+- [ ] 供应链：skill 不能带 npm 依赖；kit 的 vendor 一律精确锁定版本，用 `npm pack --ignore-scripts` 获取，并记录 sha256（AntV 投毒事件教训，06 §2）。现状：精确版本 ✅；`tools/vendor.py` 用 `npm pack <pkg>@<ver>` 取 registry tarball、`tarfile` 解压，不跑安装脚本 ✅，但命令里没有显式加 `--ignore-scripts`；sha256 / `dist.integrity` 还没记录 ⬜。
 - [ ] 资源上限：单个 skill ≤ 1 MB，沙箱单次调用 ≤ 5 s，返回 ≤ 1 万行。
 - [ ] 审计：导入、启用、禁用、每次 tool 调用都写入本地审计日志（IndexedDB，可导出）。
 
@@ -267,7 +267,7 @@ LLM 只填写和 JSON layout spec 里 `blocks[]` 相同的结构：
  "options": {"regression": true}}
 ```
 
-- **可选组件和通道表**：直接来自 `kit/catalog.json`（52 个组件的 `channels`、`options`、`best_for`、`avoid_when`、`category`）。
+- **可选组件和通道表**：直接来自 `kit/catalog.json`（53 个组件的 `channels`、`options`、`best_for`、`avoid_when`、`category`）。
   它本身就是给 LLM 用的工具清单（07 R1）。
 - **校验器** ⬜：组件必须存在；必填通道都要给；字段必须在 dataset 里存在且类型匹配；`options` 的键必须在 manifest 里声明过；
   未知键给警告。用一个小型手写 JS 校验器实现，不用 Ajv（Ajv 依赖代码生成，和严格 CSP 冲突，09 §2.7）。Python 端已有的
@@ -328,7 +328,7 @@ LLM 只填写和 JSON layout spec 里 `blocks[]` 相同的结构：
 | **M1 数据 API**（2–3 周） | 参考服务端（`reportkit serve` 内置 `/api/v1/reports/{id}/…`）；ETag / 304；按需加载；鉴权（cookie / OIDC token）；problem+json 错误；Arrow 通道（可选）；"Data as of" 刷新提示 | API 模式和离线 bundle 渲染结果逐像素一致（smoke 截图对比）；断网和 401 时显示可读错误 |
 | **M2 Skills v1**（3 周） | `rk-skill.json` schema；`RK.skills` 运行时；声明式导入（metrics / queries / charts / functions）；权限预览与确认；query-console Templates；构建时打包 skill | 3 个示例 skill（comps-valuation、precedents-premia、dcf-sensitivity）；恶意样例（远程 URL、JS 注入、越权数据集）全部被拒绝 |
 | **M3 本地 LLM v1**（3–4 周） | companion 反向代理 + token + 审计；`RK.ai` provider；意图 query / metric / filter / answer；聊天面板；评测工具 | 在评测集上执行准确率 ≥ 85%（Qwen3 14B 级）；CSP 拦截外泄测试通过；所有数字都可追溯 |
-| **M4 Text-to-chart + 沙箱**（3 周） | chart 意图 → block spec 校验器 → 钉到页面或导出 spec；iframe 沙箱 JSON-RPC；Vega-Lite 子集导入器 | 52 个组件的 sample 都能被 LLM 复现（catalog 驱动）；沙箱逃逸测试通过 |
+| **M4 Text-to-chart + 沙箱**（3 周） | chart 意图 → block spec 校验器 → 钉到页面或导出 spec；iframe 沙箱 JSON-RPC；Vega-Lite 子集导入器 | 53 个组件的 sample 都能被 LLM 复现（catalog 驱动）；沙箱逃逸测试通过 |
 | **M5 加固与试点**（2–3 周） | 物理隔离安装手册、GPO 模板；在银行数据字典上评测模型；安全评审签字；可选：transformers.js 语义搜索、DuckDB power-pack（46 MB，懒加载，08 §5.5）、Flint → Excel 导出 | 1–2 个真实项目试点；合规审阅通过 |
 
 依赖顺序：M0 → M1 / M2 可以并行 → M3 → M4 → M5。

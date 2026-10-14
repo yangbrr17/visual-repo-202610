@@ -143,6 +143,7 @@
 .g-card { background: var(--rk-paper); border: 1px solid var(--rk-rule); border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; min-width: 0; }
 .g-compcard { display: flex; flex-direction: column; gap: 12px; margin: 0; transition: box-shadow var(--rk-dur-fast), border-color var(--rk-dur-fast); }
 .g-compcard__stage { min-width: 0; }
+.g-wall--solo { grid-template-columns: minmax(0, 1fr); max-width: 980px; }
 .g-compcard:hover { box-shadow: var(--rk-shadow-page); border-color: var(--rk-accent-3); }
 .g-compcard__head { text-decoration: none; color: var(--rk-ink); }
 .g-compcard__head h3 { display: inline; font-size: 16px; font-weight: 600; }
@@ -296,4 +297,6 @@
   .g-film { grid-auto-columns: 72%; }
   /* wide tables (league / comps / pivot) scroll inside their card instead of widening the page */
   .g-compcard__stage, .g-featcard__stage, .g-stage__page .rk-page__body { overflow-x: auto; }
+  .g-scrollx > .g-table { min-width: 600px; }
+  .g-scrollx > .g-table td:last-child { min-width: 240px; }
 }

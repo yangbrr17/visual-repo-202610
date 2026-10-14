@@ -2,7 +2,7 @@
    ReportKit print — each .rk-page becomes one 16:9 landscape sheet
    (13.333in x 7.5in, the PowerPoint widescreen size) for "Save as PDF".
    ========================================================================== */
-@page { size: 13.333in 7.5in; margin: 0; }
+@page { size: 13.333in 7.5in; margin: 0; }   /* the builder appends a Letter / A4 @page rule when page_size is set */
 
 @media print {
   html, body { background: #fff !important; }
@@ -20,6 +20,8 @@
     overflow: hidden;
   }
   .rk-page:last-child { break-after: auto; page-break-after: auto; }
+  [data-rk-page-size="letter"] .rk-page { width: 11in; height: 8.5in; }
+  [data-rk-page-size="a4"] .rk-page { width: 297mm; height: 210mm; }
   .rk-js .rk-reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
   .rk-block { break-inside: avoid; }
   a { color: inherit; text-decoration: none; }

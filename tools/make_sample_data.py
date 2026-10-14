@@ -1571,6 +1571,58 @@ class _Gen:
                          unit="USD per share", notes=[f"Current share price ${PRICE:.2f} (09-Oct-2026).",
                                                       "Ranges derived from peers (core = Industrial Automation + Motion & Power Control), precedents, sensitivity_dcf and sensitivity_lbo."]))
 
+    # ------------------------------------------------- ib-valuation: sum-of-the-parts, offer price levels (AVP)
+    def ib_valuation(self):
+        """sotp: segments on FY26E (segment EBITDA + corporate costs = group EBITDA); offer_prices: AVP column levels."""
+        e26 = self.fin[2026]["ebitda"]
+        rev26 = {s: self._seg_total(2026, seg=s) for s in SEGMENTS}
+        margin = {"Factory Automation": 0.195, "Motion Control": 0.168, "Sensors & Instrumentation": 0.225, "Software & Services": 0.256}
+        seg_e = {s: rnd(rev26[s] * margin[s]) for s in SEGMENTS}
+        corporate = rnd(e26 - sum(seg_e.values()))          # unallocated corporate costs (negative) close the tie-out
+        others = [p for p in self.peer_rows if not p["is_target"]]
+
+        def peer_note(sector, fn, label):
+            xs = [fn(p) for p in others if p["sector"] == sector]
+            lo, md, hi = quantile(xs, 0.25), quantile(xs, 0.5), quantile(xs, 0.75)
+            return f"{sector} peers: {lo:.1f}x–{hi:.1f}x {label} (interquartile), median {md:.1f}x"
+        m_e, m_r = "EV / EBITDA 2026E", "EV / Revenue 2026E"
+        parts = [
+            ("Factory Automation", "EBITDA 2026E", seg_e["Factory Automation"], 8.0, 9.0, m_e,
+             peer_note(IA, lambda p: p["ev_ebitda_26e"], m_e)),
+            ("Motion Control", "EBITDA 2026E", seg_e["Motion Control"], 7.0, 8.0, m_e, peer_note(MPC, lambda p: p["ev_ebitda_26e"], m_e)),
+            ("Sensors & Instrumentation", "EBITDA 2026E", seg_e["Sensors & Instrumentation"], 9.5, 11.0, m_e,
+             peer_note(ISS, lambda p: p["ev_ebitda_26e"], m_e) + "; discount for hardware mix"),
+            ("Software & Services", "Revenue 2026E", rev26["Software & Services"], 2.5, 3.25, m_r,
+             peer_note(ISS, lambda p: p["ev"] / p["revenue_26e"], m_r) + "; discount for scale"),
+        ]
+        # corporate costs capitalised at the blended segment multiple (segment EV / segment EBITDA, rounded to 0.5x)
+        blend = [round(2 * sum(p[2] * p[3 + k] for p in parts) / sum(seg_e.values())) / 2 for k in (0, 1)]
+        parts.append(("Unallocated corporate costs", "Corporate costs 2026E", corporate, blend[0], blend[1], m_e,
+                      "Capitalised at the blended segment multiple"))
+        rows = [dict(segment=s, metric_name=mn, metric_value=mv, multiple_low=lo, multiple_high=hi, method=me,
+                     ebitda=seg_e.get(s, corporate), note=nt) for s, mn, mv, lo, hi, me, nt in parts]
+        ev = [sum(r["metric_value"] * r[k] for r in rows) for k in ("multiple_low", "multiple_high")]
+        eq = [v - NET_DEBT + OTHER_ADJ for v in ev]
+        f_m = "$#,##0.0;($#,##0.0)"
+        fields = [S("segment", "Segment"), S("metric_name", "Metric"), N("metric_value", "Metric value", f_m, "USD m"),
+                  N("multiple_low", "Multiple (low)", F_MULT), N("multiple_high", "Multiple (high)", F_MULT), S("method", "Method"),
+                  N("ebitda", "EBITDA 2026E", f_m, "USD m"), S("note", "Basis")]
+        self.add(make_ds("sotp", "Sum-of-the-parts valuation", fields, rows, source=SRC_ANALYSIS, unit="USD m", notes=[
+            f"Segment EBITDA plus unallocated corporate costs = FY26E group EBITDA (${e26:,.1f}m); Software & Services valued on revenue.",
+            f"Implied EV ${ev[0]:,.0f}m–${ev[1]:,.0f}m ({ev[0] / e26:.1f}x–{ev[1] / e26:.1f}x EBITDA 2026E); less net debt ${NET_DEBT:,.0f}m "
+            f"and other adjustments ${-OTHER_ADJ:,.0f}m = equity ${eq[0]:,.0f}m–${eq[1]:,.0f}m, "
+            f"${eq[0] / SHARES:.2f}–${eq[1] / SHARES:.2f} per share on {SHARES:.1f}m diluted shares."]))
+        # --- offer price levels for the analysis at various prices (AVP): current price, proposals received, levels
+        vwap_30d, high_52w = 41.10, 47.90
+        levels = [(PRICE, "Current", "current", iso(REF_DAY)), (45.00, None, "level", None),
+                  (47.00, "Initial proposal", "proposal", "2026-08-12"), (49.50, "Revised proposal", "proposal", "2026-09-15"),
+                  (52.00, "Final proposal", "offer", "2026-10-06"), (55.00, None, "level", None)]
+        self.add(make_ds("offer_prices", "Offer price levels for the analysis at various prices", [
+            N("price", "Price per share", F_PX, "USD"), S("label", "Label"), S("kind", "Kind"), D("date", "Received")],
+            [dict(price=p, label=lb, kind=k, date=d) for p, lb, k, d in levels], source=SRC_ANALYSIS, unit="USD per share", notes=[
+                f"Reference prices: unaffected ${PRICE:.2f} (09-Oct-2026 close), 30-day VWAP ${vwap_30d:.2f}, 52-week high ${high_52w:.2f}.",
+                "kind: current = current share price; proposal = indicative proposal received; offer = final proposal; level = illustrative."]))
+
     def ebitda_bridge(self):
         e25, e26 = self.fin[2025]["ebitda"], self.fin[2026]["ebitda"]
         steps = [("Volume", 74.0, "Organic"), ("Pricing", 52.5, "Organic"), ("Mix", 10.0, "Organic"),
@@ -1596,6 +1648,7 @@ class _Gen:
                  self.corr_matrix, self.peer_scores, self.kpis, self.org_structure, self.pipeline_funnel, self.scenarios,
                  self.monthly_returns, self.daily_activity, self.network, self.debt_maturity, self.yield_curve]
         order += [self.credentials, self.sources_uses, self.capital_structure]   # ib-pitch (after precedents)
+        order += [self.ib_valuation]   # ib-valuation (after segment_revenue, peers)
         for fn in order:
             fn()
         return {k: self.out[k] for k in DATASET_ORDER}
@@ -1616,6 +1669,7 @@ DATASET_ORDER = [
     "precedents", "segments_tree", "pnl_flow", "corr_matrix", "peer_scores", "kpis", "org_structure", "pipeline_funnel",
     "scenarios", "monthly_returns", "daily_activity", "network_nodes", "network_edges", "debt_maturity", "yield_curve",
     "credentials", "sources_uses", "capital_structure",
+    "sotp", "offer_prices",
 ]
 
 # id -> which chart types / components it is meant to feed (README + index.json)
@@ -1659,6 +1713,8 @@ PURPOSE = {
     "credentials": "Deal credentials / tombstone grid (deal type, parties, value, role), filterable by sector / region",
     "sources_uses": "LBO sources & uses table (two balancing sides, % of total, x EBITDA, footnotes)",
     "capital_structure": "Pro forma capitalisation table (tranches, rates, maturities, cumulative leverage)",
+    "sotp": "Sum-of-the-parts build-up: segment metric x multiple range -> EV -> equity value and value per share",
+    "offer_prices": "Analysis at various prices (AVP) columns: current price, proposals received, final proposal, levels",
 }
 
 
@@ -1962,6 +2018,22 @@ def check_consistency(ds: dict) -> list[str]:
         chk(0 < v["low"] < v["high"], f"valuation_ranges {v['method']}: low >= high")
         chk(20 < v["low"] and v["high"] < 80, f"valuation_ranges {v['method']}: implausible")
     chk(any(v["low"] <= PRICE <= v["high"] for v in rows("valuation_ranges")), "valuation_ranges: none straddles price")
+    # ib-valuation: SOTP ties to FY26E EBITDA and segment revenue; offer levels ascending with one current / one offer
+    so = rows("sotp")
+    chk(abs(sum(r["ebitda"] for r in so) - fin[2026]["ebitda"]) < 0.05, "sotp: segment EBITDA + corporate != FY26E EBITDA")
+    chk(all(0 < r["multiple_low"] < r["multiple_high"] for r in so), "sotp: multiple_low >= multiple_high")
+    for r in so:
+        if r["metric_name"].startswith("Revenue"):
+            seg = sum(x["revenue"] for x in rows("segment_revenue") if x["year"] == "2026E" and x["segment"] == r["segment"])
+            chk(abs(r["metric_value"] - seg) < 0.05, f"sotp {r['segment']}: revenue != segment_revenue 2026E")
+        elif r["metric_name"].startswith("EBITDA"):
+            chk(r["metric_value"] == r["ebitda"], f"sotp {r['segment']}: metric != EBITDA")
+    so_px = [(sum(r["metric_value"] * r[k] for r in so) - NET_DEBT + OTHER_ADJ) / SHARES for k in ("multiple_low", "multiple_high")]
+    chk(so_px[0] < PRICE * 1.1 and so_px[1] > PRICE and so_px[1] < 80, f"sotp: implausible per-share range {so_px}")
+    op = rows("offer_prices")
+    chk([r["price"] for r in op] == sorted(r["price"] for r in op), "offer_prices: not ascending")
+    chk(sum(r["kind"] == "current" for r in op) == 1 and sum(r["kind"] == "offer" for r in op) == 1, "offer_prices: one current, one offer")
+    chk(next(r["price"] for r in op if r["kind"] == "current") == PRICE, "offer_prices: current != PRICE")
     for k in rows("kpis"):
         chk(len(k["spark"]) == 12 and k["good"] in ("up", "down"), f"kpis {k['id']}: spark/good")
     return errs

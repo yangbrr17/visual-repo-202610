@@ -98,6 +98,10 @@
 .rk-page__conf { white-space: nowrap; text-transform: uppercase; letter-spacing: .06em; }
 .rk-page__num { font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; min-width: 18px; text-align: right; color: var(--rk-ink-2); font-weight: 600; }
 
+/* page proportions: 16:9 widescreen (default) | US Letter landscape | A4 landscape (Report(page_size=...)) */
+[data-rk-page-size="letter"] .rk-page { aspect-ratio: 11 / 8.5; }
+[data-rk-page-size="a4"] .rk-page { aspect-ratio: 297 / 210; }
+
 /* ---------- 12-column grid ---------- */
 .rk-grid {
   display: grid;

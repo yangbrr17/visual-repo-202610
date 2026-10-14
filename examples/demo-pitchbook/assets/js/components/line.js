@@ -8,8 +8,6 @@
 (function () {
   'use strict';
   var C = RK.chart, util = RK.util;
-  // house rule: generic fields cross-filter only this block's dataset; business dimensions filter globally
-  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|series|category|group|label|name|key|id|status|variable)$/i;
   var FORECAST_RE = /\d\s*[EFBP]$/i;      // "2026E", "FY27F", "2025B", "2028P"
   var DELTA = '+0.0%;-0.0%;0.0%';
 
@@ -43,11 +41,11 @@
       var state = { zoom: null, legendSel: null, labelIds: [], model: null, yAxis: null, raf: 0 };
       var api = C(function (c, inst) { return build(c, inst, state); }, {
         rebuildOnResize: true,     // date-tick density and the end-label margin depend on the plot size
-        select: function (p, c) {
-          var f = c.enc.series, s = state.model && state.model.byId[p.seriesId];
-          if (!f || !s || Array.isArray(c.enc.y) || p.seriesType !== 'line' || c.options.crossFilter === false) return null;
-          c.select(f, s.name, GENERIC.test(f) && !c.options.crossFilterScope ? { scope: 'dataset' } : null);
-          return null;
+        select: function (p, c, chart) {
+          // clicks on the line body carry seriesIndex but no seriesId; generic series fields are scoped by core
+          var sm = chart.getModel().getSeriesByIndex(p.seriesIndex);
+          var s = state.model && sm && state.model.byId[sm.id];
+          return s && c.enc.series && !Array.isArray(c.enc.y) && p.seriesType === 'line' ? { field: c.enc.series, value: s.name } : null;
         }
       })(ctx);
       var inst = api.chart;
@@ -114,7 +112,8 @@
     var fmt = o.format || (o.rebase != null ? '#,##0.0' : data.yFormat) || 'auto';
     var hl = o.highlight;
     var stacked = o.area === 'stacked';
-    var pal = RK.theme.palette({ n: data.series.length });     // peers stay clear of the accent2 highlight
+    // stacked areas are parts of a whole -> ordinal ramp; otherwise peers stay clear of the accent2 highlight
+    var pal = stacked && data.series.length <= t.ord.length ? t.ord : RK.theme.palette({ n: data.series.length });
     var sel = enc.series && !Array.isArray(enc.y) ? ctx.selected(enc.series) : [];
 
     var pi = 0;
@@ -364,7 +363,7 @@
       splitLine: { show: false },
       axisLine: { show: true, lineStyle: { color: t.axis } },
       axisTick: model.isTime ? { show: true, length: 3, lineStyle: { color: t.axis }, customValues: tk.values } : { show: true },
-      axisLabel: model.isTime ? tickLabel(tk) : { formatter: tickFmt(o.xFormat || ctx.fmtOf(ctx.enc.x) || 'auto') },
+      axisLabel: model.isTime ? tickLabel(tk) : { formatter: C.tickFmt(o.xFormat || ctx.fmtOf(ctx.enc.x) || 'auto') },
       axisPointer: { show: true, type: 'line', label: { show: false } }
     };
 
@@ -387,7 +386,7 @@
       xAxis: xAxis,
       yAxis: {
         id: 'y', type: 'value', min: y ? y.min : null, max: y ? y.max : null, interval: y ? y.interval : null,
-        axisLabel: { formatter: tickFmt(fmt, function () { return state.yAxis && state.yAxis.interval; }) }
+        axisLabel: { formatter: C.tickFmt(fmt, function () { return state.yAxis && state.yAxis.interval; }) }
       },
       dataZoom: dz,
       series: series
@@ -401,23 +400,6 @@
     var below = 0, total = 0;
     a.values.forEach(function (v, i) { if (v != null && b.values[i] != null) { total++; if (v < b.values[i]) below++; } });
     return total && below / total > 0.5;
-  }
-
-  /**
-   * Axis tick formatter (house style: no decimals when the tick step is whole at display precision,
-   * "$6,000" not "$6,000.0", "20%" not "20.0%"). step: number, function returning the live step,
-   * or an array of tick values; null decides per value.
-   */
-  function tickFmt(code, step) {
-    code = String(RK.format.presets[code] || code || 'auto');
-    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
-    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
-    function whole(v) { return num(v, code) === num(v, trimmed); }
-    return function (v) {
-      var s = typeof step === 'function' ? step() : step;
-      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
-      return RK.format(v, ok ? trimmed : code);
-    };
   }
 
   /**
@@ -458,11 +440,12 @@
   function markSeries(ctx, model, fmt) {
     var o = ctx.options, t = ctx.theme;
     var lines = (o.refLines || []).map(function (r) {
+      var col = RK.theme.resolve(r.color) || t.ref;          // token names ('pos', 'accent2') or literal colours
       return {
         yAxis: r.value, name: r.label || '',
-        lineStyle: { color: r.color || t.ref, type: r.type || 'dashed', width: 1.25 },
+        lineStyle: { color: col, type: r.type || 'dashed', width: 1.25 },
         // label on a paper chip so it stays legible where it crosses the lines
-        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: r.color || t.ref, fontWeight: 600, fontSize: 10.5,
+        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: col, fontWeight: 600, fontSize: 10.5,
           backgroundColor: RK.theme.alpha(t.paper, 0.85), padding: [1, 4], borderRadius: 2 }
       };
     });

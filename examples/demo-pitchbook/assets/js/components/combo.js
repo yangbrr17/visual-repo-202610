@@ -7,8 +7,6 @@
 (function () {
   'use strict';
   var C = RK.chart, U = RK.util;
-  // house rule: generic fields cross-filter only this block's dataset; business dimensions filter globally
-  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|series|category|group|label|name|key|id|status|variable)$/i;
   // legend glyph for line series: a rule with a dot; the two empty sub-paths keep the 14x14 box square
   var LINE_ICON = 'path://M7,0L7,0Z M7,14L7,14Z M0,6.4L14,6.4L14,7.6L0,7.6Z M9.4,6L9.4,8L8,9.4L6,9.4L4.6,8L4.6,6L6,4.6L8,4.6Z';
 
@@ -42,7 +40,8 @@
       var band = o.layout !== 'overlay';
       // primary line in accent2; bars and further lines from the palette, kept clear of it
       var pal = RK.theme.palette({ n: bars.length + lines.length });
-      var barColor = function (i) { return bars.length === 1 ? t.accent : pal[i]; };
+      var ord = o.barStack && bars.length > 1 && bars.length <= t.ord.length;   // stacked bars: parts of a whole
+      var barColor = function (i) { return bars.length === 1 ? t.accent : ord ? t.ord[i] : pal[i]; };
       var lineColor = function (i) { return i === 0 ? t.accent2 : i === 1 ? t.ink3 : pal[bars.length + i - 2]; };
 
       // per-category bar tops (stack totals or tallest bar) — used for scales, labels and CAGR legs
@@ -94,13 +93,13 @@
           for (var bv = bmin; bv <= Math.ceil(hi / bstep) * bstep + 1e-9 && bv <= bmax; bv += bstep) bticks.push(+bv.toPrecision(12));
           yLeft = {
             type: 'value', min: bmin, max: bmax,
-            axisLabel: { customValues: bticks, formatter: tickFmt(bfmt, bstep) },
+            axisLabel: { customValues: bticks, formatter: C.tickFmt(bfmt, bstep) },
             axisTick: { show: false, customValues: bticks }
           };
         } else {
           var astep = U.niceStep(hi - lo || 1, 5);
           var amin = Math.floor(lo / astep) * astep, amax = Math.ceil(hi / astep) * astep;
-          yLeft = { type: 'value', min: amin, max: amax > amin ? amax : amin + astep, interval: astep, axisLabel: { formatter: tickFmt(bfmt, astep) } };
+          yLeft = { type: 'value', min: amin, max: amax > amin ? amax : amin + astep, interval: astep, axisLabel: { formatter: C.tickFmt(bfmt, astep) } };
         }
         if (hasLine) {
           // the line gets its own band [lineLo, lineHi] of the plot; right-axis labels only inside it
@@ -114,7 +113,7 @@
           }
           yRight = {
             type: 'value', position: 'right', min: A, max: B, splitLine: { show: false },
-            axisLabel: { customValues: lticks, formatter: tickFmt(lAxisFmt, o.lineAxisFormat ? null : lstep) },
+            axisLabel: { customValues: lticks, formatter: C.tickFmt(lAxisFmt, o.lineAxisFormat ? null : lstep) },
             axisTick: { show: false, customValues: lticks }
           };
         }
@@ -125,11 +124,11 @@
         var omin = lo < 0 ? Math.floor(lo / ostep) * ostep : 0;
         var omax = Math.ceil(top / ostep) * ostep;
         var k = Math.max(1, Math.round((omax - omin) / ostep));
-        yLeft = { type: 'value', min: omin, max: omax, interval: ostep, axisLabel: { formatter: tickFmt(bfmt, ostep) } };
+        yLeft = { type: 'value', min: omin, max: omax, interval: ostep, axisLabel: { formatter: C.tickFmt(bfmt, ostep) } };
         if (hasLine) {
           var al = alignScale(lmin, lmax, k);
           yRight = { type: 'value', position: 'right', min: al.min, max: al.max, interval: al.step, splitLine: { show: false },
-            axisLabel: { formatter: tickFmt(lAxisFmt, o.lineAxisFormat ? null : al.step) } };
+            axisLabel: { formatter: C.tickFmt(lAxisFmt, o.lineAxisFormat ? null : al.step) } };
         }
       }
       yLeft.splitLine = { show: true };
@@ -151,6 +150,7 @@
           stack: o.barStack ? 'bars' : null,
           barGap: '14%', barCategoryGap: groups > 1 ? '30%' : '36%',
           z: 2,
+          itemStyle: { color: base },          // series colour also drives the legend icon
           label: showBarLabels ? C.label(ctx, bfmt, o.barStack ? {
             position: 'inside', fontSize: 10.5, color: RK.theme.textOn(base),
             formatter: function (p) { return U.isNum(p.value) && Math.abs(p.value) >= (hi - lo) * 0.07 ? RK.format(p.value, bfmt) : ''; }
@@ -307,12 +307,7 @@
       };
     }, {
       rebuildOnResize: true,     // label density and the band split depend on the plot size
-      select: function (p, ctx) {
-        if (!/^b-\d+$/.test(p.seriesId) || ctx.options.crossFilter === false) return null;
-        var f = ctx.enc.x;
-        ctx.select(f, p.name, GENERIC.test(f) && !ctx.options.crossFilterScope ? { scope: 'dataset' } : null);
-        return null;
-      }
+      select: function (p, ctx) { return /^b-\d+$/.test(p.seriesId) ? { field: ctx.enc.x, value: p.name } : null; }
     })
   });
 
@@ -416,21 +411,4 @@
 
   /** "2019A" -> "'19A" for compact bracket captions. */
   function shortX(x) { return String(x).replace(/^(?:FY)?(\d{2})(\d{2})/, '’$2'); }
-
-  /**
-   * Axis tick formatter (house style: no decimals when the tick step is whole at display precision,
-   * "$6,000" not "$6,000.0", "20%" not "20.0%"). step: number, function returning the live step,
-   * or an array of tick values; null decides per value.
-   */
-  function tickFmt(code, step) {
-    code = String(RK.format.presets[code] || code || 'auto');
-    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
-    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
-    function whole(v) { return num(v, code) === num(v, trimmed); }
-    return function (v) {
-      var s = typeof step === 'function' ? step() : step;
-      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
-      return RK.format(v, ok ? trimmed : code);
-    };
-  }
 })();

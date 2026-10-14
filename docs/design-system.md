@@ -105,7 +105,7 @@
 
 | 角色 | Token | 字体栈 | 授权 |
 |---|---|---|---|
-| 正文 / UI / 数据 | `--rk-font-sans` / `--rk-font-num` | **Inter** 400/500/600/700 → Helvetica Neue → Arial → PingFang SC → Microsoft YaHei → Noto Sans SC | OFL-1.1，`kit/fonts/inter/` |
+| 正文 / UI / 数据 | `--rk-font-sans` / `--rk-font-num` | **Inter** 400/500/600/700 → Helvetica Neue → Arial → PingFang SC → Hiragino Sans GB → Microsoft YaHei → Noto Sans SC（`--rk-font-num` 只到 Arial，不含中文回退） | OFL-1.1，`kit/fonts/inter/` |
 | 标题 | `--rk-font-serif` | **Source Serif 4** 400/400i/600/700 → Georgia → Times New Roman → Songti SC → SimSun | OFL-1.1，`kit/fonts/source-serif-4/` |
 | 公式 / 代码 | — | 系统 monospace（建议改用 JetBrains Mono ⬜，05 §TL;DR） | — |
 
@@ -169,7 +169,7 @@ ECharts 侧（`rk.theme.js` 中的 `echartsTheme`）：全局 `textStyle` 12px�
 3. **参考线专用 `--rk-ref`**：football field 的报价线、股价图的 offer 线、事件线都用它；任何系列都不能用这个颜色。
 4. **Reference-only 方法**（52 周区间、分析师目标价）用浅色或灰色条，和主方法区分开（GS "For Reference Only"）。
 5. **pos / neg 只用于 delta 列、bridge 增减和 diverging 热力图**，并且必须同时带符号：`+5.2%` / `(3.1%)` / ▲▼。
-   单页最多 1 个 diverging 语义。KPI tile 用 `good: 'down'` 声明"下降为好"（如 leverage、成本）✅。
+   单页最多 1 个 diverging 语义。KPI tile 用 `good` 通道（该行字段值为 `'down'`）声明"下降为好"（如 leverage、成本）✅。
 6. **中国惯例 红涨绿跌**：ECharts candlestick 默认就是红涨绿跌（06 §0-3）。kit 的 candlestick / price-volume 已改为读取 `t.pos` / `t.neg`
    （西方惯例）✅。面向中国客户时，建一个主题变体对调 `--rk-pos` 和 `--rk-neg` 即可，组件不用改。
 7. **暗色不是自动反色**：`ink` 主题有单独一套 token。暗色色板必须在暗底上单独验证（§3.4）。
@@ -223,7 +223,7 @@ kit 主题里的 categorical **并不等同于上表**：cat-1 被设成品牌�
 | navy | FAIL | `#5f8dc4` chroma 0.097 < 0.10；`#57873a↔#008e88` 正常视觉 ΔE 10.3 | 改为 `#9f3960 #4b99c9 #cb5f31 #008e88 #7555a8 #57873a`（相邻 11.1 / 20.0；前 3 色 all-pairs 15.2 / 15.3） |
 | bronze | **PASS**（12.8 / 18.6） | 只有 cat-8 灰色不过（预期内） | 保持不变 |
 | slate | FAIL | `#c38700↔#3e9245` protan ΔE 4.0 | 只重排：`#c38700 #c35f92 #3e6dc8 #db6143 #7d5abc #3e9245`（相邻 9.7 / 19.8；前 3 色 all-pairs 9.7 / 19.8） |
-| ink | FAIL | 5 色超出暗色 lightness band（L > 0.67），4 色 chroma 不足 | 用 §3.4 "navy · dark" 一行（去掉 gold）：`#d5683b #129d97 #8a69be #639346 #449fc9 #b74e74`（9.6 / 17.7；前 3 色 9.6 / 19.8） |
+| ink | FAIL | 4 色超出暗色 lightness band（L 0.71–0.87 > 0.67），3 色 chroma < 0.10；相邻 CVD ΔE 4.3、正常视觉 ΔE 12.3 | 用 §3.4 "navy · dark" 一行（去掉 gold）：`#d5683b #129d97 #8a69be #639346 #449fc9 #b74e74`（9.6 / 17.7；前 3 色 9.6 / 19.8） |
 
 同时，bronze 的 ordinal 浅端 `#dfc7a3` 只有 1.61:1，slate 的 `#a9bad0` 只有 1.98:1，都低于 2:1 下限。
 改用 §3.4 的 4 阶版本，或者删掉第 5 阶。**修正属于 token 改动，要另开任务做**（§10）。
@@ -234,9 +234,9 @@ kit 主题里的 categorical **并不等同于上表**：cat-1 被设成品牌�
 | 主题 | ink | ink-2 | ink-3（脚注 10px） | accent-2 | ref | pos | neg | axis |
 |---|---|---|---|---|---|---|---|---|
 | navy | 17.1 | 9.0 | 4.53 ✅ | 3.09 | 6.54 | 4.91 | 5.66 | 3.03 |
-| bronze | 15.3 | 9.3 | **4.22 ✗** | 11.3 | 7.89 | 5.64 | 5.86 | 2.85 |
+| bronze | 15.3 | 9.3 | **4.22 ✗** | 11.3 | 6.43 | 5.64 | 5.86 | 2.85 |
 | slate | 16.3 | 8.9 | 4.51 ✅ | 4.13 | 5.44 | **4.18 ✗** | 4.67 | 2.93 |
-| ink | 15.3 | 9.9 | 5.85 ✅ | 9.13 | 7.42 | 7.24 | 7.48 | 2.94 |
+| ink | 15.3 | 9.9 | 5.85 ✅ | 9.13 | 7.42 | 7.24 | 6.23 | 2.94 |
 
 - 小字（< 18px）需要 ≥ 4.5:1，因此 bronze 的 `--rk-ink-3` 和 slate 的 `--rk-pos`（当它被用作文字色时）需要加深 ⬜。
 - 图形标记需要 ≥ 3:1：navy 的 accent-2（3.09）刚好达标，所以金色高亮条不能再调浅。
@@ -251,7 +251,7 @@ kit 主题里的 categorical **并不等同于上表**：cat-1 被设成品牌�
 | id | 名称（`RK.theme.labels`） | 定位 | accent / accent-2 / ref | 备注 |
 |---|---|---|---|---|
 | `navy`（默认） | Navy classic | Bulge-bracket pitchbook：深 navy + 冷蓝 + 一个 muted gold | `#0b2d5b` / `#b08d57` / `#b3261e` | `:root` 同时等于 navy |
-| `bronze` | Bronze & ivory | 精品投行 / 私行：暖纸面、espresso 文字、bronze 主色，navy 作对比色 | `#6b4f36` / `#1f3a5f` / `#8f2c47` | 和 serif 标题最搭 |
+| `bronze` | Bronze & ivory | 精品投行 / 私行：暖纸面、espresso 文字、bronze 主色，navy 作对比色 | `#6b4f36` / `#1f3a5f` / `#b3261e` | 和 serif 标题最搭（ref 原为 `#8f2c47`，与 cat-2 撞色，c4f9b5d 改为 `#b3261e`） |
 | `slate` | Slate modern | 咨询风：冷灰 + teal 点缀 | `#1f2a44` / `#1b8a8f` / `#c0392b` | 适合内部 dashboard |
 | `ink` | Ink (dark) | 屏幕 / 会议室大屏演示的暗色模式 | `#7fa7d9` / `#d6b47a` / `#ef8a8a` | **打印时 `print.css` 会强制换回纸面色** |
 
@@ -274,7 +274,7 @@ kit 主题里的 categorical **并不等同于上表**：cat-1 被设成品牌�
    ```
    脚本在 dataviz skill 的 `scripts/validate_palette.js`。建议把它 vendor 到 `tools/` 并接入 `tools/check.sh` ⬜。
    文字 token 再查一遍 WCAG（§3.6 的口径）。
-5. **截图**：`node tools/smoke.cjs --all`，然后对比 `tests/screens/*-<id>.png`。重点看 football field 的参考线、
+5. **截图**：`node tools/smoke.cjs --all --theme <id>`（不加 `--theme` 时用 navy，文件名不带后缀），然后对比 `tests/screens/*-<id>.png`。重点看 football field 的参考线、
    comps 表的目标行、waterfall 的增减色、choropleth 的 seq。
 6. **切换**：`<html data-rk-theme="<id>">`、Python `Report(..., theme="<id>")`，或运行时调用 `RK.theme.set('<id>')`。
    `RK.theme.set` 会重读 token、重新注册 ECharts 主题 `rk`、发出 `theme:changed` 事件，所有 block 随之重绘 ✅。
@@ -334,7 +334,7 @@ kit 主题里的 categorical **并不等同于上表**：cat-1 被设成品牌�
 - **线末直接标注最新值**（ECharts `endLabel`），颜色与线相同；系列 ≤ 4 条时用直接标注代替图例（GS / MS 实证）。
 - **时间序列**：用浅网格（`--rk-grid`）或不用网格；x 轴用 `mmm-yy` 均匀刻度；事件用字母标记或竖向引线 + `dd-mmm-yy` 标签。
 - **Football field**：主方法用 `accent` / cat，reference-only 方法用浅色条，报价 / 现价用 `--rk-ref` 竖虚线 + 斜体标签，条两端标注数值。
-- **Comps / precedents 表**：统计行（Max / 75th / Median / Mean / 25th / Min）加灰底；目标行用 `accent2` 浅底 + 粗体；
+- **Comps / precedents 表**：统计行（Max / 75th / Median / Mean / 25th / Min）加灰底（`comps-table` 目前支持 `stats: mean | median | high | low`，75th / 25th 分位行 ⬜）；目标行用 `accent2` 浅底 + 粗体；
   统计时排除 n.m. 和目标公司本身（`statsExcludeTarget: true` ✅）。
 - **Sensitivity / comps 必须是 HTML table**：可选中、可复制到 Excel、打印清晰。不要用 canvas 画表（04 §13-16）。
 - **双轴默认改成上下两个 pane，共用 x 轴**（multi-grid + 联动 dataZoom）。`combo` 组件默认 `layout: 'band'`，
@@ -391,7 +391,7 @@ NN/g 动画时长（https://www.nngroup.com/articles/animation-duration/ ）、0
 
 **已实现 ✅**
 - 每个数据块的工具栏都有 "View data"（弹出完整表格）和 "Download CSV"，作为图表的文本替代。
-- 控件有完整的 ARIA 语义：`aria-pressed`（情景切换）、`aria-sort`（表格排序）、`aria-expanded` / `aria-activedescendant`
+- 控件有完整的 ARIA 语义：`role="radio"` + `aria-checked`（情景切换）、`aria-pressed`（图表内的模式切换按钮，如 `scatter`、`bubble`、`sensitivity-table`）、`aria-sort`（表格排序）、`aria-expanded` / `aria-activedescendant`
   （下拉）、`aria-valuetext`（滑块）、`aria-live`（查询结果）。`:focus-visible` 焦点环、键盘可操作。
 - 数据标签颜色由 `RK.theme.textOn(fill)` 按 WCAG 对比度自动选深色或浅色，明暗主题都适用。
 - 增减同时用 ▲▼ 箭头、符号和括号表达，颜色只是冗余编码；KPI 箭头带 `aria-hidden`，读屏只读数字。

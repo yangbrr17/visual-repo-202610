@@ -400,14 +400,14 @@
     return h('div.g-page',
       h('nav.g-crumbs', link('#/', 'Gallery'), ' / ', cat.name_zh),
       h('header.g-pagehead', h('p.g-kicker', cat.name + ' · ' + members.length + ' component' + (members.length > 1 ? 's' : '')), h('h1', cat.name_zh), h('p.g-lead', cat.desc_zh), h('p.g-lead-en', cat.desc)),
-      h('div.g-wall', members.map(function (c) {
+      h('div.g-wall', { class: members.length === 1 ? 'g-wall--solo' : null }, members.map(function (c) {
         var s = (c.samples || [])[0];
         var n = (c.samples || []).length;
         return h('article.g-card.g-compcard',
           h('a.g-compcard__head', { href: '#/c/' + c.id },
             h('h3', c.name_zh || c.name), h('span', c.name),
             h('p', c.summary_zh || c.summary)),
-          h('div.g-compcard__stage', s ? liveBlock(c, s, { head: false, foot: false, tools: false, height: WALL_H }) : h('div.g-empty', 'No sample')),
+          h('div.g-compcard__stage', s ? liveBlock(c, s, { head: false, foot: false, tools: false, height: members.length === 1 ? Math.max(WALL_H, s.height || 0) : WALL_H }) : h('div.g-empty', 'No sample')),
           h('div.g-compcard__foot', engineBadges(c), n > 1 ? h('span.g-muted', n + ' samples') : null, link('#/c/' + c.id, '详情 Details →', 'g-more')));
       })));
   }

@@ -17,6 +17,8 @@ __all__ = ["Report", "Page", "Block", "SpecError", "SPEC_VERSION", "CONTRACT_VER
 CONTRACT_VERSION = "0.1"   # "reportkit" key of data/manifest.json (architecture.md §4.2)
 SPEC_VERSION = "0.1"       # "reportkit" key of the JSON layout spec
 PAGE_KINDS = ("content", "cover", "section")
+# page proportions -> printed @page size: 16:9 widescreen (PowerPoint), US Letter landscape, A4 landscape
+PAGE_SIZES = {"16:9": "13.333in 7.5in", "letter": "11in 8.5in", "a4": "297mm 210mm"}
 DEFAULT_CONFIDENTIALITY = "Strictly private & confidential"
 
 
@@ -164,8 +166,11 @@ class Report:
     def __init__(self, title: str, subtitle: str | None = None, client: str | None = None,
                  date: Any = None, theme: str = "navy",
                  confidentiality: str | None = DEFAULT_CONFIDENTIALITY, locale: str = "en-US",
-                 firm: str | None = None):
+                 firm: str | None = None, page_size: str = "16:9"):
+        if page_size not in PAGE_SIZES:
+            raise ValueError(f"page_size must be one of {', '.join(PAGE_SIZES)}, got {page_size!r}")
         self.title = title
+        self.page_size = page_size
         self.subtitle = subtitle
         self.client = client
         self.date = iso_date(date)
@@ -289,7 +294,7 @@ class Report:
     def report_meta(self) -> dict:
         meta = {"title": self.title, "subtitle": self.subtitle, "client": self.client, "date": self.date,
                 "confidentiality": self.confidentiality, "locale": self.locale, "firm": self.firm,
-                "theme": self.theme}
+                "theme": self.theme, "page_size": self.page_size if self.page_size != "16:9" else None}
         return {k: v for k, v in meta.items() if v is not None}
 
     def manifest(self) -> dict:
@@ -395,7 +400,7 @@ class Report:
 
         keys_ok(spec, {"reportkit", "report", "params", "datasets", "topbar", "pages"}, "spec")
         rep = spec.get("report") or {}
-        report_keys = {"title", "subtitle", "client", "date", "theme", "confidentiality", "locale", "firm"}
+        report_keys = {"title", "subtitle", "client", "date", "theme", "confidentiality", "locale", "firm", "page_size"}
         keys_ok(rep, report_keys, "report")
         if not isinstance(rep, dict):
             rep = {}

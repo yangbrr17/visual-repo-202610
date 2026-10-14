@@ -1,0 +1,110 @@
+/* tombstones */
+.rk-tomb { position: relative; }
+
+/* facet chips (cross-filter) */
+.rk-tomb__facets { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin: 0 0 12px; }
+.rk-tomb__facets[hidden] { display: none; }
+.rk-tomb__facet { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.rk-tomb__flabel { margin-right: 4px; font-size: var(--rk-fs-xs); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--rk-ink-3); }
+.rk-tomb__chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px;
+  border: 1px solid var(--rk-rule); border-radius: 999px; background: var(--rk-paper);
+  font-size: 11px; color: var(--rk-ink-2); cursor: pointer; white-space: nowrap;
+  transition: background var(--rk-dur-fast), color var(--rk-dur-fast), border-color var(--rk-dur-fast), opacity var(--rk-dur-fast);
+}
+.rk-tomb__chip:hover { border-color: var(--rk-accent-3); color: var(--rk-accent); }
+.rk-tomb__chip.is-on { background: var(--rk-accent); border-color: var(--rk-accent); color: var(--rk-paper); }
+.rk-tomb__chip.is-empty { opacity: .45; }
+.rk-tomb__n { font-size: 10px; color: var(--rk-ink-3); }
+.rk-tomb__chip.is-on .rk-tomb__n { color: inherit; opacity: .75; }
+.rk-tomb__clear { height: 22px; padding: 0 4px; border: 0; background: none; font-size: 11px; color: var(--rk-accent-3); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.rk-tomb__clear[hidden] { display: none; }
+
+/* grid: auto-fill, or at most --rk-tomb-cols per row (fewer when a card would drop below --rk-tomb-min) */
+.rk-tomb__grid {
+  --rk-tomb-gap: 12px;
+  display: grid; gap: var(--rk-tomb-gap);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--rk-tomb-min, 180px)), 1fr));
+  grid-auto-rows: 1fr;                       /* every card as tall as the tallest */
+}
+.rk-tomb__grid.has-cols {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(var(--rk-tomb-min, 180px), calc((100% - (var(--rk-tomb-cols) - 1) * var(--rk-tomb-gap)) / var(--rk-tomb-cols)))), 1fr));
+}
+
+/* card (classic: framed, centred) */
+.rk-tomb__card {
+  position: relative; display: flex; flex-direction: column; align-items: center; min-width: 0;
+  padding: 12px 14px 11px; text-align: center;
+  background: var(--rk-paper); border: 1px solid var(--rk-rule); border-radius: var(--rk-radius);
+  box-shadow: inset 0 2px 0 var(--rk-accent);
+  break-inside: avoid; page-break-inside: avoid; outline: none;
+}
+.rk-tomb.is-motion .rk-tomb__card {
+  transition: transform 420ms var(--rk-ease), opacity 260ms var(--rk-ease), border-color var(--rk-dur-fast), box-shadow var(--rk-dur-fast), filter 260ms var(--rk-ease);
+}
+.rk-tomb__card:hover, .rk-tomb__card:focus-visible {
+  border-color: color-mix(in srgb, var(--rk-accent-3) 55%, var(--rk-rule));
+  box-shadow: inset 0 2px 0 var(--rk-accent), 0 6px 18px rgba(15, 28, 46, .08);
+}
+.rk-tomb.is-motion .rk-tomb__card:hover, .rk-tomb.is-motion .rk-tomb__card:focus-visible { transform: translateY(-2px); }
+.rk-tomb__card:focus-visible { border-color: var(--rk-accent-3); }
+
+.rk-tomb__kicker {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 9.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--rk-accent-3);
+}
+.rk-tomb__logos { display: flex; justify-content: center; gap: 4px; margin: 10px 0 8px; }
+.rk-tomb__mono {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 30px; height: 30px; border-radius: 4px; border: 1px solid var(--rk-rule);
+  font-family: var(--rk-font-sans); font-size: 11px; font-weight: 700; letter-spacing: .03em; line-height: 1;
+  color: var(--rk-accent); background: var(--rk-surface);
+}
+.rk-tomb__mono.is-lead:not(.is-filled) { background: var(--rk-accent); border-color: var(--rk-accent); color: var(--rk-paper); }
+
+.rk-tomb__names { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 1px; width: 100%; min-width: 0; }
+.rk-tomb__lead, .rk-tomb__party {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere;
+  font-family: var(--rk-font-serif); font-weight: 600; line-height: 1.22; color: var(--rk-ink);
+}
+.rk-tomb__lead { font-size: 14.5px; }
+.rk-tomb__party { font-size: 13px; color: var(--rk-ink-2); }
+.rk-tomb__verb { margin: 2px 0 1px; font-size: 10.5px; font-style: italic; color: var(--rk-ink-3); line-height: 1.3; }
+.rk-tomb__desc { margin-top: 5px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; font-size: 10.5px; line-height: 1.35; color: var(--rk-ink-3); }
+
+.rk-tomb__value { margin-top: 10px; font-size: 19px; font-weight: 600; line-height: 1.1; letter-spacing: -.01em; color: var(--rk-accent); }
+[data-rk-theme="ink"] .rk-tomb__value { color: var(--rk-ink); }
+.rk-tomb__date { margin-top: 2px; font-size: 10.5px; color: var(--rk-ink-3); }
+.rk-tomb__role {
+  align-self: stretch; margin-top: 9px; padding-top: 7px; border-top: 1px solid var(--rk-grid);
+  min-height: calc(2 * 1.3em + 7px);              /* two lines reserved: values line up across a row */
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  font-size: 10.5px; font-weight: 500; line-height: 1.3; color: var(--rk-ink-2);
+}
+
+/* highlighted deal (target / own client): accent2 cap, faint tint */
+.rk-tomb__card.is-hl { background: color-mix(in srgb, var(--rk-accent-2) 7%, var(--rk-paper)); box-shadow: inset 0 3px 0 var(--rk-accent-2); border-color: color-mix(in srgb, var(--rk-accent-2) 45%, var(--rk-rule)); }
+.rk-tomb__card.is-hl:hover, .rk-tomb__card.is-hl:focus-visible { box-shadow: inset 0 3px 0 var(--rk-accent-2), 0 6px 18px rgba(15, 28, 46, .08); }
+.rk-tomb__card.is-hl .rk-tomb__kicker { color: color-mix(in srgb, var(--rk-accent-2) 80%, var(--rk-ink)); }
+
+/* outside the chip selection */
+.rk-tomb__card.is-dim { opacity: .3; filter: grayscale(.7); }
+.rk-tomb__card.is-dim:hover { opacity: .6; }
+
+/* minimal variant: no frame, top rule, left-aligned */
+.rk-tomb--minimal .rk-tomb__card { align-items: flex-start; text-align: left; padding: 10px 2px 8px; background: transparent; border: 0; border-radius: 0; box-shadow: inset 0 2px 0 var(--rk-accent); }
+.rk-tomb--minimal .rk-tomb__card:hover, .rk-tomb--minimal .rk-tomb__card:focus-visible { box-shadow: inset 0 2px 0 var(--rk-accent-3); }
+.rk-tomb--minimal .rk-tomb__card.is-hl { background: transparent; box-shadow: inset 0 3px 0 var(--rk-accent-2); }
+.rk-tomb--minimal .rk-tomb__logos { justify-content: flex-start; margin: 8px 0 6px; }
+.rk-tomb--minimal .rk-tomb__names { justify-content: flex-start; }
+
+/* motion: staggered entry, FLIP re-flow (transform transition above), entering cards fade up */
+.rk-tomb.is-first .rk-tomb__card { animation: rk-tomb-in 520ms var(--rk-ease) both; animation-delay: calc(var(--rk-i, 0) * 45ms + 60ms); }
+.rk-tomb__card.is-enter { animation: rk-tomb-in 380ms var(--rk-ease) both; }
+@keyframes rk-tomb-in { from { opacity: 0; transform: translateY(8px); } }
+@media (prefers-reduced-motion: reduce) { .rk-tomb__card, .rk-tomb.is-first .rk-tomb__card, .rk-tomb__card.is-enter { animation: none !important; transition: none !important; transform: none !important; } }
+@media print {
+  .rk-tomb__card { animation: none !important; transition: none !important; transform: none !important; box-shadow: inset 0 2px 0 var(--rk-accent) !important; }
+  .rk-tomb__card.is-hl { box-shadow: inset 0 3px 0 var(--rk-accent-2) !important; }
+  .rk-tomb__grid { gap: 8px; }
+}

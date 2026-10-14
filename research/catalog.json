@@ -2418,7 +2418,7 @@
    "angles": [
     "05-motion-ui"
    ],
-   "in_kit": false
+   "in_kit": true
   },
   {
    "name": "Lucide",
@@ -2517,7 +2517,7 @@
    "angles": [
     "05-motion-ui"
    ],
-   "in_kit": false
+   "in_kit": true
   },
   {
    "name": "Source Serif 4 / Inter / IBM Plex (Fontsource)",
@@ -2535,7 +2535,7 @@
    "angles": [
     "04-pitchbook-design"
    ],
-   "in_kit": false
+   "in_kit": true
   },
   {
    "name": "Tabler Icons",

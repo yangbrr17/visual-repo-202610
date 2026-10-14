@@ -1,6 +1,6 @@
 # 组件目录 Component catalogue
 
-由 `tools/build_catalog.py` 自动生成 · 53 components · 12 categories
+由 `tools/build_catalog.py` 自动生成 · 55 components · 12 categories
 
 ## 版式与叙事 · Layout & narrative
 
@@ -8,6 +8,7 @@
 
 | id | 名称 | 引擎 | 能展示什么 | 数据通道 |
 |---|---|---|---|---|
+| `tombstones` | 交易业绩墓碑卡 / Deal Tombstones | dom | 交易业绩（tombstone）网格：每笔交易一张卡片，展示交易类型、按投行措辞排列的交易双方、首字母标识、交易金额、日期与本行角色；行业 / 地区筛选片可交叉筛选。 | `date`*, `target`*, `acquirer`, `value`, `type`*, `role`, `sector`, `region`, `description` |
 | `kpi-tiles` | 关键指标卡 / KPI Tiles | dom | 关键指标数字卡片：数字滚动动画、同比/环比变化（自动判断好坏方向）与迷你趋势线。 | `label`*, `value`*, `format`, `delta`, `deltaFormat`, `period`, `spark`, `good` |
 | `text-block` | 叙事文本块 / Text Block | dom | 页面叙事模块：安全 Markdown 子集正文、编号要点卡片、强调框、衬线体引言、大数字统计（数字滚动），可用 {{字段\|格式}} 占位符从数据集实时取数。 | `title`, `text`, `value`, `label`, `format`, `note` |
 
@@ -29,6 +30,7 @@
 | id | 名称 | 引擎 | 能展示什么 | 数据通道 |
 |---|---|---|---|---|
 | `football-field` | 估值足球场图 / Football Field | echarts | 按估值方法展示估值区间的横向浮动条形图，叠加当前股价 / 报价参考线。 | `label`*, `low`*, `high`*, `group`, `note`, `order` |
+| `sotp` | 分部加总估值（SOTP） / Sum-of-the-Parts | echarts | 分部加总估值累加图：各业务板块“指标 × 倍数区间”逐段累加成企业价值区间，再扣除净负债等调整项得到隐含股权价值与每股价值区间。 | `label`*, `metric`*, `metricName`, `low`*, `high`*, `method`, `note` |
 
 ## 时间趋势 · Change over time
 

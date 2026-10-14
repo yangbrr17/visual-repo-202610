@@ -223,7 +223,8 @@ def render_index(report: "Report", plan: "BuildPlan", *, data_source: str = "bun
     title = report.title + (f" — {report.subtitle}" if report.subtitle else "")
     L: list[str] = [
         "<!DOCTYPE html>",
-        f'<html lang="{esc(loc)}" data-rk-theme="{esc(report.theme)}">',
+        f'<html lang="{esc(loc)}" data-rk-theme="{esc(report.theme)}"'
+        + (f' data-rk-page-size="{esc(report.page_size)}"' if getattr(report, "page_size", "16:9") != "16:9" else "") + ">",
         "<head>",
         '  <meta charset="utf-8">',
         '  <meta name="viewport" content="width=device-width, initial-scale=1">',
@@ -232,6 +233,7 @@ def render_index(report: "Report", plan: "BuildPlan", *, data_source: str = "bun
         *([f'  <meta name="rk:data-source" content="{esc(data_source)}">'] if data_source != "bundle" else []),
         *([f'  <meta name="rk:api" content="{esc(api)}">'] if data_source == "api" and api else []),
         '  <meta name="generator" content="ReportKit">',
+        f'  <meta name="rk:themes" content="{esc(",".join(t for t, _ in plan.themes))}">',
         f'  <meta name="rk:version" content="{esc(plan.version)}">',
         f'  <meta name="rk:built" content="{esc(plan.build_date)}">',
         '  <meta name="robots" content="noindex, nofollow">',

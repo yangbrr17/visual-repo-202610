@@ -120,12 +120,12 @@
       legendTitle: null,          // defaults to the value field title
       legendPosition: 'bottomleft',
       filterField: null,          // click-to-filter field; defaults to encode.id
-      scrollZoom: 'click'         // true | false | 'click' (wheel zoom armed by a click on the map)
+      scrollZoom: 'click'         // 'click' (plain-wheel zoom armed by a click) | true | false; Ctrl/Cmd + wheel always zooms
     },
     render: function (ctx) {
       var L = window.L, t = ctx.theme, cur = ctx;
       var view = G.view(ctx, { cls: 'rk-choro' }), map = view.map;
-      var fc = RK.geo.features(ctx.options.basemap || 'world-110m');
+      var fc = G.features(ctx.options.basemap || 'world-110m');
       var byId = {}, byName = {};
       fc.features.forEach(function (f) {
         if (f.id != null) byId[f.id] = f;
@@ -219,7 +219,7 @@
         labels.set((n ? S.ranked : []).map(function (rec) {
           var name = (enc.label && rec.row[enc.label]) || rec.f.properties.name;
           return {
-            latlng: RK.geo.centroid(rec.f) || [0, 0], prio: Math.abs(rec.v - mid), pos: ['c'], cls: 'rk-choro__label',
+            latlng: G.centroid(rec.f) || [0, 0], prio: Math.abs(rec.v - mid), pos: ['c'], cls: 'rk-choro__label',
             html: '<b>' + RK.util.escapeHTML(name) + '</b><span>' + RK.util.escapeHTML(RK.format(rec.v, S.fmt)) + '</span>'
           };
         }), n);
@@ -232,7 +232,7 @@
         if (first) {
           var pts = [];
           S.list.forEach(function (x) { pts = pts.concat(mainBounds(x.f)); });
-          view.fit(G.fitTarget(o.fit, pts), 12, function () { return S.list.map(function (x) { return { ll: RK.geo.centroid(x.f) || [0, 0], r: 6 }; }); });
+          view.fit(G.fitTarget(o.fit, pts), 12, function () { return S.list.map(function (x) { return { ll: G.centroid(x.f) || [0, 0], r: 6 }; }); });
           labels.place();
         }
       }

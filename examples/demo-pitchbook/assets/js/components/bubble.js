@@ -50,9 +50,6 @@
   function axisStep(inst, axis, dflt) {
     try { return inst.getModel().getComponent(axis, 0).axis.scale.getInterval() || dflt; } catch (e) { return dflt; }
   }
-  /** Generic field names cross-filter only this block's dataset; business dimensions (company, country …) stay global. */
-  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
-  function scoped(ctx, f) { return GENERIC.test(f) ? { scope: ctx.options.crossFilterScope || 'dataset' } : null; }
   function sortPeriods(list) {
     var nums = list.every(function (v) { return typeof v === 'number'; });
     return list.slice().sort(function (a, b) { return nums ? a - b : String(a).localeCompare(String(b)); });
@@ -203,7 +200,7 @@
     if (!st.selField) return;
     var vals = st.points.filter(function (p) { return p.x >= xr[0] && p.x <= xr[1] && p.y >= yr[0] && p.y <= yr[1]; })
       .map(function (p) { return p.key; });
-    st.ctx.setSelection(st.selField, util.unique(vals), scoped(st.ctx, st.selField));   // empty box clears
+    st.ctx.setSelection(st.selField, util.unique(vals));   // empty box clears; generic fields stay in this dataset (core)
   }
 
   /* ---------------- option builder ---------------- */
@@ -510,13 +507,10 @@
   }
 
   var base = C(build, {
-    on: {
-      // click a bubble -> toggle it in the cross-filter on the label (or name) field
-      click: function (p, ctx, inst) {
-        var f = inst.__rk && inst.__rk.selField;
-        if (p.componentType !== 'series' || !p.data || !p.data.row || !f || ctx.options.crossFilter === false) return;
-        ctx.select(f, p.data.row[f], scoped(ctx, f));
-      }
+    // click a bubble -> toggle it in the cross-filter on the label (or name) field
+    select: function (p, ctx, inst) {
+      var f = inst.__rk && inst.__rk.selField;
+      return p.componentType === 'series' && p.data && p.data.row && f ? { field: f, value: p.data.row[f] } : null;
     },
     init: function (inst) {
       inst.on('brushEnd', function (params) { onBrushEnd(params, inst); });
@@ -573,7 +567,8 @@
     },
     render: function (ctx) {
       var api = base(ctx), inst = api.chart;
-      var bar = !ctx.print && ctx.options.zoom !== false ? toolbar(ctx, inst) : null;
+      var bar = ctx.options.zoom !== false ? toolbar(ctx, inst) : null;
+      if (bar) bar.hidden = !!ctx.print;   // print: no buttons (also re-checked on every print refresh)
       var relabel = util.rafThrottle(function () { layoutLabels(inst); });
       layoutLabels(inst);
       inst.on('datazoom', relabel);
@@ -582,6 +577,7 @@
       api.resize = function () { resize(); layoutLabels(inst); };
       // timeline options (baseOption + options) cannot be replace-merged: rebuild them in place, keeping the period
       api.update = function (c) {
+        if (bar) bar.hidden = !!c.print;
         if (!c.options.timeField) update(c);
         else inst.setOption(build(c, inst), { notMerge: true });
         layoutLabels(inst);

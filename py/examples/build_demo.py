@@ -304,15 +304,15 @@ def build(out: Path) -> Path:
     r.section("Valuation perspectives", subtitle="Intrinsic, market and transaction-based reference points")
 
     t = "Fundamental analyses support $45–55 per share, a 6–29% premium to the current $42.50"
-    p = r.page(t, kicker="Valuation summary", id="valuation", subtitle="Implied value per share (USD)",
+    p = r.page(t, kicker="Valuation summary", id="valuation", subtitle="USD per share; share price as of 09-Oct-2026",
                source=SRC_NB, notes=["DCF: 2026E–2030E management plan, end-year discounting.",
                                       "LBO: 5.0x opening leverage, 20–25% sponsor IRR, 9.0x exit."])
     p.block("football-field", data="valuation_ranges", span=7, height=plot_h(t, block_sub=True),
-            title="Valuation summary", subtitle="Shaded: indicative value range of $45–55 per share",
+            title="Implied value per share by methodology", subtitle="Intrinsic, market and transaction-based ranges",
             options={"encode": {"label": "method", "low": "low", "high": "high", "group": "group", "note": "basis"},
-                     "refLines": [CURRENT], "refBand": {"from": 45, "to": 55}})
+                     "refLines": [CURRENT], "refBand": {"from": 45, "to": 55, "label": "Indicative range $45–55"}})
     p.block("sensitivity-table", data="sensitivity_dcf", span=5, height=plot_h(t, block_sub=True),
-            title="DCF sensitivity", subtitle="Implied value per share (USD); click a cell to move the base case",
+            title="DCF sensitivity: value per share", subtitle="Click a cell to move the base case",
             options={"encode": {"row": "wacc", "col": "tgr", "value": "value"},
                      "rowTitle": "WACC", "colTitle": "Terminal growth rate", "base": {"row": "@wacc", "col": "@tgr"}})
 

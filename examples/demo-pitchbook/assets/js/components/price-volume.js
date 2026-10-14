@@ -261,7 +261,7 @@
 
     var ax = state.axes = axesFor(ctx, state);
     // fixed left margin so both panels share one x scale
-    var pAxisFmt = tickFmt(fmt, function () { return state.axes && state.axes.p.interval; });
+    var pAxisFmt = C.tickFmt(fmt, function () { return state.axes && state.axes.p.interval; });
     var font = '11px ' + t.fontNum;
     var left = Math.ceil(Math.max(
       C.measure(pAxisFmt(ax.p.max), font), C.measure(pAxisFmt(ax.p.min), font),
@@ -272,7 +272,8 @@
     var tk = state.ticks = dateTicks(windowOf(m, state.zoom), state.plotW);
 
     var priceColor = t.accent;
-    var pal = RK.theme.palette({ exclude: [priceColor, t.accent2], n: m.mas.length + 1 });   // overlays clear of price + highlight
+    // MA / VWAP overlays stay clear of the price line, the accent2 highlight, the 52-week (pos / neg) and reference lines
+    var pal = RK.theme.palette({ exclude: [priceColor, t.accent2, t.pos, t.neg, t.ref], minDistance: 110, n: m.mas.length + 1 });
     var series = [];
     var sel = state.legendSel;
 
@@ -369,8 +370,9 @@
     var chip = RK.theme.alpha(t.paper, 0.85);       // label background: legible where it crosses the line
     var lines = [], area = null;
     (o.refLines || []).forEach(function (r) {
-      lines.push({ yAxis: r.value, lineStyle: { color: r.color || t.ref, type: r.type || 'dashed', width: 1.25 },
-        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: r.color || t.ref, fontWeight: 600, fontSize: 10.5, backgroundColor: chip, padding: [1, 4], borderRadius: 2 } });
+      var col = RK.theme.resolve(r.color) || t.ref;          // token names ('pos', 'accent2') or literal colours
+      lines.push({ yAxis: r.value, lineStyle: { color: col, type: r.type || 'dashed', width: 1.25 },
+        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: col, fontWeight: 600, fontSize: 10.5, backgroundColor: chip, padding: [1, 4], borderRadius: 2 } });
     });
     if (m.r52 && o.range52w === 'band') {
       area = { silent: true, itemStyle: { color: RK.theme.alpha(t.accent3 || t.accent, t.dark ? 0.12 : 0.07) },
@@ -513,23 +515,6 @@
   /* ------------------------------------------------------------------ *
    * Small helpers
    * ------------------------------------------------------------------ */
-  /**
-   * Axis tick formatter (house style: no decimals when the tick step is whole at display precision,
-   * "$6,000" not "$6,000.0", "20%" not "20.0%"). step: number, function returning the live step,
-   * or an array of tick values; null decides per value.
-   */
-  function tickFmt(code, step) {
-    code = String(RK.format.presets[code] || code || 'auto');
-    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
-    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
-    function whole(v) { return num(v, code) === num(v, trimmed); }
-    return function (v) {
-      var s = typeof step === 'function' ? step() : step;
-      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
-      return RK.format(v, ok ? trimmed : code);
-    };
-  }
-
   /**
    * Pitchbook date ticks for a window [a, b] (ms): month multiples aligned to quarters / halves / years
    * ("Jan-25", "Apr-25"), weeks or days ("5 Aug"), about one label per 80px.

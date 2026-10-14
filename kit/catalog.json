@@ -87,6 +87,218 @@
  ],
  "components": [
   {
+   "id": "tombstones",
+   "name": "Deal Tombstones",
+   "name_zh": "交易业绩墓碑卡",
+   "category": "layout",
+   "engine": "dom",
+   "deps": [],
+   "summary": "Deal credentials grid: one tombstone card per transaction with deal type, parties in pitchbook wording, monogram tiles, value, date and role; sector / region chips cross-filter.",
+   "summary_zh": "交易业绩（tombstone）网格：每笔交易一张卡片，展示交易类型、按投行措辞排列的交易双方、首字母标识、交易金额、日期与本行角色；行业 / 地区筛选片可交叉筛选。",
+   "description_zh": "投行 pitchbook 的“credentials / tombstones”页：每行数据是一笔交易，卡片顶部为交易类型，中间按交易类型自动生成措辞（卖方并购“X has been acquired by Y”、买方并购“Y has acquired X”、收购融资、合并、IPO 等），下方为交易金额、公告日期和本行角色；标识用双方名称首字母生成的方块代替外部 logo，离线可用。卡片在响应式网格中等高排列（columns 控制每行最多卡片数，窄屏自动换行），highlight 指定的公司（如目标公司或本行客户）用强调色 accent2 标出。顶部的行业 / 地区筛选片会对报告中所有含 sector / region 字段的数据集做交叉筛选，未选中的卡片变淡；全局筛选变化时卡片平滑重排。适合 4–16 笔精选交易的业绩展示页。",
+   "best_for": [
+    "Credentials / selected transactions page",
+    "Relevant experience in a sector or region",
+    "Deal team or adviser track record in a pitch"
+   ],
+   "avoid_when": [
+    "More than ~16 deals (use data-grid or a precedents table)",
+    "When deal multiples must be compared (use comps-table / scatter)"
+   ],
+   "channels": {
+    "date": {
+     "type": "date",
+     "required": true,
+     "desc": "Announcement / closing date (sort key, shown as 'August 2026')",
+     "default": "date"
+    },
+    "target": {
+     "type": "string",
+     "required": true,
+     "desc": "Target / issuer / divested business",
+     "default": "target"
+    },
+    "acquirer": {
+     "type": "string",
+     "required": false,
+     "desc": "Acquirer / borrower / merger partner (empty for IPOs and offerings)",
+     "default": "acquirer"
+    },
+    "value": {
+     "type": "number",
+     "required": false,
+     "desc": "Deal value (missing = n.a., or options.missingValue)",
+     "default": "deal_value_bn"
+    },
+    "type": {
+     "type": "string",
+     "required": true,
+     "desc": "Deal type; drives the wording (Sell-side M&A, Buy-side M&A, Acquisition financing, Merger, Divestiture, IPO, Follow-on offering ...)",
+     "default": "deal_type"
+    },
+    "role": {
+     "type": "string",
+     "required": false,
+     "desc": "The bank's role, e.g. 'Exclusive financial advisor'",
+     "default": "role"
+    },
+    "sector": {
+     "type": "string",
+     "required": false,
+     "desc": "Sector (facet chip / cross-filter field)",
+     "default": "sector"
+    },
+    "region": {
+     "type": "string",
+     "required": false,
+     "desc": "Region (facet chip / cross-filter field)",
+     "default": "region"
+    },
+    "description": {
+     "type": "string",
+     "required": false,
+     "desc": "One-line deal description (tooltip; on the card with showDescription)",
+     "default": "description"
+    }
+   },
+   "options": {
+    "columns": {
+     "type": "number",
+     "default": null,
+     "desc": "Maximum cards per row; wraps to fewer columns when a card would be narrower than minCardWidth. null = auto-fill"
+    },
+    "minCardWidth": {
+     "type": "number",
+     "default": 180,
+     "desc": "Minimum card width in px"
+    },
+    "variant": {
+     "type": "string",
+     "default": "classic",
+     "desc": "classic (framed, centred tombstone) | minimal (top rule, left-aligned)"
+    },
+    "sort": {
+     "type": "string",
+     "default": "newest",
+     "desc": "newest | oldest | value | null (data order)"
+    },
+    "max": {
+     "type": "number",
+     "default": null,
+     "desc": "Show only the first N cards after sorting"
+    },
+    "highlight": {
+     "type": "string|string[]",
+     "default": null,
+     "desc": "Company name(s); cards where either party matches get the accent2 cap, tint and monogram"
+    },
+    "facets": {
+     "type": "string[]",
+     "default": [
+      "sector",
+      "region"
+     ],
+     "desc": "Chip rows above the grid (channel or field names) that cross-filter; [] hides them"
+    },
+    "selectionMode": {
+     "type": "string",
+     "default": "dim",
+     "desc": "dim | hide — cards outside the chip selection"
+    },
+    "monogram": {
+     "type": "string|boolean",
+     "default": "accent",
+     "desc": "accent (lead party filled with the theme accent) | palette (colour hashed per company) | false (no tiles)"
+    },
+    "showDescription": {
+     "type": "boolean",
+     "default": false,
+     "desc": "Show the description on the card (it is always in the tooltip)"
+    },
+    "showRole": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Role line at the foot of the card"
+    },
+    "format": {
+     "type": "string",
+     "default": null,
+     "desc": "Value format (defaults to the value field format)"
+    },
+    "dateFormat": {
+     "type": "string",
+     "default": null,
+     "desc": "Date format (defaults to the date field format, else 'mmmm yyyy')"
+    },
+    "missingValue": {
+     "type": "string",
+     "default": null,
+     "desc": "Text for a missing deal value, e.g. 'Undisclosed' (default n.a.)"
+    },
+    "wording": {
+     "type": "object",
+     "default": {},
+     "desc": "{'<deal type>': {lead: 'target'|'acquirer', verb, party, solo}} overrides of the built-in wording rules"
+    },
+    "tooltip": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Hover / focus tooltip with type, value, date, sector, region, role and description"
+    },
+    "crossFilterScope": {
+     "type": "string",
+     "default": "global",
+     "desc": "global: chips filter every dataset with the facet field (peers, precedents ...) | dataset: only this dataset"
+    }
+   },
+   "interactions": [
+    "Sector / region chips cross-filter the report (non-matching cards dim)",
+    "Hover / keyboard focus lifts the card and shows a detail tooltip",
+    "Cards re-flow with a 2-D FLIP glide when global filters change",
+    "Staggered entry on reveal; static in print"
+   ],
+   "samples": [
+    {
+     "title": "Selected credentials",
+     "data": "credentials",
+     "height": 520,
+     "options": {
+      "columns": 4,
+      "max": 8,
+      "highlight": "Helios Industrial"
+     }
+    },
+    {
+     "title": "All transactions by size — minimal, six across",
+     "data": "credentials",
+     "height": 520,
+     "options": {
+      "columns": 6,
+      "sort": "value",
+      "variant": "minimal",
+      "facets": [
+       "sector"
+      ],
+      "missingValue": "Undisclosed"
+     }
+    },
+    {
+     "title": "Recent sector credentials with descriptions",
+     "data": "credentials",
+     "height": 360,
+     "span": 8,
+     "options": {
+      "columns": 3,
+      "max": 3,
+      "monogram": "palette",
+      "showDescription": true,
+      "facets": []
+     }
+    }
+   ],
+   "has_css": true
+  },
+  {
    "id": "kpi-tiles",
    "name": "KPI Tiles",
    "name_zh": "关键指标卡",
@@ -1323,6 +1535,293 @@
        "from": 48,
        "to": 55,
        "label": "Proposed range"
+      }
+     }
+    }
+   ],
+   "has_css": false
+  },
+  {
+   "id": "sotp",
+   "name": "Sum-of-the-Parts",
+   "name_zh": "分部加总估值（SOTP）",
+   "category": "valuation",
+   "engine": "echarts",
+   "deps": [
+    "echarts"
+   ],
+   "summary": "Sum-of-the-parts build-up: each segment's metric × multiple range stacked into an EV range, then net debt and other deductions down to the implied equity value and value per share.",
+   "summary_zh": "分部加总估值累加图：各业务板块“指标 × 倍数区间”逐段累加成企业价值区间，再扣除净负债等调整项得到隐含股权价值与每股价值区间。",
+   "description_zh": "投行分部估值（SOTP）页的核心图表。数据每行一个业务板块（segment、metric_name、metric_value、multiple_low、multiple_high、method），每段横条在低倍数累计值上浮动：实色 = 按低倍数计算的价值贡献，浅色延伸 = 按高倍数多出的价值；公司总部费用等负值行与净负债、养老金、少数股东权益等扣减项依次向左回走，最后得到股权价值区间。左侧第二行文字给出“指标 × 倍数”的计算依据，右侧一列为每股价值，虚线参考线标出当前股价（股价 × 稀释股数，与图表同一 USD m 刻度）。适用于多元化集团、分拆 / 剥离分析与“集团折价”论证；净负债、股数等数值选项可绑定 @参数，随假设滑块实时重算。",
+   "best_for": [
+    "Conglomerate / multi-segment valuation",
+    "Break-up and spin-off analysis (hidden value vs. market cap)",
+    "Showing which segment drives value and the metric × multiple behind it"
+   ],
+   "avoid_when": [
+    "A single-segment company (use football-field)",
+    "More than ~8 segments (aggregate the tail)",
+    "Segments valued on incompatible bases that cannot sum to one EV"
+   ],
+   "channels": {
+    "label": {
+     "type": "string",
+     "required": true,
+     "desc": "Segment name",
+     "default": "segment"
+    },
+    "metric": {
+     "type": "number",
+     "required": true,
+     "desc": "Valuation metric (EBITDA, revenue …, USD m); a negative value (unallocated corporate costs) walks down",
+     "default": "metric_value"
+    },
+    "metricName": {
+     "type": "string",
+     "required": false,
+     "desc": "Metric name shown in the basis line and tooltip (e.g. 'EBITDA 2026E')",
+     "default": "metric_name"
+    },
+    "low": {
+     "type": "number",
+     "required": true,
+     "desc": "Low multiple",
+     "default": "multiple_low"
+    },
+    "high": {
+     "type": "number",
+     "required": true,
+     "desc": "High multiple",
+     "default": "multiple_high"
+    },
+    "method": {
+     "type": "string",
+     "required": false,
+     "desc": "Valuation method shown in the tooltip footer (e.g. 'EV / EBITDA 2026E')",
+     "default": "method"
+    },
+    "note": {
+     "type": "string",
+     "required": false,
+     "desc": "Basis / peer reference shown in the tooltip footer"
+    }
+   },
+   "options": {
+    "netDebt": {
+     "type": "number|string",
+     "default": null,
+     "desc": "Net debt deducted from the EV build (USD m), or an '@param' name"
+    },
+    "netDebtLabel": {
+     "type": "string",
+     "default": "Less: net debt",
+     "desc": "Label of the net debt row"
+    },
+    "netDebtNote": {
+     "type": "string",
+     "default": null,
+     "desc": "Second line under the net debt label (e.g. 'As of 30-Sep-2026')"
+    },
+    "deductions": {
+     "type": "array",
+     "default": [],
+     "desc": "[{label, value, note}] further EV -> equity items (pension, minorities, associates); a positive value is deducted, a negative value added; value may be an '@param'"
+    },
+    "shares": {
+     "type": "number|string",
+     "default": null,
+     "desc": "Diluted shares (m) or an '@param' — enables the per-share column and the reference lines"
+    },
+    "refPrice": {
+     "type": "number|string",
+     "default": null,
+     "desc": "Current share price (or '@param'): dashed reference line at price × shares in the theme reference colour"
+    },
+    "refLabel": {
+     "type": "string",
+     "default": null,
+     "desc": "Caption prefix of the reference line (default 'Current', followed by the price)"
+    },
+    "refLines": {
+     "type": "array",
+     "default": [],
+     "desc": "[{price, label, color}] further per-share reference lines, e.g. the offer price with color 'accent2'"
+    },
+    "evMetric": {
+     "type": "object",
+     "default": null,
+     "desc": "{label, value} — implied multiple shown under the EV total (e.g. {\"label\": \"EV / EBITDA 2026E\", \"value\": 996.5})"
+    },
+    "evLabel": {
+     "type": "string",
+     "default": "Enterprise value",
+     "desc": "Label of the EV total row"
+    },
+    "equityLabel": {
+     "type": "string",
+     "default": "Equity value",
+     "desc": "Label of the equity total row"
+    },
+    "equityNote": {
+     "type": "string",
+     "default": null,
+     "desc": "Second line under the equity total (default: diluted share count, e.g. '158.0m diluted shares')"
+    },
+    "lowLabel": {
+     "type": "string",
+     "default": "Low multiple",
+     "desc": "Legend text of the solid part of each bar"
+    },
+    "highLabel": {
+     "type": "string",
+     "default": "Range to high multiple",
+     "desc": "Legend text of the light extension"
+    },
+    "perShare": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Right-hand value-per-share column (needs shares)"
+    },
+    "perShareTitle": {
+     "type": "string",
+     "default": "Per share",
+     "desc": "Heading of the per-share column"
+    },
+    "showBasis": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Metric × multiple line under each segment name (implied multiple under the EV total)"
+    },
+    "sort": {
+     "type": "string",
+     "default": null,
+     "desc": "null (data order) | 'desc' | 'asc' by midpoint contribution"
+    },
+    "format": {
+     "type": "string",
+     "default": null,
+     "desc": "Value format (USD m); default '#,##0;(#,##0)'"
+    },
+    "perShareFormat": {
+     "type": "string",
+     "default": null,
+     "desc": "Per-share format; default '$#,##0.00;($#,##0.00)'"
+    },
+    "multipleFormat": {
+     "type": "string",
+     "default": null,
+     "desc": "Multiple format; defaults to the low field's format ('0.0x')"
+    },
+    "metricFormat": {
+     "type": "string",
+     "default": null,
+     "desc": "Metric format; defaults to the metric field's format"
+    },
+    "labels": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Low – high value labels at the bar ends"
+    },
+    "connectors": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Dashed connectors along the low-case running total"
+    },
+    "valueAxis": {
+     "type": "boolean",
+     "default": false,
+     "desc": "Show a value axis with light gridlines (the labels carry the numbers by default)"
+    },
+    "legend": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Key for the solid / light bar parts, top-left"
+    },
+    "paramDefaults": {
+     "type": "object",
+     "default": {},
+     "desc": "Fallback values for '@param' options the report does not define (they are then defined in the store, shared with sliders)"
+    },
+    "crossFilter": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Click a segment to cross-filter other blocks (segment names match segment_revenue / segments_tree)"
+    }
+   },
+   "interactions": [
+    "Hover tooltip with the metric × multiple math, share of EV and value per share",
+    "Click a segment to cross-filter (others dim)",
+    "Live recompute when bound @params change (net debt, shares, price)",
+    "Animated transitions on filter / parameter updates",
+    "Re-lays out on resize (label columns, value-label room)",
+    "PNG / CSV export"
+   ],
+   "samples": [
+    {
+     "title": "Sum-of-the-parts — implied equity value (USD m)",
+     "data": "sotp",
+     "height": 440,
+     "options": {
+      "encode": {
+       "note": "note"
+      },
+      "netDebt": 1490,
+      "netDebtNote": "Gross debt $2,105m less cash $615m",
+      "deductions": [
+       {
+        "label": "Less: other adjustments",
+        "value": 145,
+        "note": "Pension (120), minorities (85), associates +60"
+       }
+      ],
+      "shares": 158.0,
+      "refPrice": 42.5,
+      "evMetric": {
+       "label": "EV / EBITDA 2026E",
+       "value": 996.5
+      }
+     }
+    },
+    {
+     "title": "Sorted build-up with offer line and value axis (net debt bound to @net_debt)",
+     "data": "sotp",
+     "height": 460,
+     "options": {
+      "encode": {
+       "note": "note"
+      },
+      "sort": "desc",
+      "valueAxis": true,
+      "netDebt": "@net_debt",
+      "paramDefaults": {
+       "net_debt": 1490
+      },
+      "deductions": [
+       {
+        "label": "Less: pension deficit",
+        "value": 120
+       },
+       {
+        "label": "Less: minority interests",
+        "value": 85
+       },
+       {
+        "label": "Plus: associates",
+        "value": -60
+       }
+      ],
+      "shares": 158.0,
+      "refPrice": 42.5,
+      "refLines": [
+       {
+        "price": 52.0,
+        "label": "Offer $52.00",
+        "color": "accent2"
+       }
+      ],
+      "evMetric": {
+       "label": "EV / EBITDA 2026E",
+       "value": 996.5
       }
      }
     }

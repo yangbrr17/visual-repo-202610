@@ -4,7 +4,7 @@
 > **依据**
 > - 主要来源：`research/raw/06-china-xhs.md`（下称 06）。
 > - 补充来源：02（地图合规）、07（合集与 AI 新秀）、08（AI 与 Step 2）。
-> - 现状核对：`vendor/vendor.json`、`kit/catalog.json`（52 个组件）、`docs/design-system.md`、`docs/roadmap-step2.md`、`research/landscape.md` §2.6。
+> - 现状核对：`vendor/vendor.json`、`kit/catalog.json`（53 个组件）、`docs/design-system.md`、`docs/roadmap-step2.md`、`research/landscape.md` §2.6。
 >
 > **口径**
 > - 版本、许可、体积、日期都在 2026-10-14 实查。方法：`npm view`、jsDelivr 数据 API、下载 UMD 后本地 `gzip -9`、读 raw LICENSE、shields.io。标 *（未核实）* 的除外。
@@ -17,14 +17,14 @@
 
 | # | 决策 | 一句话理由 |
 |---|---|---|
-| 1 | **只用 ECharts 6.1.0 一个引擎，不引入 AntV G2 / VisActor VChart 运行时** | 中国生态的大屏模板、低代码 BI 和 pyecharts 都建在 ECharts 上。kit 的 52 个组件里已有 35 个用 ECharts。G2（320 KB gz）和 VChart（617 KB gz）与它功能重叠 |
-| 2 | **vendor 官方 `@echarts-x/custom-bar-range`、`custom-line-range`、`custom-violin`** | Apache-2.0，每个 2–3 KB，是 `file://` 可用的 classic script。分别补上 football field 的正规区间编码、fan chart / 区间带、violin。**目前尚未 vendor** |
+| 1 | **只用 ECharts 6.1.0 一个引擎，不引入 AntV G2 / VisActor VChart 运行时** | 中国生态的大屏模板、低代码 BI 和 pyecharts 都建在 ECharts 上。kit 的 53 个组件里已有 36 个用 ECharts。G2（320 KB gz）和 VChart（617 KB gz）与它功能重叠 |
+| 2 | **vendor 官方 `@echarts-x/custom-bar-range`、`custom-line-range`、`custom-violin`** | Apache-2.0，每个约 2 KB（min 1.8–2.2 KB，见 §2.2），是 `file://` 可用的 classic script。分别补上 football field 的正规区间编码、fan chart / 区间带、violin。**目前尚未 vendor** |
 | 3 | **透视表是中国库唯一能补能力的地方：AntV S2 或 VisActor VTable，懒加载** | 带小计的交叉表是投行刚需。只用 2026-05-19 投毒事件清理后的版本，并核对哈希 |
 | 4 | **AI 出图走"AI 只做填空题"** | LLM 只输出一个经 schema 校验的最小意图 spec，样式由确定性编译器负责。VMind 已停更；GPT-Vis、VSeed、T8 只借设计，不当依赖；**云端渲染一律禁止**（mcp-server-chart、chart-visualization 技能、echarts-mcp） |
 | 5 | **供应链：AntV npm 命名空间在 2026-05-19 被投毒** | 300 多个包、600 多个恶意版本。我们的 `tools/vendor.py` 用 `npm pack`，不跑 install 脚本，方向是对的；但 `vendor.json` **还没有 integrity 哈希** |
 | 6 | **大屏审美不适合投行客户报告** | 深色背景、霓虹、发光、毛玻璃、3D、飞线、水球、词云、1920 × 1080 等比缩放都不用。可以借鉴的：克制的 count-up、跨图联动、叙事布局、标注体系、主题 token |
 | 7 | **小红书本身无法访问** | 需要登录和签名请求头，搜索引擎也不收录。"中文设计师推荐什么"是从掘金、微信（经搜狗）、CSDN 和知乎标题、官方设计指南三角推断出来的（§1） |
-| 8 | **中国地图：不用 DataV.GeoAtlas，面向中国受众时用 tile-grid 方格图或原样使用标准地图** | GeoAtlas 声明"仅供学习和交流使用"。按 PRC 规定，公开展示的地图需要审图号，标准地图哪怕只做裁剪或缩放也要重新送审。`china-tilemap` 组件**开发中** |
+| 8 | **中国地图：不用 DataV.GeoAtlas，面向中国受众时用 tile-grid 方格图或原样使用标准地图** | GeoAtlas 声明"仅供学习和交流使用"。按 PRC 规定，公开展示的地图需要审图号，标准地图哪怕只做裁剪或缩放也要重新送审。`china-tilemap` 组件已进 kit（manifest 和 `china_provinces` 样例数据已在 catalog 中），合规表述仍待法务确认（§9.3） |
 | 9 | **中文交付物的细节靠 token 和配置切换，不改组件** | 红涨绿跌：做一个对调 `--rk-pos` / `--rk-neg` 的主题变体。万 / 亿：改 `RK.format.config.compactUnits`。中文字体：builder 对 Noto Sans SC 做子集化 |
 
 ---
@@ -39,7 +39,7 @@
 | 知乎 zhuanlan.zhihu.com | ❌ WebFetch 返回 HTTP 403 | 只用了搜索摘要里的标题 |
 | CSDN | ◐ 正文被 JS cookie 校验拦截（HTTP 521）；搜索 API `so.csdn.net/api/v3/search` 可用 | 只用标题、日期、阅读数，当**趋势信号** |
 | **掘金 Juejin** | ◐ 搜索 API `api.juejin.cn/search_api/v1/search` 可用。文章页有 ByteDance WAF 的 proof-of-work，低频解开了**约 12 篇** | **主要的中文从业者来源** |
-| 微信公众号 | ◐ 搜狗 `weixin.sogou.com` 可用，但只有标题和摘要 | 信号来源，例如图表兔 2026-10-08 的文章让我们发现了 AntV 投毒事件 |
+| 微信公众号 | ◐ 搜狗 `weixin.sogou.com` 可用，但只有标题和摘要 | 信号来源，例如搜狗微信的搜索结果让我们注意到了 AntV 投毒事件（06 没有记录是哪一篇；06 引用的图表兔 2026-10 那篇讲的是误导性图表） |
 | 官方文档与设计指南 | ✅ echarts.apache.org、visactor.github.io、飞书设计规范、阿里云 DataV 帮助中心、Canva CN | 设计规则的硬依据 |
 | npm、jsDelivr、unpkg、raw.githubusercontent、shields.io | ✅ | 版本、许可、体积等硬事实 |
 
@@ -52,7 +52,7 @@
 
 ## 2. ECharts 生态（Baidu → Apache）
 
-**现状：** kit vendor 了 `echarts@6.1.0`（Apache-2.0，随附 NOTICE 和 LICENSE-d3），52 个组件里有 35 个基于它。06 在 ECharts 生态里没有发现投行刚需它覆盖不了的情况。
+**现状：** kit vendor 了 `echarts@6.1.0`（Apache-2.0，随附 NOTICE 和 LICENSE-d3），53 个组件里有 36 个基于它。06 在 ECharts 生态里没有发现投行刚需它覆盖不了的情况。
 
 ### 2.1 ECharts 6.x 对投行有用的能力
 
@@ -72,7 +72,7 @@
 | 轴标签默认防溢出、防重叠（`grid.outerBoundsMode`） | 长公司名 | 已受益 |
 | 6.1 修复 `lines` series tooltip 的 **XSS** | tooltip 显示用户提供的名称时 | 已在 6.1.0 ✓ |
 
-**坑：ECharts K 线默认红涨绿跌**（`#eb5454` / `#47b262`，中国惯例）。kit 的 `candlestick` 和 `price-volume` 已改为读取主题的 `t.pos` / `t.neg`，即西方惯例（`docs/design-system.md` 第 173 行）。
+**坑：ECharts K 线默认红涨绿跌**（`#eb5454` / `#47b262`，中国惯例）。kit 的 `candlestick` 和 `price-volume` 已改为读取主题的 `t.pos` / `t.neg`，即西方惯例（`docs/design-system.md` §3.2 第 6 条）。
 
 ### 2.2 官方 custom series `@echarts-x/*`（adopt）
 
@@ -298,11 +298,11 @@
 | 中文常见做法 | 投行客户报告？ | 理由和替代方案 | kit 现状 |
 |---|---|---|---|
 | 深色或深蓝大屏背景（`#0a0e1a`、`#001529`） | ❌（屏幕演示时可选） | pitchbook 要打印和转 PDF | `ink` 暗色主题只用于屏幕，打印时 `print.css` 强制换回纸面色 ✓ |
-| 霓虹青 / 品红、`box-shadow` 发光、柱子渐变 | ❌ | 降低精度，打印发灰，像消费科技产品 | 不用；`design-system.md` 第 176 行明令禁止 ✓ |
+| 霓虹青 / 品红、`box-shadow` 发光、柱子渐变 | ❌ | 降低精度，打印发灰，像消费科技产品 | 不用；`design-system.md` §3.2 第 8 条明令禁止 ✓ |
 | 毛玻璃（`backdrop-filter: blur`） | ❌ | 对比度差，打印没有对应效果 | 不用 ✓ |
 | DataV 式动画科技边框、角标装饰 | ❌ | 图表垃圾（chart junk） | 改用 kicker、action title、细分隔线、"Exhibit N" ✓ |
 | 3D 柱 / 3D 饼 / 地球（echarts-gl） | ❌ | 扭曲数值大小 | 没有 vendor echarts-gl ✓ |
-| 地图飞线、旋转雷达环、粒子背景 | ❌ | 纯装饰 | `flow-map` 以静态弧线为主，线宽编码金额；**流动光点是可选项**（`animate`），打印和 reduced-motion 时自动关闭 ◐ |
+| 地图飞线、旋转雷达环、粒子背景 | ❌ | 纯装饰 | `flow-map` 以静态弧线为主，线宽编码金额；**流动光点由 `animate` 控制，默认开启**，打印和 reduced-motion 时自动关闭 ◐ |
 | 水球图、速度表仪表盘 | ❌（极少数情况可以） | 数据墨水比低 | 用 `bullet` 或 `kpi-tiles`（带变化值和迷你线） ✓ |
 | 词云 | ❌ | 不精确 | 用排序条形图 ✓ |
 | 1920 × 1080 等比缩放（autofit.js） | ❌ | 破坏重排、打印和无障碍 | 12 栅格加打印页面尺寸 ✓ |
@@ -364,20 +364,20 @@
 - 可以选择加一条南海诸岛的说明。
 
 **kit 现状：**
-- `kit/components/china-tilemap/china-tilemap.js` **开发中**，还没有 `manifest.json`，所以没进 `kit/catalog.json`。
+- `china-tilemap` 已进 kit：`kit/components/china-tilemap/` 有 JS 和 `manifest.json`（category `geo`，引擎 ECharts），已收入 `kit/catalog.json`、`docs/component-catalog.md` 和 gallery。
 - 已实现的部分：
-  - 34 个省级行政区排成 7 × 8 网格，布局取自 geofacet 的 `china_prov_grid1`（MIT），台湾放在福建东侧，中间隔一个空格作为"海峡"；
+  - 34 个省级行政区排成 7 × 8 网格。布局是自研的：按省份质心经纬度排布再压缩，并与 geofacet 的 `china_prov_grid1`（MIT）交叉核对过。台湾放在福建东侧，中间隔一个空格作为"海峡"；70 条省际陆地边界中有 63 条保留为相邻方块；
   - 可以按 GB/T 2260 adcode、中英文名称或 ISO 3166-2:CN 关联数据；
-  - 支持顺序色、发散色、分档图例、交叉筛选。
+  - 方块或六边形两种形状；支持顺序色、发散色、分档图例、交叉筛选。
 - 示例数据 `kit/samples/datasets/china_provinces.json`（34 行，合成数据）已经就绪。
-- ⚠ 组件的文件头注释写着"no 审图号 needed in client decks"。这是**工程上的设计意图，不是法律结论**。上线前仍要合规确认（02 §6.3 (d)）。
+- ⚠ 组件的文件头注释写着"no 审图号 needed in client decks"，manifest 的 `summary_zh` 和 `best_for` 里也有"无需审图号"的说法。这是**工程上的设计意图，不是法律结论**。上线前仍要合规确认（02 §6.3 (d)）。
 
 ### 9.4 按受众选方案
 
 | 受众 | 推荐方案 | 组件 / 数据 |
 |---|---|---|
 | 全球或海外客户，只看中国以外 | 正常用世界底图（实控口径，public domain） | `choropleth`、`bubble-map` 等加 `world-110m` |
-| 全球客户，含中国省级数据 | 首选 tile-grid；也可以用 NE admin-1 中国省级加等面积投影（manifest 标注 `compliance: "de facto / not PRC-reviewed"`） | `china-tilemap`（开发中）；计划中的 `china-map`（ECharts 加 d3 Albers，02 §10.3） |
+| 全球客户，含中国省级数据 | 首选 tile-grid；也可以用 NE admin-1 中国省级加等面积投影（manifest 标注 `compliance: "de facto / not PRC-reviewed"`） | `china-tilemap`；计划中的 `china-map`（ECharts 加 d3 Albers，02 §10.3） |
 | **中国境内客户或中国境内公开展示** | ① **tile-grid 方格图**（首选，可交互）；② 标准地图**原样**作为静态图片，并标审图号；③ 已取得授权或审核的底图作为数据文件放进来，审图号自动渲染到脚注 | `china-tilemap`；静态图片块；底图 manifest 的合规字段 |
 | 不确定 | 不画地图，改用省级排序条形图或表格 | `bar`、`league-table` |
 
@@ -423,7 +423,7 @@
 
 | 话题 | 建议 | kit 现状 |
 |---|---|---|
-| **中文字体** | Noto Sans SC / 思源黑体（**OFL-1.1**）。完整 CJK 字体每个字重约 8–16 MB，所以由 builder 用 `fonttools pyftsubset` 按报告实际用字做子集化，或者用 GB2312 一级 3500 字的子集（约 1–2 MB）。标题用衬线体时选 Noto Serif SC（OFL） | 目前回退到系统字体（PingFang、YaHei），子集化是 P3（`docs/design-system.md` 第 116、438 行） |
+| **中文字体** | Noto Sans SC / 思源黑体（**OFL-1.1**）。完整 CJK 字体每个字重约 8–16 MB，所以由 builder 用 `fonttools pyftsubset` 按报告实际用字做子集化，或者用 GB2312 一级 3500 字的子集（约 1–2 MB）。标题用衬线体时选 Noto Serif SC（OFL） | 目前回退到系统字体（PingFang、YaHei），子集化是 P3（`docs/design-system.md` §2.1 和 §10 第 8 项） |
 | 避免的字体 | 霞鹜文楷、得意黑（OFL，但太花哨）；阿里巴巴普惠体、HarmonyOS Sans、MiSans、OPPO Sans（厂商自定义许可，需要法务审核）；仓耳今楷（**仅限个人使用**） | 不用 |
 | **万 / 亿** | 中文财报常用"亿元"，西方投行用 mm / bn。同一份报告只用一套。`Intl.NumberFormat('zh-CN', {notation:'compact'})` 可以输出万 / 亿 | `RK.format.config.compactUnits` 可以改成 `[[1e8,'亿'],[1e4,'万']]` 🟡。建议加一个随 `report.locale` 切换的预设 |
 | **红涨绿跌** | 默认西方惯例；中国客户用主题变体对调 `--rk-pos` 和 `--rk-neg`，组件不用改 | 组件已经读 token ✓；中国变体主题还没建 |
@@ -437,7 +437,7 @@
 |---|---|---|---|
 | **P0** | 交付物里禁用 DataV.GeoAtlas 和任何来源不明的中国 GeoJSON；运行时禁止访问 `geo.datav.aliyun.com`。`tools/smoke.cjs` 目前只记录 `requestfailed`，建议加一条断言：拦截所有外部请求，出现任何外连即判失败 | 规范加测试 | §9.2 |
 | **P0** | 中国境内交付物的地图一律走 §9.4 的决策表；上线前由合规签字 | 流程 | §9.1 |
-| **P1** | 给 `china-tilemap` 补 `manifest.json`（category 用 `geo`，`refs.ft` 写 `Spatial:equalised-cartogram`），连同 `china_provinces` 样例进 catalog；文件头里的合规表述改成"设计意图，须合规确认" | `kit/components/china-tilemap/` | §9.3 |
+| **P1** | `china-tilemap`：manifest（category `geo`）和 `china_provinces` 样例已进 catalog ✓。还没做的：manifest 加 `refs.ft: "Spatial:equalised-cartogram"`；文件头、manifest 的 `summary_zh` / `best_for` 里"无需审图号"的说法改成"设计意图，须合规确认" | `kit/components/china-tilemap/` | §9.3 |
 | **P1** | vendor `@echarts-x/custom-bar-range` 1.2.1、`custom-line-range` 1.1.1、`custom-violin` 1.1.1。`football-field` 改用 bar-range；`line` 加 `band`（fan chart）；`boxplot` 或 `beeswarm` 加 violin 变体 | `vendor/vendor.json`、对应组件 | §2.2 |
 | **P1** | `vendor.json` 增加 `integrity`（npm `dist.integrity`）和逐文件 sha256，`vendor.py --check` 校验；在 `vendor/LICENSES.md` 记下 AntV 事件和"只 pack、不 install"的约定 | `tools/vendor.py` | §10 |
 | **P1** | 底图 manifest 增加合规元数据（`worldview`、`prc_reviewed`、`审图号`），审图号自动渲染到脚注；builder 在 zh-CN 报告用了未审底图时发出警告 | `kit/core/rk.geo.js`、`py/reportkit` | §9.4 |
@@ -455,5 +455,5 @@
 - 主笔记：`research/raw/06-china-xhs.md` 全文，含 §16 来源清单。
 - 地图合规：`research/raw/02-geo-maps.md` §0.7–0.8、§6.3、§7.4、§10。
 - AI 和 Step 2：`research/raw/08-query-ai.md` §8.5–8.6、§9；`research/raw/07-collections.md` §7；`docs/roadmap-step2.md` §4.6、§5。
-- kit 现状：`vendor/vendor.json`、`kit/catalog.json`、`docs/design-system.md`（中文字体、红涨绿跌、大屏禁用、万 / 亿）、`kit/components/china-tilemap/china-tilemap.js`（开发中）。
+- kit 现状：`vendor/vendor.json`、`kit/catalog.json`、`docs/design-system.md`（中文字体、红涨绿跌、大屏禁用、万 / 亿）、`kit/components/china-tilemap/`（`china-tilemap.js` + `manifest.json`）。
 - 相关合集与画廊：`research/awesome-collections.md`。
