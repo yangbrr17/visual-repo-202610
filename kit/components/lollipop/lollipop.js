@@ -21,11 +21,24 @@
     return code.replace(/([0#])\.([0#]+)/g, function (m, a, d) { var n = Math.min(dec, d.length); return a + (n ? '.' + d.slice(0, n) : ''); });
   }
 
-  /** Signed percentage with a true minus sign (matches the other comparison components). */
-  function pct(v) {
-    if (!isNum(v)) return RK.format(v, '0.0%');
-    var s = RK.format(Math.abs(v), '0.0%');
-    return v > 0 ? '+' + s : v < 0 && /[1-9]/.test(s) ? '\u2212' + s : s;
+  var MINUS = '\u2212';
+  /** Value text with a true minus sign (the signed delta columns use U+2212 too). */
+  function num(v, f) { return RK.format(v, f).replace(/^-/, MINUS); }
+  /** Signed value with a true minus sign. */
+  function signed(v, f) {
+    if (!isNum(v)) return RK.format(v, f);
+    var s = RK.format(Math.abs(v), f);
+    return v > 0 ? '+' + s : v < 0 && /[1-9]/.test(s) ? MINUS + s : s;
+  }
+  function pct(v) { return signed(v, '0.0%'); }
+  /** Percent formats: differences of two percentages are percentage points, not relative %. */
+  function isPct(f) {
+    var code = RK.format.presets[f] || f;
+    return typeof code === 'string' && /%/.test(code.split(';')[0].replace(/"[^"]*"/g, ''));
+  }
+  function ppDiff(d, f) {
+    var dec = RK.format.decimals(f) || 0;
+    return signed(isNum(d) ? d * 100 : d, '0' + (dec ? '.' + new Array(dec + 1).join('0') : '') + '"pp"');
   }
 
   /** Is row r highlighted (boolean field such as is_target, or label listed in options.highlight)? */
@@ -35,7 +48,10 @@
     return function (r) { return (hf && !!r[hf] && r[hf] !== 'false') || list.indexOf(r[enc.label]) >= 0; };
   }
 
-  /** Tinted full-width row band behind highlighted categories (like .rk-table tr.is-target). */
+  /**
+   * Tinted full-width row band behind highlighted categories (like .rk-table tr.is-target). On dark paper an
+   * alpha tint of accent-2 turns muddy, so it stays faint and a 2px accent-2 rule marks the row instead.
+   */
   function rowBand(ctx, idx, horiz) {
     var t = ctx.theme;
     return {
@@ -45,7 +61,9 @@
         var bw = horiz ? api.size([0, 1])[1] : api.size([1, 0])[0];
         var shape = horiz ? { x: 0, y: p[1] - bw / 2, width: api.getWidth(), height: bw }
           : { x: p[0] - bw / 2, y: cs.y, width: bw, height: cs.height + 40 };
-        return { type: 'rect', shape: shape, style: { fill: RK.theme.alpha(t.accent2, t.dark ? 0.16 : 0.11) } };
+        var kids = [{ type: 'rect', shape: shape, style: { fill: RK.theme.alpha(t.accent2, t.dark ? 0.09 : 0.11) } }];
+        if (t.dark) kids.push({ type: 'rect', shape: horiz ? { x: 0, y: shape.y, width: 2, height: bw } : { x: shape.x, y: cs.y, width: bw, height: 2 }, style: { fill: t.accent2 } });
+        return { type: 'group', children: kids };
       },
       data: idx.map(function (i) { return [i]; })
     };
@@ -55,6 +73,7 @@
     var o = ctx.options, t = ctx.theme, enc = ctx.enc;
     var horiz = o.orientation !== 'vertical';
     var fmt = o.format || ctx.fmtOf(enc.value) || 'auto';
+    var pctFmt = isPct(fmt);
     var has2 = !!(enc.value2 && ctx.dataset && ctx.dataset.has(enc.value2));
     var isHi = highlighter(ctx);
 
@@ -81,7 +100,7 @@
     function baseColor(r, i) {
       if (hi[i]) return t.accent2;
       if (groups.length) return groupPal[groups.indexOf(r[enc.group])] || t.neutral;
-      return t.accent;
+      return t.peer || t.accent;   // one peer colour across the kit
     }
     var colors = rows.map(function (r, i) { return C.dim(ctx, enc.label, r[enc.label], baseColor(r, i)); });
 
@@ -90,27 +109,61 @@
     var ref = o.refLine === 'median' || o.refLine === 'mean' ? stat(o.refLine, statRows) : isNum(o.refLine) ? o.refLine : null;
     var refName = o.refLabel || (o.refLine === 'median' ? 'Median' : o.refLine === 'mean' ? 'Mean' : 'Ref.');
 
+    // ---- end-label text and the vertical band width (labels wider than a band turn 90°) ----
+    var numFont = '11px ' + t.fontNum;
+    function endText(i) {
+      var s = num(v1[i], fmt);
+      return has2 && v2[i] != null ? s + ' / ' + num(v2[i], fmt) : s;
+    }
+    var bandPx = Math.max(8, ((inst.getWidth() || 600) - 56) / Math.max(1, labels.length));   // ~value-axis labels + margins
+    var endW = 0, catW = 0;
+    rows.forEach(function (r, i) {
+      if (o.labels !== false) endW = Math.max(endW, C.measure(endText(i), (hi[i] ? '600 ' : '') + numFont));
+      catW = Math.max(catW, C.measure(labels[i], (hi[i] ? '600 ' : '') + '11px ' + t.fontSans));
+    });
+    var rotVal = !horiz && o.labels !== false && endW > bandPx - 4;
+    var rotCat = !horiz && catW > bandPx - 6;
+
     // ---- value axis bounds with room for end labels ----
     var ext = util.extent(v1.concat(v2, [0, ref], (o.refLines || []).map(function (r) { return r.value; })));
     var span = (ext[1] - ext[0]) || Math.abs(ext[1]) || 1;
     // end labels may run into the grid margin: keep the axis on nice steps, widen the margin instead
-    var labelPx = o.labels === false ? 0 : (horiz ? (has2 ? 88 : 44) : 20);
-    var plotPx = Math.max(160, horiz ? inst.getWidth() - 190 : inst.getHeight() - 70);
+    var labelPx = o.labels === false ? 0 : (horiz ? (has2 ? 88 : 44) : rotVal ? endW + 8 : 20);
+    var plotPx = Math.max(160, horiz ? inst.getWidth() - 190 : inst.getHeight() - 70 - (rotCat ? 20 : 0));
     var step = util.niceStep(span * 1.04, horiz ? 6 : 5);
     var axMax = ext[1] > 0 ? Math.ceil(ext[1] / step) * step : 0;
     var axMin = ext[0] < 0 ? Math.floor(ext[0] / step) * step : 0;
     var room = function (gap) { return labelPx - gap / ((axMax - axMin) || 1) * plotPx; };
-    if (!horiz && room(axMax - ext[1]) > 0) axMax += step;     // vertical: keep labels inside the plot
+    for (var k = 0; k < 3 && !horiz && room(axMax - ext[1]) > 0; k++) axMax += step;     // vertical: keep labels inside the plot
     if (ext[0] < 0 && room(ext[0] - axMin) > 0) axMin -= step;      // negative labels never overlap category labels
     var marginR = horiz ? Math.max(20, room(axMax - ext[1]) + 8) : 20;
 
     var size = o.dotSize || 9;
-    function lineItem(name, value, color, width, labelColor) {
+    // statistic: ink-3 dashed 1px, regular italic label; reference (offer / target multiple): --rk-ref 1.2px, semibold italic
+    // vertical: the label sits at whichever end of the line is clear of dots and value labels (end preferred)
+    function sideOf(value, text) {
+      if (horiz) return 'start';
+      var perPx = ((axMax - axMin) || 1) / Math.max(60, plotPx), cols = Math.ceil((C.measure(text, 'italic 10.5px ' + t.fontNum) + 6) / bandPx);
+      var lo = value + 2 * perPx, hi = value + 18 * perPx;
+      function clash(from, to) {
+        for (var i = Math.max(0, from); i < Math.min(rows.length, to); i++) {
+          var v = v2[i] != null && v1[i] != null ? Math.max(v1[i], v2[i]) : v1[i];
+          if (v == null) continue;
+          var top = v + (o.labels === false ? size / 2 : size / 2 + 5 + labelPx) * perPx, bot = Math.min(v, v1[i]) - size / 2 * perPx;
+          if (top > lo && bot < hi) return true;
+        }
+        return false;
+      }
+      return !clash(rows.length - cols, rows.length) || clash(0, cols) ? 'insideEndTop' : 'insideStartTop';
+    }
+    function lineItem(name, value, color, width, labelColor, weight) {
       var d = { name: name, value: value, lineStyle: { color: color, type: [4, 3], width: width } };
       d[horiz ? 'xAxis' : 'yAxis'] = value;
+      var text = C.richSafe((name ? name + ' ' : '') + num(value, fmt));
       d.label = {
-        show: true, position: horiz ? 'start' : 'insideEndTop', distance: 4, color: labelColor || color, fontSize: 10.5, fontFamily: t.fontNum,
-        formatter: (name ? name + ' ' : '') + RK.format(value, fmt)
+        show: true, position: sideOf(value, text), distance: 4, color: labelColor || color, fontSize: 10.5, fontFamily: t.fontNum,
+        fontStyle: 'italic', fontWeight: weight || 400, textBorderColor: t.paper, textBorderWidth: 3,
+        formatter: function () { return text; }   // a function: data text is never read as a {a}/{b}/{c} template
       };
       return d;
     }
@@ -155,11 +208,13 @@
       data: v1.map(function (v, i) {
         return { name: labels[i], value: at(v, i), symbolSize: hi[i] ? size + 2 : size, itemStyle: { color: colors[i], borderColor: t.paper, borderWidth: 1 } };
       }),
+      // precision 10: the line sits at the exact statistic (the default 2 decimals moved 0.2152 to 0.22);
+      // z below the end-label series so value labels (with a paper halo) are never struck through
       markLine: (ref != null || (o.refLines || []).length) ? {
-        silent: true, symbol: ['none', 'none'], animation: false,
+        silent: true, symbol: ['none', 'none'], animation: false, precision: 10, z: 4,
         // statistic: ink-3 dashed; user reference lines (offer / target multiple): --rk-ref, label in the line colour
-        data: (ref != null ? [lineItem(refName, ref, t.ink3, 1, t.ink2)] : []).concat((o.refLines || []).map(function (r) {
-          return lineItem(r.label || '', r.value, r.color || t.ref, 1.2);
+        data: (ref != null ? [lineItem(refName, ref, t.ink3, 1, t.ink2, 400)] : []).concat((o.refLines || []).map(function (r) {
+          return lineItem(r.label || '', r.value, r.color || t.ref, 1.2, null, 600);
         }))
       } : undefined
     });
@@ -189,9 +244,14 @@
             label: {
               show: true, position: horiz ? (neg ? 'left' : 'right') : (neg ? 'bottom' : 'top'), distance: size / 2 + 5,
               fontSize: 11, fontFamily: t.fontNum, color: t.ink2,
+              // knock-out box in the paper (or row-tint) colour: reference lines never strike through a value
+              backgroundColor: hi[i] && o.highlightBand !== false ? RK.theme.mix(t.paper, t.accent2, t.dark ? 0.09 : 0.11) : t.paper,
+              padding: [1, 2], borderRadius: 2,
+              // vertical: labels wider than a band run upwards (downwards below zero) instead of touching
+              rotate: rotVal ? 90 : 0, align: rotVal ? (neg ? 'right' : 'left') : undefined, verticalAlign: rotVal ? 'middle' : undefined,
               formatter: function () {
-                var s = hi[i] ? '{h|' + RK.format(v, fmt) + '}' : RK.format(v, fmt);
-                return has2 && v2[i] != null ? s + '{s| / ' + RK.format(v2[i], fmt) + '}' : s;
+                var a = C.richSafe(num(v, fmt)), s = hi[i] ? '{h|' + a + '}' : a;
+                return has2 && v2[i] != null ? s + '{s| / ' + C.richSafe(num(v2[i], fmt)) + '}' : s;
               },
               rich: { h: { color: t.ink, fontWeight: 600, fontSize: 11, fontFamily: t.fontNum }, s: { color: t.ink3, fontSize: 10.5, fontFamily: t.fontNum } }
             }
@@ -220,15 +280,15 @@
       axisLine: { show: true, onZero: true, lineStyle: { color: t.axis } }, axisTick: { show: false },
       axisLabel: {
         interval: 0, color: t.ink2, fontSize: 11,
-        width: horiz ? 150 : Math.max(48, (inst.getWidth() - 60) / Math.max(1, labels.length) - 6), overflow: horiz ? 'truncate' : 'break',
-        rotate: !horiz && labels.length > 12 ? 35 : 0,
-        formatter: function (v, i) { return hi[i] ? '{h|' + v + '}' : v; },
+        width: horiz ? 150 : rotCat ? 90 : Math.max(24, bandPx - 6), overflow: horiz || rotCat ? 'truncate' : 'break',
+        rotate: rotCat ? 35 : 0,   // only when the longest label is wider than its band
+        formatter: function (v, i) { var s = C.richSafe(v); return hi[i] ? '{h|' + s + '}' : s; },
         rich: { h: { color: t.ink, fontWeight: 600, fontSize: 11 } }
       }
     };
     var valAxis = {
       type: 'value', min: axMin, max: axMax, interval: step,
-      axisLabel: { formatter: C.axisFmt(tickFmt(fmt, step)) },
+      axisLabel: { formatter: function (v) { return num(v, tickFmt(fmt, step)); } },
       splitLine: { show: true, lineStyle: { color: t.grid } }
     };
     var top = (showLegend ? 28 : 6) + (horiz && hasTopRef ? 18 : 0);
@@ -242,12 +302,13 @@
         formatter: function (p) {
           var i = p.dataIndex, r = rows[i];
           if (!r || (p.seriesId !== 'dot' && p.seriesId !== 'dot2')) return '';
-          var tr = [{ color: colors[i], label: ctx.title(enc.value), value: RK.format(v1[i], fmt), bold: p.seriesId === 'dot' }];
+          var tr = [{ color: colors[i], label: ctx.title(enc.value), value: num(v1[i], fmt), bold: p.seriesId === 'dot' }];
+          // differences of two percentages are percentage points ('+2.1pp'), not relative changes
           if (has2) {
-            tr.push({ label: ctx.title(enc.value2), value: RK.format(v2[i], fmt), bold: p.seriesId === 'dot2' });
-            if (v1[i] != null && v2[i] != null) tr.push({ label: 'Change', value: pct(v1[i] ? v2[i] / v1[i] - 1 : NaN) });
+            tr.push({ label: ctx.title(enc.value2), value: num(v2[i], fmt), bold: p.seriesId === 'dot2' });
+            if (v1[i] != null && v2[i] != null) tr.push({ label: 'Change', value: pctFmt ? ppDiff(v2[i] - v1[i], fmt) : pct(v1[i] ? v2[i] / v1[i] - 1 : NaN) });
           }
-          if (ref != null && v1[i] != null && ref > 0 && v1[i] > 0) tr.push({ label: 'vs. ' + refName.toLowerCase(), value: pct(v1[i] / ref - 1) });
+          if (ref != null && v1[i] != null && (pctFmt || (ref > 0 && v1[i] > 0))) tr.push({ label: 'vs. ' + refName.toLowerCase(), value: pctFmt ? ppDiff(v1[i] - ref, fmt) : pct(v1[i] / ref - 1) });
           if (enc.group) tr.unshift({ label: ctx.title(enc.group), value: r[enc.group] });
           return C.tip(labels[i], tr);
         }

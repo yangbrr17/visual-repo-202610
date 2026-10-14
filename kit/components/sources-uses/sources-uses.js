@@ -280,13 +280,13 @@
         var off = m.balance && !m.balance.ok && (p === m.balance.a || p === m.balance.b);
         var tot = { amount: p.total, pct: 1, mult: p.mult, r: {} };
         var tfoot = h('tfoot', h('tr.rk-su__total', { class: off ? 'is-off' : '' },
-          h('td', p.totalLabel),
+          h('td', String(p.totalLabel == null ? '' : p.totalLabel)),
           cols.map(function (col) {
             if (col.key === 'rate' || col.key === 'maturity') return h('td');
             return cell(col, tot, m, c, true);
           })));
         return h('section.rk-su__panel', { 'aria-label': p.title },
-          h('table.rk-table.rk-su__table', h('caption.rk-sr-only', p.title), thead, tbody, tfoot),
+          h('table.rk-table.rk-su__table', h('caption.rk-sr-only', String(p.title == null ? '' : p.title)), thead, tbody, tfoot),
           notesList(p.notes));
       }
 

@@ -40,9 +40,11 @@
       default: return 'M' + (-r) + ' 0a' + r + ' ' + r + ' 0 1 0 ' + (2 * r) + ' 0a' + r + ' ' + r + ' 0 1 0 ' + (-2 * r) + ' 0Z';
     }
   }
-  function shapeSVG(shape, r, fill, ring) {
-    var s = Math.ceil(r * 2.6 + 4);
+  /** Marker SVG (theme / option colours only). halo: accent2 outline drawn around a highlighted event. */
+  function shapeSVG(shape, r, fill, ring, halo) {
+    var s = Math.ceil((halo ? r + 3.4 : r) * 2.6 + 4);
     return '<svg viewBox="' + (-s / 2) + ' ' + (-s / 2) + ' ' + s + ' ' + s + '" width="' + s + '" height="' + s + '" style="margin:' + (-s / 2) + 'px 0 0 ' + (-s / 2) + 'px" aria-hidden="true">' +
+      (halo ? '<path d="' + shapePath(shape, r + 3.4) + '" fill="none" stroke="' + halo + '" stroke-width="2" stroke-linejoin="round"/>' : '') +
       '<path d="' + shapePath(shape, r) + '" fill="' + fill + '" stroke="' + ring + '" stroke-width="2" stroke-linejoin="round"/></svg>';
   }
 
@@ -140,16 +142,28 @@
         // kinds: stable order from all rows so colours do not shift when filtering
         var kinds = RK.util.unique(c.allRows.map(function (r) { return enc.kind && r[enc.kind] != null ? String(r[enc.kind]) : null; }).filter(function (k) { return k != null; }));
         var kc = o.kindColors || {}, ks = o.kindShapes || {};
+        var hi = o.highlight == null ? [] : [].concat(o.highlight);
+        // one highlight per chart: with a highlighted event, a kind may not also take the highlight colour
+        // (accent2); such a kindColors entry falls back to the automatic palette
+        var fixed = {};
+        Object.keys(kc).forEach(function (k) {
+          var col = tokenColor(t, kc[k]);
+          if (!col) return;
+          if (hi.length && RK.theme.distance(col, t.accent2) < 40) {
+            if (typeof console !== 'undefined' && console.warn) console.warn('[RK] timeline: kindColors["' + k + '"] uses the highlight colour (accent2) while options.highlight is set; using a palette colour instead');
+            return;
+          }
+          fixed[k] = col;
+        });
         // automatic colours stay clear of accent2 (highlight) and of colours claimed by kindColors overrides
-        var free = kinds.filter(function (k) { return !tokenColor(t, kc[k]); });
-        var pal = RK.theme.palette({ n: free.length, exclude: [t.accent2].concat(Object.keys(kc).map(function (k) { return tokenColor(t, kc[k]); })) });
+        var free = kinds.filter(function (k) { return !fixed[k]; });
+        var pal = RK.theme.palette({ n: free.length, exclude: [t.accent2].concat(Object.keys(fixed).map(function (k) { return fixed[k]; })) });
         var auto = {};
         free.forEach(function (k, i) { auto[k] = pal[i]; });
-        var colorOf = function (k) { return k == null ? t.accent : (tokenColor(t, kc[k]) || auto[k] || t.neutral); };
+        var colorOf = function (k) { return k == null ? t.accent : (fixed[k] || auto[k] || t.neutral); };
         var shapeOf = function (k) { return o.marker === 'dot' ? 'circle' : (ks[k] || SHAPES[Math.max(0, kinds.indexOf(k)) % SHAPES.length]); };
         var selField = o.selectBy ? enc[o.selectBy] : null;
         var sel = selField ? c.selected(selField) : [];
-        var hi = o.highlight == null ? [] : [].concat(o.highlight);
         evs.forEach(function (ev) {
           ev.color = colorOf(ev.kind);
           ev.shape = shapeOf(ev.kind);
@@ -174,7 +188,9 @@
         M.kinds.forEach(function (k) {
           var active = !M.sel.length || o.selectBy !== 'kind' || M.sel.indexOf(k) >= 0;
           var item = h('button.rk-legend__item.rk-tl__lg', { type: 'button', class: active ? null : 'is-off', title: o.selectBy === 'kind' ? 'Filter by ' + kindName(c, k) : null,
-            html: (o.marker === 'number' ? '<i class="rk-legend__swatch" style="background:' + M.colorOf(k) + ';border-radius:50%"></i>' : shapeSVG(M.shapeOf(k), 4.2, M.colorOf(k), t.paper)) + '<span>' + RK.util.escapeHTML(kindName(c, k)) + '</span>' });
+            // swatch markup carries theme colours only; the kind name is a text node
+            html: o.marker === 'number' ? '<i class="rk-legend__swatch" style="background:' + M.colorOf(k) + ';border-radius:50%"></i>' : shapeSVG(M.shapeOf(k), 4.2, M.colorOf(k), t.paper) });
+          item.appendChild(h('span', kindName(c, k)));
           if (o.selectBy === 'kind' && o.crossFilter !== false) item.addEventListener('click', function () { current.select(c.enc.kind, k); });
           else item.disabled = true;
           legendEl.appendChild(item);
@@ -217,10 +233,11 @@
           it.marker.classList.toggle('is-dim', ev.dim);
           it.marker.classList.toggle('is-hl', ev.hl);
           it.leader.classList.toggle('is-dim', ev.dim);
+          // highlighted event: kind colour kept (legend stays true) + accent2 ring
           it.marker.innerHTML = o.marker === 'number'
-            ? '<span class="rk-tl__num" style="background:' + ev.color + ';color:' + RK.theme.textOn(ev.color) + '">' + ev.n + '</span>'
-            : shapeSVG(ev.shape, o.marker === 'dot' ? 4.5 : (ev.hl ? 6.5 : 5.5), ev.color, t.paper);
-          it.r = o.marker === 'number' ? 9 : (ev.hl ? 7.5 : 6.5);
+            ? '<span class="rk-tl__num" style="background:' + ev.color + ';color:' + RK.theme.textOn(ev.color) + (ev.hl ? ';box-shadow:0 0 0 2px ' + t.paper + ',0 0 0 4px ' + t.accent2 : '') + '">' + ev.n + '</span>'
+            : shapeSVG(ev.shape, o.marker === 'dot' ? 4.5 : (ev.hl ? 6 : 5.5), ev.color, t.paper, ev.hl ? t.accent2 : null);
+          it.r = o.marker === 'number' ? (ev.hl ? 12 : 10) : (ev.hl ? 10 : 6.5);
         });
         items.forEach(function (it, key) {
           if (seen[key]) return;
@@ -349,8 +366,17 @@
         axisEl.style.cssText = 'left:' + padX + 'px;top:' + (axisY - 1) + 'px;width:' + plotW + 'px;height:2px;';
         gridLayer.innerHTML = '';
         var ps = periods(lo, hi, plotW / Math.max(DAY, hi - lo) * DAY);
-        var todayX = todayTs != null ? X(todayTs) : null;
+        var todayX = todayTs != null ? X(todayTs) : null, todayBox = null;
         gridLayer.appendChild(h('div.rk-tl__ruler', { style: { left: padX + 'px', top: plotBottom + 'px', width: plotW + 'px' } }));
+        // the Today caption is placed first: period labels that would touch it (+6px) are dropped
+        if (todayX != null && todayX >= padX && todayX <= padX + plotW) {
+          gridLayer.appendChild(h('div.rk-tl__today', { style: { left: todayX + 'px', top: '0px', height: (plotBottom + 2) + 'px' } }));
+          var tl = gridLayer.appendChild(h('div.rk-tl__todaylab', { style: { left: '0px', top: (plotBottom + 3) + 'px' } },
+            (o.todayLabel ? o.todayLabel + ' ' : '') + RK.format(new Date(todayTs), 'd mmm')));
+          var tlw = tl.offsetWidth, tlx = Math.max(0, Math.min(W - tlw, todayX - tlw / 2));   // centred under the line, kept inside the block
+          tl.style.left = tlx + 'px';
+          todayBox = [tlx - 6, tlx + tlw + 6];
+        }
         ps.forEach(function (p) {
           var x0 = X(p.s), x1 = X(p.e), cx0 = Math.max(padX, x0), cx1 = Math.min(padX + plotW, x1);
           if (cx1 - cx0 < 2) return;
@@ -359,18 +385,11 @@
             gridLayer.appendChild(h('div.rk-tl__tick', { style: { left: x0 + 'px', top: (axisY - 4.5) + 'px' } }));
             gridLayer.appendChild(h('div.rk-tl__rtick', { class: p.major ? 'is-major' : null, style: { left: x0 + 'px', top: plotBottom + 'px' } }));
           }
-          var cx = (cx0 + cx1) / 2, tw = RK.chart.measure(p.text, '10.5px ' + c.theme.fontNum);
+          var cx = (cx0 + cx1) / 2, tw = RK.chart.measure(p.text, '11px ' + c.theme.fontNum) * 1.05;
           if (tw + 8 > cx1 - cx0) return;
-          if (todayX != null && Math.abs(todayX - cx) < tw / 2 + 34) return;
+          if (todayBox && cx + tw / 2 > todayBox[0] && cx - tw / 2 < todayBox[1]) return;
           gridLayer.appendChild(h('div.rk-tl__period', { style: { left: cx + 'px', top: (plotBottom + 3) + 'px' } }, p.text));
         });
-        if (todayX != null && todayX >= padX && todayX <= padX + plotW) {
-          gridLayer.appendChild(h('div.rk-tl__today', { style: { left: todayX + 'px', top: '0px', height: (plotBottom + 2) + 'px' } }));
-          var tl = gridLayer.appendChild(h('div.rk-tl__todaylab', { style: { left: '0px', top: (plotBottom + 3) + 'px' } },
-            (o.todayLabel ? o.todayLabel + ' ' : '') + RK.format(new Date(todayTs), 'd mmm')));
-          var tlw = tl.offsetWidth;   // centred under the line, but kept inside the block
-          tl.style.left = Math.max(0, Math.min(W - tlw, todayX - tlw / 2)) + 'px';
-        }
         return H;
       }
 
@@ -392,17 +411,19 @@
         var LINE = 9;   // marker centre: middle of the first text line
 
         if (o.spacing === 'time' && list.length > 1) {
-          var top = 8, total = list.reduce(function (s, it) { return s + it.h + 8; }, 0);
+          var top = 8, total = list.reduce(function (s, it) { return s + it.h + 14; }, 0);
           H = Math.max(availH, Math.min(total * 1.6, total + 120));
           var t0 = M.evs[0].t, t1 = M.evs[M.evs.length - 1].t, span = Math.max(DAY, t1 - t0);
           var Y = function (v) { return top + LINE + (v - t0) / span * (H - top - 16 - list[list.length - 1].h); };
           var prevBottom = -Infinity;
-          list.forEach(function (it) { it.my = Y(it.ev.t); it.ly = Math.max(it.my - LINE, prevBottom + 8); prevBottom = it.ly + it.h; });
+          // dodged rows keep the same breathing room as evenly spaced rows (no touching entries)
+          var MIN_GAP = 14;
+          list.forEach(function (it) { it.my = Y(it.ev.t); it.ly = Math.max(it.my - LINE, prevBottom + MIN_GAP); prevBottom = it.ly + it.h; });
           var maxBottom = H - 4;
           for (var i = list.length - 1; i >= 0; i--) {
             var it = list[i];
             if (it.ly + it.h > maxBottom) it.ly = maxBottom - it.h;
-            maxBottom = it.ly - 8;
+            maxBottom = it.ly - MIN_GAP;
           }
           list.forEach(function (it) {
             var ly = it.ly + LINE;

@@ -556,6 +556,12 @@
         var def = RK.components[el.getAttribute('data-rk')];
         mount(el, { lazy: def ? def.lazy !== false : true });
       });
+      // labels are measured with canvas text metrics: once web fonts arrive, re-lay out what was drawn before
+      if (document.fonts && document.fonts.status !== 'loaded' && document.fonts.ready) {
+        document.fonts.ready.then(function () {
+          blocks.forEach(function (b) { if (b.state === 'rendered') { b.resize(); if (b.def && b.def.relayoutOnFonts !== false) b.refresh(); } });
+        });
+      }
       RK.bus.emit('report:ready', RK);
       return RK;
     });

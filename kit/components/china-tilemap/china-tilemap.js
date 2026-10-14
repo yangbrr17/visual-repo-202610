@@ -131,11 +131,65 @@
     return function (v) { return RK.format(v, trimmed !== code && num(v, code) === num(v, trimmed) ? trimmed : code); };
   }
 
-  /** Sequential class breaks: explicit, nice-rounded quantiles, or nice equal intervals. */
+  /** CIELAB (D65) of a colour, and the CIE76 colour difference. */
+  function lab(c) {
+    var p = RK.theme.parseColor(c).slice(0, 3).map(function (v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    var x = (p[0] * 0.4124 + p[1] * 0.3576 + p[2] * 0.1805) / 0.95047, y = p[0] * 0.2126 + p[1] * 0.7152 + p[2] * 0.0722,
+      z = (p[0] * 0.0193 + p[1] * 0.1192 + p[2] * 0.9505) / 1.08883;
+    function f(v) { return v > 0.008856 ? Math.cbrt(v) : 7.787 * v + 16 / 116; }
+    return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))];
+  }
+  function dE(a, b) { var p = lab(a), q = lab(b); return Math.sqrt(Math.pow(p[0] - q[0], 2) + Math.pow(p[1] - q[1], 2) + Math.pow(p[2] - q[2], 2)); }
+  /** Mix a fill toward `to` until it is at least ΔE `min` from every background it can sit next to. */
+  function separate(c, bgs, min, to) {
+    for (var k = 0; k <= 10; k++) {
+      var x = k ? RK.theme.mix(c, to, k * 0.08) : c;
+      if (bgs.every(function (b) { return !b || dE(x, b) >= min; })) return x;
+    }
+    return RK.theme.mix(c, to, 0.8);
+  }
+
+  /** Roundest number x with lo < x <= hi (coarsest step first): a class break inside the gap between two values. */
+  function roundIn(lo, hi) {
+    if (!(hi > lo)) return hi;
+    var p = Math.pow(10, Math.ceil(Math.log10(Math.max(Math.abs(lo), Math.abs(hi)) || 1)) + 1);
+    for (; p > (hi - lo) / 1e6; p /= 10) {
+      for (var k = 0, M = [10, 5, 2.5, 2, 1]; k < M.length; k++) {
+        var st = p * M[k] / 10, x = Math.floor(lo / st) * st + st;
+        if (x <= hi + 1e-12) return +x.toPrecision(12);
+      }
+    }
+    return hi;
+  }
+
+  /** Fisher-Jenks natural breaks on sorted values: start index of classes 2..k (minimum within-class variance). */
+  function jenks(s, k) {
+    var n = s.length, p1 = [0], p2 = [0], D = [], B = [], i, j, m;
+    for (i = 0; i < n; i++) { p1.push(p1[i] + s[i]); p2.push(p2[i] + s[i] * s[i]); }
+    function ssd(a, b) { var c = b - a + 1, sm = p1[b + 1] - p1[a]; return p2[b + 1] - p2[a] - sm * sm / c; }
+    for (j = 0; j < k; j++) { D.push([]); B.push([]); for (i = 0; i < n; i++) { D[j].push(Infinity); B[j].push(0); } }
+    for (i = 0; i < n; i++) D[0][i] = ssd(0, i);
+    for (j = 1; j < k; j++) {
+      for (i = j; i < n; i++) {
+        for (m = j; m <= i; m++) { var c = D[j - 1][m - 1] + ssd(m, i); if (c < D[j][i]) { D[j][i] = c; B[j][i] = m; } }
+      }
+    }
+    var out = [];
+    for (j = k - 1, i = n - 1; j > 0; j--) { m = B[j][i]; out.unshift(m); i = m - 1; }
+    return out;
+  }
+
+  /** Sequential class breaks: explicit, natural breaks (Jenks), nice-rounded quantiles, or nice equal intervals. */
   function classBreaks(o, vals, ext) {
     if (Array.isArray(o.breaks) && o.breaks.length) return o.breaks.slice().sort(function (a, b) { return a - b; });
     var n = Math.max(2, o.bins | 0), out = [];
-    if (o.classify === 'equal') {
+    if (o.classify === 'jenks') {
+      // natural breaks keep outliers (the headline provinces) in their own classes; each break is the roundest number
+      // between the last value of one class and the first of the next, so rounding never moves a value across classes
+      var sv = vals.slice().sort(function (a, b) { return a - b; }), uniq = U.unique(sv);
+      if (uniq.length <= n) { for (var u = 1; u < uniq.length; u++) out.push(roundIn(uniq[u - 1], uniq[u])); }
+      else jenks(sv, n).forEach(function (m) { if (sv[m] > sv[m - 1]) out.push(roundIn(sv[m - 1], sv[m])); });
+    } else if (o.classify === 'equal') {
       var step = U.niceStep(ext[1] - ext[0], n);
       for (var x = Math.ceil(ext[0] / step) * step; x < ext[1]; x += step) if (x > ext[0]) out.push(+x.toPrecision(10));
     } else {
@@ -145,7 +199,8 @@
         out.push(G.nice(s[lo] + (s[Math.min(lo + 1, s.length - 1)] - s[lo]) * (q - lo)));
       }
     }
-    return U.unique(out).filter(function (b) { return b > ext[0] && b < ext[1]; });
+    var top = o.classify === 'jenks' ? ext[1] + 1e-9 : ext[1];
+    return U.unique(out).filter(function (b) { return b > ext[0] && b < top; });
   }
 
   /**
@@ -159,13 +214,17 @@
     var seq = G.seqStops(t);
     var explicit = Array.isArray(o.breaks) && o.breaks.length;
     var bf = tidy(fmt);
+    // every fill keeps a visible distance from the paper and from the no-data fill (dark-theme midpoints, palest classes)
+    var bgs = [t.paper, noDataFill(t)], dHi = t.div[t.div.length - 1], sHi = seq[seq.length - 1];
+    function lift(c, hi) { return separate(c, bgs, 12, hi ? (div ? dHi : sHi) : t.div[0]); }
     if (!((o.bins > 0 || explicit) && vals.length > 1)) {
       if (div) {
-        var dev = Math.max(Math.abs(ext[0] - mid), Math.abs(ext[1] - mid)) || 1;
-        return { type: 'diverging', color: RK.theme.diverging([mid - dev, mid + dev], mid, t.div), classOf: function () { return 0; },
+        var dev = Math.max(Math.abs(ext[0] - mid), Math.abs(ext[1] - mid)) || 1, dc = RK.theme.diverging([mid - dev, mid + dev], mid, t.div);
+        return { type: 'diverging', color: function (v) { return lift(dc(v), v >= mid); }, classOf: function () { return 0; },
           classes: null, ramp: { stops: t.div, labels: [bf(mid - dev), bf(mid), bf(mid + dev)] } };
       }
-      return { type: 'sequential', color: RK.theme.sequential(ext[0] === ext[1] ? [ext[0] - 1, ext[1]] : ext, seq), classOf: function () { return 0; },
+      var sc = RK.theme.sequential(ext[0] === ext[1] ? [ext[0] - 1, ext[1]] : ext, seq);
+      return { type: 'sequential', color: function (v) { return lift(sc(v), true); }, classOf: function () { return 0; },
         classes: null, ramp: { stops: seq, labels: [bf(ext[0]), bf(ext[1])] } };
     }
     var breaks;
@@ -181,10 +240,10 @@
     if (div) {
       var dr = RK.theme.ramp(t.div);
       var nNeg = breaks.filter(function (b) { return b <= mid; }).length, m = Math.max(nNeg, n - nNeg) || 1;
-      colors = breaks.concat([null]).map(function (_, j) { return dr(j < nNeg ? 0.5 - 0.5 * (nNeg - j) / m : 0.5 + 0.5 * (j - nNeg + 1) / m); });
+      colors = breaks.concat([null]).map(function (_, j) { return lift(dr(j < nNeg ? 0.5 - 0.5 * (nNeg - j) / m : 0.5 + 0.5 * (j - nNeg + 1) / m), j >= nNeg); });
     } else {
       var sr = RK.theme.ramp(seq);
-      colors = breaks.concat([null]).map(function (_, j) { return sr(n > 1 ? j / (n - 1) : 1); });
+      colors = breaks.concat([null]).map(function (_, j) { return lift(sr(n > 1 ? j / (n - 1) : 1), true); });
     }
     function classOf(v) { var j = 0; while (j < breaks.length && v >= breaks[j]) j++; return j; }
     var classes = colors.map(function (c, j) {
@@ -215,8 +274,8 @@
     // rows depend only on the unfiltered domain, so the legend (and the grid layout) never jumps when filters change;
     // provinces the filters exclude are drawn as pale "ghost" tiles and explained in their tooltip
     var missing = tiles.filter(function (x) { return !x.inDomain; }).length;
-    if (missing) items.push({ cls: -1, color: noDataFill(t), label: txt.noData, note: String(missing), muted: true });
-    if (o.highlightLabel && tiles.some(function (x) { return x.hl; })) items.push({ cls: -2, ring: t.accent2, label: o.highlightLabel });
+    if (missing) items.push({ cls: -1, color: noDataFill(t), hatch: true, label: txt.noData, note: String(missing), muted: true });
+    if (o.highlightLabel && tiles.some(function (x) { return x.hl; })) items.push({ cls: -2, ring: ringColor(t, tiles), label: o.highlightLabel });
     var rows = items.filter(function (it) { return !scale.ramp || it.cls < 0; });
     rows.forEach(function (it) { it.lw = C.measure(it.label, F.item); });
     var labW = Math.max.apply(null, rows.map(function (it) { return it.lw; }).concat([0]));
@@ -267,7 +326,8 @@
       var rowW = flow ? LEG.sw + 6 + it.lw : m.w;
       var sw = it.ring
         ? { type: 'rect', silent: true, shape: { x: 1, y: ry + 1, width: LEG.sw - 2, height: LEG.sw - 2, r: 1.5 }, style: { fill: 'none', stroke: it.ring, lineWidth: 2 } }
-        : { type: 'rect', silent: true, shape: { x: 0, y: ry, width: LEG.sw, height: LEG.sw, r: 2 }, style: { fill: it.color } };
+        : { type: 'rect', silent: true, shape: { x: 0, y: ry, width: LEG.sw, height: LEG.sw, r: 2 },
+          style: it.hatch ? { fill: hatchFill(t), stroke: RK.theme.mix(it.color, t.ink, 0.18), lineWidth: 0.6 } : { fill: it.color } };
       var row = [
         { type: 'rect', shape: { x: -3, y: ry - 3, width: rowW + 6, height: LEG.sw + 6, r: 3 }, style: { fill: 'rgba(0,0,0,0)' } },
         sw,
@@ -290,6 +350,22 @@
   function ratioLike(f) { return /%|x$|bps|ratio|margin|growth|rate|pct|share|multiple/i.test(String(f.format || '') + ' ' + (f.name || '')); }
 
   function noDataFill(t) { return t.mapLand || t.surface2 || t.grid; }
+  /** No-data tiles are hatched, so they never read as the palest data class. */
+  function hatchFill(t) {
+    var bg = noDataFill(t), ln = RK.theme.mix(bg, t.ink, t.dark ? 0.22 : 0.18);
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="6" height="6"><rect width="6" height="6" fill="' + bg + '"/>' +
+      '<path d="M-1 1L1 -1M0 6L6 0M5 7L7 5" stroke="' + ln + '" stroke-width="1"/></svg>';
+    return { image: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg), repeat: 'repeat', imageWidth: 6, imageHeight: 6 };
+  }
+  /**
+   * Outline colour of the highlighted (target / top-N) tiles: accent-2 when it stands clear of every highlighted fill and of
+   * the paper (the ring is drawn outside the tile on a paper halo), else the ink token.
+   */
+  function ringColor(t, tiles) {
+    var a = t.accent2;
+    var ok = dE(a, t.paper) >= 15 && tiles.every(function (x) { return !x.hl || dE(a, x.base) >= 15; });
+    return ok ? a : t.ink;
+  }
   /** Provinces with data that the current filters exclude: a lighter tint of the no-data fill. */
   function filteredFill(t) { return RK.theme.mix(noDataFill(t), t.paper, 0.5); }
 
@@ -486,7 +562,7 @@
       scale: 'auto',              // auto (diverging when values straddle mid) | sequential | diverging
       mid: 0,                     // diverging midpoint (0 for growth, or a group average)
       bins: 5,                    // colour classes; 0 = continuous ramp (diverging: classes per side = bins / 2)
-      classify: 'quantile',       // quantile | equal (then rounded to nice numbers)
+      classify: 'jenks',          // jenks (natural breaks: outliers get their own class) | quantile | equal; breaks are rounded
       breaks: null,               // explicit class breaks, e.g. [5, 10, 20, 40]
       format: null,               // value format (defaults to the value field format)
       agg: 'sum',                 // several rows per province (e.g. city-level adcodes): sum | avg | max | min | first
@@ -607,6 +683,7 @@
     var motion = ctx.motion;
     var radius = U.isNum(+o.radius) ? +o.radius : 2;
     var paper = t.paper, pointer = o.crossFilter !== false && !!ff;
+    var hlRing = ringColor(t, tiles), hatch = hatchFill(t);
 
     function renderItem(params, api) {
       var fr = frameFor(api.getWidth(), api.getHeight());
@@ -617,32 +694,37 @@
       // near-paper fills (diverging midpoint, lightest class) get a hairline so the tile keeps its edge
       var faint = RK.theme.contrast(fill, paper) < 1.12;
       // selection ring in ink, or in the label colour where ink would vanish (dark tiles in light themes and vice versa)
-      var ring = x.sel ? (RK.theme.contrast(fill, t.ink) < 2.5 ? RK.theme.textOn(fill) : t.ink) : x.hl ? t.accent2 : null;
-      var lw = x.sel ? 2 : 2.5;
+      var ring = x.sel ? (RK.theme.contrast(fill, t.ink) < 2.5 ? RK.theme.textOn(fill) : t.ink) : null;
+      var lw = 2;
       var on = RK.theme.textOn(fill);
       var ink = !x.has ? t.ink3 : dim ? RK.theme.mix(on, fill, 0.4) : on;
       var delay = motion ? Math.round((c[0] / fr.gw) * 420 + (c[1] / fr.gh) * 180) : 0;
       var enter = { enterFrom: { style: { opacity: 0 } }, enterAnimation: { delay: delay, duration: 520 } };
-      var shape, ringShape;
-      if (fr.hex) {
-        var R = w / SQRT3;
-        shape = { type: 'polygon', shape: { points: hexPoints(R) } };
-        ringShape = { type: 'polygon', shape: { points: hexPoints(R - lw * 0.7) } };
-      } else {
-        shape = { type: 'rect', shape: { x: -w / 2, y: -w / 2, width: w, height: w, r: radius } };
-        ringShape = { type: 'rect', shape: { x: -w / 2 + lw / 2, y: -w / 2 + lw / 2, width: w - lw, height: w - lw, r: Math.max(0, radius - lw / 2) } };
+      var shape, ringShape, haloShape, markShape;
+      // grow / shrink the tile outline by e px (hexagon: apothem offset)
+      function outline(e) {
+        if (fr.hex) return { type: 'polygon', shape: { points: hexPoints(w / SQRT3 + e * 2 / SQRT3) } };
+        return { type: 'rect', shape: { x: -w / 2 - e, y: -w / 2 - e, width: w + 2 * e, height: w + 2 * e, r: Math.max(0, radius + e) } };
       }
+      shape = outline(0);
+      ringShape = outline(-lw * (fr.hex ? 0.6 : 0.5));
+      haloShape = outline(1.25);
+      markShape = outline(3.5);
       var kids = [
         U.merge(shape, {
-          style: { fill: fill, stroke: faint ? RK.theme.mix(fill, t.ink, 0.16) : fill, lineWidth: faint ? 0.8 : 0 },
+          style: { fill: !x.inDomain && !dim ? hatch : fill, stroke: faint || !x.inDomain ? RK.theme.mix(fill, t.ink, 0.16) : fill, lineWidth: faint || !x.inDomain ? 0.8 : 0 },
           cursor: pointer ? 'pointer' : 'default', transition: ['shape', 'style'],
           // hover: crisp ink outline, same fill (no ECharts colour lift)
-          emphasis: { style: { fill: fill, stroke: t.ink, lineWidth: 1.5 } }
+          emphasis: { style: { fill: !x.inDomain && !dim ? hatch : fill, stroke: t.ink, lineWidth: 1.5 } }
         }, enter),
         U.merge(ringShape, {
           silent: true, transition: ['shape', 'style'],
           style: { fill: 'none', stroke: ring || fill, lineWidth: lw, opacity: ring ? 1 : 0 }
-        }, enter)
+        }, enter),
+        // highlighted (target / top-N) tiles: a 2px ring outside the tile on a paper halo, above the neighbouring tiles,
+        // so it reads on any fill (gold on a pale tile, navy on a dark one)
+        U.merge(haloShape, { silent: true, z2: 5, style: { fill: 'none', stroke: paper, lineWidth: 2.5, opacity: x.hl ? 1 : 0 } }, enter),
+        U.merge(markShape, { silent: true, z2: 6, style: { fill: 'none', stroke: hlRing, lineWidth: 2, opacity: x.hl ? (dim ? 0.45 : 1) : 0 } }, enter)
       ];
       if (plan.names) {
         var nl = plan.names[i].indexOf('\n') > 0 ? 2 : 1;

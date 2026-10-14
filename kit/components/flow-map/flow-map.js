@@ -10,6 +10,132 @@
 
   function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
 
+  /* ---------------- colour guards (same block in the map components) ---------------- */
+  /** CIELAB (D65) of a colour. */
+  function lab(c) {
+    var p = RK.theme.parseColor(c).slice(0, 3).map(function (v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    var x = (p[0] * 0.4124 + p[1] * 0.3576 + p[2] * 0.1805) / 0.95047, y = p[0] * 0.2126 + p[1] * 0.7152 + p[2] * 0.0722,
+      z = (p[0] * 0.0193 + p[1] * 0.1192 + p[2] * 0.9505) / 1.08883;
+    function f(v) { return v > 0.008856 ? Math.cbrt(v) : 7.787 * v + 16 / 116; }
+    return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))];
+  }
+  /** CIE76 colour difference; kL < 1 weighs lightness less (hue tells thin marks apart better than lightness). */
+  function dE(a, b, kL) {
+    var p = lab(a), q = lab(b);
+    return Math.sqrt(Math.pow((p[0] - q[0]) * (kL || 1), 2) + Math.pow(p[1] - q[1], 2) + Math.pow(p[2] - q[2], 2));
+  }
+  /** Mix a fill toward `to` until it is at least ΔE `min` from every background it sits on (land, paper). */
+  function separate(c, bgs, min, to) {
+    for (var k = 0; k <= 10; k++) {
+      var x = k ? RK.theme.mix(c, to, k * 0.08) : c;
+      if (bgs.every(function (b) { return !b || dE(x, b) >= min; })) return x;
+    }
+    return RK.theme.mix(c, to, 0.8);
+  }
+  /**
+   * Category -> colour from the theme palette (kept clear of the accent-2 target colour), skipping hues too close to one
+   * already used (navy next to light blue, orange next to olive). Grey is reserved for an 'Other(s)' bucket.
+   */
+  function catColors(values) {
+    var t = RK.theme.tokens(), grey = t.cat[t.cat.length - 1], pal = RK.theme.palette().filter(function (c) { return c !== grey; });
+    var pick = [];
+    pal.forEach(function (c) { if (pick.every(function (q) { return dE(c, q, 0.5) >= 28; })) pick.push(c); });
+    pal.forEach(function (c) { if (pick.indexOf(c) < 0) pick.push(c); });
+    var more = RK.theme.palette({ n: values.length + 12 }).slice(RK.theme.palette().length), map = {}, i = 0;   // tints / shades
+    values.forEach(function (v) {
+      if (/^(others?|other .*|rest of .*|misc.*)$/i.test(String(v))) { map[v] = grey; return; }
+      map[v] = i < pick.length ? pick[i] : more[(i - pick.length) % Math.max(1, more.length)] || pick[i % pick.length];
+      i++;
+    });
+    return function (v) { return map[v] || t.neutral; };
+  }
+
+  /* ---------------- callout labels (same block in choropleth, bubble-map, flow-map, geo-heat) ----------------
+   * Labels for the top marks, each on the best of a ring of candidate boxes around its mark (8 directions x 4
+   * distances, plus the centre when it.center), never over a map control or another label. opts.cost(box, item, centre)
+   * scores what a box covers (other marks, data areas); a leader line joins a label that sits off its mark. Optional
+   * items (it.optional) are only placed right beside their mark at a cost <= opts.optionalCost (default 0.5).
+   *   var co = callouts(map, {cost: fn, maxCost: 5});
+   *   co.set([{latlng, html, cls, prio, r, center, leader, optional}], maxShown);
+   */
+  function callouts(map, opts) {
+    opts = opts || {};
+    var L = window.L, group = L.layerGroup().addTo(map), items = [], cap = Infinity;
+    if (!map.getPane('rk-labels')) map.createPane('rk-labels').style.zIndex = 640;
+    // [dx, dy, preference]: right first, then left, above, below, the diagonals
+    var DIRS = [[1, 0, 0], [-1, 0, 0.15], [0, -1, 0.25], [0, 1, 0.3], [0.8, -0.7, 0.35], [-0.8, -0.7, 0.45], [0.8, 0.7, 0.45], [-0.8, 0.7, 0.5]];
+    var GAPS = [3, 14, 28, 46, 70];
+    function hit(a, b, pad) { return a.x < b.x + b.w + pad && a.x + a.w + pad > b.x && a.y < b.y + b.h + pad && a.y + a.h + pad > b.y; }
+    function place() {
+      var size = map.getSize(), c0 = map.getContainer().getBoundingClientRect(), placed = [], shown = 0;
+      var hard = [].map.call(map.getContainer().querySelectorAll('.leaflet-control'), function (c) {
+        var r = c.getBoundingClientRect();
+        return { x: r.left - c0.left, y: r.top - c0.top, w: r.width, h: r.height };
+      });
+      items.slice().sort(function (a, b) { return b.it.prio - a.it.prio; }).forEach(function (x) {
+        var icon = x.m.getElement();
+        if (!icon) return;
+        var span = icon.querySelector('.rk-geo-label'), lead = icon.querySelector('.rk-geo-leader');
+        var p = map.latLngToContainerPoint(x.it.latlng), r = x.it.r || 0, w = span.offsetWidth, h = span.offsetHeight, best = null;
+        function consider(dx, dy, k, centre) {
+          var b = { x: p.x + dx, y: p.y + dy, w: w, h: h };
+          if (b.x < 2 || b.y < 2 || b.x + w > size.x - 2 || b.y + h > size.y - 2) return;
+          if (hard.some(function (q) { return hit(b, q, 2); }) || placed.some(function (q) { return hit(b, q, 3); })) return;
+          var cost = k + (opts.cost ? opts.cost(b, x.it, centre) : 0);
+          if (!best || cost < best.cost) best = { dx: dx, dy: dy, b: b, cost: cost };
+        }
+        if (shown < cap && w) {
+          if (x.it.center) consider(-w / 2, -h / 2, 0, true);
+          DIRS.forEach(function (d) {
+            (x.it.optional ? GAPS.slice(0, 1) : GAPS).forEach(function (g, gi) {
+              var e = r + g;
+              consider(d[0] > 0 ? d[0] * e : d[0] < 0 ? d[0] * e - w : -w / 2, d[1] > 0 ? d[1] * e : d[1] < 0 ? d[1] * e - h : -h / 2, d[2] + gi * 0.55, false);
+            });
+          });
+        }
+        var lim = x.it.optional ? (opts.optionalCost != null ? opts.optionalCost : 0.5) : opts.maxCost;
+        var ok = !!best && !(lim != null && best.cost > lim);
+        span.classList.toggle('is-hidden', !ok);
+        if (lead) lead.style.display = 'none';
+        if (!ok) return;
+        shown++;
+        placed.push(best.b);
+        span.style.transform = 'translate(' + Math.round(best.dx) + 'px,' + Math.round(best.dy) + 'px)';
+        // leader: from the mark's edge to the nearest point of the label box
+        var nx = Math.max(best.b.x, Math.min(p.x, best.b.x + w)) - p.x, ny = Math.max(best.b.y, Math.min(p.y, best.b.y + h)) - p.y;
+        var D = Math.sqrt(nx * nx + ny * ny);
+        if (lead && x.it.leader !== false && D - r > 6) {
+          var ln = lead.querySelector('line'), k = r ? (r + 1) / D : 0;
+          ln.setAttribute('x1', (nx * k).toFixed(1)); ln.setAttribute('y1', (ny * k).toFixed(1));
+          ln.setAttribute('x2', nx.toFixed(1)); ln.setAttribute('y2', ny.toFixed(1));
+          lead.style.display = '';
+        }
+      });
+    }
+    map.on('zoomend moveend resize', place);
+    return {
+      set: function (list, n) {
+        var ink = RK.theme.tokens().ink3;
+        cap = n == null ? Infinity : n;
+        group.clearLayers();
+        items = list.map(function (it) {
+          var svg = '<svg class="rk-geo-leader" width="1" height="1" style="position:absolute;left:0;top:0;overflow:visible;pointer-events:none;display:none">' +
+            '<line stroke="' + ink + '" stroke-width="0.8"/>' + (it.r ? '' : '<circle r="1.8" fill="' + ink + '"/>') + '</svg>';
+          var m = L.marker(it.latlng, {
+            pane: 'rk-labels', interactive: false, keyboard: false,
+            icon: L.divIcon({ className: 'rk-geo-label-anchor', iconSize: null, html: svg + '<span class="rk-geo-label ' + (it.cls || '') + '">' + it.html + '</span>' })
+          });
+          group.addLayer(m);
+          return { m: m, it: it };
+        });
+        place();
+      },
+      place: place
+    };
+  }
+  /* ---------------- end callouts ---------------- */
+
+
   /** Arrowhead SVG (tip at the origin of its box, pointing +x), rotated / pulled back by CSS. */
   function arrowHTML(size, color, angle, back) {
     var s = size, w = s * 0.62;
@@ -31,10 +157,12 @@
       curvature: 0.25,            // arc bend (0 = straight); long arcs are flattened so they stay on the map
       opacity: 0.72,              // arc opacity
       arrows: true,               // arrowheads at the destination
-      animate: true,              // travelling dots along each arc (only when motion is allowed)
+      animate: true,              // travelling dots along the hovered flows (only when motion is allowed; arcs are always solid)
       nodes: true,                // origin / destination circles sized by total flow
       nodeSizeRange: [3, 11],
-      labels: 6,                  // label the top N countries by total flow (0 = none)
+      labels: 8,                  // label the top N countries by total flow (0 = none)
+      labelMin: 0.1,              // ...plus every country whose total is at least this share of the largest (when there is room)
+      labelRest: true,            // ...and every other country where a label fits right beside its node without covering anything
       flowLabels: 0,              // value labels on the top N flows (0 = none)
       maxFlows: null,             // keep only the N largest flows
       format: null,               // value format; defaults to the value field format
@@ -50,7 +178,19 @@
       var view = G.view(ctx, { cls: 'rk-flow' }), map = view.map;
       map.createPane('rk-flow-arrows').style.zIndex = 450;
       var layer = L.layerGroup().addTo(map);
-      var labels = view.labels(), legend = view.legend();
+      var legend = view.legend();
+      /** Callout cost: other nodes the box covers (arcs are thin and may pass under a label). */
+      function nodeCost(b, it, centre) {
+        if (centre) return 0;
+        var cost = 0;
+        S.nodes.forEach(function (n) {
+          if (n.name === it.name) return;
+          var c = map.latLngToContainerPoint(n.ll), r = n.r + 2;
+          if (c.x + r > b.x && c.x - r < b.x + b.w && c.y + r > b.y && c.y - r < b.y + b.h) cost += 2;
+        });
+        return cost;
+      }
+      var labels = callouts(map, { cost: nodeCost, optionalCost: 0.5 });
       var S = null, timers = [];
 
       function ff(c) { return c.options.filterField || c.enc.color || c.enc.from; }
@@ -77,7 +217,7 @@
         if (o.maxFlows > 0) flows = flows.slice(0, o.maxFlows);
         var total = flows.reduce(function (s, f) { return s + f.v; }, 0);
         var cats = enc.color ? RK.util.unique(dom.map(function (r) { return r[enc.color]; }).filter(function (v) { return v != null && v !== ''; })) : [];
-        var cm = RK.theme.categoricalSafe(cats);
+        var cm = catColors(cats);                     // sectors kept apart in hue (thin arcs), clear of the accent-2 target
         var wr = o.widthRange || [1, 9];
         var wOf = function (v) { return wr[0] + (wr[1] - wr[0]) * (maxV ? Math.max(0, v) / maxV : 0); };
         // nodes: totals per country
@@ -162,9 +302,12 @@
         // largest first so thin flows stay visible (and hoverable) on top
         S.flows.forEach(function (f, i) {
           var on = flowOn(f), op = on ? o.opacity : 0.1;
+          // solid arcs on a thin paper casing, so crossing flows stay apart; the travelling dots are a hover effect only
+          // (a static capture or print never shows dotted / dashed arcs, which are reserved for reference lines)
+          var casing = L.polyline(f.pts, { color: t.paper, weight: f.w + 2, opacity: on ? 0.85 : 0, lineCap: 'round', interactive: false, className: 'rk-flow__casing' }).addTo(layer);
           var arc = L.polyline(f.pts, { color: f.color, weight: f.w, opacity: op, lineCap: 'round', interactive: false, className: 'rk-flow__arc' }).addTo(layer);
           var dash = dots ? L.polyline(f.pts, {
-            color: t.paper, weight: Math.max(1.2, f.w * 0.42), opacity: on ? 0.9 : 0, lineCap: 'round', interactive: false,
+            color: t.paper, weight: Math.max(1.2, f.w * 0.42), opacity: 0.9, lineCap: 'round', interactive: false,
             dashArray: '0.1 ' + Math.round(10 + f.w * 2.2), className: 'rk-flow__dots'
           }).addTo(layer) : null;
           var arrow = null;
@@ -180,7 +323,7 @@
           }
           var hit = L.polyline(f.pts, { color: f.color, weight: Math.max(10, f.w + 6), opacity: 0, className: 'rk-flow__hit' }).addTo(layer);
           hit.bindTooltip(function () { return flowTip(f); }, { sticky: true, direction: 'top', offset: [0, -8], opacity: 1 });
-          f.els = [arc.getElement(), dash && dash.getElement(), arrow && arrow.getElement()];
+          f.els = [arc.getElement(), dash && dash.getElement(), arrow && arrow.getElement(), casing.getElement()];
           hit.on('mouseover', function () { focus([f]); });
           hit.on('mouseout', function () { focus(null); });
           hit.on('click', function () { G.select(cur, ff(cur), f.row[ff(cur)]); });
@@ -194,7 +337,15 @@
               pe.style.strokeDashoffset = '0';
               timers.push(setTimeout(function () { pe.style.strokeDasharray = ''; pe.style.strokeDashoffset = ''; pe.style.transition = ''; }, 1800));
             }
-            f.els.slice(1).forEach(function (e) { if (e) { e.classList.add('is-enter'); e.style.setProperty('--rk-d', (Math.min(i * 45, 700) + 650) + 'ms'); } });
+            [f.els[2]].forEach(function (e) { if (e) { e.classList.add('is-enter'); e.style.setProperty('--rk-d', (Math.min(i * 45, 700) + 650) + 'ms'); } });
+            var ce = f.els[3], clen = ce && ce.getTotalLength ? ce.getTotalLength() : 0;
+            if (clen) {
+              ce.style.strokeDasharray = clen; ce.style.strokeDashoffset = clen;
+              ce.getBoundingClientRect();
+              ce.style.transition = 'stroke-dashoffset 900ms cubic-bezier(.2,.7,.2,1) ' + Math.min(i * 45, 700) + 'ms';
+              ce.style.strokeDashoffset = '0';
+              timers.push(setTimeout(function () { ce.style.strokeDasharray = ''; ce.style.strokeDashoffset = ''; ce.style.transition = ''; }, 1800));
+            }
           }
           if (sel && on) f.els.forEach(function (e) { if (e) e.classList.add('is-sel'); });
         });
@@ -210,13 +361,18 @@
         }
 
         // labels: countries (by total) first, then flow values at the arc apex
+        // country callouts: the top N by total flow plus every country above labelMin x the largest total, beside the
+        // node or off it with a leader line; then flow values at the arc apex
         var nl = Math.max(0, o.labels | 0), fl = Math.max(0, o.flowLabels | 0);
-        var list = (nl ? S.nodes : []).map(function (n) {
-          return { latlng: n.ll, r: n.r, prio: 1e12 + n.in + n.out, group: 'node', html: '<b>' + RK.util.escapeHTML(n.name) + '</b>' };
-        }).concat((fl ? S.flows : []).map(function (f) {
-          return { latlng: f.pts[Math.floor(f.pts.length / 2)], r: f.w / 2, prio: f.v, group: 'flow', pos: ['c', 't', 'b'], cls: 'rk-flow__vlabel', html: RK.util.escapeHTML(RK.format(f.v, S.fmt)) };
+        var big = S.nodes.length ? S.nodes[0].in + S.nodes[0].out : 0, lm = o.labelMin > 0 ? o.labelMin * big : Infinity;
+        var named = S.nodes.filter(function (n, i) { return nl && (i < nl || n.in + n.out >= lm || o.labelRest !== false); });
+        var list = named.map(function (n, i) {
+          var opt = !(i < nl || n.in + n.out >= lm);   // the rest: only right beside the node, only when nothing is covered
+          return { latlng: n.ll, r: n.r, name: n.name, optional: opt, prio: (opt ? 0 : 1e12) + n.in + n.out, html: '<b>' + RK.util.escapeHTML(n.name) + '</b>' };
+        }).concat((fl ? S.flows.slice(0, fl) : []).map(function (f) {
+          return { latlng: f.pts[Math.floor(f.pts.length / 2)], r: f.w / 2, prio: f.v, center: true, leader: false, cls: 'rk-flow__vlabel', html: RK.util.escapeHTML(RK.format(f.v, S.fmt)) };
         }));
-        labels.set(list, { node: nl, flow: fl }, S.nodes.map(function (n) { return { ll: n.ll, r: n.r }; }));
+        labels.set(list);
 
 
         if (first) labels.place();

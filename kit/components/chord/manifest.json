@@ -23,7 +23,7 @@
     "sort": {"type": "string", "default": "desc", "desc": "Arc order clockwise from 12 o'clock: desc (largest first) | data"},
     "colorBy": {"type": "string", "default": "node", "desc": "node: categorical colour per entity | single: spotlight — accent arcs, ribbons touching the highlight emphasised, others faded"},
     "nodeColors": {"type": "object", "default": {}, "desc": "{name: colour} — theme token ('accent2', 'cat3' …) or CSS colour"},
-    "highlight": {"type": "string|string[]", "default": null, "desc": "Entity name(s) drawn in accent2 (e.g. the client's home market)"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Entity name(s) drawn in accent2 (e.g. the client's home market). colorBy node: the highlighted arc and all its ribbons take accent2 at a moderate opacity while every other ribbon recedes; colorBy single: its inbound / outbound ribbons are told apart by a direction key"},
     "ribbonColor": {"type": "string", "default": "source", "desc": "Ribbon colour: source | target | gradient"},
     "ribbonOpacity": {"type": "number", "default": 0.34, "desc": "Resting ribbon opacity"},
     "padAngle": {"type": "number", "default": 1.6, "desc": "Gap between arcs (degrees)"},
@@ -31,7 +31,7 @@
     "labels": {"type": "boolean", "default": true, "desc": "Entity labels outside the ring"},
     "labelValues": {"type": "boolean", "default": true, "desc": "Two-way total under each label"},
     "minLabelShare": {"type": "number", "default": 0.015, "desc": "Hide labels of arcs below this share of the total (shown on hover)"},
-    "colorKey": {"type": "boolean", "default": true, "desc": "Small reading key, top-left ('Ribbon colour = …' or the spotlighted entity)"},
+    "colorKey": {"type": "boolean", "default": true, "desc": "Reading key, top-left: 'Ribbon colour = …' (+ a 10px swatch for the highlighted flows), or with colorBy single + highlight an outbound / inbound swatch key"},
     "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field's format"},
     "crossFilter": {"type": "boolean", "default": true, "desc": "Click an arc to focus its flows and filter other blocks on the source field"},
     "crossFilterScope": {"type": "string", "default": "dataset", "desc": "dataset: the selection only filters blocks bound to the same dataset | global"},
@@ -39,7 +39,7 @@
   },
   "interactions": ["Hover an arc: adjacency emphasis + outbound / inbound / net tooltip", "Hover a ribbon: flow value, count and reverse flow", "Click an arc to focus and cross-filter (click again to clear)", "Re-lays out on resize and filter changes", "PNG / CSV export"],
   "samples": [
-    {"title": "Cross-border industrials M&A, 2021–2026 YTD (USD bn) — acquirer → target country", "data": "deal_flows", "height": 460,
+    {"title": "Cross-border industrials M&A, 2021–2026 YTD (USD bn) — acquirer to target country", "data": "deal_flows", "height": 460,
      "options": {"encode": {"source": "from_country", "target": "to_country", "value": "value", "count": "deals"}, "top": 10, "highlight": "United States"}},
     {"title": "Spotlight on Germany — inbound and outbound corridors", "data": "deal_flows", "height": 380, "span": 6,
      "options": {"top": 8, "colorBy": "single", "highlight": "Germany", "ribbonColor": "target", "labelValues": false, "ribbonOpacity": 0.3}}

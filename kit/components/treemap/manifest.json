@@ -22,7 +22,7 @@
     "colorBy": {"type": "string", "default": "auto", "desc": "auto | group | metric — auto = metric when encode.color is set"},
     "colorMid": {"type": "number|string", "default": 0, "desc": "Midpoint of the diverging metric scale: a number or 'avg' (value-weighted average)"},
     "sort": {"type": "string", "default": "desc", "desc": "desc | asc — order in which cells are squarified"},
-    "labels": {"type": "string", "default": "auto", "desc": "auto (name + value + metric) | name | value | none"},
+    "labels": {"type": "string", "default": "auto", "desc": "auto (name + value + metric) | name | value | none — fitted to each tile: figures are never cut (the share, then the metric, then the whole label drop out); names wrap or ellipsize; the highlighted target keeps its name"},
     "showShare": {"type": "boolean", "default": false, "desc": "Add the % of total to leaf labels"},
     "drill": {"type": "boolean", "default": true, "desc": "Click a group to zoom in; breadcrumb navigates back"},
     "rootName": {"type": "string", "default": null, "desc": "Breadcrumb root label (defaults to the single root node, else 'Total')"},

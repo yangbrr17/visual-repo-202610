@@ -10,6 +10,46 @@
 
   function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
 
+  /* ---------------- colour guards (same block in the map components) ---------------- */
+  /** CIELAB (D65) of a colour. */
+  function lab(c) {
+    var p = RK.theme.parseColor(c).slice(0, 3).map(function (v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    var x = (p[0] * 0.4124 + p[1] * 0.3576 + p[2] * 0.1805) / 0.95047, y = p[0] * 0.2126 + p[1] * 0.7152 + p[2] * 0.0722,
+      z = (p[0] * 0.0193 + p[1] * 0.1192 + p[2] * 0.9505) / 1.08883;
+    function f(v) { return v > 0.008856 ? Math.cbrt(v) : 7.787 * v + 16 / 116; }
+    return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))];
+  }
+  /** CIE76 colour difference; kL < 1 weighs lightness less (hue tells thin marks apart better than lightness). */
+  function dE(a, b, kL) {
+    var p = lab(a), q = lab(b);
+    return Math.sqrt(Math.pow((p[0] - q[0]) * (kL || 1), 2) + Math.pow(p[1] - q[1], 2) + Math.pow(p[2] - q[2], 2));
+  }
+  /**
+   * Category -> colour from the theme palette (kept clear of the accent-2 target colour), skipping hues too close to one
+   * already used (navy next to light blue, orange next to olive). Grey is reserved for an 'Other(s)' bucket.
+   */
+  function catColors(values) {
+    var t = RK.theme.tokens(), grey = t.cat[t.cat.length - 1], pal = RK.theme.palette().filter(function (c) { return c !== grey; });
+    var pick = [];
+    pal.forEach(function (c) { if (pick.every(function (q) { return dE(c, q, 0.5) >= 28; })) pick.push(c); });
+    pal.forEach(function (c) { if (pick.indexOf(c) < 0) pick.push(c); });
+    var more = RK.theme.palette({ n: values.length + 12 }).slice(RK.theme.palette().length), map = {}, i = 0;   // tints / shades
+    values.forEach(function (v) {
+      if (/^(others?|other .*|rest of .*|misc.*)$/i.test(String(v))) { map[v] = grey; return; }
+      map[v] = i < pick.length ? pick[i] : more[(i - pick.length) % Math.max(1, more.length)] || pick[i % pick.length];
+      i++;
+    });
+    return function (v) { return map[v] || t.neutral; };
+  }
+
+  /** Font size of the cluster figure for a badge size. */
+  function badgeFont(size) { return size < 36 ? 10.5 : size < 48 ? 11.5 : 12.5; }
+  /** Smallest badge whose inner disc fits the text plus 4px padding each side (ring 4px + 1px gap on each side). */
+  function badgeFor(text, size) {
+    var t = RK.theme.tokens(), w = RK.chart.measure(text, '600 ' + badgeFont(size) + 'px ' + t.fontNum);
+    return Math.ceil(w + 8 + 12 + 5);
+  }
+
   /** Cluster bubble SVG: accent disc + ring segments by category share. */
   function clusterSVG(size, parts, total, text, t) {
     var c = size / 2, rr = c - 2.5, circ = 2 * Math.PI * rr, off = 0, ring = '';
@@ -22,7 +62,7 @@
         off += len;
       });
     } else ring = '<circle cx="' + c + '" cy="' + c + '" r="' + rr.toFixed(2) + '" fill="none" stroke="' + RK.theme.alpha(t.accent, 0.28) + '" stroke-width="4"/>';
-    var base = size < 36 ? 10.5 : size < 48 ? 11.5 : 12.5, room = 2 * (rr - 3.5) - 5, w = text ? RK.chart.measure(text, '600 ' + base + 'px ' + t.fontNum) : 0;
+    var base = badgeFont(size), room = 2 * (rr - 3.5) - 5, w = text ? RK.chart.measure(text, '600 ' + base + 'px ' + t.fontNum) : 0;
     var fs = w > room ? Math.max(7, +(base * room / w).toFixed(1)) : base;   // shrink long sums to fit the disc
     return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">' + ring +
       '<circle cx="' + c + '" cy="' + c + '" r="' + (rr - 3.5).toFixed(2) + '" fill="' + t.accent + '" stroke="' + t.paper + '" stroke-width="1"/>' +
@@ -86,7 +126,9 @@
           var ms = cl.getAllChildMarkers(), n = ms.length, parts = partsOf(ms);
           var sum = parts.reduce(function (s, p) { return s + p.v; }, 0), useSum = cur.options.clusterValue === 'sum' && cur.enc.value;
           var size = useSum && S.total ? Math.round(30 + 30 * Math.sqrt(sum / S.total)) : Math.round(Math.min(60, 28 + 7 * Math.log2(n)));
-          return L.divIcon({ className: 'rk-cluster__icon', iconSize: [size, size], html: clusterSVG(size, parts, n, useSum ? sumFmt(sum) : String(n), t) });
+          var text = useSum ? sumFmt(sum) : String(n);
+          size = Math.max(size, badgeFor(text, badgeFor(text, size)));   // the disc always holds its figure with >= 4px either side
+          return L.divIcon({ className: 'rk-cluster__icon', iconSize: [size, size], html: clusterSVG(size, parts, n, text, t) });
         }
       }).addTo(map);
 
@@ -104,7 +146,7 @@
       function derive(c) {
         var enc = c.enc, o = c.options, dom = G.domainRows(c);
         var cats = enc.color ? RK.util.unique(dom.map(function (r) { return r[enc.color]; }).filter(function (v) { return v != null && v !== ''; })) : [];
-        var colorOf = enc.color ? RK.theme.categoricalSafe(cats) : function () { return t.accent3 || t.cat[1]; };
+        var colorOf = enc.color ? catColors(cats) : function () { return t.accent3 || t.cat[1]; };   // neighbouring hues kept apart
         var total = enc.value ? dom.reduce(function (s, r) { return s + (num(r[enc.value]) || 0); }, 0) : 0;
         var items = c.rows.filter(function (r) { return num(r[enc.lat]) != null && num(r[enc.lon]) != null; }).map(function (r) {
           return { row: r, ll: [r[enc.lat], r[enc.lon]], v: enc.value ? num(r[enc.value]) : null, color: colorOf(enc.color ? r[enc.color] : null) };

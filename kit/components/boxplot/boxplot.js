@@ -84,7 +84,7 @@
       else if (o.sort === 'asc' || o.sort === 'desc') groups.sort(function (a, b) { var c = String(a.key).localeCompare(String(b.key)); return o.sort === 'asc' ? c : -c; });
       var cats = groups.map(function (g) { return String(g.key); });
       var palette = RK.theme.categoricalSafe(util.unique(ctx.allRows.map(function (r) { return r[enc.group]; })));   // never like the accent2 target
-      var base = t.accent3 || t.cat[1];
+      var base = t.accent;   // undifferentiated peers: the same accent as lollipop / bullet / scatter
       var colorOf = function (g) { return o.groupColors ? palette(g) : base; };
       var selG = ctx.selected(enc.group);
 
@@ -163,12 +163,18 @@
               : { x: tp, y: c + ext + 3, text: tl, fill: t.ink, font: '700 10.5px ' + t.fontSans, align: 'center', verticalAlign: 'top', stroke: t.paper, lineWidth: 3 } });
         }
         // value labels
+        // paper halo: the overall line (drawn below) never strikes through a value
         function lab(p, txt, strong) {
+          var halo = { stroke: t.paper, lineWidth: 3 };
           kids.push({ type: 'text', silent: true,
-            style: vert ? { x: c + hw + 5, y: v(p), text: txt, fill: strong ? t.ink : t.ink2, font: (strong ? '600 ' : '') + labFont, align: 'left', verticalAlign: 'middle', opacity: op }
-              : { x: v(p), y: c - hw - 3, text: txt, fill: strong ? t.ink : t.ink2, font: (strong ? '600 ' : '') + labFont, align: 'center', verticalAlign: 'bottom', opacity: op } });
+            style: util.merge(vert ? { x: c + hw + 5, y: v(p), text: txt, fill: strong ? t.ink : t.ink2, font: (strong ? '600 ' : '') + labFont, align: 'left', verticalAlign: 'middle', opacity: op }
+              : { x: v(p), y: c - hw - 3, text: txt, fill: strong ? t.ink : t.ink2, font: (strong ? '600 ' : '') + labFont, align: 'center', verticalAlign: 'bottom', opacity: op }, halo) });
         }
         if (showLab) lab(pMed, RK.format(api.value(3), fmt), true);
+        if (params.dataIndex === 0 && overall != null && vert) {
+          var ol = overallLabel(api);
+          if (ol) kids.push(ol);
+        }
         if (showLab === 'all') {
           var gapOK = function (p1, p2) { return Math.abs(v(p1) - v(p2)) >= (vert ? 12 : 34); };
           if (gapOK(pQ3, pMed)) lab(pQ3, RK.format(api.value(4), fmt));
@@ -177,6 +183,50 @@
           if (gapOK(pLow, pQ1)) lab(pLow, RK.format(api.value(1), fmt));
         }
         return { type: 'group', children: kids };
+      }
+
+      /**
+       * Vertical layout: the overall line's label goes to the first free spot along the line — right end,
+       * left end, then the gaps between boxes (above, then below the line) — clear of every box, whisker,
+       * point column, value label and target label. Drawn by the box series above the line, with a halo.
+       */
+      var olText = overall != null ? 'Overall ' + o.overall + ' ' + RK.format(overall, fmt) : '';
+      var olFont = 'italic 400 10.5px ' + t.fontSans;
+      function overallLabel(api) {
+        var y = api.coord([0, overall])[1], bandPx = api.size([1, 0])[0];
+        var w = Math.min(bandPx * o.boxWidth, 72), hw = w / 2, tw = C.measure(olText, olFont) + 4, th = 14;
+        var c0 = api.coord([0, ve.min])[0], left = c0 - bandPx / 2, right = left + bandPx * boxData.length;
+        var top = api.coord([0, ve.max])[1], bottom = api.coord([0, ve.min])[1];
+        var obs = [];
+        boxData.forEach(function (d, i) {
+          var c = api.coord([i, ve.min])[0], s = d.stats, py = function (val) { return api.coord([i, val])[1]; };
+          var hi = Math.max(s.max, d.target ? d.target[enc.value] : -Infinity), lo = Math.min(s.min, d.target ? d.target[enc.value] : Infinity);
+          obs.push({ x: c - Math.max(hw, bw * 0.5) - 3, y: py(hi) - 6, w: Math.max(w, bw) + 6, h: py(lo) - py(hi) + 12 });
+          var labs = [s.median].concat(showLab === 'all' ? [s.q1, s.q3, s.low, s.high] : []);
+          labs.forEach(function (val) {
+            obs.push({ x: c + hw + 3, y: py(val) - 8, w: C.measure(RK.format(val, fmt), '600 ' + labFont) + 6, h: 16 });
+          });
+          if (d.target) {
+            var tl = (labelF ? d.target[labelF] + ' ' : '') + RK.format(d.target[enc.value], fmt), tlw = C.measure(tl, '700 ' + labFont) + 6;
+            obs.push({ x: c - hw - 9 - tlw, y: py(d.target[enc.value]) - 8, w: tlw, h: 16 });
+          }
+        });
+        var cands = [[right - tw - 2, y - th - 1], [right - tw - 2, y + 2], [left + 4, y - th - 1], [left + 4, y + 2]];
+        for (var k = 1; k < boxData.length; k++) {
+          var bx = left + k * bandPx;
+          cands.push([bx - tw / 2, y - th - 1], [bx - tw / 2, y + 2]);
+        }
+        var hit = function (b) {
+          if (b.x < left || b.x + b.w > right + 50 || b.y < top - 2 || b.y + b.h > bottom) return true;
+          return obs.some(function (q) { return b.x < q.x + q.w && b.x + b.w > q.x && b.y < q.y + q.h && b.y + b.h > q.y; });
+        };
+        var style = { fill: t.ink3, font: olFont, align: 'left', verticalAlign: 'top', stroke: t.paper, lineWidth: 3, lineHeight: 13 };
+        for (var j = 0; j < cands.length; j++) {
+          if (!hit({ x: cands[j][0], y: cands[j][1], w: tw, h: th })) return { type: 'text', name: 'overall', silent: true, style: util.merge(style, { x: cands[j][0] + 2, y: cands[j][1], text: olText }) };
+        }
+        // no room along the line (every gap holds a box): stack the label in the right gutter at the line's end
+        var stacked = ['Overall', o.overall, RK.format(overall, fmt)].join('\n');
+        return { type: 'text', name: 'overall', silent: true, style: util.merge(style, { x: right + 4, y: y - 19.5, text: stacked }) };
       }
 
       /* raw observations (jittered by the category axis), outliers hollow, target as a diamond */
@@ -204,12 +254,13 @@
         };
       };
 
+      // overall statistic: ink-3 [4, 3] dashed line below the boxes; label 10.5px italic (vertical: placed by the box series)
       var lines = [];
       if (overall != null) {
         lines.push(util.merge({
           lineStyle: { color: t.ink3, type: [4, 3], width: 1 },
-          label: { show: true, position: vert ? 'insideEndTop' : 'start', color: t.ink3, fontSize: 10, distance: 3,
-            formatter: 'Overall ' + o.overall + ' ' + RK.format(overall, fmt) }
+          label: { show: !vert, position: 'start', color: t.ink3, fontSize: 10.5, fontStyle: 'italic', distance: 3,
+            formatter: function () { return olText; } }
         }, vert ? { yAxis: overall } : { xAxis: overall }));
       }
 
@@ -229,7 +280,7 @@
               var cur = lines[lines.length - 1];
               if (cur && C.measure(cur + ' ' + wd, catFont) > maxW) lines.push(wd); else lines[lines.length - 1] = cur ? cur + ' ' + wd : wd;
             });
-            var out = lines.map(function (l) { return '{g|' + l + '}'; }).join('\n');
+            var out = lines.map(function (l) { return '{g|' + C.richSafe(l) + '}'; }).join('\n');   // braces in data never open a style run
             return o.showN ? out + '\n{n|n = ' + (nOf[k] || 0) + '}' : out;
           },
           rich: { g: { color: t.ink2, fontSize: 11, lineHeight: 14 }, n: { color: t.ink3, fontSize: 10, lineHeight: 14, fontFamily: t.fontNum } }
@@ -279,9 +330,13 @@
         yAxis: vert ? valAxis : catAxis,
         series: [
           {
+            // reference layer below the boxes; precision: ECharts would round the value to 2 decimals
+            id: 'ref', type: 'scatter', data: [], silent: true, tooltip: { show: false }, z: 1,
+            markLine: lines.length ? { silent: true, symbol: ['none', 'none'], precision: 10, data: lines } : undefined
+          },
+          {
             id: 'box', type: 'custom', renderItem: renderItem, data: boxData, z: 2,
             encode: vert ? { x: 0, y: [1, 2, 3, 4, 5] } : { y: 0, x: [1, 2, 3, 4, 5] },
-            markLine: lines.length ? { silent: true, symbol: ['none', 'none'], data: lines } : undefined,
             animationDuration: 700
           },
           ptSeries('pts', pts, { color: t.ink3, borderColor: t.paper, borderWidth: 0.6 }, 6),

@@ -22,17 +22,18 @@
   },
   "options": {
     "nodesData": {"type": "string", "default": null, "desc": "Dataset id of the node table (one row per node); nodes are derived from edges when null"},
-    "layout": {"type": "string", "default": "force", "desc": "force: deterministic spring layout solved before paint (print-identical) | circular: categories on a ring, dominant highlighted hub in the centre | physics: live ECharts force simulation"},
+    "layout": {"type": "string", "default": "force", "desc": "force: deterministic spring layout solved before paint (print-identical), nudged so labels clear other nodes | circular: nodes at equal angular steps around the dominant highlighted hub (centre), categories contiguous | physics: live ECharts force simulation"},
     "highlight": {"type": "string|string[]", "default": null, "desc": "Node id(s) or name(s) drawn in accent2 (e.g. the target company)"},
     "categoryColors": {"type": "object", "default": {}, "desc": "{category: colour} — theme token ('accent', 'cat3' …) or CSS colour"},
-    "labels": {"type": "boolean|string", "default": "auto", "desc": "auto: label the largest nodes (+ highlighted) | true | false; all labels show on hover"},
+    "labels": {"type": "boolean|string", "default": "auto", "desc": "auto: label the largest nodes (+ highlighted) | true | false. Each label takes the free side facing away from the hub (right / left / above / below / diagonal) on a paper chip; a label with no free position is hidden and shows on hover"},
     "labelTop": {"type": "number", "default": 10, "desc": "Number of labelled nodes when labels = 'auto'"},
     "nodeSize": {"type": "number[]", "default": [10, 46], "desc": "Symbol diameter range in px (sqrt scale on size)"},
     "edgeWidth": {"type": "number[]", "default": [0.8, 5], "desc": "Edge width range in px (linear on value)"},
     "edgeColor": {"type": "string", "default": "auto", "desc": "auto (colour of the non-highlighted end — reads well for hub-and-spoke) | source | target | neutral"},
     "edgeOpacity": {"type": "number", "default": 0.45, "desc": "Resting edge opacity"},
     "edgeCurve": {"type": "number", "default": 0.08, "desc": "Edge curvature for the force layout (circular uses 0.25)"},
-    "dashedTypes": {"type": "string[]", "default": [], "desc": "Edge types drawn dashed (e.g. ['Competition'])"},
+    "dashedTypes": {"type": "string[]", "default": [], "desc": "Edge types drawn dashed (listed in the edge key). House style reserves dashes for reference lines: prefer edgeColor to tell relationship types apart"},
+    "edgeKey": {"type": "boolean", "default": true, "desc": "Edge key beside the category legend (top-left): line-width scale with min / max value, plus any dashed edge types"},
     "arrows": {"type": "boolean", "default": false, "desc": "Arrowheads at the target end"},
     "force": {"type": "object", "default": {}, "desc": "layout 'physics' only: ECharts force overrides {repulsion, edgeLength, gravity, friction}; defaults scale with the container and node count"},
     "roam": {"type": "boolean", "default": true, "desc": "Zoom (Ctrl/⌘ + wheel or pinch) and drag to pan"},
@@ -49,8 +50,8 @@
   "samples": [
     {"title": "Helios ecosystem — customers, suppliers, competitors and partners (USD m)", "data": "network_edges", "height": 480,
      "options": {"nodesData": "network_nodes", "encode": {"source": "source", "target": "target", "value": "value", "edgeType": "type", "id": "id", "name": "name", "category": "type", "size": "size"},
-                 "highlight": "helios-industrial", "dashedTypes": ["Competition"], "labelTop": 24}},
+                 "highlight": "helios-industrial", "labelTop": 24}},
     {"title": "Circular layout — relationships by counterparty type", "data": "network_edges", "height": 440, "span": 7,
-     "options": {"nodesData": "network_nodes", "layout": "circular", "highlight": "helios-industrial", "labels": true, "edgeColor": "source", "arrows": true, "edgeOpacity": 0.35}}
+     "options": {"nodesData": "network_nodes", "layout": "circular", "highlight": "helios-industrial", "labels": true, "edgeColor": "auto", "arrows": true, "edgeOpacity": 0.35}}
   ]
 }

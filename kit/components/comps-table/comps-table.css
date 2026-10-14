@@ -9,7 +9,9 @@
 .rk-comps thead { position: sticky; top: 0; z-index: 3; }
 .rk-comps thead th { background: var(--rk-paper); white-space: normal; line-height: 1.25; padding-top: 4px; }
 .rk-comps thead th.is-sorted { color: var(--rk-ink); }
-.rk-comps thead th .rk-sort { width: 9px; margin: 0 0 0 3px; font-size: 8px; color: var(--rk-accent-3); vertical-align: 1px; }
+/* the sort glyph is plain inline text glued to the title (no wrap opportunity between them) */
+.rk-comps thead th .rk-sort { display: inline; width: auto; margin: 0 0 0 3px; font-size: 8px; color: var(--rk-accent-3); vertical-align: 1px; }
+.rk-comps thead th .rk-sort:empty { margin: 0; }
 .rk-comps thead th.is-num .rk-sort { margin: 0 3px 0 0; }
 .rk-comps thead tr.rk-table__group th { border-bottom: 0; padding-bottom: 0; vertical-align: bottom; }
 .rk-comps thead tr.rk-table__group th[rowspan] { border-bottom: 1.5px solid var(--rk-accent); text-transform: none; letter-spacing: 0; font-size: var(--rk-fs-sm); color: var(--rk-ink-2); text-align: left; padding-bottom: 5px; }
@@ -18,7 +20,17 @@
 .rk-comps th.rk-comps__grp > span { display: block; padding-bottom: 3px; border-bottom: 1px solid var(--rk-rule); white-space: nowrap; }
 
 /* sticky first column (wide tables scroll horizontally under it) */
-.rk-comps .is-sticky { position: sticky; left: 0; z-index: 1; background-color: var(--rk-paper); }
+.rk-comps .is-sticky { position: sticky; left: 0; z-index: 1; background-color: var(--rk-paper); transition: box-shadow var(--rk-dur-fast); }
+.rk-comps.is-scrolled-x tbody td.is-sticky, .rk-comps.is-scrolled-x thead th.is-sticky, .rk-comps.is-scrolled-x tfoot td.is-sticky { box-shadow: 6px 0 6px -5px color-mix(in srgb, var(--rk-ink) 28%, transparent); }
+.rk-comps.is-scrolled-x .rk-table tr.is-target td.is-sticky { box-shadow: inset 3px 0 0 var(--rk-accent-2), 6px 0 6px -5px color-mix(in srgb, var(--rk-ink) 28%, transparent); }
+
+/* more columns off to the right: fade the edge so cut-off figures read as "scroll", not as truncated digits */
+.rk-comps::after {
+  content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 28px; z-index: 5; pointer-events: none;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--rk-paper) 0%, transparent), var(--rk-paper) 85%);
+  opacity: 0; transition: opacity var(--rk-dur-fast);
+}
+.rk-comps.is-more-r::after { opacity: 1; }
 .rk-comps thead .is-sticky { z-index: 4; }
 .rk-comps td.rk-comps__label { color: var(--rk-ink); }
 .rk-comps__fn { margin-left: 2px; font-size: 8.5px; line-height: 0; color: var(--rk-ink-3); font-weight: 500; font-style: normal; }
@@ -32,6 +44,11 @@
 .rk-comps tbody tr.is-data td.is-heat { font-weight: 500; }
 .rk-comps .rk-table td.is-neg { color: var(--rk-neg); }
 .rk-comps .rk-table td.is-pos { color: var(--rk-pos); }
+/* change columns: ink figures, a small coloured arrow carries the direction */
+.rk-comps__chg { margin-right: 4px; font-size: 7.5px; vertical-align: 1px; }
+.rk-comps__chg.is-up { color: var(--rk-pos); }
+.rk-comps__chg.is-down { color: var(--rk-neg); }
+.rk-comps__notes { margin: 0 0 2px; color: var(--rk-ink-3); }
 
 /* target: opaque gold tint (sticky cells must not be see-through) + accent edge */
 .rk-comps .rk-table tr.is-target td { background-color: color-mix(in srgb, var(--rk-accent-2) 15%, var(--rk-paper)); font-weight: 600; border-bottom-color: color-mix(in srgb, var(--rk-accent-2) 40%, var(--rk-paper)); }
@@ -73,7 +90,8 @@
 @media (prefers-reduced-motion: reduce) { .rk-comps tr.is-in, .rk-comps tr.is-enter { animation: none; } .rk-comps tbody tr { transition: none; } }
 @media print {
   .rk-comps tr.is-in, .rk-comps tr.is-enter { animation: none; }
-  .rk-comps__scroll { height: auto; overflow: visible; }
+  .rk-comps__scroll { height: auto !important; overflow: visible; }
+  .rk-comps::after { display: none; }
   .rk-comps thead, .rk-comps tfoot { position: static; }
 }
 [data-rk-theme="ink"] .rk-comps .rk-table tr.is-target td { background-color: color-mix(in srgb, var(--rk-accent-2) 22%, var(--rk-paper)); }

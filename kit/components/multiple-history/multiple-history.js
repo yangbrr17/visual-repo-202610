@@ -16,6 +16,7 @@
       meanLine: true,        // dashed mean line (ink-3, house style for averages)
       lookback: null,        // years used for mean / σ (null = full history), e.g. 2
       compareMean: false,    // also draw the comparison series' mean
+      highlight: true,       // the y series is the target: drawn in accent2 like the target elsewhere in the deck (false = accent)
       endLabels: true,       // current value pills + mean / σ labels at the right edge
       premium: true,         // premium / (discount) vs. the comparison series in the tooltip
       format: null,          // value format (defaults to the y field format, else 0.0x)
@@ -52,7 +53,8 @@
       if (ext[0] >= 0 && yMin < 0) yMin = 0;
 
       var lastY = lastValue(ys), lastC = cs ? lastValue(cs) : null;
-      var yColor = t.accent, cColor = t.dark ? t.ink3 : RK.theme.mix(t.ink3, t.paper, 0.15);
+      // the subject company wears the deck-wide target colour (accent2); peers grey, averages ink-3 dashed
+      var yColor = o.highlight !== false ? t.accent2 : t.accent, cColor = t.dark ? t.ink3 : RK.theme.mix(t.ink3, t.paper, 0.15);
       var meanColor = t.ink3;                 // averages: ink-3 dashed (accent2 is reserved for a highlighted target)
 
       /* ---------------- bands + reference lines on the main series ---------------- */
@@ -79,22 +81,53 @@
       }
 
       /* ---------------- right-edge labels (custom series, de-overlapped in pixel space) ---------------- */
+      // pri: lower = more important. σ labels (and the comparison mean) give way when the column is crowded.
       var labels = [];
       if (o.endLabels !== false) {
-        if (lastY != null) labels.push({ v: lastY, text: RK.format(lastY, fmt), kind: 'pill', bg: yColor });
-        if (lastC != null) labels.push({ v: lastC, text: RK.format(lastC, fmt), kind: 'pill', bg: cColor });
-        if (st && o.meanLine !== false) labels.push({ v: st.mean, text: avgName + ' ' + RK.format(st.mean, fmt), kind: 'mean' });
-        if (cst && o.compareMean) labels.push({ v: cst.mean, text: avgName + ' ' + RK.format(cst.mean, fmt), kind: 'cmean' });
+        if (lastY != null) labels.push({ v: lastY, text: RK.format(lastY, fmt), kind: 'pill', bg: yColor, pri: 0 });
+        if (lastC != null) labels.push({ v: lastC, text: RK.format(lastC, fmt), kind: 'pill', bg: cColor, pri: 0 });
+        if (st && o.meanLine !== false) labels.push({ v: st.mean, text: avgName + ' ' + RK.format(st.mean, fmt), kind: 'mean', pri: 1, tag: avgName });
+        if (cst && o.compareMean) labels.push({ v: cst.mean, text: avgName + ' ' + RK.format(cst.mean, fmt), kind: 'cmean', pri: 2, drop: true });
         if (st) {
           for (var j = 1; j <= k; j++) {
-            labels.push({ v: st.mean + j * st.sd, text: '+' + j + 'σ ' + RK.format(st.mean + j * st.sd, fmt), kind: 'sd' });
-            labels.push({ v: st.mean - j * st.sd, text: '−' + j + 'σ ' + RK.format(st.mean - j * st.sd, fmt), kind: 'sd' });
+            labels.push({ v: st.mean + j * st.sd, text: '+' + j + 'σ ' + RK.format(st.mean + j * st.sd, fmt), kind: 'sd', pri: 2 + j, drop: true, tag: '+' + j + 'σ' });
+            labels.push({ v: st.mean - j * st.sd, text: '−' + j + 'σ ' + RK.format(st.mean - j * st.sd, fmt), kind: 'sd', pri: 2 + j, drop: true, tag: '−' + j + 'σ' });
           }
         }
+        // a level that shows the same figure as a current-value pill is merged into it: "8.6x = +1σ", not two "8.6x"
+        labels = labels.filter(function (l) {
+          if (l.kind !== 'sd' && l.kind !== 'mean') return true;
+          var vt = RK.format(l.v, fmt);
+          var pill = labels.filter(function (p) { return p.kind === 'pill' && p.text === vt; })[0];
+          if (!pill) return true;
+          pill.suffix = (pill.suffix ? pill.suffix + ' ' : '= ') + l.tag;
+          return false;
+        });
       }
-      var font = '600 10.5px ' + t.fontNum;
-      var labelW = labels.reduce(function (m, l) { return Math.max(m, Math.ceil(C.measure(l.text, font)) + (l.kind === 'pill' ? 12 : 0)); }, 0);
+      var font = '600 10.5px ' + t.fontNum, fontSd = '11px ' + t.fontNum, fontSuffix = '11px ' + t.fontNum;
+      labels.forEach(function (l) {
+        l.w = l.kind === 'pill' ? Math.ceil(C.measure(l.text, font)) + 10 : Math.ceil(C.measure(l.text, l.kind === 'sd' ? fontSd : font));
+        l.full = l.w + (l.suffix ? 5 + Math.ceil(C.measure(l.suffix, fontSuffix)) : 0);
+      });
+      var labelW = labels.reduce(function (m, l) { return Math.max(m, l.full); }, 0);
       var layout = null;
+
+      /** Spread labels >= 16px apart; while one ends up more than a row from its level, drop a nearby σ label. */
+      function layoutLabels(y0, lo, hi) {
+        var act = labels.map(function () { return true; });
+        for (;;) {
+          var idx = [];
+          act.forEach(function (a, i) { if (a) idx.push(i); });
+          var ys = C.spreadLabels(idx.map(function (i) { return y0[i]; }), 16, lo, hi), pos = {};
+          var worst = -1, wd = 17;
+          idx.forEach(function (i, n) { pos[i] = ys[n]; var d = Math.abs(ys[n] - y0[i]); if (d > wd) { wd = d; worst = i; } });
+          if (worst < 0) return pos;
+          var cand = idx.filter(function (i) { return labels[i].drop && Math.abs(y0[i] - y0[worst]) <= 48; })
+            .sort(function (a, b) { return labels[b].pri - labels[a].pri || Math.abs(y0[a] - y0[worst]) - Math.abs(y0[b] - y0[worst]); });
+          if (!cand.length) return pos;
+          act[cand[0]] = false;
+        }
+      }
 
       var series = [{
         id: 'y', name: ctx.title(yf), type: 'line', data: ys, z: 4,
@@ -120,9 +153,10 @@
             var cs2 = params.coordSys;
             if (params.dataIndex === 0 || !layout) {
               // one pass for all labels: y from the value, then push apart (min gap 16px) inside the plot
-              layout = C.spreadLabels(labels.map(function (l) { return api.coord([last, l.v])[1]; }), 16, cs2.y + 6, cs2.y + cs2.height - 6);
+              layout = layoutLabels(labels.map(function (l) { return api.coord([last, l.v])[1]; }), cs2.y + 6, cs2.y + cs2.height - 6);
             }
             var l = labels[params.dataIndex], y0 = api.coord([last, l.v])[1], y = layout[params.dataIndex];
+            if (y == null) return null;                       // dropped: the band edge itself still shows the level
             var x = cs2.x + cs2.width + 10;
             var kids = [];
             if (Math.abs(y - y0) > 1.5 || l.kind !== 'pill') {
@@ -131,10 +165,14 @@
             }
             var st2 = l.kind === 'pill'
               ? { text: l.text, fill: RK.theme.textOn(l.bg), backgroundColor: l.bg, padding: [2, 5], borderRadius: 2, font: font }
-              : { text: l.text, fill: l.kind === 'mean' ? t.ink2 : (l.kind === 'cmean' ? cColor : t.ink3),
-                font: l.kind === 'sd' ? '10px ' + t.fontNum : font };
+              : { text: l.text, fill: l.kind === 'mean' ? t.ink2 : t.ink3,          // ink-3 text: the grey comparison colour is too light for type
+                font: l.kind === 'sd' ? fontSd : font };
             st2.align = 'left'; st2.verticalAlign = 'middle';
             kids.push({ type: 'text', x: x, y: y, style: st2, enterFrom: { style: { opacity: 0 } } });
+            if (l.suffix) {
+              kids.push({ type: 'text', x: x + l.w + 5, y: y, enterFrom: { style: { opacity: 0 } },
+                style: { text: l.suffix, fill: t.ink3, font: fontSuffix, align: 'left', verticalAlign: 'middle' } });
+            }
             return { type: 'group', children: kids };
           }
         });

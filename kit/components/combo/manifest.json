@@ -18,7 +18,7 @@
     "period": {"type": "string", "required": false, "desc": "Actual / estimate flag (values starting with E, F, P or B mark estimates) used by forecastFrom 'auto'", "default": "period"}
   },
   "options": {
-    "layout": {"type": "string", "default": "band", "desc": "band = line in its own band above the bars (no label collisions) | overlay = classic dual axes with aligned ticks"},
+    "layout": {"type": "string", "default": "band", "desc": "band = line in its own band above the bars (no label collisions; the line carries its own value labels) | overlay = classic dual axes with aligned ticks, axis titles and a zero-based line axis"},
     "barStack": {"type": "boolean", "default": false, "desc": "Stack the bar series (parts of a whole: ordinal colour ramp; totals labelled on top)"},
     "labels": {"type": "boolean|string", "default": "auto", "desc": "Value labels: true | false | 'auto' (on when bars are wide enough) | 'bars' | 'line'"},
     "format": {"type": "string", "default": null, "desc": "Bar value format; defaults to the first bar field's format"},
@@ -26,6 +26,8 @@
     "lineAxisFormat": {"type": "string", "default": null, "desc": "Right-axis tick format; defaults to lineFormat with redundant decimals trimmed"},
     "forecastFrom": {"type": "string|null", "default": "auto", "desc": "x value where estimates start; 'auto' = period field or x ending in E/F/B; null = no estimate styling"},
     "forecastLabel": {"type": "string", "default": "Projected", "desc": "Caption above the estimate band ('' hides it)"},
+    "lineColor": {"type": "string", "default": "auto", "desc": "First line colour: 'auto' (ink-2 in the band layout, a palette colour clear of the bars in overlay) | token ('accent2' marks a target metric) | colour"},
+    "axisTitles": {"type": "boolean|string", "default": "auto", "desc": "Value-axis titles with units, e.g. 'Revenue (USD m)' / 'EBITDA margin (%)': 'auto' (overlay layout) | true | false"},
     "cagr": {"type": "boolean|string|object|array", "default": false, "desc": "true = first→last bar; 'split' = actuals and estimates separately; {from, to, label, field} or an array of them"},
     "cagrFormat": {"type": "string", "default": "0.0%", "desc": "Format of the CAGR figure"},
     "legend": {"type": "boolean", "default": true, "desc": "Top-left legend (shown when there is more than one series)"},

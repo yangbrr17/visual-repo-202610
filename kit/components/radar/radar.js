@@ -10,6 +10,16 @@
 
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
   var DASH_ICON = 'path://M0,0h3v1.6H0z M3.5,0h3v1.6h-3z M7,0h3v1.6H7z';   // dashed legend swatch for the median
+  var PEERS = 'Peers', MEDIAN = 'Peer median', NAME_GAP = 12;
+  /** Value text with a true minus sign. */
+  function num(v, f) { return RK.format(v, f).replace(/^-/, '\u2212'); }
+  function isPct(f) {
+    var code = RK.format.presets[f] || f;
+    return typeof code === 'string' && /%/.test(code.split(';')[0].replace(/"[^"]*"/g, ''));
+  }
+  function ppCode(f) { var dec = RK.format.decimals(f) || 0; return '0' + (dec ? '.' + new Array(dec + 1).join('0') : '') + '"pp"'; }
+  /** Axis names longer than 18 characters wrap onto two lines at a space. */
+  function axisName(name) { name = String(name); return name.length > 18 ? name.replace(/(.{1,18})(\s|$)/g, '$1\n').trim() : name; }
 
   RK.component({
     id: 'radar',
@@ -29,7 +39,7 @@
     },
     render: C(build, {
       rebuildOnResize: true,  // the radar centre / radius and the legend column depend on the block size
-      select: function (p, ctx) { return p.name && p.name !== 'Peer median' ? { field: ctx.enc.series, value: p.name } : null; }
+      select: function (p, ctx) { return p.name && p.seriesId !== 'median' ? { field: ctx.enc.series, value: p.name } : null; }
     })
   });
 
@@ -101,12 +111,15 @@
     var vertexLabel = function (j0, strong, color) {
       return {
         show: true, distance: 4, fontSize: 10.5, fontFamily: t.fontNum, fontWeight: strong ? 600 : 400,
-        color: color, textBorderColor: t.paper, textBorderWidth: 2.5,
-        formatter: function (p) { return RK.format(p.value, fmts[p.dimensionIndex != null ? p.dimensionIndex : j0] || fmts[0]); }
+        color: color, textBorderColor: t.paper, textBorderWidth: 3,
+        formatter: function (p) { return C.richSafe(num(p.value, fmts[p.dimensionIndex != null ? p.dimensionIndex : j0] || fmts[0])); }
       };
     };
 
-    var data = peers.map(function (n) {
+    // three radar series on one radar, painted in order: peers, peer median, target(s) — so the target's
+    // vertex labels always sit above the dashed median polygon
+    var muted = o.peers === 'muted';
+    var peerData = peers.map(function (n) {
       var c = colorOf(n), dim = dimmed(n);
       return {
         name: String(n), value: matrix[n],
@@ -117,49 +130,84 @@
         label: o.labels === 'all' && !dim ? vertexLabel(0, false, t.ink2) : { show: false }
       };
     });
-    if (o.median && peers.length > 1) {
-      data.push({
-        name: 'Peer median', value: med, symbol: 'none',
-        lineStyle: { color: t.ink3, width: 1.5, type: [4, 3] }, itemStyle: { color: t.ink3 }, areaStyle: { opacity: 0 },
-        label: { show: false }
-      });
-    }
-    targets.forEach(function (n) {
+    var hasMed = o.median && peers.length > 1;
+    var targetData = targets.map(function (n) {
       var dim = dimmed(n);
-      data.push({
+      return {
         name: String(n), value: matrix[n],
         symbol: 'circle', symbolSize: 6,
         lineStyle: { color: t.accent2, width: 2.5, opacity: dim ? 0.25 : 1 },
         itemStyle: { color: t.accent2, borderColor: t.paper, borderWidth: 1.5, opacity: dim ? 0.25 : 1 },
         areaStyle: { color: RK.theme.alpha(t.accent2, dim ? 0.06 : 0.22) },
-        label: o.labels !== 'none' && !dim ? vertexLabel(0, true, t.ink) : { show: false },
-        z: 3
-      });
+        label: o.labels !== 'none' && !dim ? vertexLabel(0, true, t.ink) : { show: false }
+      };
     });
 
-    // legend: target(s) first, then peers, then median; vertical at top-left when the block is wide
-    var legendNames = targets.concat(peers).map(String).concat(o.median && peers.length > 1 ? ['Peer median'] : []);
-    var legendData = legendNames.map(function (n) { return n === 'Peer median' && peers.indexOf(n) < 0 ? { name: n, icon: DASH_ICON } : n; });
+    // legend: target(s) first, then peers (one 'Peers' entry when they are muted — identical grey swatches say
+    // nothing), then the median
+    var mutedCol = RK.theme.mix(t.ink3, t.paper, 0.25);
+    var peerEntries = muted ? (peers.length ? [{ name: PEERS, itemStyle: { color: mutedCol } }] : []) : peers.map(String);
+    var legendData = targets.map(String).concat(peerEntries, hasMed ? [{ name: MEDIAN, icon: DASH_ICON, itemStyle: { color: t.ink3 } }] : []);
+    var legendNames = legendData.map(function (d) { return typeof d === 'string' ? d : d.name; });
+
+    /* ---------- layout: the legend column sits next to the radar and the pair is centred in the block ---------- */
     var W = ctx.el.clientWidth || 600, H = ctx.el.clientHeight || 320;
     var vertical = W > H * 1.45 && o.legend !== false;
     var legendW = vertical ? Math.min(200, 26 + Math.max.apply(null, legendNames.map(function (n) { return C.measure(n, '11px ' + t.fontSans); }))) : 0;
     var top = o.legend !== false && !vertical ? 30 : 0;
-    var cx = vertical ? legendW + (W - legendW) / 2 : W / 2;
-    var radius = Math.max(40, Math.min((W - legendW) / 2 - 90, (H - top) / 2 - 32));
+    var nameFont = '600 11px ' + t.fontSans;
+    var nameLines = indicator.map(function (ind) { return axisName(ind.name); });
+    var nameW = Math.max.apply(null, nameLines.map(function (n) { return Math.max.apply(null, n.split('\n').map(function (l) { return C.measure(l, nameFont); })); }).concat([20]));
+    var nameH = 13 * Math.max.apply(null, nameLines.map(function (n) { return n.split('\n').length; }).concat([1]));
+    var side = Math.min(120, nameW + NAME_GAP + 8);                   // horizontal room the axis names need beyond the radius
+    var gapL = vertical ? 24 : 0;
+    var radius = Math.max(40, Math.min((W - legendW - gapL) / 2 - side, (H - top) / 2 - nameH - NAME_GAP - 6));
+    var groupW = legendW + gapL + 2 * (radius + side);
+    var x0 = vertical ? Math.max(0, (W - groupW) / 2) : 0;
+    var cx = vertical ? x0 + legendW + gapL + side + radius : W / 2;
+
+    var series = [];
+    if (peerData.length) {
+      series.push({
+        id: 'peers', name: PEERS, type: 'radar', z: 2,
+        lineStyle: { color: mutedCol }, itemStyle: { color: mutedCol },
+        emphasis: { focus: 'self', lineStyle: { width: 3 } },
+        blur: { lineStyle: { opacity: 0.15 }, itemStyle: { opacity: 0.15 }, areaStyle: { opacity: 0.04 }, label: { show: false } },
+        data: peerData
+      });
+    }
+    if (hasMed) {
+      series.push({
+        id: 'median', name: MEDIAN, type: 'radar', z: 3, silent: false,
+        lineStyle: { color: t.ink3, width: 1.5, type: [4, 3] }, itemStyle: { color: t.ink3 },
+        emphasis: { focus: 'self' }, blur: { lineStyle: { opacity: 0.3 } },
+        data: [{ name: MEDIAN, value: med, symbol: 'none', lineStyle: { color: t.ink3, width: 1.5, type: [4, 3] }, itemStyle: { color: t.ink3 }, areaStyle: { opacity: 0 }, label: { show: false } }]
+      });
+    }
+    if (targetData.length) {
+      series.push({
+        id: 'target', name: targets.map(String).join(' / '), type: 'radar', z: 4,
+        lineStyle: { color: t.accent2 }, itemStyle: { color: t.accent2 },   // legend swatch
+        emphasis: { focus: 'self', lineStyle: { width: 3 } },
+        blur: { lineStyle: { opacity: 0.15 }, itemStyle: { opacity: 0.15 }, areaStyle: { opacity: 0.04 }, label: { show: false } },
+        data: targetData
+      });
+    }
 
     return {
       legend: C.legend(ctx, {
-        data: legendData, orient: vertical ? 'vertical' : 'horizontal', top: vertical ? 4 : 0, left: 0, itemGap: vertical ? 9 : 14
+        data: legendData, orient: vertical ? 'vertical' : 'horizontal', top: vertical ? 4 : 0, left: x0, itemGap: vertical ? 9 : 14
       }),
       tooltip: {
         trigger: 'item', confine: true,
         formatter: function (p) {
           var n = p.name, vals = p.value || [];
-          var isMed = n === 'Peer median';
+          var isMed = p.seriesId === 'median';
           var tr = indicator.map(function (ind, j) {
             var v = vals[j], d = util.isNum(v) && util.isNum(med[j]) && !isMed ? v - med[j] : null;
-            var dtxt = d == null ? '' : '  (' + (d > 0 ? '+' : d < 0 ? '-' : '±') + RK.format(Math.abs(d), fmts[j]) + ')';
-            return { label: ind.name, value: RK.format(v, fmts[j]) + dtxt };
+            // differences of percentages are percentage points
+            var dtxt = d == null ? '' : '  (' + (d > 0 ? '+' : d < 0 ? '\u2212' : '\u00b1') + (isPct(fmts[j]) ? RK.format(Math.abs(d) * 100, ppCode(fmts[j])) : RK.format(Math.abs(d), fmts[j])) + ')';
+            return { label: ind.name, value: num(v, fmts[j]) + dtxt };
           });
           return C.tip(n, tr, isMed || !peers.length ? null : '( ) difference vs. peer median');
         }
@@ -171,21 +219,16 @@
         center: [cx, top + (H - top) / 2 + 1],
         radius: radius,
         axisName: {
-          color: t.ink2, fontSize: 11, fontWeight: 600, fontFamily: t.fontSans,
-          formatter: function (name) { return name.length > 18 ? name.replace(/(.{1,18})(\s|$)/g, '$1\n').trim() : name; }
+          color: t.ink2, fontSize: 11, fontWeight: 600, fontFamily: t.fontSans, lineHeight: 13,
+          formatter: function (name) { return C.richSafe(axisName(name)); }
         },
-        nameGap: 10,
+        nameGap: NAME_GAP,
         axisLine: { lineStyle: { color: t.rule } },
         splitLine: { lineStyle: { color: t.grid, width: 1 } },
         splitArea: { show: false },
         axisLabel: { show: false }
       },
-      series: [{
-        id: 'radar', type: 'radar',
-        emphasis: { focus: 'self', lineStyle: { width: 3 } },
-        blur: { lineStyle: { opacity: 0.15 }, itemStyle: { opacity: 0.15 }, areaStyle: { opacity: 0.04 }, label: { show: false } },
-        data: data
-      }]
+      series: series
     };
   }
 })();

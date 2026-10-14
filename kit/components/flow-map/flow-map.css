@@ -2,20 +2,21 @@
 
 /* shared map styles (legend, labels, controls) live in kit/styles/components.css (maps) */
 
-.rk-flow__arc, .rk-flow__dots, .rk-flow__arrow { transition: stroke-opacity var(--rk-dur-fast), opacity var(--rk-dur-fast); }
+.rk-flow__arc, .rk-flow__casing, .rk-flow__dots, .rk-flow__arrow { transition: stroke-opacity var(--rk-dur-fast), opacity var(--rk-dur-fast); }
 .rk-flow.is-focus .rk-flow__arc:not(.is-hot) { stroke-opacity: .08; }
-.rk-flow.is-focus .rk-flow__dots:not(.is-hot) { stroke-opacity: 0; }
+.rk-flow.is-focus .rk-flow__casing:not(.is-hot) { stroke-opacity: 0; }
+/* travelling dots: only along the hovered flows, only with motion; static captures, print and exports show solid arcs */
+.rk-flow__dots { visibility: hidden; }
+.rk-flow.is-motion.is-focus .rk-flow__dots.is-hot { visibility: visible; animation: rk-flow-travel 1.6s linear infinite; }
 .rk-flow.is-focus .rk-flow__arrow:not(.is-hot) { opacity: .08 !important; }
 .rk-flow.is-focus .rk-flow__arc.is-hot { stroke-opacity: .95; }
 .rk-flow .rk-flow__arc.is-sel { stroke-opacity: .9; }
 .rk-flow__arrow { pointer-events: none; }
 .rk-flow__arrow-svg { position: absolute; left: 0; top: 0; overflow: visible; display: block; max-width: none !important; max-height: none !important; }
-.rk-flow.is-motion .rk-flow__dots { animation: rk-flow-travel 1.6s linear infinite; }
 .rk-flow.is-motion .is-enter { animation: rk-flow-fade 500ms var(--rk-ease) var(--rk-d, 0ms) both; }
-.rk-flow.is-motion .rk-flow__dots.is-enter { animation: rk-flow-fade 500ms var(--rk-ease) var(--rk-d, 0ms) both, rk-flow-travel 1.6s linear infinite; }
 @keyframes rk-flow-travel { to { stroke-dashoffset: -40; } }
 @keyframes rk-flow-fade { from { opacity: 0; } }
 .rk-flow__vlabel { font-weight: 600; color: var(--rk-ink-2); font-family: var(--rk-font-num); }
 .rk-flow__wsw { flex: none; width: 22px; border-radius: 2px; }
-@media (prefers-reduced-motion: reduce) { .rk-flow .rk-flow__dots, .rk-flow .is-enter { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .rk-flow .rk-flow__dots { display: none; } .rk-flow .is-enter { animation: none !important; } }
 @media print { .rk-flow .rk-flow__dots { display: none; } }

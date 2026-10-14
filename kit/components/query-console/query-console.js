@@ -91,6 +91,34 @@
   }
   function lineCol(text, pos) { var pre = text.slice(0, pos).split('\n'); return { line: pre.length, col: pre[pre.length - 1].length + 1 }; }
   function typeTag(t) { return t === 'number' ? '#' : t === 'date' ? 'dt' : t === 'boolean' ? 'y/n' : 'abc'; }
+  /** Hue (0-360) and saturation (0-1) of a colour. */
+  function hueSat(c) {
+    var x = RK.theme.parseColor(c), r = x[0] / 255, g = x[1] / 255, b = x[2] / 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, l = (mx + mn) / 2, hh = 0;
+    if (d) hh = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return [hh * 60, d ? d / (1 - Math.abs(2 * l - 1)) : 0];
+  }
+  /**
+   * Series colours: categorical, clear of accent-2 (the highlighted target) and of anything that reads as the
+   * pos / neg change colours (hue within 40 degrees of either, or a saturated green / red), so a series never
+   * looks like "good" or "bad".
+   */
+  function seriesPalette(n) {
+    var t = RK.theme.tokens(), sem = [hueSat(t.pos)[0], hueSat(t.neg)[0]];
+    function semantic(c) {
+      var hs = hueSat(c);
+      if (hs[1] < 0.22) return false;
+      var near = sem.some(function (x) { var dd = Math.abs(hs[0] - x) % 360; return Math.min(dd, 360 - dd) < 40; });
+      return near || (hs[0] >= 80 && hs[0] <= 170) || hs[0] >= 345 || hs[0] <= 12;
+    }
+    var base = t.cat.filter(function (c) {
+      return !semantic(c) && [t.accent2, t.pos, t.neg].every(function (e) { return RK.theme.distance(c, e) >= 90; });
+    });
+    if (!base.length) return RK.theme.palette({ n: n, exclude: [t.accent2, t.pos, t.neg] });
+    var out = base.slice(0, n), k = 0;
+    while (out.length < n) { var src = base[k % base.length]; out.push(RK.theme.mix(src, t.paper, 0.4 + 0.15 * Math.floor(k / base.length))); k++; }
+    return out;
+  }
   function isTimeLike(v) {
     if (typeof v === 'number') return v >= 1900 && v <= 2100 && Math.round(v) === v;
     return typeof v === 'string' && /^(\d{4}[AEFPB]?|\d{4}-\d{2}(-\d{2})?|[QH][1-4][ -]?'?\d{2,4}|\d{4}[ -]?[QH][1-4]|FY\d{2,4}[AE]?)$/i.test(v.trim());
@@ -100,11 +128,34 @@
     var s = Math.max(0, (Date.now() - t) / 1000);
     return s < 60 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : s < 86400 ? Math.round(s / 3600) + ' h ago' : Math.round(s / 86400) + ' d ago';
   }
+  /**
+   * History store, scoped to this report: every file:// page shares one storage origin in Chromium, so an
+   * unscoped key would show one client's queries in another client's report. Under file:// history lives in
+   * sessionStorage (this tab only); the key carries a hash of the report path + title either way.
+   */
+  function historyKey() {
+    var man = (RK.data && RK.data.manifest) || {}, title = (man.report && man.report.title) || '';
+    var src = String(location.pathname || '') + '|' + title, hsh = 5381;
+    for (var i = 0; i < src.length; i++) hsh = ((hsh << 5) + hsh + src.charCodeAt(i)) | 0;
+    return HKEY + ':' + (hsh >>> 0).toString(36);
+  }
+  var legacyCleared = false;
+  function historyStore() {
+    try {
+      // drop the old unscoped key (shared by every report on this machine)
+      if (!legacyCleared) { legacyCleared = true; window.localStorage.removeItem(HKEY); }
+    } catch (e) { /* storage unavailable */ }
+    try { return location.protocol === 'file:' ? window.sessionStorage : window.localStorage; } catch (e) { return null; }
+  }
   function loadHistory() {
-    try { var v = JSON.parse(window.localStorage.getItem(HKEY) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+    try {
+      var v = JSON.parse(historyStore().getItem(historyKey()) || '[]');
+      // query text + dataset id + time only (never result values)
+      return Array.isArray(v) ? v.filter(function (x) { return x && typeof x.q === 'string'; }).map(function (x) { return { q: x.q, ds: typeof x.ds === 'string' ? x.ds : null, t: +x.t || 0 }; }) : [];
+    } catch (e) { return []; }
   }
   function saveHistory(list) {
-    try { window.localStorage.setItem(HKEY, JSON.stringify(list)); } catch (e) { /* storage unavailable (file://, private mode) */ }
+    try { historyStore().setItem(historyKey(), JSON.stringify(list)); } catch (e) { /* storage unavailable (private mode) */ }
   }
 
   function editDistance(a, b) {
@@ -438,6 +489,10 @@
       var editor = h('div.rk-qc__editor', builderPane, queryPane, statusEl);
 
       var refEl = o.reference ? h('aside.rk-qc__ref', { 'aria-label': 'Fields and functions' }) : null;
+      // bottom fade over the reference list while more items sit below the fold
+      var refFade = o.reference ? h('div.rk-qc__reffade', { 'aria-hidden': 'true' }) : null;
+      function refEdge() { if (refEl) refFade.classList.toggle('is-on', refEl.scrollHeight - refEl.clientHeight - refEl.scrollTop > 2); }
+      if (refEl) refEl.addEventListener('scroll', refEdge, { passive: true });
       var resHead = h('div.rk-qc-rh');
       var tableWrap = h('div.rk-qc-table');
       var chartHost = h('div.rk-qc-chart__host');
@@ -445,7 +500,7 @@
       var chartWrap = h('div.rk-qc-chart', chartHost, chartMsg);
       var resBody = h('div.rk-qc-rb', tableWrap, chartWrap);
       var results = h('div.rk-qc__results', resHead, resBody);
-      root.appendChild(h('div.rk-qc__grid', head, editor, refEl, results));
+      root.appendChild(h('div.rk-qc__grid', head, editor, refEl, refFade, results));
       ctx.el.appendChild(root);
 
       /* ---------------- dataset ---------------- */
@@ -855,6 +910,7 @@
           refEl.appendChild(h('section.rk-qc-ref__sec', h('h4', 'Syntax'), sl));
         }
         if (keepFocus) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+        refEdge();
       }
       function setRef(open) {
         st.refOpen = open;
@@ -1048,6 +1104,23 @@
         if (!rows.length) { tableWrap.appendChild(h('div.rk-qc-empty', 'No rows match — check the "where" clause or the report filters.')); return; }
         tableWrap.appendChild(h('table.rk-table.rk-qc-tbl', thead, tbody));
         if (rows.length > max) tableWrap.appendChild(h('p.rk-qc-more', 'Showing first ' + max + ' of ' + rows.length + ' rows — CSV exports all.'));
+        snapTable();
+      }
+      /**
+       * The table pane ends on a row boundary (no half-cut last row); highlighted rows below the fold stay
+       * pinned to the bottom edge (CSS sticky) so the target is always visible next to its chart bar.
+       */
+      function snapTable() {
+        tableWrap.style.maxHeight = '';
+        var tbl = tableWrap.querySelector('table');
+        if (!tbl || !tableWrap.clientHeight || tbl.offsetHeight <= tableWrap.clientHeight + 1) return;
+        var H = tableWrap.clientHeight, rws = tbl.tBodies[0].rows, best = 0;
+        for (var i = 0; i < rws.length; i++) {
+          var b = rws[i].offsetTop + rws[i].offsetHeight;
+          if (b > H + 0.5) break;
+          best = b;
+        }
+        if (best) tableWrap.style.maxHeight = (best + (tableWrap.offsetHeight - tableWrap.clientHeight)) + 'px';
       }
       function sortBy(c) {
         var cur = st.tsort && st.tsort.col === c.name ? st.tsort.dir : null;
@@ -1098,7 +1171,8 @@
         var combo = timeLike && !sdim && kinds.length > 1 && cats.length <= 15 && o.chart !== 'line';
         var kind = o.chart === 'bar' || o.chart === 'line' ? o.chart : (timeLike && !combo ? 'line' : 'bar');
         if (timeLike && !st.tsort) cats.sort(function (a, b) { return String(a).localeCompare(String(b)); });
-        var catLabels = cats.map(function (c) { return c == null ? 'n.a.' : String(RK.format(c, x.format)); });
+        // braces in data would start ECharts rich-text runs in axis / point labels
+        var catLabels = cats.map(function (c) { return c == null ? 'n.a.' : RK.chart.richSafe(RK.format(c, x.format)); });
         var labelLen = Math.max.apply(null, catLabels.map(function (c) { return c.length; }));
         var horiz = kind === 'bar' && !timeLike && (cats.length > 7 || labelLen > 11);
         function byCat(list, field) {
@@ -1119,7 +1193,8 @@
           return { show: true, position: pos, distance: 4, color: t.ink2, fontSize: 10.5, fontFamily: t.fontNum, formatter: function (p) { return RK.format(valueOf(p.value), fmt); } };
         }
         var opt, dropped = 0;
-        var pal = RK.theme.palette({ n: 8 });   // series colours kept clear of accent-2 (reserved for the highlighted target)
+        // series colours kept clear of accent-2 (the highlighted target) and of pos / neg (red / green mean change)
+        var pal = seriesPalette(8);
 
         if (horiz && !sdim) {
           // ---- side-by-side horizontal panels sharing the category axis ----
@@ -1191,10 +1266,10 @@
           var showLabels = barLabels || lineLabels;
           if (sdim) {
             var groups = RK.util.groupBy(rows, function (r) { return r[sdim.name]; }), gi = 0;
-            var gpal = RK.theme.palette({ n: groups.size });   // extended with tints instead of repeating
+            var gpal = seriesPalette(groups.size);   // extended with tints instead of repeating
             groups.forEach(function (list, name) {
-              legend.push(String(name));
-              series.push(mk(String(name), byCat(list, meas[0].name), meas[0], 0, gpal[gi++], kind, false));
+              legend.push(RK.chart.richSafe(name));
+              series.push(mk(RK.chart.richSafe(name), byCat(list, meas[0].name), meas[0], 0, gpal[gi++], kind, false));
             });
           } else {
             plotted.forEach(function (p, i) {
@@ -1224,25 +1299,23 @@
           if (!horiz && slot < labelLen * 6.4 + 8 && catLabels.every(function (c) { return /^(FY)?\d{4}[A-Z]?$/.test(c); })) {
             catAxis.axisLabel.formatter = function (v) { return String(v).replace(/^(FY)?\d{2}(\d{2})/, '$2'); };
           }
+          if (!horiz && cats.length <= 40) {
+            var lfmt = catAxis.axisLabel.formatter || function (v) { return v; };
+            var lblW = Math.max.apply(null, catLabels.map(function (c) { return RK.chart.measure(lfmt(c), '11px ' + t.fontSans); })) + 10;
+            var slotW = ((chartHost.clientWidth || 400) - 70) / Math.max(1, cats.length), nC = cats.length;
+            var every = Math.max(1, Math.ceil(lblW / slotW));
+            catAxis.axisLabel.hideOverlap = false;
+            catAxis.axisLabel.interval = every === 1 ? 0 : function (i) { return (nC - 1 - i) % every === 0; };
+          }
           var valAxis = [{ type: 'value', scale: kind === 'line' && primaryKind !== 'num', axisLabel: { formatter: axisFmt(plotted[0] ? plotted[0].col.format : meas[0].format) }, splitLine: { lineStyle: { color: t.grid } } }];
-          if (p1 && kind === 'bar') {
-            // combo: bars in the lower ~60% of the plot, the second-unit line labelled above them (right axis hidden)
-            var barMax = 0, lo = Infinity, hi = -Infinity;
-            plotted.forEach(function (p) {
-              byCat(rows, p.col.name).forEach(function (v) {
-                if (!isNum(v)) return;
-                if (p.axis === 0) barMax = Math.max(barMax, v); else { lo = Math.min(lo, v); hi = Math.max(hi, v); }
-              });
-            });
-            var span = (hi - lo) || Math.abs(hi) || 1;
-            if (barMax > 0) valAxis[0].max = function (e) { return RK.util.niceStep(e.max * 1.65, 1) * Math.ceil(e.max * 1.65 / RK.util.niceStep(e.max * 1.65, 1)); };
-            valAxis.push({ type: 'value', position: 'right', min: lo - span * 1.9, max: hi + span * 0.35, axisLabel: { show: false }, splitLine: { show: false }, axisLine: { show: false } });
-          } else if (p1) valAxis.push({ type: 'value', scale: true, position: 'right', axisLabel: { formatter: axisFmt(p1.col.format) }, splitLine: { show: false } });
+          // columns + a second-unit line: stacked panels (stackedCombo below); two-unit lines: a labelled right axis
+          if (p1 && kind !== 'bar') valAxis.push({ type: 'value', scale: true, position: 'right', axisLabel: { formatter: axisFmt(p1.col.format) }, splitLine: { show: false } });
           // long series: Ctrl/Cmd + wheel or pinch zooms (plain wheel scrolls the report), slider on screen only
           var zoom = kind === 'line' && cats.length > 40 ? RK.chart.zoom(ctx, 'x', { height: 16 }) : [];
           var slider = zoom.some(function (z) { return z.type === 'slider'; });
           var showLegend = legend.length > 1;
-          opt = {
+          if (p1 && kind === 'bar') opt = stackedCombo();
+          else opt = {
             animation: ctx.motion, color: pal,
             legend: RK.chart.legend(ctx, { show: showLegend, data: legend }),
             grid: { left: 4, right: p1 && kind !== 'bar' ? 8 : (horiz && showLabels ? 36 : 16), top: showLegend ? 34 : 14, bottom: slider ? 28 : 4, containLabel: true },
@@ -1262,6 +1335,76 @@
             dataZoom: zoom,
             series: series
           };
+
+          /**
+           * Columns + a second-unit line (revenue bars + margin %): two stacked panels sharing the periods, each
+           * with its own readable scale (a % line on a $ axis would be misleading). Line labels thin out on
+           * narrow charts (every other point, or first / last), always keeping the last period.
+           */
+          function stackedCombo() {
+            var W = chartHost.clientWidth || 400, H = chartHost.clientHeight || 300;
+            var barCols = plotted.filter(function (p) { return p.axis === 0; }), lineCols = plotted.filter(function (p) { return p.axis === 1; });
+            var bFmt = axisFmt(barCols[0].col.format), lFmt = axisFmt(lineCols[0].col.format);
+            var bVals = [], lVals = [];
+            barCols.forEach(function (p) { byCat(rows, p.col.name).forEach(function (v) { if (isNum(v)) bVals.push(v); }); });
+            lineCols.forEach(function (p) { byCat(rows, p.col.name).forEach(function (v) { if (isNum(v)) lVals.push(v); }); });
+            var font = '11px ' + t.fontNum, bx = RK.util.extent(bVals.length ? bVals : [0]), lx = RK.util.extent(lVals.length ? lVals : [0]);
+            var gutter = Math.ceil(Math.max(RK.chart.measure(bFmt(bx[1] * 1.15), font), RK.chart.measure(bFmt(bx[0]), font),
+              RK.chart.measure(lFmt(lx[1]), font), RK.chart.measure(lFmt(lx[0]), font))) + 12;
+            var legendH = showLegend ? 28 : 4, xLab = 22, gap = 26;
+            var plotH = Math.max(120, H - legendH - xLab - gap);
+            var topH = Math.max(66, Math.round(plotH * 0.36));
+            // % panel scale: three or four round ticks with head-room for the point labels
+            var lSpan = (lx[1] - lx[0]) || Math.abs(lx[1]) || 1, lStep = RK.util.niceStep(lSpan * 1.5, 2);
+            var lMin = Math.floor((lx[0] - lSpan * 0.15) / lStep) * lStep, lMax = Math.ceil((lx[1] + lSpan * 0.3) / lStep) * lStep;
+            if (lx[0] >= 0 && lMin < 0) lMin = 0;
+            var plotW = Math.max(60, W - gutter - 10), slotW = plotW / Math.max(1, cats.length), nC = cats.length;
+            // point labels: all when they fit, else every other (counted from the last), else first + last
+            var lw = 0;
+            lineCols.forEach(function (p) { byCat(rows, p.col.name).forEach(function (v) { if (isNum(v)) lw = Math.max(lw, RK.chart.measure(RK.format(v, p.col.format || 'auto'), '10.5px ' + t.fontNum)); }); });
+            var step = slotW >= lw + 6 ? 1 : slotW * 2 >= lw + 6 ? 2 : 0;
+            function showAt(i) { return step === 1 || (step === 2 ? (nC - 1 - i) % 2 === 0 : i === 0 || i === nC - 1); }
+            series.forEach(function (se, i) {
+              var p = plotted[i];
+              if (p.axis === 1) {
+                se.xAxisIndex = 0; se.yAxisIndex = 0;
+                var fmt = p.col.format || 'auto';
+                se.label = { show: lineLabels, position: 'top', distance: 5, color: t.ink2, fontSize: 10.5, fontFamily: t.fontNum,
+                  formatter: function (q) { return showAt(q.dataIndex) ? RK.format(valueOf(q.value), fmt) : ''; } };
+                se.labelLayout = { hideOverlap: true };
+              } else { se.xAxisIndex = 1; se.yAxisIndex = 1; }
+            });
+            var bottomAxis = RK.util.merge({}, catAxis, { gridIndex: 1 });
+            return {
+              animation: ctx.motion, color: pal,
+              legend: RK.chart.legend(ctx, { show: showLegend, data: legend }),
+              axisPointer: { link: [{ xAxisIndex: 'all' }] },
+              grid: [
+                { left: gutter, right: 10, top: legendH + 12, height: topH - 12, containLabel: false },
+                { left: gutter, right: 10, top: legendH + topH + gap, bottom: xLab, containLabel: false }
+              ],
+              tooltip: {
+                trigger: 'axis', axisPointer: { type: 'shadow' }, confine: true,
+                formatter: function (ps) {
+                  if (!ps.length) return '';
+                  var i = ps[0].dataIndex;
+                  return RK.chart.tip(catLabels[i], plotted.map(function (p, k) {
+                    return { color: pal[k % pal.length], label: p.col.title, value: RK.format(byCat(rows, p.col.name)[i], p.col.format) };
+                  }), isEstimate(cats[i]) ? 'Estimate' : null);
+                }
+              },
+              xAxis: [
+                { type: 'category', gridIndex: 0, data: catLabels, boundaryGap: true, axisLabel: { show: false }, axisLine: { show: false }, axisTick: { show: false } },
+                bottomAxis
+              ],
+              yAxis: [
+                { type: 'value', gridIndex: 0, min: +lMin.toFixed(10), max: +lMax.toFixed(10), interval: lStep,
+                  axisLabel: { formatter: lFmt, fontSize: 11, color: t.ink3 }, splitLine: { lineStyle: { color: t.grid } } },
+                { type: 'value', gridIndex: 1, axisLabel: { formatter: bFmt, fontSize: 11, color: t.ink3 }, splitLine: { lineStyle: { color: t.grid } } }
+              ],
+              series: series
+            };
+          }
         }
         var key = (opt.grid.length || 1) + '|' + horiz + '|' + kind + '|' + (opt.yAxis.length || 1) + '|' + opt.series.length;
         if (!chart) {
@@ -1402,7 +1545,7 @@
           // re-run when a global filter touches the dataset, or a parameter used by the query / its fields changes
           if ((ds && RK.data.affected(ds, changes)) || (params && /@/.test(st.last.text))) runText(st.last.text, { silent: true, rerun: true, keepSort: true });
         },
-        resize: function () { if (chart) chart.resize(); },
+        resize: function () { if (chart) chart.resize(); snapTable(); refEdge(); },
         exportImage: function () {
           if (!chart || st.view === 'table') return null;
           return chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: t.paper });

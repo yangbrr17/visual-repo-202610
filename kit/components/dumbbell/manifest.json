@@ -14,7 +14,7 @@
     "label": {"type": "string", "required": true, "desc": "Category (company, quarter)", "default": "company"},
     "from": {"type": "number", "required": true, "desc": "Start / reference / low value", "default": "from"},
     "to": {"type": "number", "required": true, "desc": "End / actual / high value", "default": "to"},
-    "marker": {"type": "number", "required": false, "desc": "Optional third value drawn as a diamond in the reference colour --rk-ref (current price)"},
+    "marker": {"type": "number", "required": false, "desc": "Optional third value drawn as a diamond (current price) in the brand colour, accent-2 on the target row (--rk-ref stays reserved for reference lines)"},
     "highlight": {"type": "boolean", "required": false, "desc": "Boolean field marking the target row(s)", "default": "is_target"}
   },
   "options": {
@@ -26,7 +26,7 @@
     "sortOrder": {"type": "string", "default": "desc", "desc": "'desc' | 'asc'"},
     "labels": {"type": "string|boolean", "default": "ends", "desc": "'ends' | 'marker' | 'all' | false"},
     "delta": {"type": "string", "default": null, "desc": "Right-hand column: null | 'abs' (to − from) | 'pct' (to / from − 1) | 'marker' (marker / to − 1)"},
-    "deltaFormat": {"type": "string", "default": null, "desc": "Delta column format; default value format ('abs') or 0.0%"},
+    "deltaFormat": {"type": "string", "default": null, "desc": "Delta column format; default value format ('abs'; percentage-point 'pp' when the values are percentages) or 0.0%"},
     "deltaTitle": {"type": "string", "default": null, "desc": "Delta column header"},
     "fromLabel": {"type": "string", "default": null, "desc": "Legend / tooltip name of 'from' (default: field title)"},
     "toLabel": {"type": "string", "default": null, "desc": "Legend / tooltip name of 'to' (default: field title)"},

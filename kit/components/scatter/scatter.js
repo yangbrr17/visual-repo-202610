@@ -53,6 +53,19 @@
     try { return inst.getModel().getComponent(axis, 0).axis.scale.getInterval() || dflt; } catch (e) { return dflt; }
   }
 
+  /** Rows a wrapping (type 'plain') ECharts legend needs within `avail` px — mirrors ECharts' box layout. */
+  var LEGEND_ROW = 25;   // item height (~11px) + itemGap (14px)
+  function legendRows(items, avail, t) {
+    var font = '11px ' + t.fontSans, rows = 1, x = 0;
+    items.forEach(function (it) {
+      var name = typeof it === 'string' ? it : it.name, iw = (it && it.itemWidth) || 10;
+      var w = iw + 5 + C.measure(name, font);
+      if (x > 0 && x + w > avail) { rows++; x = 0; }
+      x += w + 14;
+    });
+    return rows;
+  }
+
   /* ---------------- label placement (greedy, think-cell style) ---------------- */
   function gridRect(inst) {
     try { return inst.getModel().getComponent('grid', 0).coordinateSystem.getRect(); }
@@ -74,11 +87,33 @@
     var inRect = function (q) { return q[0] >= rect.x - 0.5 && q[0] <= rect.x + rect.width + 0.5 && q[1] >= rect.y - 0.5 && q[1] <= rect.y + rect.height + 0.5; };
     var obs = L.obstacles.filter(function (o) { return on(o.name); }).map(function (o) { var q = toPx(o); return { x: q[0], y: q[1], r: o.r, id: o.id }; });
     var placed = [];
+    // reference lines (quadrant / regression) in px: labels prefer spots that no line crosses
+    var segs = (L.lines || []).map(function (ln) {
+      if (ln.x != null) { var px = toPx({ x: ln.x, y: 0 })[0]; return [px, rect.y, px, rect.y + rect.height]; }
+      if (ln.y != null) { var py = toPx({ x: 0, y: ln.y })[1]; return [rect.x, py, rect.x + rect.width, py]; }
+      var a = toPx({ x: ln.x0, y: ln.y0 }), b = toPx({ x: ln.x1, y: ln.y1 });
+      return [a[0], a[1], b[0], b[1]];
+    });
+    function crosses(b) {
+      for (var i = 0; i < segs.length; i++) {
+        var sg = segs[i], x0 = b.x - 1, x1 = b.x + b.w + 1, y0 = b.y - 1, y1 = b.y + b.h + 1;
+        var dx = sg[2] - sg[0], dy = sg[3] - sg[1], t0 = 0, t1 = 1;
+        // Liang-Barsky clip of the segment against the label box
+        var pp = [-dx, dx, -dy, dy], qq = [sg[0] - x0, x1 - sg[0], sg[1] - y0, y1 - sg[1]], hit = true;
+        for (var k = 0; k < 4 && hit; k++) {
+          if (pp[k] === 0) { if (qq[k] < 0) hit = false; continue; }
+          var r = qq[k] / pp[k];
+          if (pp[k] < 0) { if (r > t1) hit = false; else if (r > t0) t0 = r; } else { if (r < t0) hit = false; else if (r < t1) t1 = r; }
+        }
+        if (hit) return true;
+      }
+      return false;
+    }
     function free(b, selfId) {
       if (b.x < rect.x + 1 || b.y < rect.y + 1 || b.x + b.w > rect.x + rect.width - 1 || b.y + b.h > rect.y + rect.height - 1) return false;
       for (var i = 0; i < placed.length; i++) {
-        var p = placed[i];
-        if (b.x < p.x + p.w + 2 && b.x + b.w + 2 > p.x && b.y < p.y + p.h && b.y + b.h > p.y) return false;
+        var p = placed[i];   // >= 4px between neighbouring labels
+        if (b.x < p.x + p.w + 4 && b.x + b.w + 4 > p.x && b.y < p.y + p.h + 1 && b.y + b.h + 1 > p.y) return false;
       }
       for (var j = 0; j < obs.length; j++) {
         var o = obs[j];
@@ -102,9 +137,12 @@
       var cands = [[r + g, -h / 2], [-r - g - w, -h / 2], [-w / 2, -r - g - h], [-w / 2, r + g],
         [d + 1, -d - h + 1], [d + 1, d - 1], [-d - 1 - w, -d - h + 1], [-d - 1 - w, d - 1],
         [r + g + 9, -h / 2], [-r - g - 9 - w, -h / 2]];
-      for (var k = 0; k < cands.length; k++) {
-        var b = { x: sp.px + cands[k][0], y: sp.py + cands[k][1], w: w, h: h };
-        if (free(b, sp.id)) { placed.push(b); res[key] = cands[k]; return; }
+      // first pass: a free spot no reference line runs through; second pass: any free spot (the halo keeps it legible)
+      for (var pass = 0; pass < 2; pass++) {
+        for (var k = 0; k < cands.length; k++) {
+          var b = { x: sp.px + cands[k][0], y: sp.py + cands[k][1], w: w, h: h };
+          if (free(b, sp.id) && (pass || !crosses(b))) { placed.push(b); res[key] = cands[k]; return; }
+        }
       }
       if (sp.force) { placed.push({ x: sp.px + r + g, y: sp.py - h / 2, w: w, h: h }); res[key] = [r + g, -h / 2]; return; }
       res[key] = null;
@@ -283,32 +321,37 @@
       radius[L.id + ':lab'] = L.sz / 2;
       series.push({
         id: L.id + ':lab', name: L.name, type: 'scatter', symbol: 'circle', symbolSize: L.sz, z: 6, silent: true,
-        tooltip: { show: false }, itemStyle: { color: 'transparent', borderWidth: 0 }, emphasis: { disabled: true },
+        tooltip: { show: false }, itemStyle: { color: 'transparent', borderWidth: 0, opacity: 1 }, emphasis: { disabled: true },
+        // opaque paper halo: quadrant and regression lines never strike through a label
         label: {
-          show: false, fontFamily: t.fontSans, fontSize: L.target ? 11 : 10.5, fontWeight: L.target ? 700 : 400,
-          textBorderColor: t.paper, textBorderWidth: 2.5, formatter: function (p) { return p.name; }
+          show: false, fontFamily: t.fontSans, fontSize: L.target ? 11 : 10.5, fontWeight: L.target ? 700 : 400, opacity: 1,
+          textBorderColor: t.paper, textBorderWidth: 3.5, formatter: function (p) { return p.name; }
         },
         animationDelay: function (i) { return 200 + i * 14; },
         data: items
       });
     });
-    inst.__rkLabels = { series: labelSeries, specs: specs, obstacles: obstacles, r: radius };
+    var refSegs = [];
+    inst.__rkLabels = { series: labelSeries, specs: specs, obstacles: obstacles, r: radius, lines: refSegs };
 
     /* ---- reference layer: zero lines, quadrant lines + labels, regression ---- */
     var lines = [], areas = [];
+    // house style for statistics lines (medians / means): ink-3, [4, 3] dash, 1px, 10.5px italic label
     var refLine = { color: t.ink3, type: [4, 3], width: 1 };
+    var refLab = { color: t.ink3, fontSize: 10.5, fontStyle: 'italic', fontWeight: 400, distance: 3, textBorderColor: t.paper, textBorderWidth: 3 };
     if (xe.min < 0 && xe.max > 0) lines.push({ xAxis: 0, lineStyle: { color: t.axis, type: 'solid', width: 1 }, label: { show: false } });
     if (ye.min < 0 && ye.max > 0) lines.push({ yAxis: 0, lineStyle: { color: t.axis, type: 'solid', width: 1 }, label: { show: false } });
     if (q) {
-      var qlab = function (v, f) { return (q.label ? q.label + ' ' : '') + RK.format(v, f); };
-      if (util.isNum(q.x)) lines.push({ xAxis: q.x, lineStyle: refLine, label: { show: true, position: 'end', formatter: qlab(q.x, xFmt), color: t.ink3, fontSize: 10, distance: 3 } });
-      if (util.isNum(q.y)) lines.push({ yAxis: q.y, lineStyle: refLine, label: { show: true, position: 'insideEndTop', formatter: qlab(q.y, yFmt), color: t.ink3, fontSize: 10, distance: 3 } });
+      // formatter functions (not template strings): '{b}' / '{c}' in a label are never substituted
+      var qlab = function (v, f) { var txt = (q.label ? q.label + ' ' : '') + RK.format(v, f); return function () { return txt; }; };
+      if (util.isNum(q.x)) { refSegs.push({ x: q.x }); lines.push({ xAxis: q.x, lineStyle: refLine, label: util.merge({ show: true, position: 'end', formatter: qlab(q.x, xFmt) }, refLab) }); }
+      if (util.isNum(q.y)) { refSegs.push({ y: q.y }); lines.push({ yAxis: q.y, lineStyle: refLine, label: util.merge({ show: true, position: 'insideEndTop', formatter: qlab(q.y, yFmt) }, refLab) }); }
       var ql = o.quadrantLabels || [];
       if (ql.length && util.isNum(q.x) && util.isNum(q.y)) {
         var qa = function (text, x0, x1, y0, y1, pos) {
           if (!text) return;
           areas.push([{ coord: [x0, y0], itemStyle: { color: 'transparent' },
-            label: { show: true, position: pos, formatter: text, color: t.ink3, fontSize: 10, fontWeight: 600, distance: 6 } }, { coord: [x1, y1] }]);
+            label: { show: true, position: pos, formatter: function () { return text; }, color: t.ink3, fontSize: 10, fontWeight: 600, distance: 6 } }, { coord: [x1, y1] }]);
         };
         qa(ql[0], xe.min, q.x, q.y, ye.max, 'insideTopLeft');
         qa(ql[1], q.x, xe.max, q.y, ye.max, 'insideTopRight');
@@ -321,10 +364,12 @@
       var fx = util.extent(xs), pad = (fx[1] - fx[0]) * 0.04;
       var x0 = Math.max(xe.min, fx[0] - pad), x1 = Math.min(xe.max, fx[1] + pad);
       fitName = (o.equation ? 'y = ' + coef(fit.b) + 'x ' + (fit.a < 0 ? '− ' : '+ ') + coef(Math.abs(fit.a)) + ', ' : 'Linear fit, ') + 'R² = ' + RK.format(fit.r2, '0.00');
+      refSegs.push({ x0: x0, y0: fit.a + fit.b * x0, x1: x1, y1: fit.a + fit.b * x1 });
     }
     series.unshift({
       id: 'ref', type: 'scatter', data: [], silent: true, tooltip: { show: false }, z: 1,
-      markLine: lines.length ? { silent: true, symbol: ['none', 'none'], animationDuration: 600, data: lines } : undefined,
+      // precision: ECharts rounds markLine values to 2 decimals by default (an 18.79% median would draw at 19%)
+      markLine: lines.length ? { silent: true, symbol: ['none', 'none'], precision: 10, animationDuration: 600, data: lines } : undefined,
       markArea: areas.length ? { silent: true, data: areas } : undefined
     });
 
@@ -335,7 +380,7 @@
       series.splice(1, 0, {
         id: 'fit', name: fitName, type: 'line', silent: true, z: 1, symbol: 'none', tooltip: { show: false },
         lineStyle: { color: fitColor, width: 1.25, type: 'solid' }, itemStyle: { color: fitColor },
-        endLabel: { show: !legendOn, formatter: fitName, color: fitColor, fontSize: 10.5, fontWeight: 600, distance: 4, textBorderColor: t.paper, textBorderWidth: 2.5, align: 'right', offset: [0, -10] },
+        endLabel: { show: !legendOn, formatter: function () { return fitName; }, color: fitColor, fontSize: 10.5, fontWeight: 600, distance: 4, textBorderColor: t.paper, textBorderWidth: 2.5, align: 'right', offset: [0, -10] },
         data: [[x0, fit.a + fit.b * x0], [x1, fit.a + fit.b * x1]]
       });
     }
@@ -350,11 +395,14 @@
     var showLegend = legendOn && legendNames.length > 1;
     var interactive = !ctx.print && o.zoom !== false;
     var zoomed = zoomState(inst).some(function (z) { return z.start > 0 || z.end < 100; });
+    // plain legend that wraps onto extra rows (never scroll paging: page 2 would vanish in print / PDF)
+    var legendRight = interactive ? 92 : 0;
+    var lRows = showLegend ? legendRows(legendNames, inst.getWidth() - legendRight - 10, t) : 1;
 
     return {
-      legend: C.legend(ctx, { show: showLegend, data: legendNames, right: interactive ? 92 : 0 }),
+      legend: C.legend(ctx, { show: showLegend, type: 'plain', data: legendNames, right: legendRight }),
       // containLabel:false lets ECharts 6 fit axis labels *and* axis names inside the container (outerBounds)
-      grid: C.grid(ctx, { top: (showLegend || interactive ? 30 : 10) + (q && util.isNum(q.x) ? 14 : 0), right: 8, left: 2, bottom: 2, containLabel: false }),
+      grid: C.grid(ctx, { top: (showLegend || interactive ? 30 : 10) + (lRows - 1) * LEGEND_ROW + (q && util.isNum(q.x) ? 14 : 0), right: 8, left: 2, bottom: 2, containLabel: false }),
       tooltip: {
         trigger: 'item',
         formatter: function (p) {
@@ -397,6 +445,7 @@
   };
 
   var base = C(build, {
+    rebuildOnResize: true,   // legend rows depend on the width
     // click a point -> toggle it in the cross-filter on the label (or name) field
     select: function (p, ctx, inst) {
       var f = inst.__rk && inst.__rk.selField;

@@ -20,6 +20,7 @@
       highlight: null,        // label value(s) to emphasise, in addition to rows flagged by encode.highlight
       median: false,          // dashed median line across both periods (ink-3)
       change: false,          // append the % change to the right-hand labels
+      delta: 'auto',          // ▲ / ▼ change token after the right-hand labels: 'auto' (direction colours without change) | true | false
       labels: 'both',         // both (names both sides) | right (names on the right only) | values (no names)
       inverse: false,         // reverse the value axis (ranks: 1 at the top)
       format: null,           // value format (defaults to the from / value field format)
@@ -38,6 +39,9 @@
       if (o.median) {
         items = items.concat([{ label: 'Median', a: median(items.map(function (it) { return it.a; })), b: median(items.map(function (it) { return it.b; })), median: true }]);
       }
+      // red / green direction colours always come with a sign: a ▲ / ▼ token with the size of the move
+      var showDelta = o.delta === true || (o.delta === 'auto' && o.colorBy === 'direction' && !o.change);
+      var dfmt = unsigned(fmt);
       items.forEach(function (it) {
         it.ta = RK.format(it.a, fmt);
         it.tb = RK.format(it.b, fmt);
@@ -45,6 +49,14 @@
         it.dim = sel.length > 0 && !it.median && sel.indexOf(it.label) < 0;
         it.sel = sel.length > 0 && sel.indexOf(it.label) >= 0;
         it.color = colorOf(it);
+        it.td = '';
+        if (showDelta && !it.median && U.isNum(it.a) && U.isNum(it.b)) {
+          var mag = RK.format(Math.abs(it.b - it.a), dfmt);
+          var visUp = o.inverse ? it.b < it.a : it.b > it.a;
+          it.td = it.a === it.b || mag === RK.format(0, dfmt) ? '=' : (visUp ? '▲' : '▼') + mag;
+          var good = o.good === 'down' ? it.b < it.a : it.b > it.a;
+          it.dk = it.a === it.b || o.colorBy !== 'direction' ? '0' : good ? 'p' : 'n';    // also for the highlighted row
+        }
       });
 
       /* ---------------- horizontal layout: label columns + centred slope area ---------------- */
@@ -53,16 +65,17 @@
       function nameFont(it) { return it.hl || it.median || it.sel ? fNameB : fName; }
       var valAW = Math.max.apply(null, items.map(function (it) { return measure(it.ta, fVal); }).concat([0]));
       var valBW = Math.max.apply(null, items.map(function (it) { return measure(it.tb, fVal); }).concat([0]));
+      var deltaW = Math.max.apply(null, items.map(function (it) { return it.td ? measure(it.td, fVal) + 8 : 0; }).concat([0]));
       var fullW = Math.min(o.labelWidth || 170, Math.max.apply(null, items.map(function (it) { return measure(String(it.label), nameFont(it)); }).concat([0])));
       // names on both sides only when they fit; otherwise fall back to names on the right
       var mode = o.labels === 'values' ? 'values' : o.labels === 'right' ? 'right' : 'both';
-      if (mode === 'both' && 24 + valAW + valBW + MIN_SLOPE + 2 * (fullW + 8) > W) mode = 'right';
+      if (mode === 'both' && 24 + valAW + valBW + deltaW + MIN_SLOPE + 2 * (fullW + 8) > W) mode = 'right';
       var sides = mode === 'both' ? 2 : mode === 'right' ? 1 : 0;
-      var maxName = sides ? Math.max(48, Math.min(fullW, (W - 24 - valAW - valBW - MIN_SLOPE - sides * 8) / sides)) : 0;
+      var maxName = sides ? Math.max(48, Math.min(fullW, (W - 24 - valAW - valBW - deltaW - MIN_SLOPE - sides * 8) / sides)) : 0;
       items.forEach(function (it) { it.name = truncate(String(it.label), nameFont(it), maxName); });
       var nameW = sides ? Math.max.apply(null, items.map(function (it) { return measure(it.name, nameFont(it)); }).concat([0])) : 0;
       var leftW = 12 + valAW + (mode === 'both' ? 8 + nameW : 0);
-      var rightW = 12 + valBW + (mode !== 'values' ? 8 + nameW : 0);
+      var rightW = 12 + valBW + (mode !== 'values' ? 8 + nameW : 0) + deltaW;
       var slopeW = Math.max(120, Math.min(MAX_SLOPE_W, W - leftW - rightW - 8));
       var extra = Math.max(0, W - leftW - rightW - slopeW);
       var gridLeft = leftW + extra / 2, gridRight = rightW + extra / 2;
@@ -71,14 +84,59 @@
       items.forEach(function (it) { vals.push(it.a, it.b); });
       var ext = U.extent(vals), pad = (ext[1] - ext[0]) * 0.04 || Math.abs(ext[1]) * 0.05 || 1;
 
+      /*
+       * Label layout per side: the target, the median and selected rows are pinned at their true height; the
+       * other labels are placed around them, least crowded first, and a label is only kept while every kept
+       * label stays within about one row of its own point. In a dense band the rest go unlabelled (dot +
+       * tooltip) rather than being pushed rows away, where a reader would match a value to the wrong company.
+       */
+      var GAP = 14, CAP = 16;
       var lay = null;
       function layout(api, cs) {
         var top = cs.y - 2, bottom = cs.y + cs.height + 2;
         function side(key, x) {
-          var idx = [], ys = [];
-          items.forEach(function (it, i) { if (U.isNum(it[key])) { idx.push(i); ys.push(api.coord([x, it[key]])[1]); } });
-          var out = C.spreadLabels(ys, 14, top, bottom), res = {};
-          idx.forEach(function (i, n) { res[i] = out[n]; });
+          var idx = [], y0 = {};
+          items.forEach(function (it, i) { if (U.isNum(it[key])) { idx.push(i); y0[i] = api.coord([x, it[key]])[1]; } });
+          var pinned = idx.filter(function (i) { return items[i].hl || items[i].median || items[i].sel; })
+            .sort(function (a, b) { return y0[a] - y0[b]; });
+          var pinY = C.spreadLabels(pinned.map(function (i) { return y0[i]; }), GAP, top, bottom);
+          var res = {};
+          pinned.forEach(function (i, n) { res[i] = pinY[n]; });
+          // free labels go into the gaps between pinned ones
+          function place(free) {
+            var segs = [];
+            for (var s2 = 0; s2 <= pinned.length; s2++) segs.push([]);
+            free.forEach(function (i) {
+              var s3 = 0;
+              while (s3 < pinned.length && y0[i] > res[pinned[s3]]) s3++;
+              segs[s3].push(i);
+            });
+            var out = {};
+            for (var g = 0; g < segs.length; g++) {
+              if (!segs[g].length) continue;
+              var lo = g === 0 ? top : res[pinned[g - 1]] + GAP, hi = g === pinned.length ? bottom : res[pinned[g]] - GAP;
+              if ((segs[g].length - 1) * GAP > hi - lo + 1e-6) return null;
+              var ys = C.spreadLabels(segs[g].map(function (i) { return y0[i]; }), GAP, lo, hi);
+              segs[g].forEach(function (i, n) { out[i] = ys[n]; });
+            }
+            return out;
+          }
+          function fits(pos) {
+            return pos && Object.keys(pos).every(function (i) { return Math.abs(pos[i] - y0[i]) <= CAP; });
+          }
+          var rest = idx.filter(function (i) { return pinned.indexOf(i) < 0; });
+          var iso = {};
+          rest.forEach(function (i) {
+            iso[i] = Math.min.apply(null, idx.filter(function (j) { return j !== i; }).map(function (j) { return Math.abs(y0[i] - y0[j]); }).concat([1e9]));
+          });
+          rest.sort(function (a, b) { return iso[b] - iso[a] || y0[a] - y0[b]; });
+          var kept = [];
+          rest.forEach(function (i) {
+            var trial = kept.concat([i]);
+            if (fits(place(trial))) kept = trial;
+          });
+          var pos = place(kept) || {};
+          Object.keys(pos).forEach(function (i) { res[i] = pos[i]; });
           return res;
         }
         return { a: side('a', 0), b: side('b', 1) };
@@ -95,18 +153,23 @@
       }
 
       // values sit in fixed-width columns (right-aligned on the left side) so names line up
+      // data strings are made safe for the rich-text markup ("{v|...}" in a name would restyle it)
       function labelText(it, side) {
         var v = side === 'a' ? it.ta : it.tb;
         var named = mode === 'both' || (mode === 'right' && side === 'b');
         var key = it.dim ? 'd' : it.hl ? 'h' : it.median || it.sel ? 'm' : '';
-        var val = '{v' + key + side + '|' + esc(v) + '}';
-        if (!named) return val;
-        return side === 'a' ? '{n' + key + '|' + esc(it.name) + '}  ' + val : val + '  {n' + key + '|' + esc(it.name) + '}';
+        var val = '{v' + key + side + '|' + C.richSafe(v) + '}';
+        var txt = !named ? val : side === 'a' ? '{n' + key + '|' + C.richSafe(it.name) + '}  ' + val : val + '  {n' + key + '|' + C.richSafe(it.name) + '}';
+        if (side === 'b' && it.td) txt += '  {d' + (it.dim ? 'd' : it.dk) + '|' + C.richSafe(it.td) + '}';
+        return txt;
       }
-      var hlInk = t.dark ? t.accent2 : RK.theme.mix(t.accent2, t.ink, 0.35);
+      // target text uses the text-safe accent (accent2 itself is for marks)
+      var hlInk = t.accent2Ink;
       var rich = {
         n: { font: fName, fill: t.ink2 }, nh: { font: fNameB, fill: hlInk }, nm: { font: fNameB, fill: t.ink },
-        nd: { font: fName, fill: RK.theme.alpha(t.ink3, 0.55) }
+        nd: { font: fName, fill: RK.theme.alpha(t.ink3, 0.55) },
+        dp: { font: fVal, fill: t.pos }, dn: { font: fVal, fill: t.neg }, d0: { font: fVal, fill: t.ink3 },
+        dd: { font: fVal, fill: RK.theme.alpha(t.ink3, 0.55) }
       };
       [['', t.ink], ['h', hlInk], ['m', t.ink], ['d', RK.theme.alpha(t.ink3, 0.55)]].forEach(function (k) {
         rich['v' + k[0] + 'a'] = { font: fVal, fill: k[1], width: valAW, align: 'right' };
@@ -152,6 +215,7 @@
                 enterFrom: key === 'b' ? { style: { opacity: 0 } } : undefined });
             }
             var ly = lay[key][i], x = p[0] + dir * 10;
+            if (ly == null) return;                                // unlabelled in a dense band: dot + tooltip
             if (Math.abs(ly - p[1]) > 1.5) {
               kids.push({ type: 'polyline', z2: 1, shape: { points: [[p[0] + dir * 4, p[1]], [x - dir * 2, ly]] },
                 style: { stroke: RK.theme.alpha(t.rule, a), lineWidth: 1, fill: null } });
@@ -188,7 +252,7 @@
         xAxis: {
           type: 'category', data: heads.map(String), boundaryGap: false, position: 'top',
           axisLine: { show: false }, axisTick: { show: false },
-          axisLabel: { color: t.ink, fontWeight: 600, fontSize: 11.5, margin: 12 },
+          axisLabel: { color: t.ink, fontWeight: 600, fontSize: 11, margin: 12 },
           splitLine: { show: true, lineStyle: { color: t.rule, width: 1 } }
         },
         yAxis: { type: 'value', show: false, inverse: !!o.inverse, min: ext[0] - pad, max: ext[1] + pad },
@@ -260,8 +324,11 @@
     return s.replace(/\s+$/, '') + '…';
   }
 
-  /** Rich-text markup characters must not leak from data into ECharts' "{style|text}" syntax. */
-  function esc(s) { return String(s).replace(/[{}|]/g, ' '); }
+  /** Unsigned magnitude format for the ▲ / ▼ token: a leading literal ("#" for ranks) is dropped. */
+  function unsigned(code) {
+    code = String(RK.format.presets[code] || code || 'auto').replace(/^"[^"]*"/, '');
+    return code.split(';')[0] || 'auto';
+  }
 
   /** Signed variant of a format for differences; a leading literal ("#" for ranks) is dropped. */
   function signed(code) {

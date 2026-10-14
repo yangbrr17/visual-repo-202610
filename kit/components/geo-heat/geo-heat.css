@@ -3,8 +3,8 @@
 /* shared map styles (legend, labels, controls) live in kit/styles/components.css (maps) */
 
 /* leaflet.css stacks canvas (100) under svg (200) in a pane; the density must sit above the land svg */
-.rk-heat .leaflet-overlay-pane .leaflet-heatmap-layer { z-index: 300; pointer-events: none; }
-.rk-heat.is-motion .leaflet-heatmap-layer { animation: rk-heat-in 900ms var(--rk-ease) both; }
+.rk-heat .leaflet-overlay-pane .rk-heat__surface { z-index: 300; pointer-events: none; }
+.rk-heat.is-motion .rk-heat__surface { animation: rk-heat-in 900ms var(--rk-ease) both; }
 @keyframes rk-heat-in { from { opacity: 0; } }
 .rk-geo-leg__note { margin-top: 6px; color: var(--rk-ink-3); font-size: 10px; font-variant-numeric: tabular-nums; }
 .rk-geo-toggle {
@@ -17,4 +17,4 @@
 .rk-geo-toggle__box { width: 10px; height: 10px; border-radius: 2px; border: 1.5px solid var(--rk-ink-3); transition: background var(--rk-dur-fast), border-color var(--rk-dur-fast); }
 .rk-geo-toggle.is-on { color: var(--rk-accent); }
 .rk-geo-toggle.is-on .rk-geo-toggle__box { background: var(--rk-accent); border-color: var(--rk-accent); box-shadow: inset 0 0 0 1.5px var(--rk-paper); }
-@media (prefers-reduced-motion: reduce) { .rk-heat .leaflet-heatmap-layer { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .rk-heat .rk-heat__surface { animation: none !important; } }

@@ -197,6 +197,27 @@
       if (s.kind === 'deduct') return s.note || '';
       return '';
     }
+    /**
+     * Basis line variants, longest first: a basis that does not fit the label column is shortened at a clause or term
+     * boundary (metric name dropped, trailing clauses cut), never mid-number; '' (no line) when nothing fits.
+     */
+    function basisVariants(s) {
+      var full = basisOf(s);
+      if (!full) return [''];
+      var out = [full];
+      if (s.kind === 'part') {
+        var r = s.row, mult = isNum(r[enc.low]) && isNum(r[enc.high]) && r[enc.low] !== r[enc.high]
+          ? RK.format(r[enc.low], mFmt) + EN + RK.format(r[enc.high], mFmt) : RK.format(isNum(r[enc.low]) ? r[enc.low] : r[enc.high], mFmt);
+        out.push(RK.format(r[enc.metric], metFmt) + ' × ' + mult, mult);
+      } else if (s.key === 'ev' && M.evMetric && /^Implied /.test(full)) {
+        out.push('Implied ' + range(s.lo / M.evMetric.value, s.hi / M.evMetric.value, mFmtCalc));
+      } else {
+        var parts = full.split(/(?:,|;)\s+/);
+        for (var k = parts.length - 1; k > 0; k--) out.push(parts.slice(0, k).join(', ') + ' …');
+      }
+      out.push('');
+      return out;
+    }
     function valueText(s) {
       if (s.kind === 'deduct') return RK.format(s.lo, fmt);
       return range(s.lo, s.hi, fmt);
@@ -209,7 +230,14 @@
     steps.forEach(function (s) {
       leftW = Math.max(leftW, C.measure(s.label, s.kind === 'total' ? fontB : fontN), o.showBasis !== false ? C.measure(basisOf(s), fontS) : 0);
     });
-    leftW = Math.ceil(Math.min(leftW, Math.max(150, W * 0.3)));
+    leftW = Math.ceil(Math.min(leftW, Math.max(150, W * 0.34)));
+    // the basis line that fits the column (figures are never truncated: shorter wording, else no basis line)
+    var basisText = steps.map(function (s) {
+      if (o.showBasis === false) return '';
+      var vs = basisVariants(s);
+      for (var k = 0; k < vs.length; k++) if (C.measure(vs[k], fontS) <= leftW) return vs[k];
+      return '';
+    });
     var rightW = 0;
     if (showPS) steps.forEach(function (s) { rightW = Math.max(rightW, C.measure(perShare(s), s.kind === 'total' ? '600 11px ' + t.fontNum : fontV)); });
     rightW = Math.max(rightW, showPS ? C.measure(o.perShareTitle || '', '600 10px ' + t.fontSans) : 0);
@@ -251,7 +279,9 @@
       return {
         xAxis: r.value,
         lineStyle: { color: col, type: 'dashed', width: 1.25 },
-        label: { show: true, position: 'start', distance: 4, offset: [spread[k] - rxs[k], 0], formatter: refTexts[k], color: col, fontWeight: 600, fontSize: 11, fontFamily: t.fontSans }
+        // a function, not a template string: '{b}' / '{c}' in a caption is never substituted, braces never start a style run
+        label: { show: true, position: 'start', distance: 4, offset: [spread[k] - rxs[k], 0], formatter: function () { return C.richSafe(refTexts[k]); },
+          color: col, fontWeight: 600, fontSize: 11, fontFamily: t.fontSans }
       };
     });
 
@@ -339,8 +369,8 @@
         formatter: function (v, i) {
           var s = steps[i];
           if (!s) return v;
-          var b = o.showBasis !== false ? basisOf(s) : '';
-          return '{' + (s.kind === 'total' ? 't' : 'n') + '|' + v + '}' + (b ? '\n{b|' + b + '}' : '');
+          var b = basisText[i];   // data strings go into the rich template brace-safe
+          return '{' + (s.kind === 'total' ? 't' : 'n') + '|' + C.richSafe(v) + '}' + (b ? '\n{b|' + C.richSafe(b) + '}' : '');
         }
       }
     }];
@@ -351,7 +381,7 @@
         // right-aligned like a table column: the margin spans the widest label
         axisLabel: {
           interval: 0, margin: rightW + 14, align: 'right', rich: rich,
-          formatter: function (v, i) { var s = steps[i]; return s ? '{' + (s.kind === 'total' ? 'V' : 'v') + '|' + perShare(s) + '}' : ''; }
+          formatter: function (v, i) { var s = steps[i]; return s ? '{' + (s.kind === 'total' ? 'V' : 'v') + '|' + C.richSafe(perShare(s)) + '}' : ''; }
         }
       });
     }
@@ -435,7 +465,7 @@
       shares: null,              // diluted shares (m) | '@param' — per-share column and reference lines
       refPrice: null,            // current share price | '@param' — dashed reference line at price × shares (theme ref colour)
       refLabel: null,            // reference-line caption prefix (default 'Current')
-      refLines: [],              // [{price, label, color}] further per-share reference lines (e.g. offer price in 'accent2')
+      refLines: [],              // [{price, label, color}] further per-share reference lines (e.g. the offer price); default colour: theme ref
       evMetric: null,            // {label, value} — implied multiple under the EV total (e.g. {label: 'EV / EBITDA 2026E', value: 996.5})
       evLabel: 'Enterprise value',
       equityLabel: 'Equity value',

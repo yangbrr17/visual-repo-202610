@@ -20,6 +20,7 @@
     "meanLine": {"type": "boolean", "default": true, "desc": "Dashed mean line with label"},
     "lookback": {"type": "number", "default": null, "desc": "Years used to compute mean / σ (null = full history); bands span the same window"},
     "compareMean": {"type": "boolean", "default": false, "desc": "Also draw the comparison series' mean"},
+    "highlight": {"type": "boolean", "default": true, "desc": "The y series is the target: drawn in accent2, the colour the target wears across the deck (false = accent)"},
     "endLabels": {"type": "boolean", "default": true, "desc": "Current-value pills and mean / σ labels at the right edge (collision-free)"},
     "premium": {"type": "boolean", "default": true, "desc": "Show premium / (discount) vs. the comparison series in the tooltip"},
     "format": {"type": "string", "default": null, "desc": "Value format; defaults to the y field format (else 0.0x)"},

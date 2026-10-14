@@ -1,6 +1,6 @@
 /*!
  * RK component: calendar-heatmap — two calendar views of time-indexed values:
- *   mode 'daily'   : ECharts calendar coordinate, one cell per day (trading activity, volumes),
+ *   mode 'daily'   : a calendar of day cells (trading activity, volumes) — weekend rows only when needed,
  *                    sequential colour with a top-left legend (linear or quantile buckets);
  *   mode 'monthly' : year x month grid (fund-factsheet "monthly returns"), diverging colour around 0,
  *                    formatted values in every cell, compounded full-year column and optional average row.
@@ -20,6 +20,7 @@
       format: null,          // value format (defaults to the value field format)
       scale: 'auto',         // daily colour scale: auto | linear | quantile (5 buckets; auto = quantile when skewed)
       range: null,           // daily: [from, to] ISO dates (default: whole months spanned by the data)
+      weekdays: 'auto',      // daily: weekday rows — 'auto' (Sat / Sun only when data falls on a weekend) | 'all' | 'weekdays'
       yearTotal: true,       // monthly: full-year column
       compound: true,        // monthly: compound monthly returns into the year column (false = sum)
       totalLabel: 'Year',    // monthly: header of the full-year column
@@ -30,74 +31,159 @@
     },
     render: C(function (ctx, inst) {
       return ctx.options.mode === 'monthly' ? monthly(ctx, inst) : daily(ctx, inst);
-    }, { rebuildOnResize: true })   // daily cell size is derived from the block size
+    }, { rebuildOnResize: true })   // daily cell size and band wrapping are derived from the block size
   });
 
   /* ------------------------------------------------------------------ *
-   * Daily: calendar coordinate system
+   * Daily: a calendar of day cells drawn by the component (week columns x weekday rows).
+   * Weekend rows are dropped when no data falls on a weekend (trading days), and a long range wraps
+   * into several bands when that gives larger cells (narrow blocks), so the grid fills its block.
    * ------------------------------------------------------------------ */
+  var DAY_MS = 864e5;
   function daily(ctx, inst) {
     var o = ctx.options, t = ctx.theme, enc = ctx.enc;
     var df = enc.date, vf = enc.value;
     var fmt = o.format || ctx.fmtOf(vf) || 'auto';
-    var pts = ctx.rows.filter(function (r) { return r[df] && U.isNum(r[vf]); })
+    var pts = ctx.rows.filter(function (r) { return r[df] && U.isNum(r[vf]) && RK.format.toDate(String(r[df]).slice(0, 10)); })
       .map(function (r) { return [String(r[df]).slice(0, 10), r[vf]]; })
       .sort(function (a, b) { return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0; });
     if (!pts.length) return { series: [] };
     var values = pts.map(function (p) { return p[1]; });
     var avg = values.reduce(function (a, b) { return a + b; }, 0) / values.length;
-    var from = o.range ? o.range[0] : pts[0][0].slice(0, 8) + '01';
-    var to = o.range ? o.range[1] : monthEnd(pts[pts.length - 1][0]);
+    var from = o.range ? String(o.range[0]).slice(0, 10) : pts[0][0].slice(0, 8) + '01';
+    var to = o.range ? String(o.range[1]).slice(0, 10) : monthEnd(pts[pts.length - 1][0]);
+    var d0 = RK.format.toDate(from), d1 = RK.format.toDate(to);
+    if (!d0 || !d1 || d1 < d0) return { series: [] };
+    var byDay = {};
+    pts.forEach(function (p) { byDay[p[0]] = p[1]; });
 
-    // one calendar per calendar year touched; all share one cell size so weeks line up
-    var cals = [];
-    for (var y = +from.slice(0, 4); y <= +to.slice(0, 4); y++) {
-      var a = y === +from.slice(0, 4) ? from : y + '-01-01', b = y === +to.slice(0, 4) ? to : y + '-12-31';
-      cals.push({ range: [a, b], weeks: weeksIn(a, b), year: y });
+    // weekday rows (Mon = 0): weekends only when data falls on them (or weekdays: 'all')
+    var hasWeekend = o.weekdays === 'all' || (o.weekdays !== 'weekdays' && pts.some(function (p) { var d = RK.format.toDate(p[0]); return d.getDay() === 0 || d.getDay() === 6; }));
+    var nRows = hasWeekend ? 7 : 5;
+
+    // months spanned, grouped by year
+    var months = [];
+    for (var md = new Date(d0.getFullYear(), d0.getMonth(), 1); md <= d1; md = new Date(md.getFullYear(), md.getMonth() + 1, 1)) {
+      var a = md < d0 ? d0 : md, b = new Date(md.getFullYear(), md.getMonth() + 1, 0);
+      if (b > d1) b = d1;
+      months.push({ y: md.getFullYear(), m: md.getMonth(), a: a, b: b });
     }
+    var years = U.unique(months.map(function (x) { return x.y; }));
+    var multi = years.length > 1, hasLegend = o.legend !== false;
     var W = inst.getWidth(), H = inst.getHeight();
-    var multi = cals.length > 1, hasLegend = o.legend !== false;
-    var left = multi ? 64 : 36, right = 8, top = (hasLegend ? 34 : 6) + 18, gap = 28;
-    var maxWeeks = Math.max.apply(null, cals.map(function (c) { return c.weeks; }));
-    var cw = Math.max(6, (W - left - right) / maxWeeks);
-    var ch = Math.max(6, Math.min(cw, (H - top - (cals.length - 1) * gap - 6) / (7 * cals.length)));
-    cw = Math.min(cw, Math.max(ch * 1.6, ch));               // keep cells from becoming wide slabs
+    var left = multi ? 40 : 34, right = 4, legendH = hasLegend ? 34 : 4, monthRow = 18, bandGap = 8;
 
-    var calendar = cals.map(function (c, i) {
-      return {
-        range: c.range, orient: 'horizontal', left: left, top: top + i * (7 * ch + gap), cellSize: [cw, ch],
-        // empty days (weekends, holidays) must stay distinct from the lowest bucket, also in dark themes
-        itemStyle: { color: t.dark ? RK.theme.mix(t.paper, t.ink, 0.035) : t.surface, borderColor: t.paper, borderWidth: 2 },
-        splitLine: { show: true, lineStyle: { color: t.rule, width: 1 } },
-        dayLabel: { firstDay: 1, nameMap: ['', 'Mon', '', 'Wed', '', 'Fri', ''], color: t.ink3, fontSize: 11, margin: 6, fontFamily: t.fontSans },
-        monthLabel: { nameMap: 'EN', color: t.ink2, fontSize: 11, margin: 6, position: 'start', align: 'left', fontFamily: t.fontSans },
-        yearLabel: { show: multi, position: 'left', margin: 34, color: t.ink2, fontSize: 11, fontWeight: 600, fontFamily: t.fontSans }
-      };
+    // choose how many bands each year wraps into: the split with the largest cells wins (fewer bands on ties)
+    function bandsFor(k) {
+      var out = [];
+      years.forEach(function (y) {
+        var ms = months.filter(function (x) { return x.y === y; }), parts = Math.min(k, ms.length), per = Math.ceil(ms.length / parts);
+        for (var i = 0; i < ms.length; i += per) out.push({ year: y, months: ms.slice(i, i + per), first: i === 0 });
+      });
+      out.forEach(function (bd) {
+        bd.a = bd.months[0].a; bd.b = bd.months[bd.months.length - 1].b;
+        bd.start = new Date(bd.a.getFullYear(), bd.a.getMonth(), bd.a.getDate() - ((bd.a.getDay() + 6) % 7));
+        bd.weeks = Math.floor(Math.round((bd.b - bd.start) / DAY_MS) / 7) + 1;
+      });
+      return out;
+    }
+    var best = null;
+    for (var k = 1; k <= 4; k++) {
+      var bands = bandsFor(k);
+      var maxWeeks = Math.max.apply(null, bands.map(function (bd) { return bd.weeks; }));
+      var cw = (W - left - right) / maxWeeks;
+      var chAvail = (H - legendH - bands.length * monthRow - (bands.length - 1) * bandGap - 2) / (bands.length * nRows);
+      var size = Math.min(cw, chAvail);
+      if (!best || size > best.size + 0.5) best = { bands: bands, cw: cw, ch: chAvail, size: size };
+      if (bands.length >= months.length) break;
+    }
+    var bandsL = best.bands;
+    var ch = Math.max(5, Math.min(best.cw, best.ch));
+    var cwF = Math.max(5, Math.min(best.cw, ch * 1.6));          // cells may widen a little, never become slabs
+
+    // cell geometry
+    var cells = [];                                              // [{x, y, w, h, date, v, band}]
+    bandsL.forEach(function (bd, bi) {
+      bd.top = legendH + bi * (monthRow + nRows * ch + bandGap);
+      for (var d = new Date(bd.a); d <= bd.b; d.setDate(d.getDate() + 1)) {
+        var dow = (d.getDay() + 6) % 7;
+        if (dow >= nRows) continue;
+        var col = Math.floor(Math.round((d - bd.start) / DAY_MS) / 7);
+        var iso = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+        cells.push({ x: left + col * cwF, y: bd.top + monthRow + dow * ch, col: col, row: dow, date: iso, v: byDay[iso], band: bi });
+      }
+    });
+    var dataCells = cells.filter(function (c) { return c.v != null; });
+    var g = ch >= 10 ? 2 : 1;
+
+    // month separators (stair lines), month / weekday / year labels
+    var graphic = [];
+    var lineCol = t.axis;              // month boundaries run in the cell gaps, above the cells
+    bandsL.forEach(function (bd, bi) {
+      var bCells = cells.filter(function (c) { return c.band === bi; });
+      var y0 = bd.top + monthRow, y1 = y0 + nRows * ch;
+      bd.months.forEach(function (mo, mi) {
+        var first = bCells.filter(function (c) { var d = RK.format.toDate(c.date); return d.getMonth() === mo.m && d.getFullYear() === mo.y; })[0];
+        if (!first) return;
+        var x = left + first.col * cwF, yr = y0 + first.row * ch;
+        graphic.push({ type: 'text', silent: true, x: x + 1, y: bd.top + monthRow / 2,
+          style: { text: MONTHS[mo.m], fill: t.ink2, font: '11px ' + t.fontSans, align: 'left', verticalAlign: 'middle' } });
+        if (mi === 0) return;
+        var pts2 = first.row === 0 ? [[x, y0], [x, y1]] : [[x + cwF, y0], [x + cwF, yr], [x, yr], [x, y1]];
+        graphic.push({ type: 'polyline', silent: true, z: 5, shape: { points: pts2 }, style: { stroke: lineCol, lineWidth: 1.25, fill: null } });
+      });
+      ['Mon', '', 'Wed', '', 'Fri', '', ''].slice(0, nRows).forEach(function (lab, r) {
+        if (!lab || ch < 8) return;
+        graphic.push({ type: 'text', silent: true, x: left - 6, y: y0 + r * ch + ch / 2,
+          style: { text: lab, fill: t.ink3, font: '11px ' + t.fontSans, align: 'right', verticalAlign: 'middle' } });
+      });
+      if (multi && bd.first) {
+        graphic.push({ type: 'text', silent: true, x: 0, y: bd.top + monthRow / 2,
+          style: { text: String(bd.year), fill: t.ink2, font: '600 11px ' + t.fontSans, align: 'left', verticalAlign: 'middle' } });
+      }
     });
 
+    var emptyFill = t.dark ? RK.theme.mix(t.paper, t.ink, 0.035) : t.surface;
+    function rect(c) { return { x: c.x + g / 2, y: c.y + g / 2, width: Math.max(1, cwF - g), height: Math.max(1, ch - g) }; }
     var vm = visualDaily(o, t, values, fmt, hasLegend);
-    var series = cals.map(function (c, i) {
-      return {
-        id: 'cal-' + i, type: 'heatmap', coordinateSystem: 'calendar', calendarIndex: i,
-        data: pts.filter(function (p) { return p[0] >= c.range[0] && p[0] <= c.range[1]; }),
-        itemStyle: { borderColor: t.paper, borderWidth: 2 },
-        emphasis: { itemStyle: { borderColor: t.ink, borderWidth: 1.2 } }
-      };
-    });
+    vm.seriesIndex = 1;
+    vm.dimension = 1;
+    var series = [
+      {
+        // every day of the range: empty days (holidays) stay distinct from the lowest bucket, also in dark themes
+        id: 'days', type: 'custom', coordinateSystem: 'none', silent: true, tooltip: { show: false }, z: 1,
+        data: cells.map(function (c, i) { return [i]; }),
+        renderItem: function (params) {
+          var c = cells[params.dataIndex];
+          return { type: 'rect', shape: rect(c), style: { fill: emptyFill } };
+        }
+      },
+      {
+        id: 'cal', type: 'custom', coordinateSystem: 'none', z: 2,
+        data: dataCells.map(function (c, i) { return [i, c.v]; }),
+        renderItem: function (params, api) {
+          var c = dataCells[params.dataIndex];
+          return { type: 'rect', shape: rect(c), style: { fill: api.visual('color') || emptyFill },
+            emphasis: { style: { stroke: t.ink, lineWidth: 1.2 } },
+            enterFrom: { style: { opacity: 0 } }, enterAnimation: { delay: Math.min(600, c.col * 12), duration: 360 } };
+        }
+      }
+    ];
 
     return {
       tooltip: {
         trigger: 'item',
         formatter: function (p) {
-          var d = p.value && p.value[0], v = p.value && p.value[1];
-          var dt = RK.format.toDate(d);
-          var rows = [{ label: ctx.title(vf), value: RK.format(v, fmt) }];
-          if (avg) rows.push({ label: 'vs. period average', value: RK.format(v / avg - 1, '+0.0%;−0.0%;0.0%') });
-          return C.tip((dt ? WEEKDAYS[dt.getDay()] + ' ' : '') + RK.format(d, 'dd mmm yyyy'), rows);
+          var c = p.seriesId === 'cal' ? dataCells[p.dataIndex] : null;
+          if (!c) return '';
+          var dt = RK.format.toDate(c.date);
+          var rows = [{ label: ctx.title(vf), value: RK.format(c.v, fmt) }];
+          if (avg) rows.push({ label: 'vs. period average', value: RK.format(c.v / avg - 1, '+0.0%;(0.0%);0.0%') });
+          return C.tip((dt ? WEEKDAYS[dt.getDay()] + ' ' : '') + RK.format(c.date, 'dd mmm yyyy'), rows);
         }
       },
       visualMap: vm,
-      calendar: calendar,
+      graphic: graphic,
       series: series
     };
   }
@@ -142,7 +228,9 @@
   function monthly(ctx, inst) {
     var o = ctx.options, t = ctx.theme, enc = ctx.enc;
     var yf = enc.year, mf = enc.month, vf = enc.value;
-    var fmt = o.format || ctx.fmtOf(vf) || '0.0%';
+    // house negatives in brackets: "(5.4%)"; the coloured year / average cells always carry a sign: "+7.8%"
+    var base = o.format || ctx.fmtOf(vf) || '0.0%';
+    var fmt = negParens(base), sumFmt = signedParens(base);
     var cells = {};                                        // year -> [12 values]
     ctx.rows.forEach(function (r) {
       var y = r[yf], m = monthIndex(r[mf]);
@@ -194,9 +282,10 @@
         var r = cellRect(api, x, y);
         var kids = [U.merge({ type: 'rect', shape: U.merge(r, { r: 2 }), style: { fill: fill, stroke: null },
           emphasis: { style: { stroke: t.ink, lineWidth: 1.5 } } }, enter(x, y))];
-        if (showText && r.width > 26) {
+        var txt = RK.format(v, fmt);
+        if (showText && C.measure(txt, font) <= r.width - 4) {          // a figure that does not fit is dropped, never cut
           kids.push(U.merge({ type: 'text', x: r.x + r.width / 2, y: r.y + r.height / 2,
-            style: { text: RK.format(v, fmt), fill: RK.theme.textOn(fill), font: font, align: 'center', verticalAlign: 'middle' } }, enter(x, y)));
+            style: { text: txt, fill: RK.theme.textOn(fill), font: font, align: 'center', verticalAlign: 'middle' } }, enter(x, y)));
         }
         return { type: 'group', children: kids };
       }
@@ -207,13 +296,16 @@
         renderItem: function (params, api) {
           var x = api.value(0), y = api.value(1), v = api.value(2);
           var isTot = x === 12;
-          var r = cellRect(api, x, y, isTot ? 6 : 0);
+          var txt = RK.format(v, sumFmt), f = fontB;
+          // the year column is set off by a 6px gap; narrow blocks give that room back to the figure first
+          var r = cellRect(api, x, y, isTot && C.measure(txt, f) <= cellRect(api, x, y, 6).width - 4 ? 6 : 0);
           if (!isTot) { r.y += 3; r.height -= 3; }
+          if (C.measure(txt, f) > r.width - 4) f = '600 10px ' + t.fontNum;
           var ink = !U.isNum(v) ? t.ink3 : v > 0 ? t.pos : v < 0 ? t.neg : t.ink2;
           var kids = [U.merge({ type: 'rect', shape: U.merge(r, { r: 2 }), style: { fill: t.surface, stroke: t.rule, lineWidth: 1 } }, enter(x, y))];
-          if (r.width > 26) {                                  // summary cells keep their figures even when labels = false
+          if (C.measure(txt, f) <= r.width - 2) {              // summary cells keep their figures even when labels = false
             kids.push(U.merge({ type: 'text', x: r.x + r.width / 2, y: r.y + r.height / 2,
-              style: { text: RK.format(v, fmt), fill: ink, font: fontB, align: 'center', verticalAlign: 'middle' } }, enter(x, y)));
+              style: { text: txt, fill: ink, font: f, align: 'center', verticalAlign: 'middle' } }, enter(x, y)));
           }
           return { type: 'group', children: kids };
         }
@@ -232,10 +324,10 @@
           }
           if (d[4] === 'total') {
             var partial = d[3] < 12;
-            return C.tip(String(d[5]) + (partial ? ' YTD' : ''), [{ label: (o.compound !== false ? 'Compounded ' : 'Sum of ') + 'monthly ' + ctx.title(vf).toLowerCase(), value: RK.format(d[2], fmt) }],
+            return C.tip(String(d[5]) + (partial ? ' YTD' : ''), [{ label: (o.compound !== false ? 'Compounded ' : 'Sum of ') + 'monthly ' + ctx.title(vf).toLowerCase(), value: RK.format(d[2], sumFmt) }],
               partial ? d[3] + ' months of data' : null);
           }
-          return C.tip(MONTHS[d[0]] + ' average', [{ label: ctx.title(vf), value: RK.format(d[2], fmt) }], d[3] + ' years');
+          return C.tip(MONTHS[d[0]] + ' average', [{ label: ctx.title(vf), value: RK.format(d[2], sumFmt) }], d[3] + ' years');
         }
       },
       visualMap: {
@@ -243,9 +335,9 @@
         min: -lim, max: lim, calculable: true, realtime: true,
         orient: 'horizontal', left: 0, top: 0, itemWidth: 10, itemHeight: 140,
         textStyle: { color: t.ink2, fontSize: 11, fontFamily: t.fontNum },
-        inRange: { color: t.div.slice() },
+        inRange: { color: divStops(t) },
         outOfRange: { color: t.surface2 || t.surface },
-        formatter: C.tickFmt(fmt)
+        formatter: C.tickFmt(sumFmt)
       },
       xAxis: {
         type: 'category', data: xCats, position: 'top',
@@ -266,6 +358,39 @@
    * Helpers
    * ------------------------------------------------------------------ */
 
+  /** "0.0%" -> "0.0%;(0.0%)": negatives in brackets (a format with its own sections is kept). */
+  function negParens(code) {
+    code = String(RK.format.presets[code] || code);
+    return code.indexOf(';') >= 0 || code === 'auto' ? code : code + ';(' + code + ')';
+  }
+  /** "0.0%" -> "+0.0%;(0.0%);0.0%": red / green summary figures always carry a sign. */
+  function signedParens(code) {
+    code = String(RK.format.presets[code] || code);
+    if (code === 'auto') return code;
+    var b = code.split(';')[0].replace(/^\+/, '');
+    return '+' + b + ';(' + b + ');' + b;
+  }
+  /**
+   * Diverging stops from the theme's --rk-div-* tokens. An end that is close to the accent2 target colour
+   * (e.g. a navy positive end in a theme whose target is navy) is rebuilt from pos / neg, so a good month
+   * never reads as "the target".
+   */
+  function divStops(t) {
+    var st = t.div.slice(), n = st.length, mid = Math.floor(n / 2);
+    if (n < 3) return st;
+    function rebuild(endIdx, col) {
+      var lo = Math.min(endIdx, mid), hi = Math.max(endIdx, mid), span = hi - lo;
+      for (var i = lo; i <= hi; i++) {
+        if (i === mid) continue;
+        var f = Math.abs(i - mid) / span;                          // 0 at the midpoint, 1 at the end
+        st[i] = RK.theme.mix(st[mid], col, f);
+      }
+    }
+    if (RK.theme.distance(st[n - 1], t.accent2) < 140) rebuild(n - 1, t.pos);
+    if (RK.theme.distance(st[0], t.accent2) < 140) rebuild(0, t.neg);
+    return st;
+  }
+
   /** 1..12, "1".."12", "Jan".."Dec" or "January"... -> 0..11 (else -1). */
   function monthIndex(m) {
     if (U.isNum(m)) return m >= 1 && m <= 12 ? Math.round(m) - 1 : -1;
@@ -279,13 +404,6 @@
     var y = +iso.slice(0, 4), m = +iso.slice(5, 7);
     var d = new Date(y, m, 0).getDate();
     return iso.slice(0, 8) + ('0' + d).slice(-2);
-  }
-
-  /** Number of Monday-start week columns a date range occupies. */
-  function weeksIn(a, b) {
-    var d0 = RK.format.toDate(a), d1 = RK.format.toDate(b);
-    var days = Math.round((d1 - d0) / 864e5) + 1;
-    return Math.ceil((((d0.getDay() + 6) % 7) + days) / 7);
   }
 
   function roundSig(v, n) {

@@ -1,6 +1,15 @@
 /* avp-table — analysis at various prices; extends the shared .rk-table pitchbook styles */
 .rk-avp { position: relative; display: flex; flex-direction: column; gap: 6px; }
 .rk-avp__wrap { overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--rk-rule) transparent; }
+/* more price columns off to the right: fade the edge so cut-off figures read as "scroll", not as truncated digits */
+.rk-avp__frame { position: relative; min-width: 0; }
+.rk-avp__frame::after {
+  content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 28px; z-index: 3; pointer-events: none;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--rk-paper) 0%, transparent), var(--rk-paper) 85%);
+  opacity: 0; transition: opacity var(--rk-dur-fast);
+}
+.rk-avp__frame.is-more-r::after { opacity: 1; }
+.rk-avp__frame.is-scrolled-x .rk-avp__table td.rk-avp__label, .rk-avp__frame.is-scrolled-x .rk-avp__table thead th:first-child { box-shadow: 6px 0 6px -5px color-mix(in srgb, var(--rk-ink) 28%, transparent); }
 
 /* offer stepper */
 .rk-avp__bar { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-height: 28px; }
@@ -76,4 +85,4 @@
 @keyframes rk-avp-col { from { opacity: 0; background-color: color-mix(in srgb, var(--rk-accent-2) 40%, var(--rk-paper)); } }
 .rk-avp.is-static .is-enter, .rk-avp.is-static tbody tr { animation: none; }
 @media (prefers-reduced-motion: reduce) { .rk-avp.is-in tbody tr, .rk-avp .is-enter { animation: none; } }
-@media print { .rk-avp.is-in tbody tr, .rk-avp .is-enter { animation: none; } .rk-avp__wrap { overflow: visible; } }
+@media print { .rk-avp.is-in tbody tr, .rk-avp .is-enter { animation: none; } .rk-avp__wrap { overflow: visible; } .rk-avp__frame::after { display: none; } }

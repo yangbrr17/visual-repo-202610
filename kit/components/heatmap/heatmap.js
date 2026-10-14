@@ -130,6 +130,17 @@
       var sel = selField ? ctx.selected(selField).map(String) : [];
       var hl = o.highlight == null ? [] : [].concat(o.highlight).map(String);
 
+      /** Cell label colour: theme ink or white; on a mid-tone where neither reaches 4.5:1, pure black / white. */
+      function cellInk(fill) {
+        var c = RK.theme.textOn(fill);
+        if (RK.theme.contrast(fill, c) >= 4.5) return c;
+        return [t.dark ? t.paper : t.ink, '#000000', '#ffffff'].reduce(function (best, x) {
+          return RK.theme.contrast(fill, x) > RK.theme.contrast(fill, best) ? x : best;
+        }, c);
+      }
+      var hlRow = {}, hlCol = {};   // highlighted row / column -> [min, max] index of the cells drawn
+      function span(map, k, i) { var s0 = map[k]; map[k] = s0 ? [Math.min(s0[0], i), Math.max(s0[1], i)] : [i, i]; }
+
       var data = [];
       ys.forEach(function (yk, iy) {
         xs.forEach(function (xk, ix) {
@@ -140,11 +151,13 @@
           if (v === undefined) return;
           var dim = sel.length && sel.indexOf(o.select === 'x' ? xk : yk) < 0;
           var fill = colorOf(v);
+          if (hl.indexOf(yk) >= 0) span(hlRow, iy, ix);
+          if (hl.indexOf(xk) >= 0) span(hlCol, ix, iy);
           data.push({
             value: [ix, iy, v],
             raw: [rawX[xk], rawY[yk]],
             itemStyle: dim ? { opacity: 0.22 } : undefined,
-            label: { color: v == null ? t.ink3 : RK.theme.textOn(fill) }
+            label: { color: v == null ? t.ink3 : cellInk(fill) }
           });
         });
       });
@@ -155,19 +168,27 @@
           var rowVals = xs.map(function (xk) { return cell.get(xk + '\u0001' + yk); }).filter(util.isNum);
           if (!rowVals.length) return;
           var v = sm.fn(rowVals);
+          if (hlRow[iy]) hlRow[iy][1] = xs.length;   // the target row outline includes its summary cell
           smData.push({ value: [xs.length, iy, v], label: { color: v < 0 && o.summary !== 'mean' ? t.neg : t.ink } });
         });
       }
 
       var xLab = labeller(o.xLabels, ctx.fmtOf(enc.x)), yLab = labeller(o.yLabels, ctx.fmtOf(enc.y));
       var rich = { hl: { fontWeight: 700, color: t.ink }, sm: { fontWeight: 700, color: t.ink } };
+      // rich-text axis labels: braces in category names would open / close style runs -> RK.chart.richSafe
       function catFmt(lab, isX) {
         return function (k) {
-          if (isX && sm && k === smKey) return '{sm|' + k + '}';
-          var s = lab(k);
+          if (isX && sm && k === smKey) return '{sm|' + C.richSafe(k) + '}';
+          var s = C.richSafe(lab(k));
           return hl.indexOf(k) >= 0 ? '{hl|' + s + '}' : s;
         };
       }
+      // target row / column: one accent-2 outline around its cells (same emphasis as lollipop / bullet bars)
+      var boxes = [];
+      // accent-2 outline, or ink when the colour ramp itself runs close to accent-2 (it would vanish on those cells)
+      var ring = stops.some(function (c) { return RK.theme.distance(c, t.accent2) < 70; }) ? t.ink : t.accent2;
+      Object.keys(hlRow).forEach(function (iy) { boxes.push([hlRow[iy][0], +iy, hlRow[iy][1], +iy]); });
+      Object.keys(hlCol).forEach(function (ix) { boxes.push([+ix, hlCol[ix][0], +ix, hlCol[ix][1]]); });
       var labelCfg = { show: showLabels, fontSize: fs, fontFamily: t.fontNum, formatter: function (p) { return RK.format(p.value[2], fmt); } };
       var gap = o.cellGap;
       var legendOn = o.legend !== false;
@@ -176,8 +197,9 @@
       return {
         legend: { show: false },
         // containLabel:false + outerBounds: ECharts 6 keeps top-positioned column labels below the colour legend
-        grid: C.grid(ctx, { top: (legendOn ? 30 : 6) + (top ? 4 : 0), left: 2, right: 6, bottom: 2, containLabel: false,
-          outerBounds: { left: 0, right: 0, bottom: 0, top: legendOn ? (top ? 32 : 26) : 0 } }),
+        // bottom: room for label descenders (g, p, y) — the SVG clips anything below its box
+        grid: C.grid(ctx, { top: (legendOn ? 30 : 6) + (top ? 4 : 0), left: 2, right: 6, bottom: 4, containLabel: false,
+          outerBounds: { left: 0, right: 0, bottom: 4, top: legendOn ? (top ? 32 : 26) : 0 } }),
         tooltip: {
           trigger: 'item',
           formatter: function (p) {
@@ -198,7 +220,7 @@
         xAxis: {
           type: 'category', data: xCats, position: top ? 'top' : 'bottom', splitArea: { show: false },
           axisLine: { show: false }, axisTick: { show: false },
-          axisLabel: { color: t.ink2, fontSize: 11, interval: 0, hideOverlap: true, formatter: catFmt(xLab, true), rich: rich, margin: 8 }
+          axisLabel: { color: t.ink2, fontSize: 11, lineHeight: 14, interval: 0, hideOverlap: true, formatter: catFmt(xLab, true), rich: rich, margin: 8 }
         },
         yAxis: {
           type: 'category', data: ys, inverse: true, splitArea: { show: false },
@@ -215,6 +237,15 @@
           label: util.merge({}, labelCfg, { fontWeight: 700 }),
           itemStyle: { color: t.surface2 || t.surface, borderColor: t.paper, borderWidth: gap },
           emphasis: { itemStyle: { borderColor: t.ink, borderWidth: 1.5 } }
+        }, {
+          id: 'target', type: 'custom', silent: true, z: 4, tooltip: { show: false }, animation: false,
+          encode: { x: [0, 2], y: [1, 3] }, data: boxes,
+          renderItem: function (params, api) {
+            var a = api.coord([api.value(0), api.value(1)]), b = api.coord([api.value(2), api.value(3)]), sz = api.size([1, 1]);
+            var x0 = Math.min(a[0], b[0]) - sz[0] / 2, y0 = Math.min(a[1], b[1]) - sz[1] / 2;
+            return { type: 'rect', shape: { x: x0 + 0.5, y: y0 + 0.5, width: Math.abs(b[0] - a[0]) + sz[0] - 1, height: Math.abs(b[1] - a[1]) + sz[1] - 1 },
+              style: { fill: 'none', stroke: ring, lineWidth: 2 } };
+          }
         }]
       };
     }, {

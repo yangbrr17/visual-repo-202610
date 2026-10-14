@@ -393,6 +393,16 @@
     return compile(spec)(v);
   }
 
+  /** '#,##0.0' -> '#,##0.0;(#,##0.0)': accounting negatives in parentheses (pitchbook tables). */
+  format.parens = function (spec) {
+    var code = presets[spec] || spec || '#,##0';
+    return String(code).indexOf(';') >= 0 ? code : code + ';(' + code + ')';
+  };
+  /** '0.0%' -> '+0.0%;(0.0%);0.0%': signed changes, negatives in parentheses. */
+  format.signed = function (spec) {
+    var code = presets[spec] || spec || '#,##0.0';
+    return String(code).indexOf(';') >= 0 ? code : '+' + code + ';(' + code + ');' + code;
+  };
   format.compile = compile;
   format.compact = compact;
   format.round = round;

@@ -27,6 +27,7 @@
     "loop": {"type": "boolean", "default": false, "desc": "Loop the timeline"},
     "trails": {"type": "boolean", "default": true, "desc": "Timeline: faint path of each bubble through the periods so far"},
     "colorScale": {"type": "string", "default": "auto", "desc": "'auto' | 'category' | 'sequential' | 'diverging' (auto: numeric colour field -> continuous)"},
+    "colors": {"type": "object", "default": null, "desc": "{category: theme token | colour} pins category colours (tokens: accent, accent3, pos, neg, cat1 …), e.g. scenarios {Base: 'accent', Upside: 'pos', Downside: 'neg'}"},
     "mid": {"type": "number", "default": 0, "desc": "Diverging midpoint"},
     "sizeRange": {"type": "number[]", "default": [8, 54], "desc": "[min, max] bubble diameter in px"},
     "labels": {"type": "number|boolean", "default": 8, "desc": "Label the N largest bubbles (true = all, false = none); labels sit inside big bubbles or in the first free spot around small ones, the target is always labelled"},
@@ -49,7 +50,7 @@
     "brush": {"type": "boolean", "default": true, "desc": "Box-select tool that cross-filters the label field (not in timeline mode)"},
     "zoom": {"type": "boolean", "default": true, "desc": "Box zoom, Ctrl + wheel zoom, drag to pan and the hover toolbar"},
     "wheelZoom": {"type": "boolean", "default": null, "desc": "true = a plain mouse wheel zooms; default: Ctrl/Cmd + wheel or a trackpad pinch zooms, so the wheel keeps scrolling the report"},
-    "legend": {"type": "boolean", "default": true, "desc": "Category legend (top-left)"}
+    "legend": {"type": "boolean", "default": true, "desc": "Category legend (top-left; wraps onto extra rows, never pages)"}
   },
   "interactions": ["Hover tooltip with all four dimensions", "Click a bubble to cross-filter (toggle); box-select several", "Legend toggles categories; continuous colour band handles filter by value", "Box zoom, Ctrl + wheel zoom, drag to pan, reset", "Timeline play / scrub with animated transitions and trails", "PNG / CSV export"],
   "samples": [
@@ -64,6 +65,6 @@
                  "labels": true}},
     {"title": "Scenario paths 2025A–2030E (press play)", "data": "scenarios", "height": 400,
      "options": {"encode": {"x": "revenue", "y": "ebitda", "size": "fcf", "color": "scenario", "label": "scenario", "name": "scenario"},
-                 "timeField": "year", "labels": true}}
+                 "timeField": "year", "labels": true, "colors": {"Base": "accent", "Upside": "pos", "Downside": "neg"}}}
   ]
 }

@@ -23,7 +23,7 @@
     "colorMid": {"type": "number|string", "default": 0, "desc": "Midpoint of the diverging metric scale: a number or 'avg' (value-weighted average)"},
     "sort": {"type": "string", "default": "desc", "desc": "desc | asc | null (data order); clockwise from 12 o'clock"},
     "innerRadius": {"type": "number", "default": 0.3, "desc": "Centre hole as a share of the outer radius"},
-    "labels": {"type": "string", "default": "auto", "desc": "auto (inner ring: name + share; outer: name) | name | none"},
+    "labels": {"type": "string", "default": "auto", "desc": "auto (name + share of the view on every ring) | name | none — 11px, never truncated or shrunk: a label that does not fit its slice is left to the tooltip; a highlighted slice too thin for its label gets an outside callout"},
     "minLabelAngle": {"type": "number", "default": 7, "desc": "Slices thinner than this (degrees) are not labelled"},
     "center": {"type": "boolean", "default": true, "desc": "Centre readout: total, drilled node or hovered node"},
     "rootName": {"type": "string", "default": null, "desc": "Centre caption at the top level (defaults to the single root node, else 'Total')"},

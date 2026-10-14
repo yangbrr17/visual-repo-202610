@@ -30,7 +30,8 @@
     "sort": {"type": "string", "default": null, "desc": "null (data order) | 'label' | 'total-desc' | 'total-asc' — applied at every level"},
     "colSort": {"type": "string", "default": "asc", "desc": "asc | desc | null (data order) for the column dimension"},
     "heat": {"type": "boolean|string", "default": false, "desc": "false | 'seq' | 'div' — colour the leaf cells"},
-    "heatIntensity": {"type": "number", "default": 0.5, "desc": "0–1 strength of heat tints"},
+    "heatMinN": {"type": "number", "default": 1, "desc": "Cells aggregating fewer records stay uncoloured and out of the heat range (e.g. 2 so a single deal is not read as the high)"},
+    "heatIntensity": {"type": "number", "default": 0.5, "desc": "0–1 span of the theme ramp used (0.5 = seq-2…seq-6 / div-2…div-6); text colour is picked for 4.5:1 contrast"},
     "titles": {"type": "object", "default": {}, "desc": "{\"<field or formula>\": \"Display title\"} — e.g. {\"year(date)\": \"Year announced\"}"},
     "valueTitle": {"type": "string", "default": null, "desc": "Measure label in the header corner (defaults to e.g. 'Median EV/LTM EBITDA' or 'Number of records')"},
     "scroll": {"type": "boolean", "default": true, "desc": "true: fixed block height with sticky header, label column and totals; false: grow to content"},
@@ -44,7 +45,7 @@
     {"title": "Segment mix — % of annual revenue", "data": "segment_revenue", "height": 200, "span": 8,
      "options": {"rows": ["segment"], "cols": "year", "value": "revenue", "show": "pctCol", "heat": "seq", "sort": "total-desc"}},
     {"title": "Precedents — median EV / EBITDA by sector and consideration", "data": "precedents", "height": 190, "span": 8,
-     "options": {"rows": ["sector"], "cols": "consideration", "value": "ev_ebitda", "agg": "median", "totalCol": true, "heat": "seq", "colSort": null}},
+     "options": {"rows": ["sector"], "cols": "consideration", "value": "ev_ebitda", "agg": "median", "totalCol": true, "heat": "seq", "heatMinN": 2, "colSort": null}},
     {"title": "Precedents — number of deals by year announced", "data": "precedents", "height": 190, "span": 10,
      "options": {"rows": ["sector"], "cols": "year(date)", "value": null, "agg": "count", "totalCol": true, "valueTitle": "Number of transactions", "titles": {"year(date)": "Year announced"}}}
   ]

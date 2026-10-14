@@ -5,9 +5,9 @@
   "category": "geo",
   "engine": "leaflet",
   "deps": ["leaflet", "topojson-client", "geo-world"],
-  "summary": "Origin -> destination flows as curved arcs: width by value, colour by category, arrowheads, nodes sized by total flow, travelling-dot animation.",
-  "summary_zh": "以弧线展示起点到终点的流向：线宽表示金额，颜色区分类别，箭头指向目的地，节点大小表示总流量，带流动光点动画。",
-  "description_zh": "适合展示跨境并购、资本流动、贸易或客户迁移等“从哪里到哪里”的关系。每行一条流（起点/终点名称和经纬度、数值、可选笔数和类别）；相同起终点+类别的行自动合并。弧线宽度与数值成正比、箭头指向目标国，节点圆按流入+流出总额缩放并标注前 N 个国家。悬停某条弧线会突出该流并显示金额、笔数和占比；悬停国家节点会突出它的全部进出流量并显示净流出。点击弧线或图例按类别（如行业）交叉筛选其他图表。",
+  "summary": "Origin -> destination flows as solid curved arcs: width by value, colour by category, arrowheads, nodes sized by total flow, travelling dots on hover.",
+  "summary_zh": "以弧线展示起点到终点的流向：线宽表示金额，颜色区分类别，箭头指向目的地，节点大小表示总流量，悬停时显示流动光点。",
+  "description_zh": "适合展示跨境并购、资本流动、贸易或客户迁移等“从哪里到哪里”的关系。每行一条流（起点/终点名称和经纬度、数值、可选笔数和类别）；相同起终点+类别的行自动合并。弧线宽度与数值成正比、箭头指向目标国，节点圆按流入+流出总额缩放；标注前 N 个国家及总额超过阈值的国家，其余国家在空间允许时就近标注，必要时用引线。弧线为实线（带纸色衬边，交叉处清晰），流动光点只在悬停时出现，静态截图与打印不会出现虚线效果。悬停某条弧线会突出该流并显示金额、笔数和占比；悬停国家节点会突出它的全部进出流量并显示净流出。点击弧线或图例按类别（如行业）交叉筛选其他图表。",
   "best_for": ["Cross-border M&A by acquirer -> target country", "Capital / trade / supply flows between regions", "Client or revenue migration between markets"],
   "avoid_when": ["More than ~60 flows (aggregate first or set maxFlows)", "Flows without a meaningful geography (use sankey or chord)"],
   "channels": {
@@ -27,10 +27,12 @@
     "curvature": {"type": "number", "default": 0.25, "desc": "Arc bend (0 = straight); long arcs are flattened to stay on the map, parallel flows fan out"},
     "opacity": {"type": "number", "default": 0.72, "desc": "Arc opacity"},
     "arrows": {"type": "boolean", "default": true, "desc": "Arrowheads at the destination (direction survives print)"},
-    "animate": {"type": "boolean", "default": true, "desc": "Travelling dots along each arc (CSS; off for print / reduced motion)"},
+    "animate": {"type": "boolean", "default": true, "desc": "Travelling dots along the hovered flows (CSS; only when motion is allowed). Arcs are always drawn solid, so static captures, print and PNG export never show dotted lines"},
     "nodes": {"type": "boolean", "default": true, "desc": "Country circles sized by inbound + outbound total"},
     "nodeSizeRange": {"type": "number[]", "default": [3, 11], "desc": "Min / max node radius in px"},
-    "labels": {"type": "number", "default": 6, "desc": "Label the top N countries by total flow (0 = none)"},
+    "labels": {"type": "number", "default": 8, "desc": "Label the top N countries by total flow (0 = none); each label sits beside its node or off it with a leader line, away from other nodes"},
+    "labelMin": {"type": "number", "default": 0.1, "desc": "Also label every country whose total flow is at least this share of the largest country's total (0 = top N only)"},
+    "labelRest": {"type": "boolean", "default": true, "desc": "Also label every remaining country where its label fits right beside the node without covering another node or label (isolated destinations such as Brazil or Australia)"},
     "flowLabels": {"type": "number", "default": 0, "desc": "Value labels at the apex of the top N flows (0 = none)"},
     "maxFlows": {"type": "number", "default": null, "desc": "Keep only the N largest flows"},
     "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field format"},
@@ -41,10 +43,10 @@
     "filterField": {"type": "string", "default": null, "desc": "Field used for click-to-filter; defaults to encode.color, else encode.from. Shared business dimensions (country, company, sector, region, segment, year…) filter the whole report; other fields (site name, type, from / to…) only this block's dataset — set crossFilterScope to override"},
     "scrollZoom": {"type": "boolean|string", "default": "click", "desc": "Plain mouse-wheel zoom: 'click' (armed after clicking the map, so page scrolling is never hijacked) | true | false. Ctrl/Cmd + wheel or a trackpad pinch always zooms; +/- buttons and drag too"}
   },
-  "interactions": ["Hover a flow to isolate it (tooltip: from -> to, value, deals, share)", "Hover a country to isolate its inbound / outbound flows (tooltip: in, out, net)", "Click a flow or legend category to cross-filter", "Arcs draw in on render; travelling dots show direction", "Zoom / pan", "PNG export"],
+  "interactions": ["Hover a flow to isolate it (tooltip: from -> to, value, deals, share)", "Hover a country to isolate its inbound / outbound flows (tooltip: in, out, net)", "Click a flow or legend category to cross-filter", "Arcs draw in on render; travelling dots show the direction of hovered flows (motion only)", "Zoom / pan", "PNG export"],
   "samples": [
     {"title": "Cross-border M&A by sector — acquirer to target country (USD bn)", "data": "deal_flows", "height": 480, "options": {}},
     {"title": "Top 10 flows — single colour with value labels", "data": "deal_flows", "height": 420, "span": 7,
-     "options": {"encode": {"color": null}, "maxFlows": 10, "flowLabels": 4, "labels": 6, "widthRange": [1.5, 10], "curvature": 0.3}}
+     "options": {"encode": {"color": null}, "maxFlows": 10, "flowLabels": 4, "labels": 8, "widthRange": [1.5, 10], "curvature": 0.3}}
   ]
 }

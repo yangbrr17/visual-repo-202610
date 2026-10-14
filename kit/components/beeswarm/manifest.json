@@ -27,7 +27,7 @@
     "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] reference lines, e.g. proposed offer premium — dashed in --rk-ref unless a colour is given"},
     "colorBy": {"type": "string", "default": "single", "desc": "'single' | 'group' | a field name (categorical colours + legend toggle)"},
     "symbolSize": {"type": "number", "default": 10, "desc": "Dot diameter in px"},
-    "sizeRange": {"type": "number[]", "default": [6, 24], "desc": "[min, max] diameter in px when encode.size is set"},
+    "sizeRange": {"type": "number[]", "default": [7, 24], "desc": "[min, max] diameter in px when encode.size is set (>= 7px keeps the smallest dot legible)"}, "sizeLegend": {"type": "boolean", "default": true, "desc": "Size key (circles at nice values, top right) when encode.size is set"},
     "sortGroups": {"type": "string", "default": null, "desc": "null (data order) | 'desc' | 'asc' (by group median) | 'alpha'"},
     "format": {"type": "string", "default": null, "desc": "Value format code; defaults to the value field's format"},
     "zoom": {"type": "boolean", "default": false, "desc": "dataZoom along the value axis (slider; Ctrl/Cmd + wheel or pinch); the swarm re-flows on zoom"},

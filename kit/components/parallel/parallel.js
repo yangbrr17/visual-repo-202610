@@ -21,6 +21,29 @@
     return code.replace(/([0#])\.([0#]+)/g, function (m, a, d) { var n = Math.min(dec, d.length); return a + (n ? '.' + d.slice(0, n) : ''); });
   }
 
+  /** Value text with a true minus sign. */
+  function num(v, f) { return RK.format(v, f).replace(/^-/, '\u2212'); }
+  /** Greedy word wrap to `width` px; a single word wider than that stays whole (never an ellipsis). */
+  function wrap(text, width, font) {
+    var words = String(text).split(/\s+/), lines = [], cur = '';
+    words.forEach(function (w) {
+      var next = cur ? cur + ' ' + w : w;
+      if (cur && C.measure(next, font) > width) { lines.push(cur); cur = w; } else cur = next;
+    });
+    if (cur) lines.push(cur);
+    return lines;
+  }
+  /** Rows a wrapping (type 'plain') ECharts legend needs within `avail` px — mirrors ECharts' box layout. */
+  function legendRows(names, avail, font) {
+    var rows = 1, x = 0;
+    names.forEach(function (n) {
+      var w = 15 + C.measure(n, font);
+      if (x > 0 && x + w > avail) { rows++; x = 0; }
+      x += w + 14;
+    });
+    return rows;
+  }
+
   /** dims option -> [{field, title, format, type, cats, inverse, min, max}] */
   function dimsOf(ctx) {
     var o = ctx.options, ds = ctx.dataset;
@@ -121,17 +144,20 @@
         baseUpdate(c);
         restore();
       };
+      // a resize re-lays out the axes (name wrapping): put the brushes back afterwards
+      var baseResize = handle.resize;
+      handle.resize = function () { baseResize(); restore(); };
       var baseDestroy = handle.destroy;
       handle.destroy = function () { intervals = {}; baseDestroy(); };
       return handle;
     }
   });
 
-  var chart = C(function (ctx) {
+  var chart = C(function (ctx, inst) {
     var o = ctx.options, t = ctx.theme, enc = ctx.enc, lf = enc.label;
     var dims = dimsOf(ctx);
     var rows = ctx.rows;
-    var peerColor = t.accent3 || t.cat[1];
+    var peerColor = t.peer || t.accent;   // one peer colour across the kit
 
     var hl = o.highlight == null ? [] : [].concat(o.highlight);
     var isHL = function (r) { return (enc.target && r[enc.target] === true) || hl.some(function (h) { return same(h, r[lf]); }); };
@@ -176,7 +202,7 @@
       });
       series.push({
         id: 'median', name: 'Peer median', type: 'parallel', smooth: o.smooth ? 0.2 : false, z: 3,
-        lineStyle: { color: t.ink3, width: 1.6, type: [5, 4], opacity: 0.9 },
+        lineStyle: { color: t.ink3, width: 1.6, type: [4, 3], opacity: 0.9 },
         itemStyle: { color: t.ink3 },
         emphasis: { lineStyle: { width: 2.2, opacity: 1 } },
         inactiveOpacity: 0.9, activeOpacity: 0.9,
@@ -194,36 +220,60 @@
       });
     }
 
+    /* ---------- layout: wrapped axis names and a wrapping legend set the top margin ---------- */
+    var W = (inst && inst.getWidth()) || ctx.el.clientWidth || 800;
+    var PL = 64, PR = 72, nameFont = '600 11px ' + t.fontSans;
+    var spacing = dims.length > 1 ? (W - PL - PR) / (dims.length - 1) : W - PL - PR;
+    var nameW = Math.max(48, Math.min(160, spacing - 10));
+    // ECharts truncates parallel axis names to the axis spacing with an ellipsis: wrap them ourselves instead
+    var names = dims.map(function (d) { return wrap(d.title, nameW, nameFont); });
+    var nameLines = Math.max.apply(null, names.map(function (n) { return n.length; }).concat([1]));
+    var showLegend = o.legend !== false;
+    var legendNames = series.filter(function (s) { return s.id !== 'median'; }).map(function (s) { return s.name; })
+      .concat(o.median && peers.length > 2 ? ['Peer median'] : []);
+    var lRows = showLegend ? legendRows(legendNames, W, '11px ' + t.fontSans) : 0;
+    var top = (showLegend ? 25 * lRows + 4 : 0) + 13 * nameLines + 28;
+
     // axes: nice padded bounds from all rows (stable while brushing / filtering)
     var parallelAxis = dims.map(function (d, i) {
       var ax = {
-        id: 'pa-' + i, dim: i, name: d.title, type: d.type, inverse: d.inverse,
-        nameLocation: d.inverse ? 'start' : 'end', nameGap: 14,
-        nameTextStyle: { color: t.ink, fontSize: 11, fontWeight: 600, fontFamily: t.fontSans, width: 120, overflow: 'break', lineHeight: 13, align: 'center', verticalAlign: 'bottom' },
-        axisLabel: { color: t.ink3, fontSize: 11, fontFamily: t.fontNum, hideOverlap: true, textBorderColor: t.paper, textBorderWidth: 3 },
+        id: 'pa-' + i, dim: i, name: names[i].map(C.richSafe).join('\n'), type: d.type, inverse: d.inverse,
+        nameLocation: d.inverse ? 'start' : 'end', nameGap: 14, nameTruncate: { maxWidth: nameW + 40 },
+        nameTextStyle: { color: t.ink, fontSize: 11, fontWeight: 600, fontFamily: t.fontSans, lineHeight: 13, align: 'center', verticalAlign: 'bottom' },
+        // tick labels sit on a paper chip above the lines: no polyline ever runs through a number
+        axisLabel: { color: t.ink3, fontSize: 11, fontFamily: t.fontNum, hideOverlap: true, backgroundColor: t.paper, padding: [1, 2], borderRadius: 2 },
         axisLine: { show: true, lineStyle: { color: t.axis, width: 1 } },
         axisTick: { show: true, length: 3, lineStyle: { color: t.axis } },
         splitLine: { show: false }
       };
-      if (d.type === 'category') { ax.data = d.cats; ax.axisLabel.width = 90; ax.axisLabel.overflow = 'truncate'; }
+      if (d.type === 'category') {
+        // truncated here, not with a fixed label width (which would stretch the paper chip to 90px)
+        var labFont = '11px ' + t.fontNum;
+        ax.data = d.cats;
+        ax.axisLabel.formatter = function (v) {
+          var txt = String(v);
+          if (C.measure(txt, labFont) > 90) { while (txt.length > 1 && C.measure(txt + '\u2026', labFont) > 90) txt = txt.slice(0, -1); txt += '\u2026'; }
+          return C.richSafe(txt);
+        };
+      }
       else {
         var ext = util.extent(ctx.allRows.map(function (r) { return r[d.field]; }));
         var step = util.niceStep((ext[1] - ext[0]) || Math.abs(ext[1]) || 1, 5);
         ax.min = d.min != null ? d.min : Math.floor(ext[0] / step) * step;
         ax.max = d.max != null ? d.max : Math.ceil(ext[1] / step) * step;
         ax.interval = d.min == null && d.max == null ? step : null;
-        ax.axisLabel.formatter = C.axisFmt(tickFmt(d.format, ax.interval));
+        var tf = tickFmt(d.format, ax.interval);
+        ax.axisLabel.formatter = function (v) { return num(v, tf); };
       }
       return ax;
     });
 
-    var showLegend = o.legend !== false;
     var fmts = dims.map(function (d) { return d.format; });
     return {
+      // plain, wrapping legend (never scroll paging in report output)
       legend: C.legend(ctx, {
-        show: showLegend,
-        data: series.filter(function (s) { return s.id !== 'median'; }).map(function (s) { return s.name; })
-          .concat(o.median && peers.length > 2 ? [{ name: 'Peer median', icon: DASH_ICON }] : [])
+        show: showLegend, type: 'plain',
+        data: legendNames.map(function (n) { return n === 'Peer median' ? { name: n, icon: DASH_ICON } : n; })
       }),
       tooltip: {
         trigger: 'item', confine: true,
@@ -231,14 +281,14 @@
           var r = rows.filter(function (x) { return String(x[lf]) === p.name; })[0];
           var tr = dims.map(function (d, i) {
             var v = p.value ? p.value[i] : null;
-            return { label: d.title, value: d.type === 'category' ? (v == null ? 'n.a.' : String(v)) : RK.format(v, fmts[i]) };
+            return { label: d.title, value: d.type === 'category' ? (v == null ? 'n.a.' : String(v)) : num(v, fmts[i]) };
           });
           if (r && cf) tr.unshift({ color: p.color, label: ctx.title(cf), value: String(r[cf]) });
           return C.tip(p.name, tr);
         }
       },
       parallel: {
-        left: 64, right: 72, top: showLegend ? 74 : 46, bottom: 14,
+        left: PL, right: PR, top: top, bottom: 14,
         parallelAxisDefault: {
           realtime: false,
           areaSelectStyle: { width: 16, borderWidth: 1, borderColor: t.accent, color: RK.theme.alpha(t.accent3 || t.accent, 0.18), opacity: 1 }
@@ -247,5 +297,5 @@
       parallelAxis: parallelAxis,
       series: series
     };
-  });
+  }, { rebuildOnResize: true });   // axis-name wrapping and legend rows are laid out in px
 })();

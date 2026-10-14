@@ -4,30 +4,30 @@
   "name_zh": "地理热力图",
   "category": "geo",
   "engine": "leaflet",
-  "deps": ["leaflet", "leaflet-heat", "topojson-client", "geo-world"],
-  "summary": "Kernel density surface of point locations, optionally weighted by a value, in the theme's sequential colours; toggle to reveal the underlying points.",
+  "deps": ["leaflet", "topojson-client", "geo-world"],
+  "summary": "Kernel density surface of point locations, optionally weighted by a value, in the theme's sequential colours with a numeric legend (total within a stated radius); toggle to reveal the underlying points.",
   "summary_zh": "点位的核密度热力面（可按数值加权），使用主题顺序色阶；可一键叠加显示原始点位。",
-  "description_zh": "用连续的热力面展示点位在空间上的集中程度，适合看“哪里最密集 / 规模最集中”，例如产能、门店、客户或交易的地理集中度。每行一个点（lat / lon），可指定 weight 字段（如产能、收入）加权，权重按全量数据归一化，邻近点叠加。颜色来自主题顺序色阶，图例为相对密度（低 → 高）并注明点数与合计；radius / blur 控制平滑程度。右上角按钮可叠加原始点位，悬停查看详情、点击交叉筛选。",
+  "description_zh": "用连续的热力面展示点位在空间上的集中程度，适合看“哪里最密集 / 规模最集中”，例如产能、门店、客户或交易的地理集中度。每行一个点（lat / lon），可指定 weight 字段（如产能、收入）加权，邻近点按距离加权叠加。颜色来自主题顺序色阶，核半径为固定的地理距离（radius 按初始视图、1000px 宽地图的像素设定，随地图宽度缩放），因此图例给出具体数值：半径范围内按距离加权的合计（如“约 400 km 内的建筑面积”），并注明点数与合计。暗色主题下色阶止于次浅色，不出现发光效果。右上角按钮可叠加原始点位并标注最大的 N 个点位，悬停查看详情、点击交叉筛选。",
   "best_for": ["Concentration of capacity / revenue / customers", "Hundreds+ of points where individual markers are noise", "Quick 'where is the weight' overview next to a table"],
   "avoid_when": ["Few points (use bubble-map — a heat surface over 10 points misleads)", "Exact values must be read (density is relative)", "Values attached to countries rather than points (use choropleth)"],
   "channels": {
     "lat": {"type": "number", "required": true, "desc": "Latitude", "default": "lat"},
     "lon": {"type": "number", "required": true, "desc": "Longitude", "default": "lon"},
-    "weight": {"type": "number", "required": false, "desc": "Optional weight per point (normalised to the largest point)"},
+    "weight": {"type": "number", "required": false, "desc": "Optional weight per point (e.g. floor area); the surface and legend show the distance-weighted total within the kernel radius"},
     "label": {"type": "string", "required": false, "desc": "Point name for the points overlay tooltip / click-to-filter", "default": "name"}
   },
   "options": {
     "basemap": {"type": "string", "default": "world-110m", "desc": "Registered basemap name"},
-    "radius": {"type": "number", "default": 26, "desc": "Kernel radius in px"},
-    "blur": {"type": "number", "default": 20, "desc": "Blur in px"},
-    "intensity": {"type": "number", "default": 0.85, "desc": "Weight of the heaviest single point (0-1); overlapping points add up and saturate at 1"},
-    "minOpacity": {"type": "number", "default": 0.12, "desc": "Floor opacity of the faintest density"},
+    "radius": {"type": "number", "default": 26, "desc": "Kernel radius in px on a 1000px-wide map at the initial view; scaled with the map width (a 760px page gets a smaller kernel, so nearby clusters stay apart). The kernel is geographic: it zooms with the map, and the legend states it in km"},
+    "intensity": {"type": "number", "default": 1, "desc": "Colour domain = the densest spot of the unfiltered data / intensity, rounded up to a nice number (> 1 saturates the peaks sooner)"},
+    "minOpacity": {"type": "number", "default": 0.12, "desc": "Opacity of the faintest visible density (the surface fades in from the kernel edge)"},
     "gradient": {"type": "object", "default": null, "desc": "Custom {stop: colour} map (stops 0-1); defaults to the theme sequential ramp"},
     "points": {"type": "boolean", "default": false, "desc": "Show the points overlay initially"},
     "pointsToggle": {"type": "boolean", "default": true, "desc": "On-map button to show / hide the points (hidden in print)"},
+    "labels": {"type": "number", "default": 5, "desc": "Callouts (name and weight) on the N largest points while the points overlay is shown, with leader lines where they sit off the point (0 = none)"},
     "tooltip": {"type": "string[]", "default": [], "desc": "Extra fields in point tooltips"},
     "fit": {"type": "string|array|object", "default": "data", "desc": "Initial view: 'data' | 'world' | [[south, west], [north, east]] | {center: [lat, lon], zoom}"},
-    "legend": {"type": "boolean", "default": true, "desc": "Show the density legend with point count / total"},
+    "legend": {"type": "boolean", "default": true, "desc": "Density legend with numeric ticks (0 / half / top of the colour domain, in the weight's units within ~N km), point count and total"},
     "legendPosition": {"type": "string", "default": "bottomleft", "desc": "Leaflet control corner"},
     "filterField": {"type": "string", "default": null, "desc": "Field used when clicking a point; defaults to encode.label. Shared business dimensions (country, company, sector, region, segment, year…) filter the whole report; other fields (site name, type, from / to…) only this block's dataset — set crossFilterScope to override"},
     "scrollZoom": {"type": "boolean|string", "default": "click", "desc": "Plain mouse-wheel zoom: 'click' (armed after clicking the map, so page scrolling is never hijacked) | true | false. Ctrl/Cmd + wheel or a trackpad pinch always zooms; +/- buttons and drag too"}
@@ -37,7 +37,7 @@
     {"title": "Floor-area density of the site network", "data": "assets_locations", "height": 460,
      "options": {"encode": {"lat": "lat", "lon": "lon", "weight": "capacity", "label": "name"}, "tooltip": ["type", "city"]}},
     {"title": "Asia — sites with points overlay", "data": "assets_locations", "height": 420, "span": 7,
-     "options": {"encode": {"lat": "lat", "lon": "lon", "weight": "capacity", "label": "name"}, "points": true, "radius": 34, "blur": 26,
+     "options": {"encode": {"lat": "lat", "lon": "lon", "weight": "capacity", "label": "name"}, "points": true, "radius": 34,
                  "fit": [[-12, 68], [42, 146]], "tooltip": ["type", "utilization"]}}
   ]
 }

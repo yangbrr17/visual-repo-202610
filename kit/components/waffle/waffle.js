@@ -129,6 +129,7 @@
       legend: true,            // legend table (single waffle) or inline legend (several)
       format: null,            // value format; defaults to the value field format
       pctFormat: '0.0%',
+      values: true,            // several stacked waffles (encode.facet): each segment's share under its waffle
       maxSize: 280             // max waffle side (px)
     },
     render: function (ctx) {
@@ -229,8 +230,10 @@
     }
   });
 
-  function cssEsc(s) { return String(s).replace(/["\\]/g, '\\$&'); }
-  function emptyColor(t) { return RK.theme.mix(t.rule, t.paper, 0.5); }
+  // attribute-selector value for data-derived labels (quotes, backslashes, newlines …)
+  function cssEsc(s) { return window.CSS && CSS.escape ? CSS.escape(String(s)) : String(s).replace(/["\\]/g, '\\$&').replace(/[\n\r\f]/g, ' '); }
+  /** Empty squares: a quiet tint of the rule colour; dark themes lift it toward ink-3 so the grid stays visible. */
+  function emptyColor(t) { return t.dark ? RK.theme.mix(t.rule, t.ink3, 0.22) : RK.theme.mix(t.rule, t.paper, 0.5); }
 
   function fillFor(ctx, m, cat) {
     var base = m.color[cat] || ctx.theme.neutral;
@@ -267,6 +270,13 @@
       var tableW = 18 + nameW + valW + pctW;
       var S = Math.max(60, Math.min(H - 8, W - tableW - 40, o.maxSize));
       var gap = Math.min(48, Math.max(24, W * 0.04));
+      // wide blocks: the exhibit grows with the span (wider name column and gap, table up to ~36% of the width)
+      var spare = W - (S + gap + tableW) - 16;
+      if (spare > 80) {
+        var grow = Math.min(spare * 0.5, Math.max(0, Math.min(380, W * 0.36) - tableW));
+        nameW += grow; tableW += grow;
+        gap = Math.min(96, gap + Math.max(0, (W - (S + gap + tableW)) * 0.15));
+      }
       var x0 = Math.max(0, (W - (S + gap + tableW)) / 2);
       L.items.push({ x: x0, y: (H - S) / 2, S: S });
       var rows = m.cats.length, rowH = Math.max(18, Math.min(24, (H - 52) / Math.max(1, rows)));
@@ -282,12 +292,18 @@
       legendH = 8 + lines * 18;
     }
     var headH = (facet || m.waffles[0].title) ? 20 : 0, footH = facet ? 30 : 0;
+    var shares = !facet && n > 1 && o.values !== false;   // several stacked waffles: a share row under each
     var gx = 28, gy = 18, best = null;
     for (var cols = 1; cols <= n; cols++) {
       var rws = Math.ceil(n / cols);
-      var s = Math.min((W - (cols - 1) * gx) / cols, (H - legendH - rws * (headH + footH) - (rws - 1) * gy) / rws, o.maxSize);
-      if (!best || s > best.s + 0.5) best = { s: s, cols: cols, rows: rws };
+      var sw = (W - (cols - 1) * gx) / cols, fh = footH;
+      var fit = function (f) { return Math.min(sw, (H - legendH - rws * (headH + f) - (rws - 1) * gy) / rws, o.maxSize); };
+      var s = fit(fh);
+      // the share row wraps with the waffle width, which depends on the row height: settle in two passes
+      for (var pass = 0; shares && pass < 2; pass++) { fh = shareRows(ctx, m, Math.max(30, Math.floor(s))).h; s = fit(fh); }
+      if (!best || s > best.s + 0.5) best = { s: s, cols: cols, rows: rws, fh: fh };
     }
+    if (shares) footH = best.fh;
     var S2 = Math.max(30, Math.floor(best.s));
     var gridW = best.cols * S2 + (best.cols - 1) * gx;
     // spread waffles across the width when there is spare room (calmer than a tight cluster)
@@ -301,7 +317,18 @@
       L.items.push({ x: left + col * (S2 + gxx), y: top + row * (headH + S2 + footH + gy) + headH, S: S2, headH: headH, footH: footH });
     });
     L.legendH = legendH;
+    L.shares = shares;
     return L;
+  }
+
+  /** Per-segment share row(s) under a stacked waffle of side S: items wrap to fit, figures are never cut. */
+  function shareRows(ctx, m, S) {
+    var f = '10.5px ' + ctx.theme.fontNum, n = m.cats.length;
+    var w = 13 + RK.chart.measure(RK.format(0.888, ctx.options.pctFormat), f) + 8;
+    // balanced grid (2 + 2 rather than 3 + 1) so the figures line up in columns
+    var rows = Math.max(1, Math.ceil(n * w - 8 > S ? n / Math.max(1, Math.floor((S + 8) / w)) : 1));
+    var cols = Math.ceil(n / rows);
+    return { h: 8 + rows * 15, itemW: Math.max(w, Math.min(S / cols, w * 1.6)), cols: cols };
   }
 
   function paint(ctx, m, L, wrap, animate, state) {
@@ -336,13 +363,28 @@
         tt.textContent = truncate(wf.title, it.S, '600 11.5px ' + t.fontSans);
       }
       if (o.mode === 'facet') {
-        var vv = svgEl('text', RK.util.merge({ x: 0, y: it.S + 22, fill: wf.cat && m.hl.indexOf(wf.cat) >= 0 ? t.accent2 : t.ink, 'data-rk-val': wi, 'data-v': wf.share }, font(18, 600, true)), g);
+        // the highlighted facet: bold ink figure with an accent-2 underline (text never in the mark colour)
+        var isHl = wf.cat && m.hl.indexOf(wf.cat) >= 0;
+        var vv = svgEl('text', RK.util.merge({ x: 0, y: it.S + 22, fill: t.ink, 'data-rk-val': wi, 'data-v': wf.share }, font(18, isHl ? 700 : 600, true)), g);
         vv.classList.add('rk-num');
         RK.motion.countUp(vv, wf.share, { format: o.pctFormat, animate: animate });
+        if (isHl) svgEl('rect', { x: 0, y: it.S + 26, width: Math.ceil(RK.chart.measure(RK.format(wf.share, o.pctFormat), '700 18px ' + t.fontNum)), height: 2.5, rx: 1, fill: t.accent2 }, g);
         if (!m.pctLike) {
           var sub = svgEl('text', RK.util.merge({ x: it.S, y: it.S + 22, fill: t.ink3, 'text-anchor': 'end' }, font(10.5, 400, true)), g);
           sub.textContent = RK.format(wf.value, m.fmt) + m.unit;
         }
+      } else if (L.shares) {
+        // several stacked waffles: each segment's share under its waffle (swatch + figure), in legend order
+        var SR = shareRows(ctx, m, it.S), sx = 0, sy = it.S + 16;
+        m.cats.forEach(function (cat, ci) {
+          var cc = wf.counts.filter(function (x) { return x.cat === cat; })[0];
+          if (ci && ci % SR.cols === 0) { sx = 0; sy += 15; }
+          var row = svgEl('g', { 'data-cat': cat, class: 'rk-waffle__row' }, g);
+          svgEl('rect', { x: sx, y: sy - 4.5, width: 9, height: 9, rx: 2, fill: fillFor(ctx, m, cat), class: 'rk-waffle__sw', 'data-sw': cat }, row);
+          var st = svgEl('text', RK.util.merge({ x: sx + 13, y: sy, 'dominant-baseline': 'central', fill: t.ink2, 'data-ls': wi + '|' + cat }, font(10.5, 400, true)), row);
+          st.textContent = cc && cc.value ? RK.format(cc.share, o.pctFormat) : '–';
+          sx += SR.itemW;
+        });
       }
     });
 
@@ -377,7 +419,7 @@
       var cy = y + T.rowH * (i + 0.5);
       var row = svgEl('g', { 'data-cat': cat, class: 'rk-waffle__row' }, g);
       svgEl('rect', { x: -4, y: (cy - T.rowH / 2).toFixed(1), width: T.w + 8, height: T.rowH, fill: 'transparent' }, row);
-      svgEl('rect', { x: 0, y: (cy - 5).toFixed(1), width: 10, height: 10, rx: ctx.options.shape === 'circle' ? 5 : 2, fill: fillFor(ctx, m, cat), class: 'rk-waffle__sw', 'data-sw': cat }, row);
+      svgEl('rect', { x: 0, y: (cy - 5).toFixed(1), width: 10, height: 10, rx: 2, fill: fillFor(ctx, m, cat), class: 'rk-waffle__sw', 'data-sw': cat }, row);   // house swatch
       var strong = m.hl.indexOf(cat) >= 0;
       var nm = svgEl('text', RK.util.merge({ x: 16, y: cy, 'dominant-baseline': 'central', fill: strong ? t.ink : t.ink2 }, font(11.5, strong ? 600 : 400)), row);
       nm.textContent = truncate(cat, T.nameW - 4, (strong ? '600 ' : '') + '11.5px ' + t.fontSans);
@@ -408,10 +450,15 @@
     if (!wf) return;
     m.cats.forEach(function (cat) {
       var c = wf.counts.filter(function (x) { return x.cat === cat; })[0] || { value: 0, share: 0 };
-      var v = svg.querySelector('[data-lv="' + cssEsc(cat) + '"]'), p = svg.querySelector('[data-lp="' + cssEsc(cat) + '"]'), sw = svg.querySelector('[data-sw="' + cssEsc(cat) + '"]');
+      var v = svg.querySelector('[data-lv="' + cssEsc(cat) + '"]'), p = svg.querySelector('[data-lp="' + cssEsc(cat) + '"]');
       if (v) v.textContent = c.value ? RK.format(c.value, m.fmt) : '–';     // nil in the current filter
       if (p) p.textContent = c.value ? RK.format(m.pctLike ? c.value : c.share, ctx.options.pctFormat) : '–';
-      if (sw) sw.setAttribute('fill', fillFor(ctx, m, cat));
+      svg.querySelectorAll('[data-sw="' + cssEsc(cat) + '"]').forEach(function (sw) { sw.setAttribute('fill', fillFor(ctx, m, cat)); });
+    });
+    svg.querySelectorAll('[data-ls]').forEach(function (el) {
+      var k = el.getAttribute('data-ls'), cut = k.indexOf('|'), w2 = m.waffles[+k.slice(0, cut)], cat = k.slice(cut + 1);
+      var cc = w2 && w2.counts.filter(function (x) { return x.cat === cat; })[0];
+      el.textContent = cc && cc.value ? RK.format(cc.share, ctx.options.pctFormat) : '–';
     });
     var lt = svg.querySelector('[data-lt]'), ltp = svg.querySelector('[data-ltp]');
     if (lt) lt.textContent = RK.format(wf.total, m.fmt);
@@ -426,7 +473,7 @@
       if (x + w + 30 > L.W && x > 0) { x = 0; y += 18; }
       var row = svgEl('g', { 'data-cat': cat, class: 'rk-waffle__row' }, g);
       svgEl('rect', { x: x - 2, y: y - 8, width: w + 22, height: 16, fill: 'transparent' }, row);
-      svgEl('rect', { x: x, y: y - 5, width: 10, height: 10, rx: ctx.options.shape === 'circle' ? 5 : 2, fill: fillFor(ctx, m, cat), class: 'rk-waffle__sw', 'data-sw': cat }, row);
+      svgEl('rect', { x: x, y: y - 5, width: 10, height: 10, rx: 2, fill: fillFor(ctx, m, cat), class: 'rk-waffle__sw', 'data-sw': cat }, row);   // house swatch
       var tx = svgEl('text', RK.util.merge({ x: x + 15, y: y, 'dominant-baseline': 'central', fill: t.ink2 }, font(11, m.hl.indexOf(cat) >= 0 ? 600 : 400)), row);
       tx.textContent = cat;
       x += w + 34;

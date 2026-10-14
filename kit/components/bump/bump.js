@@ -10,7 +10,17 @@
   var C = RK.chart, util = RK.util;
 
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
-  function richKey(i) { return 'c' + i; }
+
+  /** Greedy word wrap to `width` px (period headers that would run into their neighbours). */
+  function wrap(text, width, font) {
+    var words = String(text).split(/\s+/), lines = [], cur = '';
+    words.forEach(function (w) {
+      var next = cur ? cur + ' ' + w : w;
+      if (cur && C.measure(next, font) > width) { lines.push(cur); cur = w; } else cur = next;
+    });
+    if (cur) lines.push(cur);
+    return lines;
+  }
 
   RK.component({
     id: 'bump',
@@ -103,29 +113,40 @@
         return muted ? mutedColor : pal[Math.max(0, colorOrder.indexOf(e))];
       };
       var dimmed = function (e) { return sel.length && sel.indexOf(e) < 0; };
-      var nameColor = function (e) {
-        if (dimmed(e)) return RK.theme.alpha(t.ink3, 0.5);
-        if (isHL(e)) return t.ink;
-        return muted ? t.ink3 : colorOf(e);
-      };
 
       /* ---------- end labels via left / right category axes (containLabel sizes the margins) ---------- */
-      var rich = { v: { color: t.ink2, fontSize: 10.5, fontFamily: t.fontNum, padding: [0, 0, 0, 6] } };
-      entities.forEach(function (e, i) {
-        rich[richKey(i)] = { color: nameColor(e), fontSize: 11, fontFamily: t.fontSans, fontWeight: isHL(e) || !muted ? 600 : 400 };
-      });
-      var esc = function (s) { return String(s).replace(/[{}|]/g, ''); };
+      // names wear ink tokens (the series colour is carried by the rank node next to them); the target is ink 600.
+      // Right-hand values sit in one right-aligned column after a fixed-width name segment.
+      var nameFont = '11px ' + t.fontSans, valFont = '10.5px ' + t.fontNum;
       var namesAt = function (j, ri) {
         return entities.filter(function (e) { return rank[e][j] === ri + 1; });
       };
+      var valText = function (e, j) { return o.showValue && hasValues && util.isNum(val[e][j]) ? C.richSafe(RK.format(val[e][j], fmt).replace(/^-/, '\u2212')) : ''; };
+      var nameW = 0, valW = 0, leftW = 0;
+      entities.forEach(function (e) {
+        var f = (isHL(e) ? '600 ' : '') + nameFont;
+        if (inView(rank[e][last])) { nameW = Math.max(nameW, C.measure(e, f)); valW = Math.max(valW, C.measure(valText(e, last), valFont)); }
+        if (inView(rank[e][0])) leftW = Math.max(leftW, C.measure(e, f));
+      });
+      nameW = Math.ceil(nameW) + 1; valW = Math.ceil(valW) + 1;
+      var rich = {
+        v: { color: t.ink2, fontSize: 10.5, fontFamily: t.fontNum, padding: [0, 0, 0, 6] },
+        vc: { color: t.ink2, fontSize: 10.5, fontFamily: t.fontNum, width: valW, align: 'right', padding: [0, 0, 0, 10] },
+        n: { color: t.ink2, fontSize: 11, fontFamily: t.fontSans },
+        h: { color: t.ink, fontSize: 11, fontFamily: t.fontSans, fontWeight: 600 },
+        d: { color: RK.theme.alpha(t.ink3, 0.5), fontSize: 11, fontFamily: t.fontSans }
+      };
+      ['n', 'h', 'd'].forEach(function (k) { rich[k + 'w'] = util.merge({}, rich[k], { width: nameW }); });
+      var cls = function (e) { return dimmed(e) ? 'd' : isHL(e) ? 'h' : 'n'; };
       var sideLabel = function (j, right) {
         return function (_, ri) {
           var list = namesAt(j, ri);
           if (!list.length) return '';
+          var column = right && list.length === 1 && valW > 1;   // ties ('a / b') fall back to running text
           return list.map(function (e) {
-            var txt = '{' + richKey(entities.indexOf(e)) + '|' + esc(e) + '}';
-            if (right && o.showValue && hasValues && util.isNum(val[e][j])) txt += '{v|' + esc(RK.format(val[e][j], fmt)) + '}';
-            return txt;
+            var v = right ? valText(e, j) : '';
+            if (column) return '{' + cls(e) + 'w|' + C.richSafe(e) + '}{vc|' + v + '}';
+            return '{' + cls(e) + '|' + C.richSafe(e) + '}' + (v ? '{v|' + v + '}' : '');
           }).join('{v| / }');
         };
       };
@@ -139,8 +160,15 @@
         util.merge({}, yBase, { position: 'right', axisLabel: { show: !!o.endLabels, margin: 16, rich: rich, formatter: sideLabel(last, true) } })
       ];
 
-      /* ---------- series ---------- */
+      /* ---------- period headers: wrapped to the column spacing so neighbours never run together ---------- */
       var nodeSize = o.rankLabels ? (N > 14 ? 16 : 20) : 8;
+      var W = ctx.el.clientWidth || 800, headFont = '600 11px ' + t.fontSans;
+      var plotW = W - 12 - (o.endLabels ? leftW + 16 + nameW + valW + 26 : 40);
+      var colPx = periods.length > 1 ? plotW / (periods.length - 1) : plotW;
+      var heads = labelsX.map(function (l) { return wrap(l, Math.max(40, colPx - 10), headFont); });
+      var headLines = Math.max.apply(null, heads.map(function (h) { return h.length; }).concat([1]));
+
+      /* ---------- series ---------- */
       var series = entities.map(function (e) {
         var c = colorOf(e), dim = dimmed(e), h = isHL(e);
         var lc = dim ? RK.theme.alpha(c, 0.18) : c;
@@ -172,7 +200,7 @@
 
       return {
         legend: { show: false },
-        grid: { left: 6, right: 6, top: 28 + nodeSize / 2, bottom: nodeSize / 2 + 3, containLabel: true },
+        grid: { left: 6, right: 6, top: 28 + 13 * (headLines - 1) + nodeSize / 2, bottom: nodeSize / 2 + 3, containLabel: true },
         tooltip: {
           trigger: 'axis', confine: true,
           axisPointer: { type: 'line', lineStyle: { color: t.axis, type: 'dashed' } },
@@ -189,7 +217,10 @@
         xAxis: {
           type: 'category', data: labelsX, position: 'top', boundaryGap: false,
           axisLine: { show: false }, axisTick: { show: false },
-          axisLabel: { color: t.ink, fontWeight: 600, fontSize: 11, margin: 14, interval: 0 },
+          axisLabel: {
+            color: t.ink, fontWeight: 600, fontSize: 11, lineHeight: 13, margin: 14, interval: 0,
+            formatter: function (v, j) { return (heads[j] || [String(v)]).map(C.richSafe).join('\n'); }
+          },
           splitLine: { show: true, lineStyle: { color: t.grid } }
         },
         yAxis: yAxes,

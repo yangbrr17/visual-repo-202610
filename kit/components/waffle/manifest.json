@@ -29,11 +29,12 @@
     "legend": {"type": "boolean", "default": true, "desc": "Legend table beside a single waffle, inline legend above several"},
     "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field format"},
     "pctFormat": {"type": "string", "default": "0.0%", "desc": "Share format"},
+    "values": {"type": "boolean", "default": true, "desc": "Several stacked waffles (encode.facet): each segment's share (swatch + figure) under its waffle"},
     "maxSize": {"type": "number", "default": 280, "desc": "Maximum side of one waffle (px)"}
   },
   "interactions": ["Squares fill in sequence when the block scrolls into view", "Hover a square or legend row: that category stays in focus, tooltip with value / share / squares", "Click to cross-filter ('Others' toggles all of its members)", "Colours cross-fade and numbers count when filters change", "PNG / SVG export"],
   "samples": [
-    {"title": "Shareholder structure by investor type (% of shares outstanding)", "data": "ownership", "height": 280,
+    {"title": "Shareholder structure by investor type (% of shares outstanding)", "data": "ownership", "height": 280, "span": 7,
      "options": {"encode": {"label": "type", "value": "pct"}}},
     {"title": "Share of register by investor type", "data": "ownership", "height": 230,
      "options": {"encode": {"label": "type", "value": "shares_m"}, "mode": "facet", "highlight": "Strategic", "pctFormat": "0%"}},

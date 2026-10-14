@@ -42,6 +42,48 @@
     };
   }
 
+  /** Accounting negatives (house rule): '$#,##0' -> '$#,##0;($#,##0)'; an explicit '-' section -> parentheses. */
+  function acct(code) {
+    var c = code && (RK.format.presets[code] || code);
+    if (typeof c !== 'string' || !/[0#?]/.test(c.replace(/"[^"]*"/g, '')) || RK.format.isDateCode(c)) return code;
+    var s = [], cur = '', q = false;
+    for (var i = 0; i < c.length; i++) {
+      var ch = c[i];
+      if (ch === '"') q = !q;
+      if (ch === ';' && !q) { s.push(cur); cur = ''; } else cur += ch;
+    }
+    s.push(cur);
+    if (s.length === 1) return c + ';(' + c.replace(/^\+/, '') + ')';
+    if (/^-/.test(s[1])) s[1] = '(' + s[1].slice(1) + ')';
+    return s.join(';');
+  }
+
+  /** Readable text on a heat fill: the fill is nudged (away from the text colour) until contrast >= 4.5:1. */
+  function readable(bg, t) {
+    var T = RK.theme, dk = t.dark ? t.paper : t.ink, lt = t.dark ? t.ink : '#ffffff';
+    for (var i = 0; i < 14; i++) {
+      var cd = T.contrast(bg, dk), cl = T.contrast(bg, lt);
+      if (Math.max(cd, cl) >= 4.5) return { bg: bg, fg: cd >= cl ? dk : lt };
+      bg = T.mix(bg, cd >= cl ? lt : dk, 0.06);
+    }
+    return { bg: bg, fg: T.contrast(bg, dk) >= T.contrast(bg, lt) ? dk : lt };
+  }
+  /**
+   * Heat scale on the theme ramp clamped to its inner stops (seq-2..seq-6 / div-2..div-6 at intensity 0.5):
+   * the top bin stays chromatic (no mixing toward paper / grey) and the text keeps 4.5:1.
+   */
+  function heatScale(t, kind, domain, mid, intensity) {
+    var all = (kind === 'div' ? t.div : t.seq).slice(), k = util.isNum(intensity) ? intensity : 0.5, stops;
+    if (kind === 'div') {
+      var c = Math.floor((all.length - 1) / 2), r = Math.max(1, Math.min(c, Math.round(k * 4)));
+      stops = all.slice(c - r, c + r + 1);
+    } else {
+      stops = all.slice(1, Math.max(3, Math.min(all.length, Math.round(k * 10) + 1)));
+    }
+    var sc = kind === 'div' ? RK.theme.diverging(domain, mid, stops) : RK.theme.sequential(domain, stops);
+    return function (v) { return util.isNum(v) ? readable(sc(v), t) : null; };
+  }
+
   function label(dim, v) {
     if (v == null || v === '') return RK.format.config.na;
     if (typeof v === 'number' && !dim.format) return String(v);
@@ -95,6 +137,7 @@
       colSort: 'asc',        // asc | desc | null (data order)
       heat: false,           // false | 'seq' | 'div' — colour leaf cells
       heatIntensity: 0.5,
+      heatMinN: 1,           // cells aggregating fewer records stay uncoloured (e.g. 2: a single deal is not a "high")
       titles: {},            // {"<field or formula>": "Display title"}
       valueTitle: null,      // measure label in the corner (default e.g. "Median EV/LTM EBITDA")
       scroll: true,          // fixed block height with sticky header / totals; false = grow to content
@@ -109,8 +152,15 @@
       var thead = h('thead'), tbody = h('tbody'), tfoot = h('tfoot');
       var table = h('table.rk-table.rk-pivot__table', thead, tbody, tfoot);
       var tip = RK.ui.tip();
-      var root = h('div.rk-pivot', { class: auto ? 'is-auto' : null }, h('div.rk-pivot__scroll', table));
+      var scroller = h('div.rk-pivot__scroll', table);
+      var root = h('div.rk-pivot', { class: auto ? 'is-auto' : null }, scroller);
       ctx.el.appendChild(root);
+      // horizontal scroll cue: edge fade while columns sit off to the right, shadow on the sticky row headers
+      function edges() {
+        root.classList.toggle('is-more-r', scroller.scrollWidth - scroller.clientWidth - scroller.scrollLeft > 1);
+        root.classList.toggle('is-scrolled-x', scroller.scrollLeft > 1);
+      }
+      scroller.addEventListener('scroll', edges, { passive: true });
       var model = null;
 
       /* ---------------- model ---------------- */
@@ -147,7 +197,7 @@
         ckeys.forEach(function (k) { colTotals[k] = cell(tree, k); });
         var grand = total(tree);
         // counts show empty cells as an en dash; other measures as n.a.
-        var vfmt = o.format || (counting ? '#,##0;-#,##0;"–"' : (val && val.format) || '#,##0.0');
+        var vfmt = acct(o.format || (counting ? '#,##0;-#,##0;"–"' : (val && val.format) || '#,##0.0'));
         var pct = o.show && o.show !== 'value' && SHOW[o.show] !== undefined;
         function shown(n, ck) {
           var v = ck === '\u0002' ? total(n) : cell(n, ck);
@@ -162,7 +212,7 @@
           if (a <= 0 || b < 0) return NaN;
           return Math.pow(b / a, 1 / (ckeys.length - 1)) - 1;
         }
-        return { o: o, dims: dims, col: col, val: val, tree: tree, ckeys: ckeys, cell: cell, total: total, shown: shown, cagr: cagr, fmt: pct ? '0.0%' : vfmt, vfmt: vfmt, pct: pct };
+        return { o: o, dims: dims, col: col, val: val, tree: tree, ckeys: ckeys, cell: cell, total: total, shown: shown, cagr: cagr, fmt: pct ? '0.0%;(0.0%)' : vfmt, vfmt: vfmt, pct: pct };
       }
 
       function measureLabel(m) {
@@ -214,21 +264,17 @@
           if (o.collapsed && depth > 1) (function walk(n) { n.kids.forEach(function (k) { if (k.kids.length && k.level < depth - 1) { collapsed.add(k.key); walk(k); } }); })(m.tree);
         }
         // heat domain over the leaf cells as displayed
-        var heat = null;
+        var heat = null, minN = Math.max(1, +o.heatMinN || 1);
+        function heated(n, k) { return (n.cells.get(k) || []).length >= minN; }
         if (o.heat) {
           var vals = [];
           (function walk(n) {
-            if (!n.kids.length && n.level >= 0) m.ckeys.forEach(function (k) { var v = m.shown(n, k); if (util.isNum(v)) vals.push(v); });
+            if (!n.kids.length && n.level >= 0) m.ckeys.forEach(function (k) { var v = m.shown(n, k); if (util.isNum(v) && heated(n, k)) vals.push(v); });
             n.kids.forEach(walk);
           })(m.tree);
           if (vals.length > 1) {
-            var ext = util.extent(vals), stops = (o.heat === 'div' ? t.div : t.seq);
-            var sc = o.heat === 'div' ? RK.theme.diverging(ext, RK.expr.agg.median(vals), stops) : RK.theme.sequential(ext, stops);
-            heat = function (v) {
-              if (!util.isNum(v)) return null;
-              var fill = RK.theme.mix(t.paper, sc(v), o.heatIntensity);
-              return { bg: fill, fg: RK.theme.textOn(fill) };
-            };
+            var ext = util.extent(vals);
+            heat = heatScale(t, o.heat === 'div' ? 'div' : 'seq', ext, RK.expr.agg.median(vals), o.heatIntensity);
           }
         }
         var selBy = m.dims.map(function (d) { return d.field ? cur.selected(d.field) : []; });
@@ -240,9 +286,9 @@
 
         function valueCells(n, isLeaf) {
           var out = m.ckeys.map(function (k) {
-            var v = m.shown(n, k), hc = isLeaf && heat ? heat(v) : null;
+            var v = m.shown(n, k), hc = isLeaf && heat && heated(n, k) ? heat(v) : null;
             var td = h('td.is-num.rk-pivot__v', {
-              class: (hc ? 'is-heat ' : '') + (colSel.length && colSel.indexOf(k) < 0 ? 'is-coldim' : ''),
+              class: (hc ? 'is-heat ' : '') + (isLeaf && heat && !heated(n, k) && util.isNum(v) ? 'is-thin ' : '') + (colSel.length && colSel.indexOf(k) < 0 ? 'is-coldim' : ''),
               style: hc ? { 'background-color': hc.bg, color: hc.fg } : null
             });
             td._rkCell = { node: n, ck: k };
@@ -258,7 +304,7 @@
           }
           if (o.cagr && m.col && m.ckeys.length > 1) {
             var cg = h('td.is-num.rk-pivot__cagr');
-            tweens.push([cg, n.key + '|cagr', m.cagr(n), '0.0%']);
+            tweens.push([cg, n.key + '|cagr', m.cagr(n), '0.0%;(0.0%)']);
             out.push(cg);
           }
           return out;
@@ -318,6 +364,7 @@
         model = compute(cur);
         drawHead(model);
         drawBody(model, animate);
+        edges();
         first = false;
       }
 
@@ -374,7 +421,9 @@
 
       return {
         update: function (c) { cur = c; draw(true); },
+        resize: edges,
         destroy: function () {
+          scroller.removeEventListener('scroll', edges);
           table.removeEventListener('click', onClick);
           table.removeEventListener('mouseover', onOver);
           table.removeEventListener('mouseleave', tip.hide);

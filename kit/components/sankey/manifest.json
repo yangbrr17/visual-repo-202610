@@ -27,7 +27,7 @@
     "linkOpacity": {"type": "number", "default": 0.3, "desc": "Resting link opacity (hover and selection raise it)"},
     "nodeWidth": {"type": "number", "default": 12, "desc": "Node bar thickness (px)"},
     "nodeGap": {"type": "number", "default": 14, "desc": "Gap between nodes in a column (px)"},
-    "labels": {"type": "boolean", "default": true, "desc": "Node labels: first column outside-left, others to the right with a paper halo"},
+    "labels": {"type": "boolean", "default": true, "desc": "Node labels: first column outside-left, others to the right with a paper halo. Labels are planned against the node layout: where the next column is close they wrap / stack the value and % on separate lines, and a label that cannot clear its neighbours is hidden (tooltip only)"},
     "labelValues": {"type": "boolean", "default": true, "desc": "Formatted node total under each name (single line where nodes are crowded)"},
     "percentOf": {"type": "string", "default": null, "desc": "null | 'max' | node name — append the share of that node to labels (e.g. margins vs. 'Revenue')"},
     "focus": {"type": "string", "default": "adjacency", "desc": "Hover emphasis: adjacency | trajectory | none"},
@@ -46,6 +46,6 @@
     {"title": "Revenue build to gross profit — segments coloured, links by source", "data": "pnl_flow", "height": 340, "span": 8,
      "options": {"where": "target in [\"Revenue\", \"Gross profit\", \"Cost of goods sold\"]",
                  "colorBy": "node", "nodeColors": {"Revenue": "accent", "Gross profit": "accent"}, "costNodes": ["Cost of goods sold"],
-                 "linkColor": "source", "linkOpacity": 0.38, "nodeAlign": "justify", "format": "$#,##0"}}
+                 "linkColor": "source", "linkOpacity": 0.38, "nodeAlign": "justify", "percentOf": "Revenue", "format": "$#,##0"}}
   ]
 }

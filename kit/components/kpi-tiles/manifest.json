@@ -21,7 +21,7 @@
     "good": {"type": "string", "required": false, "desc": "'up' or 'down' — which direction is favourable", "default": "good"}
   },
   "options": {
-    "columns": {"type": "number", "default": null, "desc": "Fixed number of columns (auto-fit when null)"},
+    "columns": {"type": "number", "default": null, "desc": "Fixed number of columns; null = balanced automatic count (as many as fit at ~160px, rows evened out: 6 tiles -> 6 x 1 wide, 3 x 2 at ~760px, 2 x 3 on phones)"},
     "countUp": {"type": "boolean", "default": true, "desc": "Animate numbers when they scroll into view"},
     "sparkline": {"type": "boolean", "default": true, "desc": "Draw sparklines"},
     "variant": {"type": "string", "default": "plain", "desc": "plain | boxed | accent"}

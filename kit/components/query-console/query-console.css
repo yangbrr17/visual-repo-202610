@@ -1,6 +1,7 @@
 /* query-console */
 .rk-qc-host { --rk-qc-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace; }
-.rk-block__body.rk-qc-host { min-height: 480px; }      /* usable even when the block sets no --rk-h */
+/* usable even when the block sets no height; an explicit --rk-h (e.g. a one-row 16:9 page) wins */
+.rk-block__body.rk-qc-host:not([style*="--rk-h"]) { min-height: 480px; }
 .rk-qc { height: 100%; min-height: 0; container-type: inline-size; font-size: 12.5px; color: var(--rk-ink); }
 .rk-qc__grid {
   position: relative; height: 100%; min-height: 0;
@@ -127,6 +128,13 @@
 /* ---------- reference panel ---------- */
 .rk-qc__ref { grid-column: 2; grid-row: 2 / 4; min-height: 0; overflow: auto; padding: 0 10px 14px; border-left: 1px solid var(--rk-rule); background: var(--rk-surface); font-size: 12px; }
 .rk-qc-ref__top { position: sticky; top: 0; z-index: 1; padding: 10px 0 6px; background: var(--rk-surface); }
+/* bottom fade while more fields sit below the fold (same grid cell as the panel, above it) */
+.rk-qc__reffade {
+  grid-column: 2; grid-row: 3; align-self: end; z-index: 2; height: 34px; margin-left: 1px; pointer-events: none;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--rk-surface) 0%, transparent), var(--rk-surface) 80%);
+  opacity: 0; transition: opacity var(--rk-dur-fast);
+}
+.rk-qc__reffade.is-on { opacity: 1; }
 .rk-qc-ref__q { width: 100%; height: 28px; padding: 0 9px; border: 1px solid var(--rk-rule); border-radius: var(--rk-radius); background: var(--rk-paper); color: var(--rk-ink); font-size: 12px; outline: none; }
 .rk-qc-ref__q:focus { border-color: var(--rk-accent-3); }
 .rk-qc-ref__tip { margin: 5px 2px 0; font-size: 10.5px; color: var(--rk-ink-3); }
@@ -166,6 +174,9 @@
 .rk-qc-tbl thead th.is-sorted { color: var(--rk-accent); }
 [data-rk-theme="ink"] .rk-qc-tbl thead th.is-sorted { color: var(--rk-ink); }
 .rk-qc-tbl td { padding: 5px 10px; }
+/* the highlighted target stays visible: pinned to the pane's bottom edge while it is below the fold */
+.rk-qc-tbl tbody tr.is-target td { position: sticky; bottom: 0; z-index: 1; background: color-mix(in srgb, var(--rk-accent-2) 15%, var(--rk-paper)); box-shadow: 0 -1px 0 color-mix(in srgb, var(--rk-accent-2) 45%, var(--rk-paper)); }
+.rk-qc-tbl tbody tr.is-target td:first-child { box-shadow: inset 3px 0 0 var(--rk-accent-2), 0 -1px 0 color-mix(in srgb, var(--rk-accent-2) 45%, var(--rk-paper)); }
 .rk-qc-tbl tbody tr { animation: rk-qc-row 260ms var(--rk-ease) both; }
 .rk-qc-empty { padding: 32px 20px; text-align: center; color: var(--rk-ink-3); }
 .rk-qc-more { margin: 0; padding: 6px 10px; font-size: 11px; color: var(--rk-ink-3); }
@@ -238,7 +249,7 @@
 /* ---------- narrow blocks (container queries) ---------- */
 @container (max-width: 780px) {
   .rk-qc.has-ref .rk-qc__grid { grid-template-columns: minmax(0, 1fr); }
-  .rk-qc__ref { display: none; }
+  .rk-qc__ref, .rk-qc__reffade { display: none; }
   .rk-qc.is-ref-open .rk-qc__ref { display: block; grid-column: auto; grid-row: auto; position: absolute; z-index: 4; right: 0; top: 47px; bottom: 0; width: min(290px, 88%); box-shadow: var(--rk-shadow-pop); animation: rk-qc-in 180ms var(--rk-ease); }
   .rk-qc-refbtn { display: inline-flex; }
   .rk-qc-kbd { display: none; }
@@ -262,7 +273,7 @@
 .rk-qc.is-static *, .rk-qc.is-static *::before, .rk-qc.is-static *::after { animation: none !important; transition: none !important; }
 @media (prefers-reduced-motion: reduce) { .rk-qc *, .rk-qc-pop { animation: none !important; transition: none !important; } }
 @media print {
-  .rk-qc__head, .rk-qc__editor, .rk-qc__ref, .rk-qc-rh .rk-seg, .rk-qc-rh .rk-btn, .rk-qc-pop, .rk-qc-ac { display: none !important; }
+  .rk-qc__head, .rk-qc__editor, .rk-qc__ref, .rk-qc__reffade, .rk-qc-rh .rk-seg, .rk-qc-rh .rk-btn, .rk-qc-pop, .rk-qc-ac { display: none !important; }
   .rk-qc__grid { grid-template-columns: minmax(0, 1fr) !important; border: 0; }
   .rk-qc-tbl tbody tr { animation: none; }
 }

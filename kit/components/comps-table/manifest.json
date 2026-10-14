@@ -16,7 +16,7 @@
     "note": {"type": "string", "required": false, "desc": "Per-row footnote marker shown after the label, e.g. '(1)'"}
   },
   "options": {
-    "columns": {"type": "array", "default": null, "desc": "[{field, expr?, title?, format?, group?, heat?: 'seq'|'div'|false, mid?, reverse?, nm?: [lo, hi], sign?, stats?: false, align?, width?, note?}] — field names or specs; null = every numeric field. Include the label field to position it; expr derives a column with an RK formula"},
+    "columns": {"type": "array", "default": null, "desc": "[{field, expr?, title?, format?, group?, heat?: 'seq'|'div'|false, mid?, reverse?, nm?: [lo, hi], sign? (change column: '+' / parentheses, arrow), stats?: false, align?, width?, note?}] — field names or specs; null = every numeric field. Include the label field to position it; expr derives a column with an RK formula"},
     "groupBy": {"type": "string", "default": null, "desc": "Field that splits rows into sections with a header row (e.g. sector)"},
     "stats": {"type": "string[]", "default": ["mean", "median"], "desc": "Statistic rows: mean | median | high | low"},
     "statsScope": {"type": "string", "default": "overall", "desc": "overall | group | both — where statistic rows appear (group / both need groupBy)"},
@@ -26,10 +26,11 @@
     "pinTarget": {"type": "boolean|string", "default": false, "desc": "false | 'top' | 'bottom' — lift the target rows out of their section"},
     "labelTitle": {"type": "string", "default": null, "desc": "Header of the label column (defaults to the field title)"},
     "labelWidth": {"type": "number|string", "default": null, "desc": "Width of the label column (px or CSS length)"},
-    "notes": {"type": "object", "default": {}, "desc": "{\"<label value>\": \"(1)\"} footnote markers after row labels (the note text goes in the block footer)"},
+    "notes": {"type": "object", "default": {}, "desc": "{\"<label value>\": \"(1)\"} footnote markers after row labels"},
+    "footnotes": {"type": "object", "default": {}, "desc": "{\"(1)\": \"Pending completion\"} text for the markers, written above the source line in the block footer"},
     "sort": {"type": "object", "default": null, "desc": "{field, dir: 'asc'|'desc'} initial sort; rows always sort within their section"},
     "sortable": {"type": "boolean", "default": true, "desc": "Click headers to sort (numbers descending first; third click restores data order)"},
-    "heatIntensity": {"type": "number", "default": 0.5, "desc": "0–1 strength of heat-map tints"},
+    "heatIntensity": {"type": "number", "default": 0.5, "desc": "0–1 span of the theme ramp used for heat columns (0.5 = seq-2…seq-6 / div-2…div-6); text colour is picked for 4.5:1 contrast"},
     "scroll": {"type": "boolean", "default": true, "desc": "true: fixed block height with sticky header, first column and overall-statistics footer; false: the block grows to fit the table"},
     "dense": {"type": "boolean", "default": false, "desc": "Tighter row padding"},
     "stagger": {"type": "boolean", "default": true, "desc": "Staggered row reveal on first paint"},
@@ -55,7 +56,7 @@
        ]}},
     {"title": "Selected precedent transactions", "data": "precedents", "height": 600,
      "options": {
-       "encode": {"label": "target"}, "labelTitle": "Target", "sort": {"field": "date", "dir": "desc"}, "stats": ["mean", "median", "high", "low"], "highlight": "Brennick Robotics", "notes": {"Upland Drives": "(1)", "Tarrant Automation": "(1)"},
+       "encode": {"label": "target"}, "labelTitle": "Target", "sort": {"field": "date", "dir": "desc"}, "stats": ["mean", "median", "high", "low"], "highlight": "Brennick Robotics", "notes": {"Upland Drives": "(1)", "Tarrant Automation": "(1)"}, "footnotes": {"(1)": "Announced, pending completion; terms as announced."},
        "columns": [
          {"field": "date", "title": "Announced", "format": "mmm yyyy"},
          {"field": "target"},

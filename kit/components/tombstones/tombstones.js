@@ -161,7 +161,7 @@
         var valueText = (value == null || value === '') && o.missingValue != null ? o.missingValue : RK.format(value, vf);
         var dateText = r[enc.date] == null ? RK.format(null) : RK.format(r[enc.date], RK.format.isDateCode(df) ? df : 'mmmm yyyy');
         var logos = o.monogram ? h('div.rk-tomb__logos', tile(d.lead, true, isHl(d.lead), c), d.party ? tile(d.party, false, isHl(d.party), c) : null) : null;
-        var desc = enc.description ? r[enc.description] : null;
+        var desc = enc.description && r[enc.description] != null && r[enc.description] !== '' ? String(r[enc.description]) : null;   // text child, never a props bag
         var el = h('article.rk-tomb__card', {
           role: 'listitem',
           tabindex: '0',
@@ -169,7 +169,7 @@
           style: { '--rk-i': Math.min(i, 24) },
           'aria-label': [r[enc.type], d.lead, d.verb || d.solo, d.party, valueText, dateText, r[enc.role]].filter(Boolean).join(', ')
         },
-          h('div.rk-tomb__kicker', { title: r[enc.type] || '' }, r[enc.type] || ''),
+          h('div.rk-tomb__kicker', { title: String(r[enc.type] || '') }, String(r[enc.type] || '')),
           logos,
           h('div.rk-tomb__names',
             h('div.rk-tomb__lead', { title: d.lead }, d.lead),
@@ -178,7 +178,7 @@
             o.showDescription && desc ? h('div.rk-tomb__desc', desc) : null),
           h('div.rk-tomb__value.rk-num', valueText),
           h('div.rk-tomb__date.rk-num', dateText),
-          o.showRole !== false && enc.role && r[enc.role] ? h('div.rk-tomb__role', { title: r[enc.role] }, r[enc.role]) : null);
+          o.showRole !== false && enc.role && r[enc.role] ? h('div.rk-tomb__role', { title: String(r[enc.role]) }, String(r[enc.role])) : null);
         el.dataset.key = keyOf(r, c);
         el._rkRow = r;
         return el;

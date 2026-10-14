@@ -14,4 +14,5 @@
 .rk-choro__label b { font-weight: 500; font-size: 9.5px; color: var(--rk-ink-3); letter-spacing: .01em; }
 .rk-choro__label span { font-weight: 600; }
 .rk-geo-leg__nodata span { color: var(--rk-ink-3); }
+.rk-choro__hatch { background: repeating-linear-gradient(135deg, var(--rk-map-land) 0 2px, color-mix(in srgb, var(--rk-map-land) 78%, var(--rk-ink)) 2px 3px); }
 @media (prefers-reduced-motion: reduce) { .rk-choro .rk-choro__area { animation: none !important; transition: none !important; } }

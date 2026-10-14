@@ -35,7 +35,7 @@
     "xFormat": {"type": "string", "default": null, "desc": "X format for tooltip titles (dates default to the field format)"},
     "format": {"type": "string", "default": null, "desc": "Value format; defaults to the y field format ('#,##0.0' when rebased)"},
     "yMin": {"type": "string|number", "default": "auto", "desc": "'auto' (zero for areas, otherwise fit the data) | 'dataMin' | number"},
-    "legend": {"type": "boolean", "default": true, "desc": "Legend top-left (shown when there is more than one series)"}
+    "legend": {"type": "boolean|string", "default": "auto", "desc": "'auto' = legend top-left unless the end labels already name the series (4 or fewer) | true | false"}
   },
   "interactions": ["Axis tooltip with all series (and % change when rebased)", "Hover near a pin to read the event", "Slider, drag, Ctrl/Cmd + wheel or pinch zoom with automatic y re-fit (plain wheel scrolls the page)", "Legend toggle re-fits the axis", "Click a line to cross-filter (long data; generic series fields filter this dataset only)", "End labels follow zoom and filters", "PNG / CSV export"],
   "samples": [

@@ -55,6 +55,25 @@
     return list.slice().sort(function (a, b) { return nums ? a - b : String(a).localeCompare(String(b)); });
   }
 
+  /** " ($m)" for a size field in USD m shown with a $ format; " (unit)" otherwise; "" when the format already says it. */
+  function unitTag(unit, fmt) {
+    if (!unit) return '';
+    var sym = { USD: '$', EUR: '€', GBP: '£', JPY: '¥', CNY: '¥', RMB: '¥' }, m = /^([A-Z]{3})\s*(.*)$/.exec(unit);
+    if (m && sym[m[1]] && String(RK.format.presets[fmt] || fmt || '').indexOf(sym[m[1]]) >= 0) unit = m[2] ? sym[m[1]] + m[2] : '';
+    return unit ? ' (' + unit + ')' : '';
+  }
+  /** Rows a wrapping (type 'plain') ECharts legend needs within `avail` px — mirrors ECharts' box layout. */
+  var LEGEND_ROW = 25;   // item height (~11px) + itemGap (14px)
+  function legendRows(items, avail, t) {
+    var font = '11px ' + t.fontSans, rows = 1, x = 0;
+    items.forEach(function (name) {
+      var w = 10 + 5 + C.measure(name, font);
+      if (x > 0 && x + w > avail) { rows++; x = 0; }
+      x += w + 14;
+    });
+    return rows;
+  }
+
   /* ---------------- label placement (greedy, think-cell style) ---------------- */
   function gridRect(inst) {
     try { return inst.getModel().getComponent('grid', 0).coordinateSystem.getRect(); }
@@ -95,7 +114,7 @@
       if (b.x < rect.x + 1 || b.y < rect.y + 1 || b.x + b.w > rect.x + rect.width - 1 || b.y + b.h > rect.y + rect.height - 1) return false;
       for (var i = 0; i < placed.length; i++) {
         var p = placed[i];
-        if (b.x < p.x + p.w + 2 && b.x + b.w + 2 > p.x && b.y < p.y + p.h && b.y + b.h > p.y) return false;
+        if (b.x < p.x + p.w + 4 && b.x + b.w + 4 > p.x && b.y < p.y + p.h + 1 && b.y + b.h + 1 > p.y) return false;   // >= 4px apart
       }
       for (var j = 0; j < obs.length; j++) {
         var o = obs[j];
@@ -106,15 +125,29 @@
       return true;
     }
     var specs = L.specs.map(function (sp) { var q = toPx(sp); return util.merge({}, sp, { px: q[0], py: q[1] }); });
+    /** In-bubble label only when no other bubble reaches into the label box (else it is overprinted). */
+    function clearInside(sp) {
+      var b = { x: sp.px - sp.w / 2, y: sp.py - sp.h / 2, w: sp.w, h: sp.h };
+      for (var j = 0; j < obs.length; j++) {
+        var o = obs[j];
+        if (o.id === sp.id) continue;
+        var nx = Math.max(b.x, Math.min(o.x, b.x + b.w)), ny = Math.max(b.y, Math.min(o.y, b.y + b.h));
+        if ((o.x - nx) * (o.x - nx) + (o.y - ny) * (o.y - ny) < (o.r + 1) * (o.r + 1)) return false;
+      }
+      return true;
+    }
     // targets first, then isolated points (they rarely block), then crowded ones
     specs.forEach(function (sp) {
       sp.crowd = obs.filter(function (o) { var dx = o.x - sp.px, dy = o.y - sp.py; return dx * dx + dy * dy < 1600; }).length;
     });
-    specs.sort(function (a, b) { return (b.force ? 1 : 0) - (a.force ? 1 : 0) || a.crowd - b.crowd; });
+    // in-bubble candidates go last: they rarely need outside room, and when blocked they should not take the
+    // only free spot of a small neighbour
+    specs.sort(function (a, b) { return (b.force ? 1 : 0) - (a.force ? 1 : 0) || (a.inside ? 1 : 0) - (b.inside ? 1 : 0) || a.crowd - b.crowd; });
     var res = {};
     specs.forEach(function (sp) {
       var key = sp.seriesId + '#' + sp.index;
-      if (sp.inside || !on(sp.name) || !inRect([sp.px, sp.py])) { res[key] = sp.inside && on(sp.name) && inRect([sp.px, sp.py]) ? 'inside' : null; return; }
+      if (!on(sp.name) || !inRect([sp.px, sp.py])) { res[key] = null; return; }
+      if (sp.inside && clearInside(sp)) { res[key] = 'inside'; return; }
       var r = sp.r, g = 3, w = sp.w, h = sp.h, d = r * 0.71;
       var cands = [[r + g, -h / 2], [-r - g - w, -h / 2], [-w / 2, -r - g - h], [-w / 2, r + g],
         [d + 1, -d - h + 1], [d + 1, d - 1], [-d - 1 - w, -d - h + 1], [-d - 1 - w, d - 1],
@@ -131,10 +164,10 @@
         id: id,
         data: L.series[id].map(function (it, i) {
           var pos = res[id + '#' + i], r = it.symbolSize ? it.symbolSize / 2 : L.r[id];
-          if (pos === 'inside') return util.merge({}, it, { label: { show: true, position: 'inside' } });
+          if (pos === 'inside') return util.merge({}, it, { label: { show: true, position: 'inside', align: 'center', verticalAlign: 'middle', color: it.labIn, textBorderWidth: 0 } });
           if (!pos) return util.merge({}, it, { label: { show: false } });
           // array positions are offsets from the symbol's bounding-box corner (-r, -r)
-          return util.merge({}, it, { label: { show: true, position: [pos[0] + r, pos[1] + r], align: 'left', verticalAlign: 'top' } });
+          return util.merge({}, it, { label: { show: true, position: [pos[0] + r, pos[1] + r], align: 'left', verticalAlign: 'top', color: it.labOut, textBorderWidth: 3.5 } });
         })
       };
     });
@@ -239,10 +272,19 @@
     var cScale = continuous ? RK.theme.sequential(cDom, stops) : null;   // identical ramp to the visualMap -> label contrast
     var groups = cType === 'category' ? util.unique(allRows.map(function (r) { return r[colorF]; }).filter(function (v) { return v != null; })) : [];
     var palette = RK.theme.categoricalSafe(groups.length ? groups : [0]);   // peers never resemble the accent2 target
+    // options.colors pins categories to theme tokens / colours (e.g. scenarios: Base accent, Upside pos, Downside neg)
+    var catColor = function (g) { return o.colors && o.colors[g] != null ? RK.theme.resolve(o.colors[g]) : palette(g); };
 
     /* size: area ∝ value (diameter ∝ √value), scaled to the unfiltered maximum so filtering never rescales */
     var sMax = sizeF ? util.extent(allRows.map(function (r) { return Math.abs(r[sizeF]); }))[1] : 0;
     var dMin = o.sizeRange[0], dMax = o.sizeRange[1];
+    // the largest bubble shrinks with the plot (~1/10 of its geometric-mean side) so a narrow block does not
+    // turn into a pile of overlapping discs; sizeRange[1] is the cap
+    var W0 = inst.getWidth(), H0 = inst.getHeight();
+    if (W0 > 0 && H0 > 0) {
+      var plotW = W0 - 64 - (sizeF && o.sizeLegend !== false ? dMax + 70 : 8), plotH = H0 - 84 - (tf && !ctx.print ? 50 : 0);
+      if (plotW > 0 && plotH > 0) dMax = Math.max(Math.min(dMax, Math.round(Math.sqrt(plotW * plotH) / 10)), Math.min(dMax, dMin * 2.5));
+    }
     function diam(v) {
       if (!sizeF) return Math.round((dMin + dMax) / 3);
       if (!util.isNum(v) || v <= 0 || !sMax) return dMin;
@@ -262,7 +304,7 @@
 
     /* layers: one series per category (legend toggles) + target layer */
     var layers = [];
-    if (cType === 'category') groups.forEach(function (g) { layers.push({ id: 'g-' + g, name: String(g), color: palette(g), match: function (r) { return !isTarget(r) && r[colorF] === g; } }); });
+    if (cType === 'category') groups.forEach(function (g) { layers.push({ id: 'g-' + g, name: String(g), color: catColor(g), match: function (r) { return !isTarget(r) && r[colorF] === g; } }); });
     else layers.push({ id: 'all', name: o.peerLabel, color: continuous ? null : palette(0), match: function (r) { return !isTarget(r); } });
     var targetName = null;
     allRows.some(function (r) { if (isTarget(r)) { targetName = String(r[nameF] == null ? 'Target' : r[nameF]); return true; } return false; });
@@ -270,18 +312,25 @@
 
     var points = [];
     var frameLabels = [];
+    // continuous colour: the target gets a ring (accent2, or ink when the ramp itself is close to accent2)
+    // separated from its fill by a paper gap, so it reads on any ramp colour
+    var ringColor = continuous && stops.some(function (c) { return RK.theme.distance(c, t.accent2) < 70; }) ? t.ink : t.accent2;
+    // z tiers by size: across categories, smaller bubbles always draw above larger ones (series z is per series,
+    // so each layer is split by size; the legend toggles all series of one name). Timeline frames keep one tier
+    // so every bubble stays in its series and morphs between periods.
+    var tierOf = function (d) { return timeline ? 0 : d > dMax * 0.66 ? 0 : d > dMax * 0.4 ? 1 : 2; };
     function frameSeries(list, fi) {
       var topN = o.labels === true ? Infinity : o.labels === false ? 0 : +o.labels || 0;
       var specs = [], obstacles = [], labelSeries = {};
       var bySize = list.slice().sort(function (a, b) { return (b[sizeF] || 0) - (a[sizeF] || 0); });
       var labelled = new Set(bySize.slice(0, topN));
-      var out = [], labelOut = [];
+      var out = [], labelOut = [], rings = [];
       layers.forEach(function (L) {
         var mine = bySize.filter(L.match);   // large first: small bubbles drawn on top
-        var data = [], labs = [];
+        var tiers = [[], [], []], labs = [];
         mine.forEach(function (r) {
           var key = selField ? r[selField] : null, dim = sel.length && sel.indexOf(key) < 0;
-          var d = diam(sizeF ? r[sizeF] : null);
+          var d = diam(sizeF ? r[sizeF] : null), tier = tierOf(d), data = tiers[tier];
           var fill = continuous ? cScale(r[colorF]) : L.color;
           var name = labelF ? String(r[labelF] == null ? '' : r[labelF]) : '';
           if (!timeline) points.push({ x: r[enc.x], y: r[enc.y], key: key });
@@ -291,42 +340,53 @@
             itemStyle: { opacity: dim ? 0.14 : opacity }
           };
           if (sizeF && !(r[sizeF] > 0)) it.itemStyle = { opacity: dim ? 0.14 : 1, color: 'transparent', borderColor: fill || t.ink3, borderWidth: 1 };
-          if (L.target && continuous) { it.itemStyle.borderColor = t.accent2; it.itemStyle.borderWidth = 2.5; }
+          var ring = L.target && continuous;
+          if (ring) {
+            it.itemStyle.borderColor = t.paper; it.itemStyle.borderWidth = 2;
+            rings.push({ value: it.value, name: name, symbolSize: d + 8, itemStyle: { opacity: dim ? 0.3 : 1 } });
+          }
           data.push(it);
-          var oid = L.id + '#' + (data.length - 1);
-          obstacles.push({ x: it.value[0], y: it.value[1], r: d / 2 + 0.5, id: oid, name: L.name });
+          var oid = L.id + '@' + tier + '#' + (data.length - 1), rr = ring ? d / 2 + 4 : d / 2;
+          obstacles.push({ x: it.value[0], y: it.value[1], r: rr + 0.5, id: oid, name: L.name });
           if (!name || !(L.target || labelled.has(r))) return;
           var font = (L.target ? '700 ' : '500 ') + '10.5px ' + t.fontSans, tw = C.measure(name, font);
-          var inside = d >= tw + 8;
+          var inside = !L.target && d >= tw + 8;   // the target label always sits outside, bold
           var eff = RK.theme.mix(t.paper, fill || t.cat[0], opacity);
-          specs.push({ seriesId: L.id + ':lab', index: labs.length, x: it.value[0], y: it.value[1], r: d / 2, w: tw + 2, h: 13,
+          specs.push({ seriesId: L.id + ':lab', index: labs.length, x: it.value[0], y: it.value[1], r: rr, w: tw + 2, h: 13,
             force: !!L.target, inside: inside, id: oid, name: L.name });
+          var outC = L.target ? t.ink : t.ink2;
           labs.push({
             value: it.value, name: name, symbolSize: d,
-            label: {
-              show: false,   // shown by layoutLabels() once a free position is found
-              color: dim ? RK.theme.alpha(t.ink2, 0.35) : inside ? RK.theme.textOn(eff) : (L.target ? t.ink : t.ink2),
-              textBorderWidth: inside ? 0 : 2.5, fontWeight: L.target ? 700 : 500
-            }
+            labIn: dim ? RK.theme.alpha(t.ink2, 0.35) : RK.theme.textOn(eff), labOut: dim ? RK.theme.alpha(outC, 0.35) : outC,
+            label: { show: false, fontWeight: L.target ? 700 : 500 }   // shown by layoutLabels() once a free position is found
           });
         });
-        out.push({
-          id: L.id, name: L.name, type: 'scatter', symbol: 'circle', z: L.target ? 3 : 2,
-          itemStyle: L.color ? { color: L.color, borderColor: t.paper, borderWidth: 1 } : { borderColor: t.paper, borderWidth: 1 },
-          emphasis: { focus: 'self', scale: 1.06, itemStyle: { opacity: 1, borderColor: t.ink, borderWidth: 1.5 } },
-          blur: { itemStyle: { opacity: 0.25 } },
-          animationDelay: function (i) { return i * 18; },
-          data: data
+        tiers.forEach(function (data, tier) {
+          if (!data.length && tier) return;
+          out.push({
+            id: L.id + '@' + tier, name: L.name, type: 'scatter', symbol: 'circle', z: 2 + tier + (L.target ? 0.5 : 0),
+            itemStyle: L.color ? { color: L.color, borderColor: t.paper, borderWidth: 1 } : { borderColor: t.paper, borderWidth: 1 },
+            emphasis: { focus: 'self', scale: 1.06, itemStyle: { opacity: 1, borderColor: t.ink, borderWidth: 1.5 } },
+            blur: { itemStyle: { opacity: 0.25 } },
+            animationDelay: function (i) { return i * 18; },
+            data: data
+          });
         });
         labelOut.push({
           id: L.id + ':lab', name: L.name, type: 'scatter', symbol: 'circle', z: 6, silent: true,
-          tooltip: { show: false }, itemStyle: { color: 'transparent', borderWidth: 0 }, emphasis: { disabled: true },
-          label: { show: false, fontSize: 10.5, fontFamily: t.fontSans, textBorderColor: t.paper, formatter: function (p) { return p.name; } },
+          tooltip: { show: false }, itemStyle: { color: 'transparent', borderWidth: 0, opacity: 1 }, emphasis: { disabled: true },
+          label: { show: false, fontSize: 10.5, fontFamily: t.fontSans, opacity: 1, textBorderColor: t.paper, formatter: function (p) { return p.name; } },
           animationDelay: function (i) { return 250 + i * 18; },
           data: labs
         });
         labelSeries[L.id + ':lab'] = labs;
       });
+      if (targetName && continuous) {
+        out.push({
+          id: 'target-ring', name: targetName, type: 'scatter', symbol: 'circle', z: 5.5, silent: true, tooltip: { show: false },
+          itemStyle: { color: 'transparent', borderColor: ringColor, borderWidth: 2 }, emphasis: { disabled: true }, data: rings
+        });
+      }
       // trails: each entity's path through the periods so far
       var trails = [];
       if (timeline && o.trails) {
@@ -335,7 +395,7 @@
           var path = [];
           for (var j = 0; j <= fi; j++) frameRows[j].forEach(function (r) { if (r[keyF] === k) path.push([r[enc.x], r[enc.y]]); });
           var proto = rows.filter(function (r) { return r[keyF] === k; })[0];
-          var col = isTarget(proto) && !continuous ? t.accent2 : (cType === 'category' ? palette(proto[colorF]) : t.ink3);
+          var col = isTarget(proto) && !continuous ? t.accent2 : (cType === 'category' ? catColor(proto[colorF]) : t.ink3);
           trails.push({
             id: 'trail-' + ki, type: 'line', silent: true, z: 1, symbol: 'circle', symbolSize: 4, showSymbol: true,
             lineStyle: { color: RK.theme.alpha(col, 0.45), width: 1.2 }, itemStyle: { color: RK.theme.alpha(col, 0.55) },
@@ -349,44 +409,51 @@
 
     var frames = frameRows.map(frameSeries);
     var bubbleIdx = [];
-    frames[0].forEach(function (s, i) { if (s.type === 'scatter' && !/:lab$/.test(s.id)) bubbleIdx.push(i + 1); }); // +1: ref series first
+    frames[0].forEach(function (s, i) { if (s.type === 'scatter' && !/:lab$|^target-ring$/.test(s.id)) bubbleIdx.push(i + 1); }); // +1: ref series first
 
     /* reference lines */
     var lines = [];
     if (o.xScale !== 'log' && xe.min < 0 && xe.max > 0) lines.push({ xAxis: 0, lineStyle: { color: t.axis, type: 'solid' }, label: { show: false } });
     if (o.yScale !== 'log' && ye.min < 0 && ye.max > 0) lines.push({ yAxis: 0, lineStyle: { color: t.axis, type: 'solid' }, label: { show: false } });
     (o.refLines || []).forEach(function (r) {
-      // house style: reference lines in t.ref, dashed, label in the line colour
-      var isX = r.axis === 'x', col = r.color || t.ref, d = { lineStyle: { color: col, type: [4, 3], width: 1.25 } };
+      // house style: reference lines in t.ref, [4, 3] dash, 10.5px italic 600 label in the line colour
+      var isX = r.axis === 'x', col = r.color ? RK.theme.resolve(r.color) : t.ref, d = { lineStyle: { color: col, type: [4, 3], width: 1.2 } };
+      var txt = (r.label ? r.label + ' ' : '') + RK.format(r.value, isX ? xFmt : yFmt);
       d[isX ? 'xAxis' : 'yAxis'] = r.value;
-      d.label = { show: true, position: isX ? 'end' : 'insideEndTop', color: col, fontSize: 10, distance: 3,
-        formatter: (r.label ? r.label + ' ' : '') + RK.format(r.value, isX ? xFmt : yFmt) };
+      d.label = { show: true, position: isX ? 'end' : 'insideEndTop', color: col, fontSize: 10.5, fontStyle: 'italic', fontWeight: 600, distance: 3,
+        textBorderColor: t.paper, textBorderWidth: 3, formatter: function () { return txt; } };   // a function: no {b}/{c} templating
       lines.push(d);
     });
     var hasXRef = (o.refLines || []).some(function (r) { return r.axis === 'x'; });
     var ref = {
       id: 'ref', type: 'scatter', data: [], silent: true, tooltip: { show: false }, z: 1,
-      markLine: lines.length ? { silent: true, symbol: ['none', 'none'], data: lines } : undefined
+      // precision: ECharts would round the line value to 2 decimals (0.1879 -> 0.19)
+      markLine: lines.length ? { silent: true, symbol: ['none', 'none'], precision: 10, data: lines } : undefined
     };
 
     /* size key (nested circles, bottom-aligned) in the right gutter */
     var showKey = o.sizeLegend !== false && !!sizeF && sMax > 0;
     var keyVals = showKey ? util.unique([niceBelow(sMax), niceBelow(sMax / 4), niceBelow(sMax / 16)]).filter(function (v) { return v > 0; }) : [];
+    // a reference circle under ~8px reads as a dot: two sizes then
+    if (keyVals.length > 2 && dMax * Math.sqrt(keyVals[2] / sMax) < 8) keyVals = keyVals.slice(0, 2);
     var keyFmt = ticks(sFmt, null, true), keyFont = '10px ' + t.fontNum, titleFont = '600 10px ' + t.fontSans;
     var keyLabW = Math.max.apply(null, [24].concat(keyVals.map(function (v) { return C.measure(keyFmt(v), keyFont); })));
     var gutter = showKey ? Math.max(Math.round(dMax + 14 + keyLabW), C.measure(ctx.title(sizeF), titleFont) * 0.6) : 0;
     var graphic = [];
     var top0 = 34;
     if (showKey) {
-      var sTitle = o.sizeTitle || ctx.title(sizeF);
-      var lines = Math.max(1, Math.ceil(C.measure(sTitle, titleFont) / gutter));
+      var sTitle = o.sizeTitle || ctx.title(sizeF) + unitTag((ds.field(sizeF) || {}).unit, sFmt);
+      var tLines = Math.max(1, Math.ceil(C.measure(sTitle, titleFont) / gutter));
       var kids = [{ type: 'text', x: 0, y: 0, style: { text: sTitle, fill: t.ink3, font: titleFont, width: gutter, overflow: 'break', lineHeight: 12 } }];
-      var base = 6 + 12 * lines + dMax;
-      keyVals.forEach(function (v) {
-        var r = diam(v) / 2, ty = base - 2 * r;
+      var base = 6 + 12 * tLines + dMax;
+      var tys = keyVals.map(function (v) { return base - diam(v); });
+      // value labels >= 12px apart (leaders bend to reach them)
+      var lys = C.spreadLabels(tys, 12, 12 * tLines + 4, null);
+      keyVals.forEach(function (v, i) {
+        var r = diam(v) / 2, ty = tys[i], ly = lys[i];
         kids.push({ type: 'circle', shape: { cx: dMax / 2, cy: base - r, r: r }, style: { fill: 'none', stroke: t.ink3, lineWidth: 0.8 } });
-        kids.push({ type: 'line', shape: { x1: dMax / 2, y1: ty, x2: dMax + 6, y2: ty }, style: { stroke: t.ink3, lineWidth: 0.6, lineDash: [2, 2] } });
-        kids.push({ type: 'text', x: dMax + 8, y: ty, style: { text: keyFmt(v), fill: t.ink2, font: keyFont, verticalAlign: 'middle' } });
+        kids.push({ type: 'polyline', shape: { points: [[dMax / 2, ty], [dMax + 3, ty], [dMax + 7, ly]] }, style: { stroke: t.ink3, lineWidth: 0.6, lineDash: [2, 2], fill: 'none' } });
+        kids.push({ type: 'text', x: dMax + 9, y: ly, style: { text: keyFmt(v), fill: t.ink2, font: keyFont, verticalAlign: 'middle' } });
       });
       graphic.push({ type: 'group', id: 'rk-size', right: 2, top: top0, silent: true, children: kids });
     }
@@ -444,7 +511,7 @@
         var title = r[nameF] == null ? '' : String(r[nameF]);
         if (labelF && nameF !== labelF && r[labelF] != null) title += ' (' + r[labelF] + ')';
         var tr = [];
-        if (colorF) tr.push({ color: continuous ? cScale(r[colorF]) : (isTarget(r) ? t.accent2 : palette(r[colorF])), label: ctx.title(colorF), value: RK.format(r[colorF], continuous ? cFmt : null) });
+        if (colorF) tr.push({ color: continuous ? cScale(r[colorF]) : (isTarget(r) ? t.accent2 : catColor(r[colorF])), label: ctx.title(colorF), value: RK.format(r[colorF], continuous ? cFmt : null) });
         tr.push({ label: ctx.title(enc.x), value: RK.format(r[enc.x], xFmt) });
         tr.push({ label: ctx.title(enc.y), value: RK.format(r[enc.y], yFmt) });
         if (sizeF) tr.push({ label: ctx.title(sizeF) + ' (size)', value: RK.format(r[sizeF], sFmt) });
@@ -452,9 +519,12 @@
         return C.tip(title, tr, tf ? ctx.title(tf) + ': ' + r[tf] : (isTarget(r) ? 'Target' : null));
       }
     };
-    var gridTop = (continuous ? 42 : showLegend || interactive ? 30 : 10) + (hasXRef ? 14 : 0);
+    // plain legend wrapping onto extra rows (no scroll paging: a hidden page 2 is lost in print / PDF)
+    var legendRight = (interactive ? 92 : 0) + gutter;
+    var lRows = showLegend ? legendRows(legendNames, inst.getWidth() - legendRight - 10, t) : 1;
+    var gridTop = (continuous ? 42 : showLegend || interactive ? 30 : 10) + (lRows - 1) * LEGEND_ROW + (hasXRef ? 14 : 0);
     var common = {
-      legend: C.legend(ctx, { show: showLegend, data: legendNames, right: (interactive ? 92 : 0) + gutter }),
+      legend: C.legend(ctx, { show: showLegend, type: 'plain', data: legendNames, right: legendRight }),
       // containLabel:false -> ECharts 6 keeps axis labels + names inside outerBounds (above the timeline)
       grid: C.grid(ctx, { top: gridTop, right: gutter ? gutter + 14 : 8, left: 2, bottom: tlShown ? 50 : 2, containLabel: false,
         outerBounds: { left: 0, right: 0, top: 0, bottom: tlShown ? 48 : 0 } }),
@@ -545,6 +615,7 @@
       loop: false,
       trails: true,            // timeline: faint path of each bubble through the periods so far
       colorScale: 'auto',      // 'auto' | 'category' | 'sequential' | 'diverging' (auto: numeric colour field -> continuous)
+      colors: null,            // {category: token | colour} pins category colours, e.g. {Base: 'accent', Upside: 'pos', Downside: 'neg'}
       mid: 0,                  // diverging midpoint
       sizeRange: [8, 54],      // [min, max] bubble diameter in px; area ∝ value
       labels: 8,               // label the N largest bubbles (true = all, false = none); the target is always labelled
@@ -573,15 +644,17 @@
       layoutLabels(inst);
       inst.on('datazoom', relabel);
       inst.on('legendselectchanged', relabel);
-      var update = api.update, resize = api.resize, destroy = api.destroy;
-      api.resize = function () { resize(); layoutLabels(inst); };
+      var update = api.update, destroy = api.destroy, cur = ctx;
       // timeline options (baseOption + options) cannot be replace-merged: rebuild them in place, keeping the period
       api.update = function (c) {
+        cur = c;
         if (bar) bar.hidden = !!c.print;
         if (!c.options.timeField) update(c);
         else inst.setOption(build(c, inst), { notMerge: true });
         layoutLabels(inst);
       };
+      // bubble sizes, legend rows and the size key follow the block size: rebuild on resize
+      api.resize = function () { inst.resize(); api.update(cur); };
       api.destroy = function () { if (bar) bar.remove(); destroy(); };
       return api;
     }

@@ -16,6 +16,19 @@
     var s = RK.format(Math.abs(v), fmt);
     return v > 0 ? '+' + s : v < 0 && /[1-9]/.test(s) ? MINUS + s : s;
   }
+  /** Value text with a true minus sign: the actual, variance and axis columns read the same ('−0.2x' / '−2.2x'). */
+  function num(v, f) { return RK.format(v, f).replace(/^-/, MINUS); }
+  /** Percent formats: the difference of two percentages is in percentage points ('+12.5pp'), not relative %. */
+  function isPct(f) {
+    var code = RK.format.presets[f] || f;
+    return typeof code === 'string' && /%/.test(code.split(';')[0].replace(/"[^"]*"/g, ''));
+  }
+  function pp(v, f) {
+    var dec = RK.format.decimals(f) || 0;
+    return signed(isNum(v) ? v * 100 : v, '0' + (dec ? '.' + new Array(dec + 1).join('0') : '') + '"pp"');
+  }
+  /** Signed absolute variance in the row format (pp for percentages). */
+  function absVar(v, f) { return isPct(f) ? pp(v, f) : signed(v, f); }
   /** Axis tick format: the value format with no more decimals than the tick step needs. */
   function tickFmt(fmt, step) {
     var code = RK.format.presets[fmt] || fmt;
@@ -26,14 +39,19 @@
     return code.replace(/([0#])\.([0#]+)/g, function (m, a, d) { var n = Math.min(dec, d.length); return a + (n ? '.' + d.slice(0, n) : ''); });
   }
 
-  /** Tinted full-width row band behind highlighted categories (like .rk-table tr.is-target). */
+  /**
+   * Tinted full-width row band behind highlighted categories (like .rk-table tr.is-target). On dark paper an
+   * alpha tint of accent-2 turns muddy, so it stays faint and a 2px accent-2 rule marks the row instead.
+   */
   function rowBand(ctx, idx) {
     var t = ctx.theme;
     return {
       id: 'hl', type: 'custom', silent: true, z: 0, tooltip: { show: false }, animation: false,
       renderItem: function (params, api) {
         var p = api.coord([0, api.value(0)]), bw = api.size([0, 1])[1];
-        return { type: 'rect', shape: { x: 0, y: p[1] - bw / 2, width: api.getWidth(), height: bw }, style: { fill: RK.theme.alpha(t.accent2, t.dark ? 0.16 : 0.11) } };
+        var kids = [{ type: 'rect', shape: { x: 0, y: p[1] - bw / 2, width: api.getWidth(), height: bw }, style: { fill: RK.theme.alpha(t.accent2, t.dark ? 0.09 : 0.11) } }];
+        if (t.dark) kids.push({ type: 'rect', shape: { x: 0, y: p[1] - bw / 2, width: 2, height: bw }, style: { fill: t.accent2 } });
+        return { type: 'group', children: kids };
       },
       data: idx.map(function (i) { return [i]; })
     };
@@ -101,13 +119,19 @@
     });
 
     // ---- colours ----
-    var shades = [];
-    for (var k = 0; k < nBands; k++) shades.push(RK.theme.mix(t.ink3, t.paper, 0.42 + 0.42 * (nBands > 1 ? k / (nBands - 1) : 1)));
+    // qualitative bands: ink-3 mixed toward the paper. Dark paper needs a narrower, brighter range or the bands
+    // vanish (>= 1.8:1 for the faintest band, ~1.3x contrast steps between neighbours, the actual bar still >= 2:1)
+    var shades = [], mixLo = t.dark ? 0.35 : 0.42, mixHi = t.dark ? 0.63 : 0.84;
+    for (var k = 0; k < nBands; k++) shades.push(RK.theme.mix(t.ink3, t.paper, mixLo + (mixHi - mixLo) * (nBands > 1 ? k / (nBands - 1) : 1)));
     if (!up) shades.reverse();
+    // a theme whose accent-2 sits close to pos / neg would make the target read as one more met / missed peer:
+    // then the target bar keeps its met / miss colour and gets an accent-2 outline instead of an accent-2 fill
+    var hiClash = !!o.colorByTarget && Math.min(RK.theme.distance(t.accent2, t.pos), RK.theme.distance(t.accent2, t.neg)) < 110;
+    function metColor(d) { return (d.varAbs >= 0) === up ? t.pos : t.neg; }
     function barColor(d) {
-      if (d.hi) return t.accent2;
-      if (o.colorByTarget && isNum(d.varAbs)) return (d.varAbs >= 0) === up ? t.pos : t.neg;
-      return t.accent;
+      if (d.hi && !(hiClash && isNum(d.varAbs))) return t.accent2;
+      if (o.colorByTarget && isNum(d.varAbs)) return metColor(d);
+      return t.peer || t.accent;   // one peer colour across the kit
     }
 
     // ---- band legend names ----
@@ -159,7 +183,9 @@
       emphasis: { itemStyle: { opacity: 0.85 } },
       animationDelay: function (i) { return i * stagger + 150; },
       data: items.map(function (d) {
-        return { name: d.label, value: d.s(d.value), itemStyle: { color: C.dim(ctx, enc.label, d.label, barColor(d)) } };
+        var st = { color: C.dim(ctx, enc.label, d.label, barColor(d)) };
+        if (d.hi && hiClash) { st.borderColor = t.accent2; st.borderWidth = 2; }
+        return { name: d.label, value: d.s(d.value), itemStyle: st };
       })
     });
 
@@ -182,8 +208,8 @@
 
     // ---- right-hand columns: actual | variance ----
     var showVal = o.labels !== false, showVar = !!o.variance && items.some(function (d) { return d.target != null; });
-    var vText = function (d) { return RK.format(d.value, d.fmt); };
-    var dText = function (d) { return o.variance === 'abs' ? signed(d.varAbs, d.fmt) : signed(d.varPct, '0.0%'); };
+    var vText = function (d) { return num(d.value, d.fmt); };
+    var dText = function (d) { return o.variance === 'abs' ? absVar(d.varAbs, d.fmt) : signed(d.varPct, '0.0%'); };
     var numFont = '11px ' + t.fontNum, headFont = '10.5px ' + t.fontSans;
     var vHead = o.valueTitle || 'Actual', dHead = o.varianceTitle || ('vs. ' + targetName.toLowerCase());
     var vW = 0, dW = 0;
@@ -203,18 +229,18 @@
     var colAxis = {
       type: 'category', data: labels, inverse: true, position: 'right',
       show: showVal || showVar, axisLine: { show: false }, axisTick: { show: false },
-      name: (showVal ? '{hv|' + vHead + '}' : '') + (showVar ? '{g|}{hd|' + dHead + '}' : ''),
+      name: (showVal ? '{hv|' + C.richSafe(vHead) + '}' : '') + (showVar ? '{g|}{hd|' + C.richSafe(dHead) + '}' : ''),
       nameLocation: 'start', nameGap: 8, nameTextStyle: { align: 'left', verticalAlign: 'bottom', padding: [0, 0, 0, 12], rich: rich },
       axisLabel: {
         interval: 0, margin: 12, align: 'left',
         formatter: function (v, i) {
           var d = items[i];
           if (!d) return '';
-          var s = showVal ? '{v|' + vText(d) + '}' : '';
+          var s = showVal ? '{v|' + C.richSafe(vText(d)) + '}' : '';
           if (showVar) {
             var x = o.variance === 'abs' ? d.varAbs : d.varPct;
             var cls = !isNum(x) || x === 0 ? 'n' : ((x > 0) === up ? 'p' : 'm');
-            s += '{g|}{' + cls + '|' + dText(d) + '}';
+            s += '{g|}{' + cls + '|' + C.richSafe(dText(d)) + '}';
           }
           return s;
         },
@@ -227,13 +253,13 @@
       axisLine: { show: true, lineStyle: { color: t.axis } }, axisTick: { show: false },
       axisLabel: {
         interval: 0, color: t.ink2, fontSize: 11, width: 150, overflow: 'truncate',
-        formatter: function (v, i) { return items[i] && items[i].hi ? '{h|' + v + '}' : v; },
+        formatter: function (v, i) { var s = C.richSafe(v); return items[i] && items[i].hi ? '{h|' + s + '}' : s; },
         rich: { h: { color: t.ink, fontWeight: 600, fontSize: 11 } }
       }
     };
     var valAxis = {
       type: 'value', min: axMin, max: axMax, interval: rowScale ? undefined : step, show: !rowScale,
-      axisLabel: { formatter: C.axisFmt(tickFmt(baseFmt, step)), hideOverlap: true },
+      axisLabel: { formatter: function (v) { return num(v, tickFmt(baseFmt, step)); }, hideOverlap: true },
       splitLine: { show: false }
     };
 
@@ -259,12 +285,12 @@
           var band = null;
           if (d.value != null) { var bi = 0; while (bi < d.thr.length && d.value >= d.thr[bi]) bi++; band = bandNames[bi]; }
           var tr = [
-            { color: barColor(d), label: actualName, value: RK.format(d.value, d.fmt), bold: true },
-            { color: t.ink, label: targetName, value: RK.format(d.target, d.fmt) }
+            { color: barColor(d), label: actualName, value: num(d.value, d.fmt), bold: true },
+            { color: t.ink, label: targetName, value: num(d.target, d.fmt) }
           ];
           if (d.target != null) {
-            tr.push({ label: 'Variance', value: signed(d.varAbs, d.fmt) });
-            tr.push({ label: 'Variance %', value: signed(d.varPct, '0.0%') });
+            tr.push({ label: 'Variance', value: absVar(d.varAbs, d.fmt) });
+            if (!isPct(d.fmt)) tr.push({ label: 'Variance %', value: signed(d.varPct, '0.0%') });   // relative % of a % is noise
           }
           return C.tip(d.label, tr, band ? 'Band: ' + band : null);
         }

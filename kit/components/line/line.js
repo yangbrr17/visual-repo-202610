@@ -35,7 +35,7 @@
       xFormat: null,           // x format for tooltips (dates default to the field format / 'dd mmm yyyy')
       format: null,            // value format; defaults to the y field format ('#,##0.0' when rebased)
       yMin: 'auto',            // 'auto' (zero for areas, else fit the data) | 'dataMin' | number
-      legend: true
+      legend: 'auto'           // 'auto' (off when end labels already name <= 4 series) | true | false
     },
     render: function (ctx) {
       var state = { zoom: null, legendSel: null, labelIds: [], model: null, yAxis: null, raf: 0 };
@@ -274,7 +274,9 @@
     var showLabels = o.labels === 'auto' ? model.isCat && n <= 12 && !model.stacked && (o.highlight != null || model.series.length <= 2) : !!o.labels;
     var showSymbols = o.symbols === 'auto' ? model.isCat && n <= 24 && !model.stacked : !!o.symbols;
     var pins = state.pins = preparePins(ctx, model);
-    var hasLegend = o.legend !== false && model.series.length > 1;
+    // direct labels beat a legend: end labels that carry the names replace it for a few series
+    var named = o.endLabels === true || o.endLabels === 'name';
+    var hasLegend = o.legend !== false && model.series.length > 1 && (o.legend === true || !(named && model.series.length <= 4));
     var slider = useZoom && o.zoomSlider !== false && !ctx.print;
 
     // reserve the right margin for the end labels
@@ -296,6 +298,22 @@
     var tk = state.ticks = model.isTime && n ? dateTicks(windowFromZoom(model, state.zoom), state.plotW) : null;
 
     var y = state.yAxis = yAxisFor(ctx, state);
+    // the "Projected" caption sits above the plot: keep it clear of point labels near the top of the band
+    var capLift = 0;
+    if (showLabels && model.fIdx > 0 && o.forecastLabel && y && util.isNum(y.max) && y.max > y.min) {
+      var hiV = null;
+      model.series.forEach(function (s) {
+        if (!(o.labels === true || o.highlight == null || s.hl)) return;
+        for (var j = model.fIdx; j < n; j++) if (util.isNum(s.values[j]) && (hiV == null || s.values[j] > hiV)) hiV = s.values[j];
+      });
+      if (hiV != null) {
+        // a label tops out ~19px above its point; the caption's baseline sits 5px above the plot
+        var dPx = (y.max - hiV) / (y.max - y.min) * state.gridH;
+        capLift = Math.max(0, Math.ceil(16 - dPx));
+        var needTop = 19 + capLift + (hasLegend ? 22 : 0);
+        if (top < needTop) { state.gridH -= needTop - top; top = needTop; }
+      }
+    }
 
     var xAxisData = function (s, mask) {
       if (model.isCat) return s.values.map(function (v, i) { return mask && !mask(i) ? null : v; });
@@ -350,9 +368,9 @@
     });
 
     // reference lines / estimates band / rebase baseline on a silent helper series (survives legend toggles)
-    var marks = markSeries(ctx, model, fmt);
+    var marks = markSeries(ctx, model, fmt, capLift);
     if (marks) series.push(marks);
-    if (pins.length) series.push(pinSeries(ctx, model, pins));
+    if (pins.length) series.push(pinSeries(ctx, model, pins, state));
 
     var xAxis = model.isCat ? {
       id: 'x', type: 'category', data: model.xs, boundaryGap: showLabels || showSymbols,
@@ -437,7 +455,7 @@
     return { customValues: tk.values, hideOverlap: true, formatter: function (v) { return RK.format(new Date(v), f); } };
   }
 
-  function markSeries(ctx, model, fmt) {
+  function markSeries(ctx, model, fmt, capLift) {
     var o = ctx.options, t = ctx.theme;
     var lines = (o.refLines || []).map(function (r) {
       var col = RK.theme.resolve(r.color) || t.ref;          // token names ('pos', 'accent2') or literal colours
@@ -445,7 +463,8 @@
         yAxis: r.value, name: r.label || '',
         lineStyle: { color: col, type: r.type || 'dashed', width: 1.25 },
         // label on a paper chip so it stays legible where it crosses the lines
-        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: col, fontWeight: 600, fontSize: 10.5,
+        // text from a function: "{a}", "{b}", "{c}" in a label are never template-substituted
+        label: { formatter: refText(r, fmt), position: 'insideStartTop', color: col, fontWeight: 600, fontSize: 10.5,
           backgroundColor: RK.theme.alpha(t.paper, 0.85), padding: [1, 4], borderRadius: 2 }
       };
     });
@@ -459,7 +478,8 @@
       area = {
         silent: true,
         itemStyle: { color: RK.theme.alpha(t.ink3, t.dark ? 0.1 : 0.06) },
-        label: { show: !!o.forecastLabel, position: 'top', distance: 5, color: t.ink3, fontSize: 10.5, fontStyle: 'italic', formatter: o.forecastLabel || '' },
+        label: { show: !!o.forecastLabel, position: 'top', distance: 5 + (capLift || 0), color: t.ink3, fontSize: 10.5, fontStyle: 'italic',
+          formatter: function () { return String(o.forecastLabel || ''); } },
         data: [[{ xAxis: from }, { xAxis: to }]]
       };
     }
@@ -471,22 +491,48 @@
     };
   }
 
+  function refText(r, fmt) {
+    var text = r.label != null && r.label !== '' ? String(r.label) : RK.format(r.value, fmt);
+    return function () { return text; };
+  }
+
   /* ------------------------------------------------------------------ *
    * Event pins (custom series): numbered markers on stems, staggered when close
    * ------------------------------------------------------------------ */
-  function pinSeries(ctx, model, pins) {
+  function pinSeries(ctx, model, pins, state) {
     var t = ctx.theme;
     var pinColor = t.ink2, txt = RK.theme.textOn(pinColor);
-    var R = 8;
+    var R = 8.5;
+    var xOf = function (i) { return model.isCat ? i : model.xv[i]; };
     return {
-      id: 'events', type: 'custom', name: '__events', z: 6, clip: true, silent: false, tooltip: { show: false },
+      // not clipped: a pin on the last point may reach into the right margin rather than be cut in half
+      id: 'events', type: 'custom', name: '__events', z: 6, clip: false, silent: false, tooltip: { show: false },
       encode: { x: 0, y: 1 },
-      data: pins.map(function (p) { return [model.isCat ? p.i : model.xv[p.i], p.y, p.n]; }),
+      data: pins.map(function (p) { return [xOf(p.i), p.y, p.n]; }),
       renderItem: function (params, api) {
         var c = params.context;
         var cs = params.coordSys;
         if (!c.pos) {
-          c.pos = pins.map(function (p) { return api.coord([model.isCat ? p.i : model.xv[p.i], p.y]); });
+          c.pos = pins.map(function (p) { return api.coord([xOf(p.i), p.y]); });
+          // a pin stands above every visible line near it (not only its own series), so it never hides data
+          c.top = pins.map(function (p, k) {
+            var px = c.pos[k][0], top = c.pos[k][1], bot = c.pos[k][1];
+            [-1, 1].forEach(function (dir) {
+              for (var j = dir < 0 ? p.i : p.i + 1; j >= 0 && j < model.xv.length; j += dir) {
+                var x = api.coord([xOf(j), 0])[0];
+                if (Math.abs(x - px) > R + 3) break;
+                model.series.forEach(function (s) {
+                  if (!isShown(state, s)) return;
+                  var v = model.stacked ? s.top[j] : s.values[j];
+                  if (!util.isNum(v)) return;
+                  var y = api.coord([xOf(j), v])[1];
+                  if (y < top) top = y;
+                  if (y > bot) bot = y;
+                });
+              }
+            });
+            return [top, bot];
+          });
           c.lv = [];
           c.pos.forEach(function (pt, k) {
             var used = {};
@@ -498,9 +544,9 @@
         }
         var k = params.dataIndex, pt = c.pos[k];
         if (!pt || pt[0] < cs.x - 1 || pt[0] > cs.x + cs.width + 1) return null;
-        var stem = 14 + c.lv[k] * (2 * R + 4);
-        var up = pt[1] - stem - R >= cs.y - 2;
-        var cy = up ? pt[1] - stem : pt[1] + stem;
+        var lift = 14 + c.lv[k] * (2 * R + 4);
+        var up = c.top[k][0] - lift - R >= cs.y - 2;
+        var cy = up ? c.top[k][0] - lift : c.top[k][1] + lift;
         return {
           type: 'group',
           blur: { style: { opacity: 1 } },      // annotations stay crisp when a line is focused
@@ -508,7 +554,7 @@
             { type: 'line', shape: { x1: pt[0], y1: pt[1], x2: pt[0], y2: cy + (up ? R : -R) }, style: { stroke: pinColor, lineWidth: 1, opacity: 0.7 }, blur: { style: { opacity: 0.7 } } },
             { type: 'circle', shape: { cx: pt[0], cy: pt[1], r: 2.5 }, style: { fill: pinColor, stroke: t.paper, lineWidth: 1 }, blur: { style: { opacity: 1 } } },
             { type: 'circle', shape: { cx: pt[0], cy: cy, r: R }, style: { fill: pinColor, stroke: t.paper, lineWidth: 1.25 }, blur: { style: { opacity: 1 } } },
-            { type: 'text', x: pt[0], y: cy, style: { text: String(api.value(2)), fill: txt, font: '600 10px ' + t.fontNum, align: 'center', verticalAlign: 'middle' }, blur: { style: { opacity: 1 } } }
+            { type: 'text', x: pt[0], y: cy, style: { text: String(api.value(2)), fill: txt, font: '600 11px ' + t.fontNum, align: 'center', verticalAlign: 'middle' }, blur: { style: { opacity: 1 } } }
           ]
         };
       }
@@ -617,8 +663,11 @@
                fontSize: 10.5, fontWeight: 600, fontFamily: t.fontNum, lineHeight: 14 },
           n: { fill: s.dimmed ? RK.theme.alpha(t.ink2, 0.4) : (s.hl ? t.ink : t.ink2), fontSize: 11, fontWeight: s.hl ? 600 : 400, fontFamily: t.fontSans, padding: [0, 0, 0, 4], lineHeight: 14 }
         };
-        var text = o.endLabels === 'value' ? '{v|' + vtxt + '}' : o.endLabels === 'name' ? '{n|' + esc(s.name) + '}' : '{v|' + vtxt + '}{n|' + esc(s.name) + '}';
-        if (o.endLabels === 'name') rich.n.fill = s.dimmed ? s.color : (t.dark ? RK.theme.mix(s.solid, t.ink, 0.25) : s.solid);
+        // data strings never reach the rich-text markup unescaped ("{v|...}" in a name would restyle it)
+        var vs = C.richSafe(vtxt), ns = C.richSafe(s.name);
+        var text = o.endLabels === 'value' ? '{v|' + vs + '}' : o.endLabels === 'name' ? '{n|' + ns + '}' : '{v|' + vs + '}{n|' + ns + '}';
+        // names in the series colour must still read as text (>= 4.5:1): the target uses accent2Ink
+        if (o.endLabels === 'name') rich.n.fill = s.dimmed ? s.color : (s.hl ? t.accent2Ink : textInk(s.solid, t));
         var needLeader = Math.abs(it.ly - it.py) > 1.5 || lx - it.px > 10;
         var anim = animFor(ctx, mode);
         elements.push(util.merge({ id: id + '-l', type: 'polyline', z: 8, silent: true, invisible: !needLeader,
@@ -646,6 +695,13 @@
     if (patch.graphic || patch.dataZoom) inst.setOption(patch);
   }
 
+  /** The series colour, deepened toward the ink until it reads as text on the paper (WCAG 4.5:1). */
+  function textInk(col, t) {
+    var c = col;
+    for (var k = 1; k <= 6 && RK.theme.contrast(c, t.paper) < 4.5; k++) c = RK.theme.mix(col, t.ink, 0.15 * k);
+    return c;
+  }
+
   function animFor(ctx, mode) {
     if (!ctx.motion) return {};
     if (mode === 'enter') return { enterFrom: { style: { opacity: 0 } }, enterAnimation: { duration: 350, delay: 850 } };
@@ -653,5 +709,4 @@
     return { updateAnimation: { duration: 0 } };
   }
 
-  function esc(s) { return String(s == null ? '' : s).replace(/[{}|]/g, ' '); }
 })();

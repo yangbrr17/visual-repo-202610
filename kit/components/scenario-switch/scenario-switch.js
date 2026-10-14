@@ -17,6 +17,12 @@
     return 'base';
   }
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
+  /** Canonical case order when the data gives none: downside cases, then base, then upside (stable within each). */
+  function canonical(list) {
+    var rank = { neg: 0, base: 1, pos: 2 };
+    return list.map(function (v, i) { return { v: v, i: i, r: rank[autoTone(v)] }; })
+      .sort(function (a, b) { return a.r - b.r || a.i - b.i; }).map(function (x) { return x.v; });
+  }
 
   RK.component({
     id: 'scenario-switch',
@@ -40,7 +46,7 @@
     render: function (ctx) {
       var o = ctx.options, ds = ctx.dataset;
       var key = o.key || o.field;
-      var values = (o.values && o.values.length ? o.values : (ds && ds.has(o.field) ? ds.distinct(o.field) : ['Base', 'Upside', 'Downside'])).slice();
+      var values = o.values && o.values.length ? o.values.slice() : canonical(ds && ds.has(o.field) ? ds.distinct(o.field) : ['Downside', 'Base', 'Upside']);
       var inline = o.layout === 'inline' || (o.layout === 'auto' && !!ctx.block.closest('.rk-topbar'));
       var labelId = RK.util.uid('rk-ss-label');
       ctx.el.classList.add('is-auto');
@@ -48,7 +54,7 @@
       var root = h('div.rk-ss', { class: (inline ? 'rk-ss--inline' : 'rk-ss--stacked') + (o.metric ? ' has-metric' : '') + (ctx.motion ? '' : ' is-static') });
       var labelText = o.label || (ds && ds.has(o.field) ? ds.field(o.field).title : null);
       if (o.metric && o.metric.label) labelText = (labelText ? labelText + ' · ' : '') + o.metric.label;
-      if (labelText) root.appendChild(h('span.rk-ss__label', { id: labelId }, labelText));
+      if (labelText) root.appendChild(h('span.rk-ss__label', { id: labelId }, String(labelText)));
 
       var track = h('div.rk-ss__track', { role: 'radiogroup', 'aria-labelledby': labelText ? labelId : null, 'aria-label': labelText ? null : 'Scenario' });
       var thumb = h('span.rk-ss__thumb', { 'aria-hidden': 'true' });
@@ -62,7 +68,7 @@
             keydown: function (e) { onKey(e, i); }
           }
         },
-        h('span.rk-ss__main', tone ? h('i.rk-ss__dot', { 'aria-hidden': 'true' }) : null, h('span.rk-ss__text', o.labels[v] || String(v))),
+        h('span.rk-ss__main', tone ? h('i.rk-ss__dot', { 'aria-hidden': 'true' }) : null, h('span.rk-ss__text', String(o.labels[v] || v))),
         o.metric ? h('span.rk-ss__metric.rk-num') : null);
         track.appendChild(b);
         return b;
@@ -104,7 +110,7 @@
         });
         moveThumb();
         if (hasDesc) {
-          var text = v != null && o.descriptions[v] ? o.descriptions[v] : '';
+          var text = v != null && o.descriptions[v] ? String(o.descriptions[v]) : '';
           if (desc.textContent !== text) {
             desc.classList.remove('is-in');
             desc.textContent = text;
@@ -157,7 +163,8 @@
           el.textContent = RK.format(vals[i], fmt);
           if (m.compare !== false && i !== refIdx && RK.util.isNum(vals[i]) && RK.util.isNum(ref) && ref !== 0) {
             var d = vals[i] / ref - 1;
-            el.appendChild(h('span.rk-ss__delta', { class: d > 0 ? 'is-pos' : d < 0 ? 'is-neg' : null }, RK.format(d, m.compareFormat || '+0.0%;-0.0%;0.0%')));
+            // change vs. the reference case: ink text with sign / parentheses ('+11.5%', '(17.1%)')
+            el.appendChild(h('span.rk-ss__delta', RK.format(d, m.compareFormat || '+0.0%;(0.0%);0.0%')));
           }
         });
       }

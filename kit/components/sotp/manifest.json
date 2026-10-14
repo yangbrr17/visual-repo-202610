@@ -27,7 +27,7 @@
     "shares": {"type": "number|string", "default": null, "desc": "Diluted shares (m) or an '@param' — enables the per-share column and the reference lines"},
     "refPrice": {"type": "number|string", "default": null, "desc": "Current share price (or '@param'): dashed reference line at price × shares in the theme reference colour"},
     "refLabel": {"type": "string", "default": null, "desc": "Caption prefix of the reference line (default 'Current', followed by the price)"},
-    "refLines": {"type": "array", "default": [], "desc": "[{price, label, color}] further per-share reference lines, e.g. the offer price with color 'accent2'"},
+    "refLines": {"type": "array", "default": [], "desc": "[{price, label, color}] further per-share reference lines, e.g. the offer price. House style draws reference and offer lines in the theme reference colour (dashed), told apart by their captions; color overrides it"},
     "evMetric": {"type": "object", "default": null, "desc": "{label, value} — implied multiple shown under the EV total (e.g. {\"label\": \"EV / EBITDA 2026E\", \"value\": 996.5})"},
     "evLabel": {"type": "string", "default": "Enterprise value", "desc": "Label of the EV total row"},
     "equityLabel": {"type": "string", "default": "Equity value", "desc": "Label of the equity total row"},
@@ -58,7 +58,7 @@
     {"title": "Sorted build-up with offer line and value axis (net debt bound to @net_debt)", "data": "sotp", "height": 460,
      "options": {"encode": {"note": "note"}, "sort": "desc", "valueAxis": true, "netDebt": "@net_debt", "paramDefaults": {"net_debt": 1490},
                  "deductions": [{"label": "Less: pension deficit", "value": 120}, {"label": "Less: minority interests", "value": 85}, {"label": "Plus: associates", "value": -60}],
-                 "shares": 158.0, "refPrice": 42.5, "refLines": [{"price": 52.0, "label": "Offer $52.00", "color": "accent2"}],
+                 "shares": 158.0, "refPrice": 42.5, "refLines": [{"price": 52.0, "label": "Offer $52.00"}],
                  "evMetric": {"label": "EV / EBITDA 2026E", "value": 996.5}}}
   ]
 }

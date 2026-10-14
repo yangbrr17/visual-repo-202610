@@ -21,6 +21,7 @@
     "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field format"},
     "scale": {"type": "string", "default": "auto", "desc": "Daily colour scale: auto | linear (draggable continuous legend) | quantile (5 buckets); auto picks quantile for skewed data"},
     "range": {"type": "array", "default": null, "desc": "Daily: [from, to] ISO dates; default = whole months spanned by the data"},
+    "weekdays": {"type": "string", "default": "auto", "desc": "Daily weekday rows: 'auto' (Sat / Sun rows only when data falls on a weekend) | 'all' | 'weekdays'"},
     "yearTotal": {"type": "boolean", "default": true, "desc": "Monthly: full-year column (YTD for partial years)"},
     "compound": {"type": "boolean", "default": true, "desc": "Monthly: compound monthly returns into the year column (false = simple sum)"},
     "totalLabel": {"type": "string", "default": "Year", "desc": "Monthly: header of the full-year column"},

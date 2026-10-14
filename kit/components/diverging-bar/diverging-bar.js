@@ -17,6 +17,15 @@
     var s = RK.format(Math.abs(v), fmt);
     return v > 0 ? '+' + s : v < 0 && /[1-9]/.test(s) ? MINUS + s : s;
   }
+  /** Value text with a true minus sign (matches the signed bar labels). */
+  function num(v, f) { return RK.format(v, f).replace(/^-/, MINUS); }
+  /** Percent formats: a value minus a percentage baseline is in percentage points ('+22.4pp'), not relative %. */
+  function isPct(f) {
+    var code = RK.format.presets[f] || f;
+    return typeof code === 'string' && /%/.test(code.split(';')[0].replace(/"[^"]*"/g, ''));
+  }
+  function ppCode(f) { var dec = RK.format.decimals(f) || 0; return '0' + (dec ? '.' + new Array(dec + 1).join('0') : '') + '"pp"'; }
+
   /** Axis tick format: the value format with no more decimals than the tick step needs (10% not 10.0%). */
   function tickFmt(fmt, step) {
     var code = RK.format.presets[fmt] || fmt;
@@ -48,6 +57,10 @@
     var base = o.baseline === 'median' || o.baseline === 'mean' ? RK.expr.agg[o.baseline](statVals.filter(isNum)) : isNum(o.baseline) ? o.baseline : 0;
     if (base == null) base = 0;
     items.forEach(function (d) { d.v = d.raw == null ? null : d.raw - base; });
+    // spreads to a percentage baseline (peer median TSR) are percentage points
+    var ppMode = base !== 0 && isPct(fmt);
+    var dfmt = ppMode ? ppCode(fmt) : fmt;
+    function delta(v) { return C.richSafe(signed(ppMode && isNum(v) ? v * 100 : v, dfmt)); }
 
     if (o.sort === 'asc' || o.sort === 'desc') {
       var dir = o.sort === 'asc' ? 1 : -1;
@@ -58,19 +71,23 @@
       });
     }
     var labels = items.map(function (d) { return d.label; });
+    // a theme whose accent-2 sits close to pos / neg would make the target read as one more up / down bar:
+    // then the target keeps its sign colour and gets an accent-2 outline instead of an accent-2 fill
+    var hiClash = o.colorBy !== 'single' && Math.min(RK.theme.distance(t.accent2, t.pos), RK.theme.distance(t.accent2, t.neg)) < 110;
     function colorOf(d) {
-      if (d.hi) return t.accent2;
-      if (o.colorBy === 'single') return t.accent;
+      if (d.hi && !hiClash) return t.accent2;
+      if (o.colorBy === 'single') return t.peer || t.accent;
       if (!d.v) return t.neutral;
       return (d.v > 0) === up ? t.pos : t.neg;
     }
 
     // ---- bounds: leave room (in px) for value labels and zero-line category labels ----
     var numFont = '11px ' + t.fontNum, catFont = '600 11px ' + t.fontSans;
-    var vlW = 0, catW = 0;
+    var vlW = 0, catW = 0, axW = 0;
     items.forEach(function (d) {
-      vlW = Math.max(vlW, C.measure(signed(d.v, fmt), numFont));
+      vlW = Math.max(vlW, C.measure(delta(d.v), numFont));
       if (zeroLab) catW = Math.max(catW, C.measure(d.label, catFont));
+      else axW = Math.max(axW, Math.min(150, C.measure(d.label, (d.hi ? '600 ' : '') + '11px ' + t.fontSans)));
     });
     var vals = items.map(function (d) { return d.v; }).filter(isNum);
     var ext = util.extent(vals.concat([0]));
@@ -86,7 +103,20 @@
     if (lo === 0 && hi === 0) hi = 1;
     var step = util.niceStep(hi - lo, 5);
     var showVal = !!o.valueAxis && !zeroLab;
-    if (showVal) { lo = Math.floor(lo / step + 1e-9) * step; hi = Math.ceil(hi / step - 1e-9) * step; }
+    // with a value axis: nice bounds of the data itself; the value labels get their room as grid margin (px),
+    // not by inflating the axis (which left a third of the plot empty)
+    var padA = 0, padB = 0;   // extra px beyond the axis start (left / bottom) and end (right / top)
+    if (showVal) {
+      step = util.niceStep((ext[1] - ext[0]) || 1, 5);
+      lo = Math.floor(ext[0] / step + 1e-9) * step; hi = Math.ceil(ext[1] / step - 1e-9) * step;
+      if (lo === hi) hi = lo + step;
+      var P2 = Math.max(120, horiz ? inst.getWidth() - axW - 50 : inst.getHeight() - 40);
+      for (var it2 = 0; it2 < 2; it2++) {
+        var u = (hi - lo) / Math.max(60, P2 - padA - padB);
+        padA = anyNeg ? Math.max(0, Math.ceil(labPx - (ext[0] - lo) / u)) : 0;
+        padB = anyPos ? Math.max(0, Math.ceil(labPx - (hi - ext[1]) / u)) : 0;
+      }
+    }
 
     var stagger = Math.min(50, 700 / Math.max(1, items.length));
     var series = [];
@@ -102,24 +132,30 @@
           var bw = horiz ? api.size([0, 1])[1] : api.size([1, 0])[0];
           var shape = horiz ? { x: 0, y: p[1] - bw / 2, width: api.getWidth(), height: bw }
             : { x: p[0] - bw / 2, y: cs.y, width: bw, height: api.getHeight() - cs.y };
-          return { type: 'rect', shape: shape, style: { fill: RK.theme.alpha(t.accent2, t.dark ? 0.16 : 0.11) } };
+          // dark paper: a faint tint plus a 2px accent-2 rule (an alpha tint of accent-2 turns muddy there)
+          var kids = [{ type: 'rect', shape: shape, style: { fill: RK.theme.alpha(t.accent2, t.dark ? 0.09 : 0.11) } }];
+          if (t.dark) kids.push({ type: 'rect', shape: horiz ? { x: 0, y: shape.y, width: 2, height: bw } : { x: shape.x, y: cs.y, width: bw, height: 2 }, style: { fill: t.accent2 } });
+          return { type: 'group', children: kids };
         },
         data: hiIdx.map(function (i) { return [i]; })
       });
     }
 
+    var baseText = C.richSafe((o.baselineLabel || (o.baseline === 'median' ? 'Median' : o.baseline === 'mean' ? 'Mean' : 'Baseline')) + (base !== 0 ? ' ' + num(base, fmt) : ''));
     var zeroLine = {
-      silent: true, symbol: ['none', 'none'], animation: false,
+      // precision 10: reference lines sit at value − baseline exactly (the default rounds to 2 decimals)
+      silent: true, symbol: ['none', 'none'], animation: false, precision: 10,
       lineStyle: { color: t.axis, type: 'solid', width: 1 },
       label: base !== 0 || o.baselineLabel ? {
-        show: true, position: horiz ? 'start' : 'insideStartTop', color: t.ink2, fontSize: 10.5, fontFamily: t.fontNum,
-        formatter: (o.baselineLabel || (o.baseline === 'median' ? 'Median' : o.baseline === 'mean' ? 'Mean' : 'Baseline')) + (base !== 0 ? ' ' + RK.format(base, fmt) : '')
+        show: true, position: horiz ? 'start' : 'insideStartTop', color: t.ink2, fontSize: 10.5, fontFamily: t.fontNum, fontStyle: 'italic',
+        formatter: function () { return baseText; }
       } : { show: false },
       data: [horiz ? { xAxis: 0 } : { yAxis: 0 }].concat((o.refLines || []).map(function (r) {
-        // reference lines (offer / target): dashed --rk-ref, label in the line colour
-        var c = r.color || t.ref;
+        // reference lines (offer / target): dashed --rk-ref, semibold italic label in the line colour
+        var c = r.color || t.ref, text = C.richSafe(r.label || num(r.value, fmt));
         var d = { lineStyle: { color: c, type: [4, 3], width: 1.2 },
-          label: { show: true, position: horiz ? 'start' : 'insideEndTop', color: c, fontSize: 10.5, fontFamily: t.fontNum, formatter: r.label || RK.format(r.value, fmt) } };
+          label: { show: true, position: horiz ? 'start' : 'insideEndTop', color: c, fontSize: 10.5, fontFamily: t.fontNum, fontStyle: 'italic', fontWeight: 600,
+            textBorderColor: t.paper, textBorderWidth: 3, formatter: function () { return text; } } };
         d[horiz ? 'xAxis' : 'yAxis'] = r.value - base;
         return d;
       }))
@@ -132,13 +168,14 @@
       emphasis: { focus: 'none', itemStyle: { opacity: 0.85 } },
       label: o.labels === false ? { show: false } : {
         show: true, distance: 5, fontSize: 11, fontFamily: t.fontNum, color: t.ink2,
-        formatter: function (p) { var d = items[p.dataIndex]; return d ? signed(d.v, fmt) : ''; }
+        formatter: function (p) { var d = items[p.dataIndex]; return d ? delta(d.v) : ''; }
       },
       data: items.map(function (d) {
-        var neg = d.v != null && d.v < 0;
+        var neg = d.v != null && d.v < 0, st = { color: C.dim(ctx, enc.label, d.label, colorOf(d)) };
+        if (d.hi && hiClash) { st.borderColor = t.accent2; st.borderWidth = 2; }
         return {
           name: d.label, value: d.v,
-          itemStyle: { color: C.dim(ctx, enc.label, d.label, colorOf(d)) },
+          itemStyle: st,
           label: { position: horiz ? (neg ? 'left' : 'right') : (neg ? 'bottom' : 'top'), color: d.hi ? t.ink : t.ink2, fontWeight: d.hi ? 600 : 400 }
         };
       }),
@@ -155,7 +192,7 @@
           return {
             value: [0, i],
             label: { show: true, position: neg ? 'right' : 'left', distance: 6, fontSize: 11,
-              color: d.hi ? t.ink : t.ink2, fontWeight: d.hi ? 600 : 400, formatter: String(d.label) }
+              color: d.hi ? t.ink : t.ink2, fontWeight: d.hi ? 600 : 400, formatter: function () { return C.richSafe(d.label); } }
           };
         })
       });
@@ -165,16 +202,19 @@
       type: 'category', data: labels, inverse: horiz,
       axisLine: { show: false, onZero: false }, axisTick: { show: false },
       axisLabel: {
-        show: !zeroLab, interval: 0, color: t.ink2, fontSize: 11,
+        show: !zeroLab, interval: 0, color: t.ink2, fontSize: 11, margin: 8 + padA,
         width: horiz ? 150 : Math.max(44, (inst.getWidth() - 40) / Math.max(1, labels.length) - 4), overflow: horiz ? 'truncate' : 'break',
-        formatter: function (v, i) { return items[i] && items[i].hi ? '{h|' + v + '}' : v; },
+        formatter: function (v, i) { var s = C.richSafe(v); return items[i] && items[i].hi ? '{h|' + s + '}' : s; },
         rich: { h: { color: t.ink, fontWeight: 600, fontSize: 11 } }
       }
     };
     var valAxis = {
       type: 'value', min: lo, max: hi, show: true,
       axisLine: { show: false }, axisTick: { show: false },
-      axisLabel: { show: showVal, formatter: C.axisFmt(tickFmt(fmt, step)), hideOverlap: true },
+      axisLabel: {
+        show: showVal, hideOverlap: true,
+        formatter: ppMode ? function (v) { return num(v * 100, tickFmt(dfmt, step * 100)); } : function (v) { return num(v, tickFmt(fmt, step)); }
+      },
       splitLine: { show: showVal, lineStyle: { color: t.grid } },
       interval: showVal ? step : undefined
     };
@@ -182,16 +222,16 @@
 
     return {
       legend: { show: false },
-      grid: C.grid(ctx, { top: topRoom, left: zeroLab ? 0 : 4, right: zeroLab ? 0 : (showVal ? 18 : 8), bottom: 4 }),
+      grid: C.grid(ctx, { top: topRoom + (!horiz ? padB : 0), left: zeroLab ? 0 : 4, right: zeroLab ? 0 : (showVal ? 18 : 8) + (horiz ? padB : 0), bottom: 4 }),
       tooltip: {
         trigger: 'item',
         formatter: function (p) {
           var d = items[p.dataIndex];
           if (!d || p.seriesId !== 'bars') return '';
-          var tr = [{ color: colorOf(d), label: ctx.title(enc.value), value: RK.format(d.raw, fmt), bold: base === 0 }];
+          var tr = [{ color: colorOf(d), label: ctx.title(enc.value), value: num(d.raw, fmt), bold: base === 0 }];
           if (base !== 0) {
-            tr.push({ label: o.baselineLabel || (o.baseline === 'median' ? 'Median' : o.baseline === 'mean' ? 'Mean' : 'Baseline'), value: RK.format(base, fmt) });
-            tr.push({ label: 'Difference', value: signed(d.v, fmt), bold: true });
+            tr.push({ label: o.baselineLabel || (o.baseline === 'median' ? 'Median' : o.baseline === 'mean' ? 'Mean' : 'Baseline'), value: num(base, fmt) });
+            tr.push({ label: 'Difference', value: delta(d.v), bold: true });
           }
           return C.tip(d.label, tr);
         }

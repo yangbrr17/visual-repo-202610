@@ -36,8 +36,8 @@
     "summary": {"type": "boolean", "default": true, "desc": "Summary bracket from first start to last end on each header row"},
     "sort": {"type": "string", "default": "start", "desc": "'start' orders workstreams and tasks by start date; 'data' keeps dataset order"},
     "groupOrder": {"type": "array", "default": null, "desc": "Explicit workstream order (unlisted groups follow)"},
-    "palette": {"type": "string", "default": "categorical", "desc": "Phase colours: categorical | sequential (ordered phases in shades of the theme ramp)"},
-    "milestoneLabel": {"type": "string", "default": "date", "desc": "Text right of each diamond: date | label | none"},
+    "palette": {"type": "string", "default": "categorical", "desc": "Phase colours: categorical | sequential (ordered phases on the theme's ordinal ramp, early = light, late = dark; spread over the phases left by the block's 'where')"},
+    "milestoneLabel": {"type": "string", "default": "date", "desc": "Text right of each diamond (paper halo): date | label (the name, only when the row-label column is hidden with labelWidth 0; otherwise the date, as the row already names the milestone) | none"},
     "milestoneName": {"type": "string", "default": "Milestone", "desc": "Legend / tooltip name for milestones"},
     "barLabel": {"type": "string", "default": null, "desc": "Field shown right of each bar (e.g. 'owner'), 'duration', or null"},
     "endInclusive": {"type": "boolean", "default": true, "desc": "Treat the end date as the last day of the task (bar runs to the end of that day)"},
@@ -66,6 +66,6 @@
      "options": {"today": "2026-10-14"}},
     {"title": "Key workstreams with owners (sequential phase shades, no header rows)", "data": "deal_timeline", "height": 360,
      "options": {"where": "workstream in [\"Process management\", \"Due diligence\", \"Regulatory\"]", "groupHeaders": false, "palette": "sequential",
-                 "barLabel": "owner", "milestoneLabel": "label", "today": "2026-10-14", "calendar": "months"}}
+                 "barLabel": "owner", "today": "2026-10-14", "calendar": "months"}}
   ]
 }

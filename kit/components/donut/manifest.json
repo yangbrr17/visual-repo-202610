@@ -24,17 +24,19 @@
     "innerRadius": {"type": "number", "default": 0.62, "desc": "Hole radius as a share of the outer radius (0 = pie)"},
     "center": {"type": "boolean", "default": true, "desc": "Show the total in the hole (counts up on reveal and on filter changes)"},
     "centerLabel": {"type": "string", "default": "Total", "desc": "Caption under the centre total (null to hide)"},
+    "centerValue": {"type": "string", "default": "total", "desc": "total | named — what the hole shows: the sum of all parts, or only the named parts (catch-all rows and 'Others' excluded)"},
+    "othersMatch": {"type": "string|string[]|boolean", "default": "auto", "desc": "Catch-all labels that are drawn last in the neutral colour and join 'Others': 'auto' (labels starting with 'Other' or ending in 'other(s)'), a list of labels, a regex string, or false"},
     "highlight": {"type": "string|string[]", "default": null, "desc": "Label(s) drawn in the accent colour, e.g. the client"},
     "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field format"},
     "pctFormat": {"type": "string", "default": "0.0%", "desc": "Format of the share of total"}
   },
   "interactions": ["Hover a slice or legend row: slice pops out, centre shows its value and share", "Click a slice or legend row to cross-filter ('Others' toggles all of its members)", "Non-selected slices dim", "Count-up total and animated angle transitions when filters change", "PNG / CSV export"],
   "samples": [
-    {"title": "Shareholder structure by investor type (m shares)", "data": "ownership", "height": 300,
+    {"title": "Shareholder structure by investor type (m shares)", "data": "ownership", "height": 300, "span": 7,
      "options": {"encode": {"label": "type", "value": "shares_m"}, "centerLabel": "Shares (m)"}},
-    {"title": "Revenue mix by segment — FY2025A (USD m)", "data": "segment_revenue", "height": 320,
+    {"title": "Revenue mix by segment — FY2025A (USD m)", "data": "segment_revenue", "height": 320, "span": 7,
      "options": {"encode": {"label": "segment", "value": "revenue"}, "where": "year == \"2025A\"", "layout": "labels", "display": "both", "centerLabel": "FY2025A revenue"}},
     {"title": "Top holders (% of shares outstanding)", "data": "ownership", "height": 300, "span": 7,
-     "options": {"encode": {"label": "holder", "value": "pct"}, "maxSlices": 7, "othersLabel": "Other holders", "highlight": "Ardent Family Holdings", "centerLabel": "Disclosed"}}
+     "options": {"encode": {"label": "holder", "value": "pct"}, "maxSlices": 7, "othersLabel": "Other holders", "highlight": "Ardent Family Holdings", "centerValue": "named", "centerLabel": "Named holders"}}
   ]
 }

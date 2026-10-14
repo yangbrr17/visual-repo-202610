@@ -13,13 +13,13 @@
   "avoid_when": ["The audience needs a fixed, printed answer (use a sensitivity table)", "More than ~6 parameters at once (split by page)"],
   "channels": {},
   "options": {
-    "params": {"type": "array", "default": null, "desc": "[{name, label, min, max, step, format, default}] or ['wacc', ...]; merged with RK.data.manifest.params; null = every report parameter. Missing ranges are inferred from the base value"},
+    "params": {"type": "array", "default": null, "desc": "[{name, label, min, max, step, format, default}] or ['wacc', ...]; merged with RK.data.manifest.params; null = every report parameter. Missing ranges are inferred from the base value; labels default to the param title, then a standard name (wacc -> WACC, tgr -> Terminal growth)"},
     "compact": {"type": "boolean", "default": false, "desc": "Single-row label · track · value layout (automatic inside .rk-topbar)"},
     "columns": {"type": "number", "default": null, "desc": "Slider columns in the stacked layout (null = auto-fit, min 220px each)"},
     "showRange": {"type": "boolean", "default": true, "desc": "Formatted min / max under each track"},
     "showDelta": {"type": "boolean", "default": true, "desc": "Change vs. base value next to the value (bps for % formats)"},
     "computed": {"type": "array", "default": [], "desc": "[{name, formula, title, format}] computed fields added to the bound dataset (formulas may use @params)"},
-    "preview": {"type": "boolean|object", "default": false, "desc": "true or {fields, where, title, total} — live readout table of the bound dataset; live cells show % change vs. base parameters; total = true | [fields]"},
+    "preview": {"type": "boolean|object", "default": false, "desc": "true or {fields, where, title, total, key, summary} — live readout table of the bound dataset; live cells show % change vs. base parameters; total = true | [fields]; key = the output column set in bold (default: last computed column); summary = [{name, label, field + agg | expr over earlier names, format, key}] headline outputs under the table (e.g. PV of terminal value, enterprise value)"},
     "tools": {"type": "boolean", "default": false, "desc": "Block toolbar (off for controls)"}
   },
   "interactions": ["Drag or arrow keys (native range input, aria-valuetext formatted)", "Click the value to type an exact number (9.25%, 9.25 or 0.0925)", "Reset to base per slider", "Store writes throttled while dragging; every computed field using the parameter recalculates", "Preview cells flash and show % change vs. base"],
@@ -33,9 +33,14 @@
        "computed": [
          {"name": "discount_factor", "title": "Discount factor", "formula": "1 / (1 + @wacc) ^ (fiscal_year - 2025.5)", "format": "0.000"},
          {"name": "pv_fcf", "title": "PV of FCF", "formula": "fcf / (1 + @wacc) ^ (fiscal_year - 2025.5)", "format": "$#,##0.0"},
-         {"name": "implied_value", "title": "Perpetuity value FCF / (WACC – g)", "formula": "fcf / (@wacc - @tgr)", "format": "$#,##0"}
+         {"name": "pv_tv", "title": "PV of terminal value", "formula": "fcf * (1 + @tgr) / (@wacc - @tgr) / (1 + @wacc) ^ (fiscal_year - 2025)", "format": "$#,##0"}
        ],
-       "preview": {"where": "period == \"E\"", "fields": ["year", "fcf", "discount_factor", "pv_fcf", "implied_value"], "total": ["fcf", "pv_fcf"]}
+       "preview": {"where": "period == \"E\"", "fields": ["year", "fcf", "discount_factor", "pv_fcf"], "total": ["fcf", "pv_fcf"], "key": "pv_fcf",
+         "summary": [
+           {"name": "sum_pv", "label": "PV of FCF 2026E–28E", "field": "pv_fcf", "agg": "sum", "format": "$#,##0"},
+           {"name": "pv_tv", "label": "PV of terminal value", "field": "pv_tv", "agg": "last", "format": "$#,##0"},
+           {"name": "ev", "label": "Enterprise value", "expr": "sum_pv + pv_tv", "format": "$#,##0", "key": true}
+         ]}
      }},
     {"title": "Report parameters — compact (top-bar style)", "data": null, "height": 60, "span": 8,
      "options": {"compact": true}},

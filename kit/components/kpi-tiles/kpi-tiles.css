@@ -1,11 +1,16 @@
 /* kpi-tiles */
-.rk-kpi { display: grid; grid-template-columns: repeat(var(--rk-kpi-cols, auto-fit), minmax(150px, 1fr)); gap: 0; }
+.rk-kpi { display: grid; grid-template-columns: repeat(var(--rk-kpi-cols, auto-fit), minmax(0, 1fr)); gap: 0; }
 .rk-kpi__tile { position: relative; padding: 12px 16px 12px 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .rk-kpi__tile + .rk-kpi__tile { padding-left: 16px; border-left: 1px solid var(--rk-rule); }
+/* column count is set from JS (balanced rows): rules run between tiles of a row, and above later rows */
+.rk-kpi__tile.is-row-start { padding-left: 0; border-left: 0; }
+.rk-kpi__tile.is-next-row { border-top: 1px solid var(--rk-rule); }
 .rk-kpi__label { font-size: var(--rk-fs-xs); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--rk-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rk-kpi__value { font-size: clamp(22px, 1.4vw + 12px, 32px); font-weight: 600; line-height: 1.1; color: var(--rk-accent); letter-spacing: -.01em; }
 [data-rk-theme="ink"] .rk-kpi__value { color: var(--rk-ink); }
 .rk-kpi__meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--rk-fs-sm); color: var(--rk-ink-3); }
+.rk-kpi__period { text-wrap: balance; min-width: 0; }
+.rk-kpi__nw { white-space: nowrap; }
 .rk-kpi__delta { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 3px; font-weight: 600; font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; }
 .rk-kpi__delta.is-good { color: var(--rk-pos); background: color-mix(in srgb, var(--rk-pos) 12%, transparent); }
 .rk-kpi__delta.is-bad { color: var(--rk-neg); background: color-mix(in srgb, var(--rk-neg) 12%, transparent); }
@@ -18,5 +23,5 @@
 @media (prefers-reduced-motion: reduce) { .rk-kpi__spark { animation: none; clip-path: none; } }
 @media print { .rk-kpi__spark { animation: none; clip-path: none; } }
 .rk-kpi--boxed { gap: 12px; }
-.rk-kpi--boxed .rk-kpi__tile, .rk-kpi--boxed .rk-kpi__tile + .rk-kpi__tile { padding: 14px 16px; border: 1px solid var(--rk-rule); border-radius: var(--rk-radius); background: var(--rk-surface); }
+.rk-kpi--boxed .rk-kpi__tile, .rk-kpi--boxed .rk-kpi__tile + .rk-kpi__tile, .rk-kpi--boxed .rk-kpi__tile.is-row-start, .rk-kpi--boxed .rk-kpi__tile.is-next-row { padding: 14px 16px; border: 1px solid var(--rk-rule); border-radius: var(--rk-radius); background: var(--rk-surface); }
 .rk-kpi--accent .rk-kpi__tile { border-top: 3px solid var(--rk-accent); padding-top: 10px; }

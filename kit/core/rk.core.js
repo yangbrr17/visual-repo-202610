@@ -162,6 +162,14 @@
     return map;
   };
 
+  /** Balanced grid columns: as many as fit at minW, with rows evened out (6 -> 3x2 rather than 4+2). */
+  util.balancedCols = function (n, width, minW) {
+    if (!n) return 1;
+    var fit = Math.max(1, Math.min(n, Math.floor(width / (minW || 160))));
+    var rows = Math.ceil(n / fit);
+    return Math.ceil(n / rows);
+  };
+
   util.unique = function (arr) {
     var seen = new Set(), out = [];
     for (var i = 0; i < arr.length; i++) if (!seen.has(arr[i])) { seen.add(arr[i]); out.push(arr[i]); }

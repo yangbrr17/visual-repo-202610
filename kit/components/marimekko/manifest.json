@@ -20,7 +20,7 @@
     "maxSeries": {"type": "number", "default": 8, "desc": "Players beyond this (by overall size) are grouped into othersLabel"},
     "othersLabel": {"type": "string", "default": "Others", "desc": "Name of the grey residual bucket (rows named Others / Other … are merged into it)"},
     "highlight": {"type": "string|string[]", "default": null, "desc": "Player(s) drawn in the accent colour, e.g. the client"},
-    "labels": {"type": "string", "default": "auto", "desc": "auto (player + share where it fits, share only in small cells) | share | none"},
+    "labels": {"type": "string", "default": "auto", "desc": "auto (player + share where it fits — wrapped, or on one line in flat bands; never truncated, no anonymous bare shares) | share | none"},
     "showTotals": {"type": "boolean", "default": true, "desc": "Segment name, total and share of market above each column"},
     "selectBy": {"type": "string", "default": "x", "desc": "Click to cross-filter by the column ('x') or by the player ('series')"},
     "gap": {"type": "number", "default": 2, "desc": "Gutter between columns (px)"},

@@ -85,10 +85,6 @@
     return { roots: roots, total: total, rootName: rootName };
   }
 
-  function longestWord(s, font) {
-    return Math.max.apply(null, String(s).split(/\s+/).map(function (w) { return C.measure(w, font); }));
-  }
-
   function chainOf(list, id) {
     var out = [];
     (function walk(ls, trail) {
@@ -110,7 +106,7 @@
       colorMid: 0,             // metric midpoint: a number or 'avg' (value-weighted average)
       sort: 'desc',            // desc | asc | null (data order), clockwise from 12 o'clock
       innerRadius: 0.3,        // centre hole as a share of the outer radius
-      labels: 'auto',          // auto (inner ring: name + share, outer: name) | name | none
+      labels: 'auto',          // auto (name + share on every ring; labels that do not fit are hidden, never cut) | name | none
       minLabelAngle: 7,        // degrees; thinner slices are labelled in the tooltip only
       center: true,            // total (or the drilled node) in the centre
       rootName: null,          // centre caption (defaults to the single root node, else 'Total')
@@ -159,8 +155,11 @@
       // the centre is a button when drilled: back up one level
       centre.addEventListener('click', function () { if (state.view.length) zoom(state, state.view[state.view.length - 2] || null); });
 
+      // labels are fitted by measuring text: measure again once the web fonts have loaded
+      var alive = true;
+      if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(function () { if (alive) base.update(state.ctx); });
       var destroy = base.destroy;
-      base.destroy = function () { centre.remove(); destroy(); };
+      base.destroy = function () { alive = false; centre.remove(); destroy(); };
       return base;
     }
   });
@@ -197,8 +196,7 @@
 
     var W = inst.getWidth(), H = inst.getHeight();
     var showLegend = byMetric && o.legend !== false;
-    var R = Math.max(40, Math.min(H / 2 - 4 - (showLegend ? 10 : 0), W / 2 - 4));
-    var L = state.L = { W: W, H: H, cx: W / 2, cy: H / 2 + (showLegend ? 10 : 0), R: R, r0: R * Math.max(0, Math.min(0.8, o.innerRadius)), fmt: fmt };
+    var legendH = showLegend ? 22 : 0;
 
     // metric colour scale
     var leafList = [];
@@ -208,6 +206,7 @@
       : (+o.colorMid || 0);
     var dev = leafList.concat(tree.roots).reduce(function (m, n) { return n.metric == null ? m : Math.max(m, Math.abs(n.metric - mid)); }, 0) || 1;
     var scale = RK.theme.diverging([mid - dev, mid + dev], mid);
+    var ring = (t.div || []).some(function (c) { return RK.theme.distance(c, t.accent2) < 70; }) ? t.ink : t.accent2;   // target outline
 
     var total = tree.total;
     var viewTotal = viewNode ? viewNode.value : total;     // ring shares are of the current view
@@ -219,15 +218,76 @@
       if (!o.sort) return list.slice();
       return list.slice().sort(function (a, b) { return o.sort === 'asc' ? a.value - b.value : b.value - a.value; });
     }
-    // ring geometry: the outermost ring is widest (radial labels need length), inner rings share the rest
-    var bounds = [L.r0];
-    if (maxDepth <= 1) bounds.push(L.R);
-    else {
-      var outer = (L.R - L.r0) * (maxDepth === 2 ? 0.56 : 0.4);
-      var step = (L.R - L.r0 - outer) / (maxDepth - 1);
-      for (var k = 1; k < maxDepth; k++) bounds.push(L.r0 + step * k);
-      bounds.push(L.R);
+    function shareText(v) { var f = viewTotal ? v / viewTotal : null; return RK.format(f, f != null && f < 0.005 ? '0.0%' : '0%'); }   // never a bare "0%"
+
+    /* ---- labels: 11px, never truncated, never shrunk — a label either fits its slice (name + share) or is
+     * left to the tooltip / centre readout; the highlighted node gets an outside callout instead ---- */
+    var FONT1 = '600 11px ' + t.fontSans, FONT2 = '11px ' + t.fontSans, LH = 13;
+    function tw(s, f) { return C.measure(s, f) * 1.05 + 3; }   // margin: the web font may still be loading
+    /** Word-wrap `name` into lines of at most `w` px (null when a single word is wider). */
+    function wrapWords(name, w, f) {
+      var words = String(name).split(/\s+/), lines = [''];
+      for (var i = 0; i < words.length; i++) {
+        if (tw(words[i], f) > w) return null;
+        var cur = lines[lines.length - 1], tryL = cur ? cur + ' ' + words[i] : words[i];
+        if (cur && tw(tryL, f) > w) lines.push(words[i]); else lines[lines.length - 1] = tryL;
+      }
+      return lines;
     }
+    function geometry(R) {
+      var r0 = R * Math.max(0, Math.min(0.8, o.innerRadius)), b = [r0];
+      if (maxDepth <= 1) b.push(R);
+      else {
+        var outer = (R - r0) * (maxDepth === 2 ? 0.56 : 0.4), step = (R - r0 - outer) / (maxDepth - 1);
+        for (var k = 1; k < maxDepth; k++) b.push(r0 + step * k);
+        b.push(R);
+      }
+      return { R: R, r0: r0, bounds: b };
+    }
+    /** Inside label text for a slice of angular span `deg`, or null when it does not fit. */
+    function inside(n, depth, deg, G) {
+      if (o.labels === 'none' || deg < o.minLabelAngle) return null;
+      var r0 = G.bounds[depth - 1], r1 = G.bounds[depth], thick = r1 - r0, rMid = (r0 + r1) / 2;
+      var arc = deg / 360 * Math.PI * 2 * rMid, f = depth === 1 ? FONT1 : FONT2;
+      var tang = depth < maxDepth;
+      // tangential (inner rings): lines run along the arc; radial (outer ring): lines run outward
+      var along = tang ? Math.min(arc - 4, rMid * 1.6) : thick - 10, across = tang ? thick - 6 : arc - 3;
+      var share = o.labels === 'name' ? null : shareText(n.value);
+      var lines = wrapWords(n.name, along, f);
+      if (!lines) return null;
+      if (share && (lines.length + 1) * LH <= across) return lines.concat(share).join('\n');
+      return lines.length * LH <= across ? lines.join('\n') : null;
+    }
+    // angular extent of every node in the view (data is pre-sorted; startAngle 90, clockwise)
+    var span = new Map();
+    (function walk(ls, a0, scaleDeg, depth) {
+      sorted(ls).forEach(function (n) {
+        var deg = n.value * scaleDeg;
+        span.set(n.id, { a0: a0, deg: deg, depth: depth, n: n });
+        if (n.children.length) walk(n.children, a0, n.value ? deg / n.value : 0, depth + 1);
+        a0 += deg;
+      });
+    })(list, 0, viewTotal ? 360 / viewTotal : 0, 1);
+    function plan(G) {
+      var labels = new Map(), calls = [];
+      span.forEach(function (sp, id) {
+        var n = sp.n;
+        var txt = inside(n, sp.depth, sp.deg, G);
+        if (txt) labels.set(id, txt);
+        else if (hl.indexOf(n.name) >= 0 && o.labels !== 'none') calls.push({ n: n, sp: sp, text: n.name + '  ' + shareText(n.value) });
+      });
+      return { labels: labels, calls: calls };
+    }
+    var Rmax = Math.max(40, Math.min(H / 2 - 4 - legendH / 2, W / 2 - 4));
+    var G = geometry(Rmax), P = plan(G);
+    if (P.calls.length) {   // room for callouts beside the ring
+      var cw = Math.max.apply(null, P.calls.map(function (c) { return tw(c.text, FONT1); })) + 26;
+      var R2 = Math.max(40, Math.min(Rmax, W / 2 - 4 - cw));
+      if (R2 < Rmax) { G = geometry(R2); P = plan(G); }
+    }
+    var R = G.R, bounds = G.bounds;
+    var L = state.L = { W: W, H: H, cx: W / 2, cy: H / 2 + legendH / 2, R: R, r0: G.r0, fmt: fmt };
+
     var levels = [{}];
     for (var d = 1; d <= maxDepth; d++) {
       var tangential = d < maxDepth;
@@ -238,42 +298,12 @@
           show: true,
           rotate: tangential ? 'tangential' : 'radial',
           align: tangential ? 'center' : 'left',
-          padding: tangential ? 0 : [0, 0, 0, 4],
-          overflow: 'truncate', ellipsis: '…', lineOverflow: 'truncate',
-          minAngle: o.minLabelAngle,
-          fontSize: d === 1 ? 11 : 10.5,
-          fontWeight: d === 1 ? 600 : 400,
-          fontFamily: t.fontSans,
-          lineHeight: 13,
-          formatter: d === 1 && maxDepth > 1 && o.labels !== 'name'
-            ? function (p) { return p.name + '\n' + RK.format(viewTotal ? p.value / viewTotal : null, '0%'); }
-            : '{b}'
+          padding: tangential ? 0 : [0, 0, 0, 5],
+          overflow: 'none', minAngle: 0,
+          fontSize: 11, fontWeight: d === 1 ? 600 : 400, fontFamily: t.fontSans, lineHeight: LH,
+          formatter: function (p) { return p.data && p.data.lt ? p.data.lt : ''; }   // fitted text from plan()
         }
       });
-    }
-
-    /**
-     * Per-slice label box from its arc: tangential labels wrap within the arc length and the ring
-     * thickness; radial labels run along the ring and wrap only when the slice is wide enough.
-     */
-    function labelBox(n, depth) {
-      var r0 = bounds[depth - 1], r1 = bounds[depth], thick = r1 - r0, rMid = (r0 + r1) / 2;
-      var arc = (viewTotal ? n.value / viewTotal : 0) * Math.PI * 2 * rMid;
-      var font = (depth === 1 ? '600 11px ' : '10.5px ') + t.fontSans;
-      var box = depth < maxDepth
-        ? { width: Math.max(16, Math.min(arc - 10, rMid * 1.6)), height: Math.max(12, thick - 8), overflow: arc > 50 ? 'break' : 'truncate' }
-        : { width: Math.max(16, thick - 12), height: Math.max(12, Math.min(arc - 4, 42)), overflow: arc > 30 ? 'break' : 'truncate' };
-      // never split inside a word: try a slightly smaller size, else fall back to one truncated line
-      // (generous margin: the web font may not be loaded yet when we measure)
-      var fits = function (f) { return longestWord(n.name, f) * 1.15 + 8 <= box.width; };
-      if (box.overflow === 'break' && !fits(font)) {
-        var sizes = depth === 1 ? [10, 9.5] : [9.5, 9], ok = false;
-        for (var si = 0; si < sizes.length && !ok; si++) {
-          if (fits((depth === 1 ? '600 ' : '') + sizes[si] + 'px ' + t.fontSans)) { box.fontSize = sizes[si]; box.lineHeight = 12; ok = true; }
-        }
-        if (!ok) box.overflow = 'truncate';
-      }
-      return box;
     }
 
     // colours are assigned on the full tree, so a slice keeps its colour when drilled into; with a highlight
@@ -297,10 +327,11 @@
       return sorted(ls).map(function (n) {
         var kids = n.children.length > 0, color = colors.get(n.id);
         var fill = isDim(n) && !kids ? RK.theme.mix(color, t.paper, 0.72) : color;
+        var lt = P.labels.get(n.id) || '';
         var item = {
-          id: n.id, name: n.name, value: n.value, metric: n.metric, field: n.field,
-          itemStyle: { color: fill },
-          label: RK.util.merge({ color: RK.theme.textOn(fill) }, labelBox(n, depth))
+          id: n.id, name: n.name, value: n.value, metric: n.metric, field: n.field, lt: lt,
+          itemStyle: { color: fill, borderColor: byMetric && hl.indexOf(n.name) >= 0 ? ring : undefined, borderWidth: byMetric && hl.indexOf(n.name) >= 0 ? 2 : undefined },
+          label: { show: !!lt, color: RK.theme.textOn(fill), fontWeight: hl.indexOf(n.name) >= 0 ? 700 : undefined }
         };
         if (kids) item.children = toData(n.children, depth + 1);
         return item;
@@ -309,17 +340,37 @@
     var data = toData(list, 1);
 
     var graphic = [];
+    // callouts for highlighted slices too thin for an inside label: leader to the side, spread vertically
+    var sides = { l: [], r: [] };
+    P.calls.forEach(function (c) {
+      var ang = (90 - (c.sp.a0 + c.sp.deg / 2)) * Math.PI / 180, rOut = bounds[c.sp.depth];
+      var ax = L.cx + rOut * Math.cos(ang), ay = L.cy - rOut * Math.sin(ang);
+      var ex = L.cx + (rOut + 8) * Math.cos(ang), ey = L.cy - (rOut + 8) * Math.sin(ang);
+      sides[ax >= L.cx ? 'r' : 'l'].push({ c: c, ax: ax, ay: ay, ex: ex, ey: ey });
+    });
+    ['l', 'r'].forEach(function (k) {
+      var arr = sides[k];
+      if (!arr.length) return;
+      var ys = C.spreadLabels(arr.map(function (a) { return a.ey; }), 15, 8, H - 8);
+      arr.forEach(function (a, i) {
+        var right = k === 'r', x2 = L.cx + (right ? 1 : -1) * (R + 12);
+        graphic.push({ type: 'polyline', silent: true, shape: { points: [[a.ax, a.ay], [a.ex, a.ey], [x2, ys[i]]] }, style: { stroke: t.ink3, lineWidth: 1, fill: 'none' } });
+        graphic.push({ type: 'text', silent: true, x: x2 + (right ? 4 : -4), y: ys[i],
+          style: { text: a.c.text, fill: t.ink, font: FONT1, textAlign: right ? 'left' : 'right', textVerticalAlign: 'middle' } });
+      });
+    });
     if (showLegend) {
-      var lw = Math.min(140, W * 0.24), lx = W - lw - 2;
+      // colour legend top-left (house style): title, ramp, low / mid / high ticks
+      var lab = ctx.title(enc.color) + (o.colorMid === 'avg' ? ' vs. weighted avg.' : '');
+      var lw = Math.min(140, W * 0.24), lx = Math.ceil(C.measure(lab, '11px ' + t.fontSans) + 10);
       var stops = (t.div || []).map(function (c, i, a) { return { offset: i / (a.length - 1), color: c }; });
       var tick = function (x, v, align) {
         return { type: 'text', x: x, y: 12, silent: true, style: { text: RK.format(v, mfmt), fill: t.ink3, font: '10px ' + t.fontNum, textAlign: align, textVerticalAlign: 'top' } };
       };
-      graphic = [
-        { type: 'text', x: lx - 8, y: 6, silent: true, style: { text: ctx.title(enc.color) + (o.colorMid === 'avg' ? ' vs. weighted avg.' : ''), fill: t.ink2, font: '11px ' + t.fontSans, textAlign: 'right', textVerticalAlign: 'middle' } },
-        { type: 'rect', x: lx, y: 2, silent: true, shape: { width: lw, height: 8 }, style: { fill: { type: 'linear', x: 0, y: 0, x2: 1, y2: 0, colorStops: stops } } },
-        tick(lx, mid - dev, 'left'), tick(lx + lw / 2, mid, 'center'), tick(lx + lw, mid + dev, 'right')
-      ];
+      graphic.push(
+        { type: 'text', x: 0, y: 6, silent: true, style: { text: lab, fill: t.ink2, font: '11px ' + t.fontSans, textAlign: 'left', textVerticalAlign: 'middle' } },
+        { type: 'rect', x: lx, y: 2, silent: true, shape: { width: lw, height: 8, r: 1 }, style: { fill: { type: 'linear', x: 0, y: 0, x2: 1, y2: 0, colorStops: stops } } },
+        tick(lx, mid - dev, 'left'), tick(lx + lw / 2, mid, 'center'), tick(lx + lw, mid + dev, 'right'));
     }
 
     return {

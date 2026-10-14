@@ -8,8 +8,16 @@
 .rk-dgrid__spacer { flex: 1; }
 .rk-dgrid__count { font-size: var(--rk-fs-sm); color: var(--rk-ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rk-dgrid__dl { height: 28px; padding: 0 10px; font-size: 12px; }
-.rk-dgrid__table { flex: 1; min-height: 0; }
-.rk-dgrid__table.is-paged { flex: none; }
+.rk-dgrid__frame { position: relative; flex: 1; min-height: 0; }
+.rk-dgrid__frame.is-paged { flex: none; }
+/* more columns off to the right: fade the edge so cut-off figures read as "scroll", not as truncated digits */
+.rk-dgrid__frame::after {
+  content: ""; position: absolute; top: 0; right: 0; bottom: var(--rk-dgrid-foot, 0px); width: 28px; z-index: 12; pointer-events: none;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--rk-paper) 0%, transparent), var(--rk-paper) 85%);
+  opacity: 0; transition: opacity var(--rk-dur-fast);
+}
+.rk-dgrid__frame.is-more-r::after { opacity: 1; }
+.rk-dgrid__frame.is-scrolled-x .tabulator .tabulator-frozen.tabulator-frozen-left { box-shadow: 6px 0 6px -5px color-mix(in srgb, var(--rk-ink) 28%, transparent); }
 
 /* ---------- table chrome ---------- */
 .rk-dgrid .tabulator {
@@ -105,5 +113,5 @@
 .rk-dgrid.is-in .tabulator-tableholder { animation: rk-dgrid-in 480ms var(--rk-ease) both; }
 @keyframes rk-dgrid-in { from { opacity: 0; transform: translateY(6px); } }
 @media (prefers-reduced-motion: reduce) { .rk-dgrid.is-in .tabulator-tableholder { animation: none; } }
-@media print { .rk-dgrid__bar, .rk-dgrid .tabulator-header-filter { display: none !important; } .rk-dgrid.is-in .tabulator-tableholder { animation: none; } }
+@media print { .rk-dgrid__bar, .rk-dgrid .tabulator-header-filter { display: none !important; } .rk-dgrid.is-in .tabulator-tableholder { animation: none; } .rk-dgrid__frame::after { display: none; } }
 [data-rk-theme="ink"] .rk-dgrid .tabulator-row.is-target { background-color: color-mix(in srgb, var(--rk-accent-2) 22%, var(--rk-paper)); }

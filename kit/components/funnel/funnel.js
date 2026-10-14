@@ -62,9 +62,11 @@
       // geometry: stage labels left, columns right, header row on top
       var labFont = '600 11px ' + t.fontSans, numFont = '11px ' + t.fontNum, headFont = '600 10px ' + t.fontSans;
       var labW = Math.min(220, Math.max.apply(null, stages.map(function (s) { return measure(s, labFont); }).concat([40])));
+      /** Header text with the field's unit, e.g. "PIPELINE VALUE (USD M)". */
+      function titled(f) { var fd = ctx.field(f) || {}; return String(ctx.title(f)) + (fd.unit ? ' (' + fd.unit + ')' : ''); }
       var cols = [];
       if (o.columns !== false) {
-        if (hasSec) cols.push({ title: ctx.title(enc.secondary), text: secs.map(function (v) { return RK.format(v, sfmt); }) });
+        if (hasSec) cols.push({ title: titled(enc.secondary), text: secs.map(function (v) { return RK.format(v, sfmt); }) });
         if (o.cumulative !== false) cols.push({ title: '% of ' + (o.conversion === 'first' ? 'first' : 'top'), text: vals.map(function (v) { return RK.format(v == null ? null : (first ? v / first : NaN), '0.0%'); }) });
         if (!o.cumulative && !hasSec) cols = [];
       }
@@ -73,6 +75,15 @@
       });
       var colsW = cols.reduce(function (s, c) { return s + c.w; }, 0);
       var headH = cols.length ? 24 : 4;
+
+      // value labels: one placement rule for the whole chart — inside every bar when all of them fit,
+      // otherwise outside every bar (with room reserved right of the widest bar)
+      var W0 = ctx.el.clientWidth || 600, valFont = '600 ' + numFont;
+      var tws = vals.map(function (v) { return measure(RK.format(v, fmt), valFont); });
+      var plot0 = Math.max(40, W0 - (labW + 18) - (colsW + (center ? 8 : 40)));
+      var allInside = vals.every(function (v, i) { return !util.isNum(v) || v / max * plot0 > tws[i] + 14; });
+      var outRoom = allInside || o.labels === false ? 0 : Math.max.apply(null, tws.concat([0])) + 10;
+      var gridRight = colsW + (center ? 8 : 40) + (outRoom ? (center ? outRoom * 2 : Math.max(0, outRoom - 32)) : 0);
 
       function renderItem(params, api) {
         var i = params.dataIndex, v = vals[i];
@@ -90,10 +101,10 @@
           transition: ['shape', 'style'],
           emphasis: { style: { fill: RK.theme.mix(colors[i], t.ink, 0.15) } }
         });
-        // value label: inside when it fits, else just outside the bar
+        // value label: inside every bar or outside every bar (decided once for the chart above)
         if (o.labels !== false) {
-          var txt = RK.format(v, fmt), tw = measure(txt, '600 ' + numFont);
-          var inside = b - a > tw + 14;
+          var txt = RK.format(v, fmt);
+          var inside = allInside;
           kids.push({
             type: 'text', id: 'val', silent: true,
             x: inside ? mid : b + 6, y: cy,
@@ -143,10 +154,11 @@
           });
           xr -= cols[c].w;
         }
-        // hairline between rows across the label / column area (table feel)
+        // hairline between rows across the stage-label and column areas (table feel; the funnel itself stays clear)
         if (cols.length && i < n - 1) {
           var ly = (cy + api.coord([0, i + 1])[1]) / 2;
           kids.push({ type: 'line', id: 'rule', silent: true, shape: { x1: api.getWidth() - colsW + 8, y1: ly, x2: api.getWidth(), y2: ly }, style: { stroke: t.grid, lineWidth: 1 } });
+          kids.push({ type: 'line', id: 'rule2', silent: true, shape: { x1: 0, y1: ly, x2: labW + 8, y2: ly }, style: { stroke: t.grid, lineWidth: 1 } });
         }
         return { type: 'group', children: kids };
       }
@@ -162,12 +174,12 @@
           });
           xr += c.w;
         });
-        graphic.push({ type: 'text', id: 'hv', left: labW + 18, top: 4, silent: true, style: { text: String(ctx.title(enc.value)).toUpperCase(), font: headFont, fill: t.ink3 } });
+        graphic.push({ type: 'text', id: 'hv', left: labW + 18, top: 4, silent: true, style: { text: titled(enc.value).toUpperCase(), font: headFont, fill: t.ink3 } });
         graphic.push({ type: 'rect', id: 'hr', left: 0, top: headH - 4, silent: true, shape: { width: 4000, height: 1 }, style: { fill: t.rule } });
       }
 
       return {
-        grid: { left: labW + 18, right: colsW + (center ? 8 : 40), top: headH + 2, bottom: 2, containLabel: false },
+        grid: { left: labW + 18, right: gridRight, top: headH + 2, bottom: 2, containLabel: false },
         xAxis: { type: 'value', show: false, min: center ? -max / 2 : 0, max: center ? max / 2 : max },
         yAxis: { type: 'category', show: false, inverse: true, data: stages },
         graphic: graphic,
@@ -195,6 +207,7 @@
         }]
       };
     }, {
+      rebuildOnResize: true,     // inside / outside label rule and the reserved label room depend on the width
       select: function (p, ctx) { return p.componentType === 'series' ? { field: ctx.enc.stage, value: p.name } : null; }
     })
   });

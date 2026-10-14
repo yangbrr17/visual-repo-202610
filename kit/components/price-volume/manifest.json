@@ -21,7 +21,7 @@
     "area": {"type": "boolean", "default": true, "desc": "Light fill under the price line"},
     "ma": {"type": "number[]", "default": [50, 200], "desc": "Simple moving averages in trading days; [] for none"},
     "vwap": {"type": "boolean|number", "default": false, "desc": "Rolling VWAP line: true (20-day) or a number of days"},
-    "range52w": {"type": "string|boolean", "default": "lines", "desc": "'lines' | 'band' | false — 52-week high / low"},
+    "range52w": {"type": "string|boolean", "default": "lines", "desc": "'lines' (neutral ink-3 dotted lines, labels placed clear of event pins) | 'band' (shaded range) | false — 52-week high / low from the high / low fields (else close)"},
     "lastPrice": {"type": "boolean", "default": true, "desc": "Current price tag on the right axis with a dotted guide"},
     "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] horizontal price lines (offer, unaffected price), dashed in the theme's reference colour"},
     "eventsData": {"type": "string", "default": null, "desc": "Dataset id of events (date, label, kind, detail) drawn as numbered pins"},

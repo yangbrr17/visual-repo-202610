@@ -20,11 +20,11 @@
   },
   "options": {
     "basemap": {"type": "string", "default": "world-110m", "desc": "Registered basemap name"},
-    "sizeRange": {"type": "number[]", "default": [4, 26], "desc": "Min / max bubble radius in px"},
+    "sizeRange": {"type": "number[]", "default": [4, 26], "desc": "Min / max bubble radius in px on a map at least 1000px wide (sqrt scale, so area tracks the value); narrower maps scale the range down (to 62%) to limit overplotting"},
     "colorScale": {"type": "string", "default": "auto", "desc": "auto (categorical for text fields, sequential for numbers) | categorical | sequential | diverging"},
     "mid": {"type": "number", "default": 0, "desc": "Diverging midpoint"},
     "opacity": {"type": "number", "default": 0.78, "desc": "Bubble fill opacity"},
-    "labels": {"type": "number", "default": 5, "desc": "Label the top N bubbles by size (0 = none); crowded labels hide automatically"},
+    "labels": {"type": "number", "default": 5, "desc": "Label the top N bubbles by size (0 = none). Each label sits beside its bubble, or further off with a leader line, wherever it covers the fewest other bubbles; labels that cannot be placed hide"},
     "labelValue": {"type": "boolean", "default": true, "desc": "Append the size value to labels"},
     "highlight": {"type": "string|string[]", "default": null, "desc": "Label value(s) drawn in accent-2 and always labelled (e.g. the target company); rows flagged by the target channel are too. Peer colours never resemble accent-2"},
     "format": {"type": "string", "default": null, "desc": "Size value format; defaults to the size field format"},
@@ -39,7 +39,7 @@
   "interactions": ["Hover tooltip", "Click a bubble to cross-filter (others dim)", "Click a legend category to filter by it", "Zoom / pan; labels re-place on zoom", "Grow-in animation, smooth radius transitions on filter", "PNG export"],
   "samples": [
     {"title": "Global footprint — sites by floor area", "data": "assets_locations", "height": 460,
-     "options": {"encode": {"lat": "lat", "lon": "lon", "size": "capacity", "color": "type", "label": "name"}, "labels": 6, "tooltip": ["city", "country", "utilization", "opened"]}},
+     "options": {"encode": {"lat": "lat", "lon": "lon", "size": "capacity", "color": "type", "label": "name"}, "labels": 6, "sizeRange": [3, 21], "tooltip": ["city", "country", "utilization", "opened"]}},
     {"title": "Revenue 2025A by country — size = revenue, colour = growth", "data": "revenue_by_country", "height": 400, "span": 6,
      "options": {"encode": {"lat": "lat", "lon": "lon", "size": "revenue", "color": "growth", "label": "country"}, "labels": 6, "sizeRange": [3, 30], "tooltip": ["employees"]}},
     {"title": "Peer headquarters by market cap", "data": "peers", "height": 400, "span": 6,

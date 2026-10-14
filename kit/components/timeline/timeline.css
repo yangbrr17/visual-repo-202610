@@ -14,12 +14,12 @@
 .rk-tl__ruler { position: absolute; height: 0; border-top: 1px solid var(--rk-rule); }
 .rk-tl__rtick { position: absolute; width: 0; height: 5px; border-left: 1px solid var(--rk-rule); }
 .rk-tl__rtick.is-major { height: 8px; border-left-color: var(--rk-axis); }
-.rk-tl__period { position: absolute; transform: translateX(-50%); font-size: 10.5px; line-height: 16px; color: var(--rk-ink-3); white-space: nowrap; font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; }
+.rk-tl__period { position: absolute; transform: translateX(-50%); font-size: 11px; line-height: 16px; color: var(--rk-ink-3); white-space: nowrap; font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; }
 .rk-tl__today { position: absolute; width: 0; border-left: 1.25px dashed var(--rk-ref, var(--rk-neg)); }
-.rk-tl__todaylab { position: absolute; font-size: 10.5px; line-height: 16px; font-weight: 600; color: var(--rk-ref, var(--rk-neg)); white-space: nowrap; }
+.rk-tl__todaylab { position: absolute; font-size: 11px; line-height: 16px; font-weight: 600; color: var(--rk-ref, var(--rk-neg)); white-space: nowrap; }
 .rk-tl__axis { position: absolute; background: var(--rk-accent); border-radius: 1px; transform-origin: 0 50%; }
 .rk-tl--v .rk-tl__axis { transform-origin: 50% 0; background: var(--rk-rule); }
-.rk-tl__year { position: absolute; transform: translate(-50%, -50%); padding: 1px 7px; border-radius: 9px; font-size: 10px; line-height: 14px; font-weight: 600; letter-spacing: .03em; color: var(--rk-paper); background: var(--rk-accent); font-family: var(--rk-font-num); }
+.rk-tl__year { position: absolute; transform: translate(-50%, -50%); padding: 1px 7px; border-radius: 9px; font-size: 11px; line-height: 14px; font-weight: 600; letter-spacing: .03em; color: var(--rk-paper); background: var(--rk-accent); font-family: var(--rk-font-num); }
 
 /* leaders (SVG) */
 .rk-tl__svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
@@ -31,7 +31,7 @@
 .rk-tl__marker { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 2; cursor: pointer; transition: transform var(--rk-dur) var(--rk-ease), opacity var(--rk-dur-fast); }
 .rk-tl__marker > * { display: block; max-width: none; transition: transform var(--rk-dur-fast) var(--rk-ease); }
 .rk-tl__marker.is-hover > * { transform: scale(1.25); }
-.rk-tl__num { width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font: 600 10px/1 var(--rk-font-num); font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--rk-paper); }
+.rk-tl__num { width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font: 600 11px/1 var(--rk-font-num); font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--rk-paper); }
 
 /* labels */
 .rk-tl__label {
@@ -43,13 +43,14 @@
 .rk-tl__label.is-flip { text-align: right; }
 .rk-tl--center .rk-tl__label { text-align: center; }
 .rk-tl__label:focus-visible { outline: 2px solid var(--rk-accent-3); outline-offset: 3px; }
-.rk-tl__date { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--rk-ink-3); white-space: nowrap; transition: color var(--rk-dur-fast); }
+.rk-tl__date { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--rk-ink-3); white-space: nowrap; transition: color var(--rk-dur-fast); }
 .rk-tl__text { font-weight: 500; text-wrap: balance; }
 .rk-tl__detail { margin-top: 2px; font-size: 11px; line-height: 1.38; color: var(--rk-ink-3); text-wrap: pretty; }
 .rk-tl__label.is-hover .rk-tl__date { color: var(--rk-ink-2); }
 .rk-tl__label.is-hover .rk-tl__text { color: var(--rk-accent); }
 .rk-tl__label.is-hl .rk-tl__text { font-weight: 600; }
-.rk-tl__label.is-hl .rk-tl__date { color: var(--rk-accent-2); }
+/* highlight: text in the text-safe accent2 variant (>= 4.5:1); the marker carries the accent2 ring */
+.rk-tl__label.is-hl .rk-tl__date { color: var(--rk-accent-2-ink, var(--rk-accent-2)); }
 
 /* vertical: date column | axis | label + detail */
 .rk-tl--v .rk-tl__label { box-shadow: none; }

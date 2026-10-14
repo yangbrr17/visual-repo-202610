@@ -26,6 +26,7 @@
     "showChange": {"type": "boolean", "default": true, "desc": "First → last % change in each panel header (green / red)"},
     "sort": {"type": "string", "default": null, "desc": "Panel order: null (data order) | 'last-desc' | 'last-asc' | 'name'"},
     "agg": {"type": "string", "default": "sum", "desc": "Aggregation of duplicate rows per facet and x: sum | avg | last"},
+    "maxPanels": {"type": "number", "default": 24, "desc": "Panel cap (also limited to what fits the block height); further facets are left out with a '+N more not shown' note, highlighted facets always kept"},
     "format": {"type": "string", "default": null, "desc": "Value format; defaults to the y field format"},
     "dateFormat": {"type": "string", "default": "mmm yy", "desc": "Time-axis label format when x is a date field"}
   },

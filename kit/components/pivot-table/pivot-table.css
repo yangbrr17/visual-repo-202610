@@ -9,7 +9,15 @@
 .rk-pivot tfoot { position: sticky; bottom: 0; z-index: 2; }
 .rk-pivot.is-auto thead, .rk-pivot.is-auto tfoot { position: static; }
 .rk-pivot thead th { background: var(--rk-paper); white-space: nowrap; }
-.rk-pivot .is-sticky { position: sticky; left: 0; z-index: 1; background-color: var(--rk-paper); }
+.rk-pivot .is-sticky { position: sticky; left: 0; z-index: 1; background-color: var(--rk-paper); transition: box-shadow var(--rk-dur-fast); }
+.rk-pivot.is-scrolled-x .is-sticky { box-shadow: 6px 0 6px -5px color-mix(in srgb, var(--rk-ink) 28%, transparent); }
+/* more columns off to the right: fade the edge so cut-off figures read as "scroll", not as truncated digits */
+.rk-pivot::after {
+  content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 28px; z-index: 5; pointer-events: none;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--rk-paper) 0%, transparent), var(--rk-paper) 85%);
+  opacity: 0; transition: opacity var(--rk-dur-fast);
+}
+.rk-pivot.is-more-r::after { opacity: 1; }
 .rk-pivot thead .is-sticky { z-index: 4; }
 
 /* header */
@@ -17,10 +25,10 @@
 .rk-pivot thead tr.rk-table__group th[rowspan] { border-bottom: 1.5px solid var(--rk-accent); padding-bottom: 5px; text-transform: none; letter-spacing: 0; font-size: var(--rk-fs-sm); color: var(--rk-ink-2); }
 .rk-pivot thead tr.rk-table__group th.is-num[rowspan] { text-align: right; }
 .rk-pivot th.rk-pivot__coltitle > span { display: block; padding-bottom: 3px; border-bottom: 1px solid var(--rk-rule); }
-.rk-pivot .rk-table thead th.rk-pivot__corner { text-align: left; vertical-align: bottom; min-width: 180px; }
+.rk-pivot .rk-table thead th.rk-pivot__corner { text-align: left; vertical-align: bottom; min-width: min(180px, 28vw); }
 .rk-pivot__measure { display: block; font-size: var(--rk-fs-xs); font-weight: 500; color: var(--rk-ink-3); margin-bottom: 2px; text-transform: none; letter-spacing: 0; }
 .rk-pivot__dims { display: block; font-size: var(--rk-fs-sm); font-weight: 600; color: var(--rk-ink-2); text-transform: none; letter-spacing: 0; }
-.rk-pivot th.rk-pivot__ch { min-width: 64px; transition: color var(--rk-dur-fast), opacity var(--rk-dur-fast); }
+.rk-pivot th.rk-pivot__ch { min-width: 44px; transition: color var(--rk-dur-fast), opacity var(--rk-dur-fast); }
 .rk-pivot th.rk-pivot__ch.is-clickable { cursor: pointer; }
 .rk-pivot th.rk-pivot__ch.is-clickable:hover { color: var(--rk-accent); }
 .rk-pivot th.rk-pivot__ch.is-selected { color: var(--rk-accent); box-shadow: inset 0 -2px 0 var(--rk-accent); }
@@ -41,6 +49,7 @@
 .rk-pivot .rk-table tr.is-leaf.is-l1 td, .rk-pivot .rk-table tr.is-leaf.is-l2 td { border-bottom-color: color-mix(in srgb, var(--rk-grid) 70%, transparent); }
 .rk-pivot .rk-table tbody tr:hover td:not(.is-heat) { background-color: var(--rk-surface); }
 .rk-pivot td.rk-pivot__v.is-heat { font-weight: 500; }
+.rk-pivot td.rk-pivot__v.is-thin { color: var(--rk-ink-3); font-style: italic; }   /* below heatMinN records: shown, not ranked */
 .rk-pivot td.is-coldim { opacity: .4; }
 .rk-pivot tr.is-dim td { opacity: .38; }
 .rk-pivot tr.is-selected td.rk-pivot__label { box-shadow: inset 3px 0 0 var(--rk-accent); }
@@ -71,6 +80,7 @@
 @media print {
   .rk-pivot tr.is-in, .rk-pivot tr.is-enter { animation: none; }
   .rk-pivot__scroll { height: auto; overflow: visible; }
+  .rk-pivot::after { display: none; }
   .rk-pivot thead, .rk-pivot tfoot { position: static; }
   .rk-pivot__tg { visibility: hidden; }   /* no buttons on paper; keeps the indent */
 }

@@ -30,7 +30,7 @@
     "scale": {"type": "string", "default": "shared", "desc": "shared (one value axis) | row (each row scaled to its own max; axis hidden)"},
     "sort": {"type": "string", "default": null, "desc": "null | 'desc' | 'asc' (by value) | 'variance' (best first)"},
     "labels": {"type": "boolean", "default": true, "desc": "Actual value column on the right"},
-    "variance": {"type": "string", "default": "pct", "desc": "Variance column: 'pct' | 'abs' | null"},
+    "variance": {"type": "string", "default": "pct", "desc": "Variance column: 'pct' | 'abs' (in percentage points, e.g. '+2.1pp', when the values are percentages) | null"},
     "valueTitle": {"type": "string", "default": null, "desc": "Header of the actual column (default 'Actual')"},
     "varianceTitle": {"type": "string", "default": null, "desc": "Header of the variance column (default 'vs. <target>')"},
     "colorByTarget": {"type": "boolean", "default": false, "desc": "Colour the actual bar pos / neg by whether it meets the target"},

@@ -20,19 +20,19 @@
     "highlight": {"type": "string|string[]", "default": null, "desc": "Series value(s) drawn filled in accent-2 (in addition to rows flagged by encode.target)"},
     "max": {"type": "number|object", "default": null, "desc": "null = nice max per axis | number = common max (e.g. 100) | {axis: max}"},
     "min": {"type": "number", "default": 0, "desc": "Axis minimum; extended automatically when data falls below it (null = nice min from data)"},
-    "peers": {"type": "string", "default": "outline", "desc": "'outline' (thin categorical outlines) | 'muted' (thin grey outlines)"},
+    "peers": {"type": "string", "default": "outline", "desc": "'outline' (thin categorical outlines, one legend entry each) | 'muted' (thin grey outlines, one 'Peers' legend entry)"},
     "median": {"type": "boolean", "default": false, "desc": "Dashed 'Peer median' polygon (target excluded)"},
     "labels": {"type": "string", "default": "highlight", "desc": "Vertex value labels: 'highlight' | 'all' | 'none'"},
     "shape": {"type": "string", "default": "polygon", "desc": "polygon | circle"},
     "splitNumber": {"type": "number", "default": 4, "desc": "Number of concentric rings"},
     "format": {"type": "string", "default": null, "desc": "Value format (long data); wide data uses each field's own format"},
-    "legend": {"type": "boolean", "default": true, "desc": "Legend (vertical at top-left on wide blocks); click to show / hide a company"}
+    "legend": {"type": "boolean", "default": true, "desc": "Legend (a vertical column beside the radar on wide blocks, the pair centred in the block); click to show / hide a company"}
   },
   "interactions": ["Hover a polygon: every metric with delta vs. peer median", "Hover emphasis fades other polygons", "Legend toggle", "Click a polygon to cross-filter", "Non-selected polygons dimmed", "Re-layouts on resize", "PNG / CSV export"],
   "samples": [
-    {"title": "Peer scorecard (0–100)", "data": "peer_scores", "height": 360,
+    {"title": "Peer scorecard (0–100)", "data": "peer_scores", "height": 360, "span": 6,
      "options": {"encode": {"series": "company", "axis": "metric", "value": "score"}, "highlight": "Helios Industrial", "max": 100, "median": true}},
-    {"title": "Operating profile vs. Industrial Automation peers (wide data)", "data": "peers", "height": 340,
+    {"title": "Operating profile vs. Industrial Automation peers (wide data)", "data": "peers", "height": 360, "span": 6,
      "options": {"encode": {"series": "company", "axis": ["ebitda_margin_25e", "rev_growth_25e", "dividend_yield", "tsr_1y", "ev_ebitda_25e"]}, "where": "sector == \"Industrial Automation\"", "peers": "muted", "median": true}}
   ]
 }

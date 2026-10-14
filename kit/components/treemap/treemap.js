@@ -127,7 +127,10 @@
         else if (id) zoom(state, id, true);
         paintCrumbs(state);
       };
-      base.destroy = function () { state.nav.remove(); destroy(); };
+      var alive = true;
+      base.destroy = function () { alive = false; state.nav.remove(); destroy(); };
+      // labels are fitted by measuring text: measure again once the web fonts have loaded
+      if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(function () { if (alive) base.update(state.ctx); });
       // the colour legend is placed in pixels: re-layout when the block is resized
       var resize = base.resize, size = [base.chart.getWidth(), base.chart.getHeight()];
       base.resize = function () {
@@ -189,7 +192,10 @@
     });
     var deep = state.tree.roots.some(function (n) { return n.children.length; });
     var hint = items.length > 1 ? 'Click the header to go up' : (deep ? 'Click a group to zoom in' : '');
-    if (hint) nav.appendChild(h('span.rk-treemap__hint', hint));
+    // the hint is optional: only when it fits next to the crumbs (they share the row with the colour legend)
+    var room = parseFloat(nav.style.maxWidth) || Infinity, used = 0;
+    items.forEach(function (it, i) { used += C.measure(it.name, '600 11px ' + ctx.theme.fontSans) + (i ? 20 : 0); });
+    if (hint && used + 14 + C.measure(hint, '10px ' + ctx.theme.fontSans) <= room) nav.appendChild(h('span.rk-treemap__hint', hint));
   }
 
   function click(p, state) {
@@ -228,6 +234,8 @@
       : (+o.colorMid || 0);
     var dev = leafList.reduce(function (m, n) { return n.metric == null ? m : Math.max(m, Math.abs(n.metric - mid)); }, 0) || 1;
     var scale = RK.theme.diverging([mid - dev, mid + dev], mid);
+    // metric mode outlines the target: accent-2, or ink when the diverging ramp runs close to accent-2
+    var ring = (t.div || []).some(function (c) { return RK.theme.distance(c, t.accent2) < 70; }) ? t.ink : t.accent2;
 
     // selection (cross-filter) → dim leaves that are not selected
     function isDim(n) {
@@ -249,7 +257,7 @@
         var fill = !kids && isDim(n) ? RK.theme.mix(color, t.paper, 0.72) : color;
         var item = {
           id: n.id, name: n.name, value: n.value, metric: n.metric, field: n.field,
-          itemStyle: { color: fill, borderColor: isHl && byMetric ? t.accent2 : undefined, borderWidth: isHl && byMetric ? 2 : undefined },
+          itemStyle: { color: fill, borderColor: isHl && byMetric ? ring : undefined, borderWidth: isHl && byMetric ? 2 : undefined },
           label: { color: RK.theme.textOn(fill) }   // readable on the fill in light and dark themes
         };
         if (kids) item.children = toData(n.children, color, depth + 1);
@@ -259,14 +267,69 @@
     var data = toData(tree.roots, null, 1);
     var total = tree.total;
 
+    /** Laid-out rect of a node (the formatter runs after the treemap layout): {width, height} or null. */
+    function rectOf(p) {
+      try { return inst.getModel().getSeriesByIndex(0).getData().getItemLayout(p.dataIndex); } catch (e) { return null; }
+    }
+    var F = { n: '600 11.5px ' + t.fontSans, v: '11px ' + t.fontNum, m: '10.5px ' + t.fontNum, up: '600 11px ' + t.fontSans };
+    var ef = window.echarts && window.echarts.format;
+    function ellipsize(s, w, font) { return ef && ef.truncateText ? ef.truncateText(String(s), w, font, '…') : String(s); }
+    /** Name in <= 2 lines of width w (word wrap); null when a word does not fit. */
+    function wrap2(name, w) {
+      var words = String(name).split(' '), a = '', b = '';
+      for (var i = 0; i < words.length; i++) {
+        var tryA = a ? a + ' ' + words[i] : words[i];
+        if (!b && C.measure(tryA, F.n) <= w) { a = tryA; continue; }
+        b = b ? b + ' ' + words[i] : words[i];
+      }
+      return a && (!b || C.measure(b, F.n) <= w) ? (b ? [a, b] : [a]) : null;
+    }
+    /**
+     * Leaf label fitted to its tile: figures are never cut — the share goes first, then the value, then the
+     * whole label (the tooltip keeps the numbers); only the name may wrap / ellipsize. The highlighted
+     * target keeps its full name whenever two lines allow it.
+     */
     function leafLabel(p) {
-      var d = p.data, lines = ['{n|' + p.name + '}'];
-      if (o.labels === 'name') return lines[0];
-      var val = RK.format(d.value, fmt);
-      if (o.showShare) val += '  ' + RK.format(total ? d.value / total : null, '0.0%');
-      lines.push('{v|' + val + '}');
-      if (byMetric && d.metric != null && o.labels !== 'value') lines.push('{m|' + RK.format(d.metric, signed) + '}');
-      return lines.join('\n');
+      var d = p.data, r = rectOf(p), isHl = hl.indexOf(p.name) >= 0;
+      var w = r ? r.width - 14 : Infinity, hgt = r ? r.height - 8 : Infinity;
+      if (w < 24 || hgt < 13) return '';
+      var vals = [];
+      if (o.labels !== 'name') {
+        var v0 = RK.format(d.value, fmt);
+        var opts = o.showShare ? [v0 + '  ' + RK.format(total ? d.value / total : null, '0.0%'), v0] : [v0];
+        var val = opts.filter(function (x) { return C.measure(x, F.v) <= w; })[0];
+        if (val == null) return '';                                     // no room for the figure: no label
+        vals.push('{v|' + C.richSafe(val) + '}');
+        if (byMetric && d.metric != null && o.labels !== 'value') {
+          var mt = RK.format(d.metric, signed);
+          if (C.measure(mt, F.m) <= w) vals.push('{m|' + C.richSafe(mt) + '}');
+        }
+      }
+      var nameLines = C.measure(p.name, F.n) <= w ? [p.name] : null;
+      var room = Math.floor((hgt - 14 * vals.length) / 15);              // name lines that fit above the figures
+      if (!nameLines && room >= 2) nameLines = wrap2(p.name, w);
+      if (!nameLines && isHl && Math.floor(hgt / 15) >= 2 && wrap2(p.name, w)) {
+        nameLines = wrap2(p.name, w);                                   // the target's full name beats its figure
+        while (vals.length && Math.floor((hgt - 14 * vals.length) / 15) < nameLines.length) vals.pop();
+        room = Math.floor((hgt - 14 * vals.length) / 15);
+      }
+      if (!nameLines) nameLines = [ellipsize(p.name, w, F.n)];
+      if (room < nameLines.length) {
+        if (vals.length > 1) { vals.pop(); room = Math.floor((hgt - 14 * vals.length) / 15); }
+        if (room < nameLines.length) nameLines = room >= 1 ? [ellipsize(p.name, w, F.n)] : [];
+        // a flat tile: the target keeps its name (the figure is in the tooltip); a bare figure would be
+        // anonymous, so a peer shows nothing (hover still has it)
+        if (!nameLines.length) return isHl ? '{n|' + C.richSafe(ellipsize(p.name, w, F.n)) + '}' : '';
+      }
+      return nameLines.map(function (l) { return '{n|' + C.richSafe(l) + '}'; }).concat(vals).join('\n');
+    }
+    /** Group header: name + value + share; drops the share, then the value; only the name may ellipsize. */
+    function upperText(p) {
+      var r = rectOf(p), w = r ? r.width - 10 : Infinity;
+      var v = RK.format(p.value, fmt), sh = total ? RK.format(p.value / total, '0%') : null;
+      var opts = [p.name + '   ' + v + (sh ? '  ·  ' + sh : ''), p.name + '   ' + v, p.name];
+      for (var i = 0; i < opts.length; i++) if (C.measure(opts[i], F.up) <= w) return opts[i];
+      return w > 24 ? ellipsize(p.name, w, F.up) : '';
     }
     var rich = {
       n: { fontSize: 11.5, fontWeight: 600, lineHeight: 15, fontFamily: t.fontSans },
@@ -294,18 +357,19 @@
         show: false          // ECharts' crumb tracks the node under the chart centre; ours tracks the drill path
       },
       label: {
-        show: o.labels !== 'none', position: 'insideTopLeft', padding: [5, 6], overflow: 'truncate', ellipsis: '…',
+        // fitted by leafLabel(): ECharts' own truncation would cut figures mid-number
+        show: o.labels !== 'none', position: 'insideTopLeft', padding: [4, 6], overflow: 'none',
         formatter: leafLabel, rich: rich, fontFamily: t.fontSans
       },
       // cells too small for a legible label stay clean (the tooltip still has the numbers)
       labelLayout: function (p) {
         var r = p.rect;
-        if (r && (r.width < 50 || r.height < (o.labels === 'name' ? 22 : 34))) return { x: -9999, y: -9999 };
+        if (r && (r.width < 38 || r.height < 22)) return { x: -9999, y: -9999 };
         return {};
       },
       upperLabel: {
-        show: false, height: 22, padding: [0, 4], color: t.ink, fontSize: 11, fontWeight: 600, fontFamily: t.fontSans, overflow: 'truncate',
-        formatter: function (p) { return p.name + '   ' + RK.format(p.value, fmt) + (total ? '  ·  ' + RK.format(p.value / total, '0%') : ''); }
+        show: false, height: 22, padding: [0, 4], color: t.ink, fontSize: 11, fontWeight: 600, fontFamily: t.fontSans, overflow: 'none',
+        formatter: upperText
       },
       itemStyle: { borderColor: t.paper, borderWidth: 0, gapWidth: 1 },
       emphasis: { itemStyle: { borderColor: t.ink, borderWidth: 1 }, upperLabel: { show: true }, label: { show: o.labels !== 'none' } },
@@ -313,23 +377,25 @@
       data: data
     };
 
-    // colour legend (metric mode): top-right ramp with low / mid / high ticks
+    // colour legend (metric mode): top-left (house style) — title, ramp, low / mid / high ticks; the drill
+    // breadcrumb follows it on the same row
     var graphic = [];
-    var W = inst.getWidth();
-    if (state.nav) state.nav.style.maxWidth = (showLegend ? Math.max(120, W - Math.min(150, W * 0.22) - 24 - C.measure(ctx.title(enc.color) + (o.colorMid === 'avg' ? ' vs. weighted avg.' : ''), '11px ' + t.fontSans)) : W * 0.9) + 'px';
+    var W = inst.getWidth(), navLeft = 0;
     if (showLegend) {
-      var lw = Math.min(150, W * 0.22), lx = W - lw - 2;
-      var stops = (t.div || []).map(function (c, i, a) { return { offset: i / (a.length - 1), color: c }; });
       var lab = ctx.title(enc.color) + (o.colorMid === 'avg' ? ' vs. weighted avg.' : '');
+      var labW = C.measure(lab, '11px ' + t.fontSans), lw = Math.min(150, W * 0.22), lx = Math.ceil(labW + 10);
+      var stops = (t.div || []).map(function (c, i, a) { return { offset: i / (a.length - 1), color: c }; });
       var tick = function (x, v, align) {
         return { type: 'text', x: x, y: 12, silent: true, style: { text: RK.format(v, mfmt), fill: t.ink3, font: '10px ' + t.fontNum, textAlign: align, textVerticalAlign: 'top' } };
       };
       graphic = [
-        { type: 'text', x: lx - 8, y: 6, silent: true, style: { text: lab, fill: t.ink2, font: '11px ' + t.fontSans, textAlign: 'right', textVerticalAlign: 'middle' } },
-        { type: 'rect', x: lx, y: 2, silent: true, shape: { width: lw, height: 8 }, style: { fill: { type: 'linear', x: 0, y: 0, x2: 1, y2: 0, colorStops: stops } } },
+        { type: 'text', x: 0, y: 6, silent: true, style: { text: lab, fill: t.ink2, font: '11px ' + t.fontSans, textAlign: 'left', textVerticalAlign: 'middle' } },
+        { type: 'rect', x: lx, y: 2, silent: true, shape: { width: lw, height: 8, r: 1 }, style: { fill: { type: 'linear', x: 0, y: 0, x2: 1, y2: 0, colorStops: stops } } },
         tick(lx, mid - dev, 'left'), tick(lx + lw / 2, mid, 'center'), tick(lx + lw, mid + dev, 'right')
       ];
+      navLeft = lx + lw + 28;
     }
+    if (state.nav) { state.nav.style.left = navLeft + 'px'; state.nav.style.maxWidth = Math.max(80, W - navLeft - 4) + 'px'; }
 
     return {
       tooltip: {

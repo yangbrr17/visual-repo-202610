@@ -25,15 +25,28 @@
     var s = RK.format(Math.abs(v), fmt);
     return v > 0 ? '+' + s : v < 0 && /[1-9]/.test(s) ? MINUS + s : s;
   }
+  /** Value text with a true minus sign (matches the signed delta column). */
+  function num(v, f) { return RK.format(v, f).replace(/^-/, MINUS); }
+  /** Percent formats: differences of two percentages are percentage points ('+2.1pp'), not relative %. */
+  function isPct(f) {
+    var code = RK.format.presets[f] || f;
+    return typeof code === 'string' && /%/.test(code.split(';')[0].replace(/"[^"]*"/g, ''));
+  }
+  function ppFmt(f) { var dec = RK.format.decimals(f) || 0; return '0' + (dec ? '.' + new Array(dec + 1).join('0') : '') + '"pp"'; }
 
-  /** Tinted full-width row band behind highlighted categories (like .rk-table tr.is-target). */
+  /**
+   * Tinted full-width row band behind highlighted categories (like .rk-table tr.is-target). On dark paper an
+   * alpha tint of accent-2 turns muddy, so it stays faint and a 2px accent-2 rule marks the row instead.
+   */
   function rowBand(ctx, idx) {
     var t = ctx.theme;
     return {
       id: 'band', type: 'custom', silent: true, z: 0, tooltip: { show: false }, animation: false,
       renderItem: function (params, api) {
         var p = api.coord([0, api.value(0)]), bw = api.size([0, 1])[1];
-        return { type: 'rect', shape: { x: 0, y: p[1] - bw / 2, width: api.getWidth(), height: bw }, style: { fill: RK.theme.alpha(t.accent2, t.dark ? 0.16 : 0.11) } };
+        var kids = [{ type: 'rect', shape: { x: 0, y: p[1] - bw / 2, width: api.getWidth(), height: bw }, style: { fill: RK.theme.alpha(t.accent2, t.dark ? 0.09 : 0.11) } }];
+        if (t.dark) kids.push({ type: 'rect', shape: { x: 0, y: p[1] - bw / 2, width: 2, height: bw }, style: { fill: t.accent2 } });
+        return { type: 'group', children: kids };
       },
       data: idx.map(function (i) { return [i]; })
     };
@@ -83,7 +96,10 @@
     // ---- colours ----
     var byDir = o.colorBy === 'direction';
     var up = o.goodDirection === 'down' ? t.neg : t.pos, down = o.goodDirection === 'down' ? t.pos : t.neg;
-    var single = range ? t.accent : (t.accent3 || t.accent);
+    var single = t.peer || t.accent;   // one peer colour across the kit (lollipop, bullet, diverging-bar)
+    // the marker (e.g. current price) is a data series: brand / ink colour, accent-2 on the target row.
+    // --rk-ref stays reserved for reference lines (house rule 7)
+    var markerCol = t.dark ? t.ink : t.accent;
     var fromCol = byDir ? RK.theme.mix(t.ink3, t.paper, 0.15) : single;
     function colorOf(d) {
       if (!byDir) return single;
@@ -105,7 +121,7 @@
     var labelsOn = o.labels !== false && o.labels !== 'none' && o.labels !== 'marker';
     var size = o.dotSize || 9;
     var lblPx = 0;
-    if (labelsOn) items.forEach(function (d) { [d.pf, d.pt].forEach(function (v) { if (v != null) lblPx = Math.max(lblPx, C.measure(RK.format(v, fmt), '10.5px ' + t.fontNum)); }); });
+    if (labelsOn) items.forEach(function (d) { [d.pf, d.pt].forEach(function (v) { if (v != null) lblPx = Math.max(lblPx, C.measure(num(v, fmt), '10.5px ' + t.fontNum)); }); });
     // end labels run past the plot edge: push the category labels / delta column out by the overflow
     var room = function (gap, side) {
       var need = labelsOn && !(norm === 'to' && side === 'right') && !(norm === 'from' && side === 'left') ? lblPx + size / 2 + 6 : 0;
@@ -144,7 +160,7 @@
       if (norm === which) return { show: false };     // the normalising end is always 100%
       return {
         show: true, distance: range ? 5 : size / 2 + 3, fontSize: 10.5, fontFamily: t.fontNum, color: t.ink2,
-        formatter: function (p) { var d = items[p.dataIndex]; return RK.format(which === 'from' ? d.pf : d.pt, fmt); }
+        formatter: function (p) { var d = items[p.dataIndex]; return C.richSafe(num(which === 'from' ? d.pf : d.pt, fmt)); }
       };
     }
     function endPos(d, which) {
@@ -160,12 +176,14 @@
       itemStyle: { color: fromCol },
       label: endLabel('from'),
       // reference lines (offer / target price): dashed --rk-ref, label in the line colour
+      // precision 10: the line sits at the exact value (the default rounds to 2 decimals, e.g. 0.2152 -> 0.22)
       markLine: (o.refLines || []).length ? {
-        silent: true, symbol: ['none', 'none'],
+        silent: true, symbol: ['none', 'none'], precision: 10,
         data: o.refLines.map(function (r) {
-          var c = r.color || t.ref;
+          var c = r.color || t.ref, text = C.richSafe(r.label || num(r.value, fmt));
           return { xAxis: r.value, lineStyle: { color: c, type: [4, 3], width: 1.2 },
-            label: { show: true, position: 'start', color: c, fontSize: 10.5, fontFamily: t.fontNum, formatter: r.label || RK.format(r.value, fmt) } };
+            label: { show: true, position: 'start', color: c, fontSize: 10.5, fontFamily: t.fontNum, fontStyle: 'italic', fontWeight: 600,
+              textBorderColor: t.paper, textBorderWidth: 3, formatter: function () { return text; } } };
         })
       } : undefined,
       data: items.map(function (d, i) {
@@ -202,13 +220,14 @@
         id: 'marker', name: o.markerLabel || ctx.title(enc.marker), type: 'scatter', z: 6,
         symbol: 'diamond', symbolSize: size + 3,
         animationDelay: function (i) { return i * stagger + 420; },
-        itemStyle: { color: t.ref, borderColor: t.paper, borderWidth: 1 },     // current price = reference colour (accent-2 is the target)
+        itemStyle: { color: markerCol, borderColor: t.paper, borderWidth: 1 },
         label: labelsOn && (o.labels === 'marker' || o.labels === 'all') ? {
           show: true, position: 'top', distance: 3, fontSize: 10.5, fontFamily: t.fontNum, color: t.ink2,
-          formatter: function (p) { return RK.format(items[p.dataIndex].pm, fmt); }
+          formatter: function (p) { return C.richSafe(num(items[p.dataIndex].pm, fmt)); }
         } : { show: false },
         data: items.map(function (d, i) {
-          return { name: d.label, value: [d.pm, i], itemStyle: { color: C.dim(ctx, enc.label, d.label, t.ref) } };
+          return { name: d.label, value: [d.pm, i], symbolSize: d.hi ? size + 5 : size + 3,
+            itemStyle: { color: C.dim(ctx, enc.label, d.label, d.hi ? t.accent2 : markerCol) } };
         })
       });
     }
@@ -220,11 +239,14 @@
       if (o.delta === 'marker') return d.to ? (d.marker == null ? null : d.marker / d.to - 1) : null;
       return null;
     }
-    var deltaFmt = o.deltaFormat || (o.delta === 'abs' ? rawFmt : '0.0%');
+    // 'abs' change of a percentage is in percentage points: '+2.1pp', not '+2.1%'
+    var ppAbs = !norm && isPct(rawFmt);
+    var deltaFmt = o.deltaFormat || (o.delta === 'abs' ? (ppAbs ? ppFmt(rawFmt) : rawFmt) : '0.0%');
+    var deltaVal = function (d) { var x = deltaOf(d); return o.delta === 'abs' && ppAbs && !o.deltaFormat && isNum(x) ? x * 100 : x; };
     // right-aligned numbers: column width = widest label; the header is right-aligned over it
     var deltaTitle = o.deltaTitle || (o.delta === 'marker' ? 'vs. ' + (o.toLabel || ctx.title(enc.to)) : 'Change');
     var colW = 0;
-    if (o.delta) items.forEach(function (d) { colW = Math.max(colW, C.measure(signed(deltaOf(d), deltaFmt), '600 11px ' + t.fontNum)); });
+    if (o.delta) items.forEach(function (d) { colW = Math.max(colW, C.measure(signed(deltaVal(d), deltaFmt), '600 11px ' + t.fontNum)); });
     colW = Math.ceil(colW) + 2;
     var headW = C.measure(deltaTitle, '10.5px ' + t.fontSans);
     var deltaAxis = o.delta ? {
@@ -235,9 +257,9 @@
       axisLabel: {
         interval: 0, align: 'right', margin: 14 + colW + overR, fontFamily: t.fontNum, fontSize: 11,
         formatter: function (v, i) {
-          var d = items[i], x = d ? deltaOf(d) : null;
+          var d = items[i], x = d ? deltaVal(d) : null;
           var cls = o.delta === 'marker' || !byDir || !isNum(x) || x === 0 ? 'n' : ((x > 0) === (o.goodDirection !== 'down') ? 'p' : 'm');
-          return '{' + cls + '|' + signed(x, deltaFmt) + '}';
+          return '{' + cls + '|' + C.richSafe(signed(x, deltaFmt)) + '}';
         },
         rich: {
           p: { color: t.pos, fontFamily: t.fontNum, fontSize: 11, fontWeight: 600 },
@@ -254,7 +276,7 @@
       { name: o.upLabel || 'Increase', itemStyle: { color: up } }, { name: o.downLabel || 'Decrease', itemStyle: { color: down } });
     else legendData.push({ name: fromName, itemStyle: { color: t.paper, borderColor: single, borderWidth: 1.5 } },   // hollow = 'from'
       { name: toName, itemStyle: { color: single } });
-    if (hasMarker) legendData.push({ name: o.markerLabel || ctx.title(enc.marker), icon: 'diamond' });   // marker shape
+    if (hasMarker) legendData.push({ name: o.markerLabel || ctx.title(enc.marker), icon: 'diamond', itemStyle: { color: markerCol } });   // marker shape
     var showLegend = o.legend !== false;
     var hasTopRef = (o.refLines || []).length > 0;
 
@@ -264,13 +286,13 @@
       splitLine: { show: true, lineStyle: { color: t.grid, type: [2, 3] } },
       axisLabel: {
         interval: 0, color: t.ink2, fontSize: 11, width: 150, overflow: 'truncate', margin: 8 + overL,
-        formatter: function (v, i) { return items[i] && items[i].hi ? '{h|' + v + '}' : v; },
+        formatter: function (v, i) { var s = C.richSafe(v); return items[i] && items[i].hi ? '{h|' + s + '}' : s; },
         rich: { h: { color: t.ink, fontWeight: 600, fontSize: 11 } }
       }
     };
     var valAxis = {
       type: 'value', min: axMin, max: axMax, interval: step,
-      axisLabel: { formatter: C.axisFmt(tickFmt(fmt, step)), hideOverlap: true },
+      axisLabel: { formatter: function (v) { return num(v, tickFmt(fmt, step)); }, hideOverlap: true },
       splitLine: { show: true, lineStyle: { color: t.grid } }
     };
 
@@ -283,16 +305,19 @@
           var d = items[p.dataIndex];
           if (!d) return '';
           var tr = [
-            { color: fromCol, label: o.fromLabel || ctx.title(enc.from), value: RK.format(d.from, rawFmt) },
-            { color: colorOf(d), label: toName, value: RK.format(d.to, rawFmt) }
+            { color: fromCol, label: o.fromLabel || ctx.title(enc.from), value: num(d.from, rawFmt) },
+            { color: colorOf(d), label: toName, value: num(d.to, rawFmt) }
           ];
           if (hasMarker) {
-            tr.push({ color: t.ref, label: o.markerLabel || ctx.title(enc.marker), value: RK.format(d.marker, rawFmt), bold: true });
+            tr.push({ color: d.hi ? t.accent2 : markerCol, label: o.markerLabel || ctx.title(enc.marker), value: num(d.marker, rawFmt), bold: true });
             if (d.to != null && d.marker != null) tr.push({ label: '% of ' + toName, value: RK.format(d.to ? d.marker / d.to : NaN, '0.0%') });
             if (d.from != null && d.to != null && d.marker != null) tr.push({ label: 'Position in range', value: RK.format(d.to - d.from ? (d.marker - d.from) / (d.to - d.from) : NaN, '0%') });
           } else {
-            tr.push({ label: 'Change', value: signed(d.gap, rawFmt), bold: true });
-            tr.push({ label: 'Change %', value: signed(d.from ? (d.gap == null ? null : d.gap / Math.abs(d.from)) : NaN, '0.0%') });
+            if (isPct(rawFmt)) tr.push({ label: 'Change', value: signed(isNum(d.gap) ? d.gap * 100 : d.gap, ppFmt(rawFmt)), bold: true });
+            else {
+              tr.push({ label: 'Change', value: signed(d.gap, rawFmt), bold: true });
+              tr.push({ label: 'Change %', value: signed(d.from ? (d.gap == null ? null : d.gap / Math.abs(d.from)) : NaN, '0.0%') });
+            }
           }
           return C.tip(d.label, tr);
         }

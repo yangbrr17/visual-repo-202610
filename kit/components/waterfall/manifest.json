@@ -17,10 +17,10 @@
     "category": {"type": "string", "required": false, "desc": "Driver group (Organic / Cost / M&A / FX) used by colorBy: 'category' and shown in the tooltip"}
   },
   "options": {
-    "orientation": {"type": "string", "default": "vertical", "desc": "vertical | horizontal (horizontal suits long step names)"},
+    "orientation": {"type": "string", "default": "vertical", "desc": "vertical | horizontal (horizontal suits long step names). A vertical bridge whose step names cannot wrap into their columns (narrow blocks) is drawn horizontally"},
     "inferTotals": {"type": "string|boolean", "default": "auto", "desc": "Which rows are totals when a row has no kind: 'auto' (first and last when the kind field is absent) | 'first' | 'last' | 'both' | false"},
     "endTotal": {"type": "string", "default": null, "desc": "Label of a computed closing total appended after the last row (e.g. 'FY26E EBITDA')"},
-    "colorBy": {"type": "string", "default": "sign", "desc": "sign (pos / neg colours) | category (deltas coloured by the category channel, with legend)"},
+    "colorBy": {"type": "string", "default": "sign", "desc": "sign (pos / neg colours) | category (deltas coloured by the category channel, with legend; driver colours never use red / green hues or the totals' colour)"},
     "invert": {"type": "boolean", "default": false, "desc": "Increases are unfavourable (cost walks): swap the pos / neg colours"},
     "connectors": {"type": "boolean|string", "default": true, "desc": "Connector lines between bars: true | 'dashed' | false"},
     "labels": {"type": "boolean", "default": true, "desc": "Value labels (deltas with +/− sign, totals in bold)"},
@@ -38,7 +38,7 @@
     {"title": "EBITDA bridge FY25A to FY26E (USD m)", "data": "ebitda_bridge", "height": 360,
      "options": {"encode": {"label": "step", "value": "value", "kind": "kind", "category": "category"}, "axisBreak": "auto"}},
     {"title": "Enterprise value to equity value (USD m)", "data": "ev_equity_bridge", "height": 340, "span": 7,
-     "options": {"encode": {"label": "step", "value": "value", "kind": "kind"}}},
+     "options": {"encode": {"label": "step", "value": "value", "kind": "kind"}, "axisBreak": "auto"}},
     {"title": "EBITDA bridge by driver (USD m)", "data": "ebitda_bridge", "height": 380, "span": 5,
      "options": {"encode": {"label": "step", "value": "value", "kind": "kind", "category": "category"}, "orientation": "horizontal", "colorBy": "category", "connectors": "dashed", "axisBreak": "auto"}}
   ]

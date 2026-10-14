@@ -36,7 +36,7 @@
     "values": {
       "type": "array",
       "default": null,
-      "desc": "Explicit option order; null = distinct values of the bound dataset in data order (fallback Base / Upside / Downside)"
+      "desc": "Explicit option order; null = distinct values of the bound dataset in canonical order (downside cases, base, upside cases; fallback Downside / Base / Upside)"
     },
     "labels": {
       "type": "object",
@@ -71,7 +71,7 @@
     "tones": {
       "type": "string|object|boolean",
       "default": "auto",
-      "desc": "Status dot colour: 'auto' (Upside = positive, Downside = negative), false, or {value: 'pos'|'neg'|'base'}"
+      "desc": "Scenario identity dot: 'auto' (Upside = accent-3 dot, Base = accent dot, Downside = hollow grey dot; pos / neg colours stay reserved for change), false, or {value: 'pos'|'neg'|'base'}"
     },
     "metric": {
       "type": "object",

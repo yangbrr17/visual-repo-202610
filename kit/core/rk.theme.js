@@ -160,7 +160,8 @@
       bar: { barMaxWidth: 36, itemStyle: { borderRadius: 0 } },
       scatter: { symbolSize: 8 },
       candlestick: { itemStyle: { color: t.pos, color0: t.neg, borderColor: t.pos, borderColor0: t.neg } },
-      markLine: { lineStyle: { color: t.ink3, type: 'dashed' }, label: { color: t.ink2, fontSize: 11 }, symbol: ['none', 'none'] },
+      // precision: ECharts rounds markLine values to the axis precision by default, which misplaces medians
+      markLine: { precision: 10, lineStyle: { color: t.ink3, type: 'dashed' }, label: { color: t.ink2, fontSize: 11 }, symbol: ['none', 'none'] },
       dataZoom: {
         borderColor: t.rule, backgroundColor: 'transparent', fillerColor: alpha(t.accent, 0.08),
         handleStyle: { color: t.paper, borderColor: t.accent }, moveHandleStyle: { color: alpha(t.accent, 0.35) },
@@ -240,7 +241,10 @@
     /** Readable label colour on top of a data fill, correct in light and dark themes. */
     textOn: function (fill) {
       var t = theme.tokens();
-      return onColor(fill, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#ffffff');
+      var c = onColor(fill, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#ffffff');
+      if (contrast(fill, c) >= 4.5) return c;
+      // neither theme colour is legible enough on this fill: fall back to pure black / white
+      return contrast(fill, '#000000') >= contrast(fill, '#ffffff') ? '#000000' : '#ffffff';
     },
 
     /**

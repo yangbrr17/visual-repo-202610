@@ -18,7 +18,6 @@
     if (m) return t.cat[(+m[1] - 1) % t.cat.length];
     return v;
   }
-  function safe(s) { return String(s == null ? '' : s).replace(/[{}|]/g, ' '); }
 
   /** Chord series ships with ECharts 6. */
   function hasChord() {
@@ -106,7 +105,7 @@
       sort: 'desc',             // desc (largest first, clockwise from 12 o'clock) | data
       colorBy: 'node',          // node (categorical) | single (accent; highlight still applies)
       nodeColors: {},           // {name: colour or theme token}
-      highlight: null,          // node name(s) in accent2 (e.g. the client's home market)
+      highlight: null,          // node name(s) in accent2 with their ribbons; other ribbons recede (e.g. the client's home market)
       ribbonColor: 'source',    // source | target | gradient | neutral
       ribbonOpacity: 0.34,
       padAngle: 1.6,            // degrees between arcs
@@ -186,11 +185,24 @@
       var dim = active && !active.has(n.name);
       return { name: n.name, itemStyle: { color: colorOf[n.name], opacity: dim ? 0.25 : 1 } };
     });
+    // with a highlight, accent2 is reserved for the highlighted arc and its ribbons (both directions, at a
+    // moderate opacity); every other ribbon recedes, so the emphasis never turns into the background.
+    // ECharts fills ribbons only from a node colour ('source' | 'target'), so each highlighted ribbon takes
+    // the end that is highlighted (colorBy node) or the direction key's end (single).
+    var baseColor = ['source', 'target', 'gradient'].indexOf(o.ribbonColor) >= 0 ? o.ribbonColor : 'source';
+    var hiOp = t.dark ? 0.42 : 0.55, muteOp = t.dark ? 0.1 : 0.16;
     var links = m.links.map(function (l) {
-      var op = o.ribbonOpacity;
-      if (single && hi.length) op = touchesHi(l) ? Math.min(0.75, o.ribbonOpacity * 2) : o.ribbonOpacity * 0.4;
+      var op = o.ribbonOpacity, col = null;
+      if (hi.length) {
+        if (touchesHi(l)) {
+          op = single ? Math.min(0.75, o.ribbonOpacity * 2) : hiOp;
+          if (!single) col = hi.indexOf(l.source) >= 0 ? 'source' : 'target';
+        } else op = single ? o.ribbonOpacity * 0.4 : muteOp;
+      }
       if (active) op = (sel.indexOf(l.source) >= 0 || sel.indexOf(l.target) >= 0) ? Math.min(0.8, o.ribbonOpacity * 1.9) : 0.05;
-      return { source: l.source, target: l.target, value: l.value, count: l.count, lineStyle: { opacity: op } };
+      var ls = { opacity: op };
+      if (col) ls.color = col;
+      return { source: l.source, target: l.target, value: l.value, count: l.count, lineStyle: ls };
     });
 
     var tooltip = {
@@ -218,9 +230,27 @@
 
     var graphic = [];
     if (keyH) {
-      var keyText = single && hi.length ? 'Highlighted: flows to / from ' + hi.join(', ')
-        : 'Ribbon colour = ' + (o.ribbonColor === 'target' ? ctx.title(enc.target) : ctx.title(enc.source)) + (o.ribbonColor === 'gradient' ? ' \u2192 ' + ctx.title(enc.target) : '');
-      graphic.push({ type: 'text', id: 'key', left: 0, top: 0, silent: true, style: { text: keyText, fill: t.ink3, font: '10.5px ' + t.fontSans } });
+      var keyFont = '11px ' + t.fontSans;
+      if (single && hi.length) {
+        // direction key (10px rounded swatches, top-left): which colour is outbound / inbound for the highlight
+        var who = hi.join(', '), outCol = baseColor === 'target' ? t.accent : t.accent2, inCol = baseColor === 'target' ? t.accent2 : t.accent;
+        var items = [[outCol, who + ' outbound'], [inCol, who + ' inbound']], kx = 0, kids = [];
+        items.forEach(function (it) {
+          kids.push({ type: 'rect', shape: { x: kx, y: 2, width: 10, height: 10, r: 2 }, style: { fill: it[0] } });
+          kids.push({ type: 'text', x: kx + 15, y: 7, style: { text: it[1], fill: t.ink2, font: keyFont, verticalAlign: 'middle' } });
+          kx += 15 + measure(it[1], keyFont) + 16;
+        });
+        graphic.push({ type: 'group', id: 'key', left: 0, top: 0, silent: true, children: kids });
+      } else {
+        var keyText = 'Ribbon colour = ' + (o.ribbonColor === 'target' ? ctx.title(enc.target) : ctx.title(enc.source)) + (o.ribbonColor === 'gradient' ? ' to ' + ctx.title(enc.target) : '');
+        var kids2 = [{ type: 'text', x: 0, y: 7, style: { text: keyText, fill: t.ink3, font: keyFont, verticalAlign: 'middle' } }];
+        if (hi.length) {
+          var kx2 = measure(keyText, keyFont) + 18, lab = 'Flows to / from ' + hi.join(', ');
+          kids2.push({ type: 'rect', shape: { x: kx2, y: 2, width: 10, height: 10, r: 2 }, style: { fill: t.accent2 } });
+          kids2.push({ type: 'text', x: kx2 + 15, y: 7, style: { text: lab, fill: t.ink2, font: keyFont, verticalAlign: 'middle' } });
+        }
+        graphic.push({ type: 'group', id: 'key', left: 0, top: 0, silent: true, children: kids2 });
+      }
     }
 
     if (!hasChord()) {
@@ -248,7 +278,7 @@
         minAngle: 0,
         itemStyle: { borderRadius: 0, borderWidth: 0 },
         // ECharts 6.1 only fills ribbons for 'source' | 'target' | 'gradient' (a literal colour is ignored)
-        lineStyle: { color: ['source', 'target', 'gradient'].indexOf(o.ribbonColor) >= 0 ? o.ribbonColor : 'source', opacity: o.ribbonOpacity, width: 0 },
+        lineStyle: { color: baseColor, opacity: o.ribbonOpacity, width: 0 },
         label: { show: false },
         emphasis: { focus: 'adjacency', lineStyle: { opacity: Math.min(0.85, o.ribbonOpacity * 2.2) }, label: { show: false } },
         blur: { itemStyle: { opacity: 0.3 }, lineStyle: { opacity: 0.05 } },
@@ -296,8 +326,8 @@
       var x = g.cx + (it.right ? 1 : -1) * (dx + 4);
       var dim = g.active && !g.active.has(it.n.name);
       var moved = Math.abs(it.y - it.y0) > 3;
-      var name = safe(it.n.name);
-      var txt = '{n|' + name + '}' + (o.labelValues ? '\n{v|' + safe(RK.format(it.n.total, g.fmt)) + '}' : '');
+      var name = C.richSafe(it.n.name);
+      var txt = '{n|' + name + '}' + (o.labelValues ? '\n{v|' + C.richSafe(RK.format(it.n.total, g.fmt)) + '}' : '');
       if (moved) {
         out.push({
           type: 'polyline', id: 'lead-' + it.n.name, silent: true, z: 1,

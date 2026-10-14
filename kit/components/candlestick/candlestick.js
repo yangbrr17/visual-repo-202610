@@ -196,8 +196,9 @@
     var step = util.niceStep((hi - lo) || Math.abs(hi) * 0.1 || 1, util.clamp(Math.round((state.priceH || 220) / 50), 3, 7));
     var p = { min: rnd(Math.floor(lo / step + 1e-9) * step), max: rnd(Math.ceil(hi / step - 1e-9) * step), interval: step };
     if (p.max === p.min) p.max = rnd(p.max + step);
-    var vstep = util.niceStep(vmax || 1, util.clamp(Math.round((state.volH || 60) / 34), 1, 3));
-    return { p: p, v: { max: rnd(Math.ceil((vmax || 1) / vstep) * vstep), interval: vstep }, first: a, last: b };
+    // the volume pane is short: one labelled tick (its top) keeps it from reading as part of the price axis
+    var vstep = util.niceStep(vmax || 1, 3), vtop = rnd(Math.ceil((vmax || 1) / vstep) * vstep);
+    return { p: p, v: { max: vtop, interval: vtop }, first: a, last: b };
   }
   function rnd(v) { return Math.round(v * 1e10) / 1e10; }
   function sameAxes(a, b) {
@@ -222,7 +223,7 @@
     var hasVol = m.V.length > 0;
     var H = inst.getHeight();
     var hasSelector = o.rangeSelector && !ctx.print && useZoom && m.n >= 30;
-    var top = hasLegend || hasSelector ? 34 : 14, gap = 16, xLab = 22, bottom = slider ? 32 : 4;
+    var top = hasLegend || hasSelector ? 34 : 14, gap = 18, xLab = 22, bottom = slider ? 32 : 4;
     var avail = Math.max(120, H - top - gap - xLab - bottom);
     var volH = state.volH = hasVol ? Math.max(36, Math.round(avail * util.clamp(o.volumeShare || 0.22, 0.1, 0.5))) : 0;
     var priceH = state.priceH = hasVol ? avail - volH : avail + gap;
@@ -238,7 +239,7 @@
 
     var upC = t.pos, dnC = t.neg;
     // MAs sit on dense red / green candles: keep them well clear of up / down and of the accent2 highlight
-    var pal = RK.theme.palette({ exclude: [upC, dnC, t.accent2], minDistance: 110, n: m.mas.length });
+    var pal = overlayPalette([upC, dnC, t.accent2, t.ref], m.mas.length, t);
     var series = [{
       id: 'ohlc', name: 'OHLC', type: 'candlestick', xAxisIndex: 0, yAxisIndex: 0,
       barMaxWidth: 14, barMinWidth: 1,
@@ -259,7 +260,7 @@
     });
     var marks = markSeries(ctx, m);
     if (marks) series.push(marks);
-    if (pins.length) series.push(pinSeries(ctx, m, pins));
+    if (pins.length) series.push(pinSeries(ctx, m, pins, state));
     if (hasVol) {
       series.push({
         id: 'volume', name: ctx.title(ctx.enc.volume) || 'Volume', type: 'bar', xAxisIndex: 1, yAxisIndex: 1,
@@ -304,8 +305,9 @@
         util.merge({}, xBase, { id: 'xv', gridIndex: 1, show: hasVol, axisLabel: tickLabel(tk) })
       ],
       yAxis: [
+        // the price axis' lowest label would sit on top of the volume label: drop it when there is a volume pane
         { id: 'yp', gridIndex: 0, type: 'value', min: ax.p.min, max: ax.p.max, interval: ax.p.interval,
-          axisLabel: { formatter: pAxisFmt }, axisPointer: { label: { formatter: function (p) { return RK.format(p.value, fmt); } } } },
+          axisLabel: { formatter: pAxisFmt, showMinLabel: !hasVol }, axisPointer: { label: { formatter: function (p) { return RK.format(p.value, fmt); } } } },
         { id: 'yv', gridIndex: 1, type: 'value', min: 0, max: ax.v.max, interval: ax.v.interval, show: hasVol,
           splitLine: { show: true, lineStyle: { color: t.grid } },
           axisLabel: { formatter: function (v) { return v === 0 ? '' : RK.format(v, 'auto'); } },
@@ -323,13 +325,14 @@
     var lines = (o.refLines || []).map(function (r) {
       var col = RK.theme.resolve(r.color) || t.ref;          // token names ('pos', 'accent2') or literal colours
       return { yAxis: r.value, lineStyle: { color: col, type: r.type || 'dashed', width: 1.25 },
-        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: col, fontWeight: 600, fontSize: 10.5, backgroundColor: chip, padding: [1, 4], borderRadius: 2 } };
+        // text from a function: "{a}", "{b}", "{c}" in a label are never template-substituted
+        label: { formatter: textFn(r.label != null && r.label !== '' ? r.label : RK.format(r.value, fmt)), position: 'insideStartTop', color: col, fontWeight: 600, fontSize: 10.5, backgroundColor: chip, padding: [1, 4], borderRadius: 2 } };
     });
     if (o.lastPrice) {
       var i = m.n - 1, c = m.C[i];
       var col = i > 0 && c < m.C[i - 1] ? t.neg : t.pos;
       lines.push({ yAxis: c, lineStyle: { color: col, type: [1.5, 2.5], width: 1, opacity: 0.9 },
-        label: { formatter: RK.format(c, fmt), position: 'end', distance: 4, backgroundColor: col,
+        label: { formatter: textFn(RK.format(c, fmt)), position: 'end', distance: 4, backgroundColor: col,
           color: RK.theme.textOn(col), padding: [3, 4, 2, 4], borderRadius: 2, fontWeight: 600, fontSize: 10.5, fontFamily: t.fontNum } });
     }
     if (!lines.length) return null;
@@ -337,17 +340,69 @@
       markLine: { silent: true, symbol: ['none', 'none'], animation: false, data: lines } };
   }
 
-  /** Numbered pins on stems above the candle high; staggered when they would touch. */
-  function pinSeries(ctx, m, pins) {
-    var t = ctx.theme, pinColor = t.ink2, txt = RK.theme.textOn(pinColor), R = 8;
+  /**
+   * Overlay (MA / VWAP) colours: theme palette minus the excluded colours and minus saturated reds and
+   * greens, which the house reserves for change; tints / shades of the survivors when more are needed.
+   */
+  function overlayPalette(exclude, n, t) {
+    // well clear of the excluded colours first; relax the distance before falling back to tints of one hue
+    function changeHue(c) {
+      var p = RK.theme.parseColor(c), r = p[0] / 255, g = p[1] / 255, b = p[2] / 255;
+      var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+      if (d < 0.15) return false;
+      var h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      h = (h * 60 + 360) % 360;
+      return h >= 330 || h <= 20 || (h >= 85 && h <= 165);
+    }
+    var base = [];
+    [110, 80, 60].forEach(function (dist) {
+      if (base.length >= n) return;
+      RK.theme.palette({ exclude: exclude, minDistance: dist }).forEach(function (c) {
+        if (base.indexOf(c) < 0 && !changeHue(c)) base.push(c);
+      });
+    });
+    if (!base.length) base = [t.ink2];
+    var out = base.slice(0, n);
+    for (var k = 0; out.length < n; k++) {
+      var src = base[k % base.length], round = Math.floor(k / base.length) + 1;
+      out.push(round % 2 ? RK.theme.mix(src, t.paper, 0.4) : RK.theme.mix(src, t.ink, 0.3));
+    }
+    return out;
+  }
+
+  function textFn(s) { s = String(s); return function () { return s; }; }
+
+  /**
+   * Numbered pins on stems above the candles: each stands clear of the highs (and visible MAs) of every
+   * candle within its own width, so it never hides the latest bars; staggered when pins would touch.
+   */
+  function pinSeries(ctx, m, pins, state) {
+    var t = ctx.theme, pinColor = t.ink2, txt = RK.theme.textOn(pinColor), R = 8.5;
     return {
-      id: 'events', type: 'custom', name: '__events', xAxisIndex: 0, yAxisIndex: 0, z: 6, clip: true, tooltip: { show: false },
+      // not clipped: a pin on the last candle may reach into the right margin rather than be cut in half
+      id: 'events', type: 'custom', name: '__events', xAxisIndex: 0, yAxisIndex: 0, z: 6, clip: false, tooltip: { show: false },
       encode: { x: 0, y: 1 },
       data: pins.map(function (p) { return [p.i, p.y, p.n]; }),
       renderItem: function (params, api) {
         var c = params.context, cs = params.coordSys;
         if (!c.pos) {
           c.pos = pins.map(function (p) { return api.coord([p.i, p.y]); });
+          var mas = m.mas.filter(function (s) { return shown(state, s.name); });
+          c.top = pins.map(function (p, k) {
+            var top = c.pos[k][1], bot = top;
+            [-1, 1].forEach(function (dir) {
+              for (var j = dir < 0 ? p.i : p.i + 1; j >= 0 && j < m.n; j += dir) {
+                if (Math.abs(api.coord([j, 0])[0] - c.pos[k][0]) > R + 3 + api.size([1, 0])[0] / 2) break;
+                [m.H[j], m.L[j]].concat(mas.map(function (s) { return s.values[j]; })).forEach(function (v) {
+                  if (v == null) return;
+                  var y = api.coord([j, v])[1];
+                  if (y < top) top = y;
+                  if (y > bot) bot = y;
+                });
+              }
+            });
+            return [top, bot];
+          });
           c.lv = [];
           c.pos.forEach(function (pt, k) {
             var used = {};
@@ -360,13 +415,13 @@
         var k = params.dataIndex, pt = c.pos[k];
         if (!pt || pt[0] < cs.x - 1 || pt[0] > cs.x + cs.width + 1) return null;
         var stem = 12 + c.lv[k] * (2 * R + 4);
-        var up = pt[1] - stem - R >= cs.y - 2;
-        var cy = up ? pt[1] - 3 - stem : pt[1] + stem;
-        var y0 = up ? pt[1] - 3 : pt[1];
+        var up = c.top[k][0] - 3 - stem - R >= cs.y - 2;
+        var cy = up ? c.top[k][0] - 3 - stem : c.top[k][1] + 3 + stem;
+        var y0 = up ? pt[1] - 3 : c.top[k][1] + 3;
         return { type: 'group', children: [
           { type: 'line', shape: { x1: pt[0], y1: y0, x2: pt[0], y2: cy + (up ? R : -R) }, style: { stroke: pinColor, lineWidth: 1, opacity: 0.7 } },
           { type: 'circle', shape: { cx: pt[0], cy: cy, r: R }, style: { fill: pinColor, stroke: t.paper, lineWidth: 1.25 } },
-          { type: 'text', x: pt[0], y: cy, style: { text: String(api.value(2)), fill: txt, font: '600 10px ' + t.fontNum, align: 'center', verticalAlign: 'middle' } }
+          { type: 'text', x: pt[0], y: cy, style: { text: String(api.value(2)), fill: txt, font: '600 11px ' + t.fontNum, align: 'center', verticalAlign: 'middle' } }
         ] };
       }
     };

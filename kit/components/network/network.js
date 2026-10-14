@@ -172,6 +172,136 @@
     return out;
   }
 
+  /* ---- label placement ------------------------------------------------------------------ *
+   * Candidate label positions around a symbol of radius r. dir: unit vector the position points to
+   * (used to prefer the side facing away from the hub). ECharts position: string or [dx, dy] from the
+   * symbol's top-left corner with explicit align / verticalAlign.
+   */
+  var LABEL_DIST = 4;
+  var POSITIONS = [
+    { key: 'right', dir: [1, 0] }, { key: 'left', dir: [-1, 0] }, { key: 'top', dir: [0, -1] }, { key: 'bottom', dir: [0, 1] },
+    { key: 'tr', dir: [0.71, -0.71] }, { key: 'br', dir: [0.71, 0.71] }, { key: 'tl', dir: [-0.71, -0.71] }, { key: 'bl', dir: [-0.71, 0.71] },
+    { key: 'tR', dir: [0.38, -0.92] }, { key: 'bR', dir: [0.38, 0.92] }, { key: 'tL', dir: [-0.38, -0.92] }, { key: 'bL', dir: [-0.38, 0.92] }
+  ];
+  function labelBox(key, x, y, r, w, h) {
+    var d = LABEL_DIST, q = r * 0.72 + 1;
+    switch (key) {
+      case 'right': return { x0: x + r + d, y0: y - h / 2, x1: x + r + d + w, y1: y + h / 2 };
+      case 'left': return { x0: x - r - d - w, y0: y - h / 2, x1: x - r - d, y1: y + h / 2 };
+      case 'top': return { x0: x - w / 2, y0: y - r - d - h, x1: x + w / 2, y1: y - r - d };
+      case 'bottom': return { x0: x - w / 2, y0: y + r + d, x1: x + w / 2, y1: y + r + d + h };
+      case 'tr': return { x0: x + q, y0: y - q - h, x1: x + q + w, y1: y - q };
+      case 'br': return { x0: x + q, y0: y + q, x1: x + q + w, y1: y + q + h };
+      case 'tl': return { x0: x - q - w, y0: y - q - h, x1: x - q, y1: y - q };
+      case 'bl': return { x0: x - q - w, y0: y + q, x1: x - q, y1: y + q + h };
+      // above / below, starting at the symbol's left edge (R) or ending at its right edge (L)
+      case 'tR': return { x0: x - r, y0: y - r - d - h, x1: x - r + w, y1: y - r - d };
+      case 'bR': return { x0: x - r, y0: y + r + d, x1: x - r + w, y1: y + r + d + h };
+      case 'tL': return { x0: x + r - w, y0: y - r - d - h, x1: x + r, y1: y - r - d };
+      default: return { x0: x + r - w, y0: y + r + d, x1: x + r, y1: y + r + d + h };   // bL
+    }
+  }
+  /** ECharts label props for a planned position (diagonals use px offsets from the symbol's box). */
+  function labelPos(key, r) {
+    if (key === 'right' || key === 'left' || key === 'top' || key === 'bottom') return { position: key, distance: LABEL_DIST };
+    if (/^[tb][RL]$/.test(key)) {
+      var up = key[0] === 't';
+      return { position: [key[1] === 'R' ? 0 : 2 * r, up ? -LABEL_DIST : 2 * r + LABEL_DIST], align: key[1] === 'R' ? 'left' : 'right', verticalAlign: up ? 'bottom' : 'top' };
+    }
+    var q = r * 0.72 + 1, right = key === 'tr' || key === 'br', topSide = key === 'tr' || key === 'tl';
+    return {
+      position: [r + (right ? q : -q), r + (topSide ? -q : q)],
+      align: right ? 'left' : 'right', verticalAlign: topSide ? 'bottom' : 'top'
+    };
+  }
+  function overlap(a, b, pad) {
+    return a.x0 < b.x1 + pad && a.x1 > b.x0 - pad && a.y0 < b.y1 + pad && a.y1 > b.y0 - pad;
+  }
+  /** Preferred position order for a node: the side facing away from the hub / centre first. */
+  function sideOrder(x, y, cx, cy, isHub) {
+    if (isHub) return ['bottom', 'top', 'right', 'left', 'br', 'bl', 'tr', 'tl'];
+    var dx = x - cx, dy = y - cy, len = Math.sqrt(dx * dx + dy * dy) || 1;
+    dx /= len; dy /= len;
+    // horizontal labels read best: bias left / right over top / bottom and diagonals
+    return POSITIONS.map(function (p) {
+      var score = p.dir[0] * dx + p.dir[1] * dy + (p.key === 'right' || p.key === 'left' ? 0.45 : /^[tb][RL]$/.test(p.key) ? -0.05 : p.key.length === 2 ? 0.1 : 0);
+      return { key: p.key, s: score };
+    }).sort(function (a, b) { return b.s - a.s; }).map(function (p) { return p.key; });
+  }
+
+  /**
+   * Nudge symbols so the preferred (outward, horizontal) label of every labelled node clears the
+   * other symbols and labels. Moves are mostly vertical (labels are wide and short).
+   */
+  function relaxForLabels(px, radii, labels, rect, cx, cy, iterations) {
+    var n = px.length;
+    for (var it = 0; it < iterations; it++) {
+      var moved = false;
+      var boxes = px.map(function (p, i) {
+        var L = labels[i];
+        if (!L) return null;
+        return labelBox(i === L.hubIndex ? 'bottom' : (p[0] >= cx ? 'right' : 'left'), p[0], p[1], radii[i], L.w, L.h);
+      });
+      for (var i = 0; i < n; i++) {
+        var b = boxes[i];
+        if (!b) continue;
+        for (var j = 0; j < n; j++) {
+          if (j === i) continue;
+          var r = radii[j], nb = { x0: px[j][0] - r, x1: px[j][0] + r, y0: px[j][1] - r, y1: px[j][1] + r };
+          var hitNode = overlap(b, nb, 3), hitLab = boxes[j] && j > i && overlap(b, boxes[j], 2);
+          if (!hitNode && !hitLab) continue;
+          var other = hitNode ? nb : boxes[j];
+          var bc = (b.y0 + b.y1) / 2, oc = (other.y0 + other.y1) / 2;
+          var need = hitNode ? ((b.y1 - b.y0) / 2 + r + 3) - Math.abs(oc - bc) : ((b.y1 - b.y0) / 2 + (other.y1 - other.y0) / 2 + 2) - Math.abs(oc - bc);
+          if (need <= 0) continue;
+          var sgn = oc >= bc ? 1 : -1, mv = Math.min(6, need / 2 + 0.5);
+          px[j][1] += sgn * mv; px[i][1] -= sgn * mv;
+          moved = true;
+        }
+      }
+      // keep symbols apart and inside the rect
+      for (var a = 0; a < n; a++) {
+        for (var c = a + 1; c < n; c++) {
+          var dx = px[c][0] - px[a][0], dy = px[c][1] - px[a][1], d = Math.sqrt(dx * dx + dy * dy) || 1e-6, min = radii[a] + radii[c] + 6;
+          if (d >= min) continue;
+          var push = (min - d) / 2;
+          px[a][0] -= dx / d * push; px[a][1] -= dy / d * push; px[c][0] += dx / d * push; px[c][1] += dy / d * push;
+        }
+      }
+      px.forEach(function (p, k) {
+        if (labels[k] && labels[k].pinned) { p[0] = labels[k].pinned[0]; p[1] = labels[k].pinned[1]; return; }
+        p[0] = util.clamp(p[0], rect.x + radii[k] * 0.5, rect.x + rect.w - radii[k] * 0.5);
+        p[1] = util.clamp(p[1], rect.y + radii[k] * 0.5, rect.y + rect.h - radii[k] * 0.5);
+      });
+      if (!moved) break;
+    }
+  }
+
+  /**
+   * Final placement: in priority order, each label takes the first candidate position that stays in
+   * the chart and clears every symbol and every placed label; labels that fit nowhere are hidden
+   * (they still show on hover). Returns [{key, box} | null] by node index.
+   */
+  function planLabels(px, radii, order, labels, bounds, cx, cy, hubIndex) {
+    var placed = [], out = px.map(function () { return null; });
+    var nodeBoxes = px.map(function (p, i) { return { x0: p[0] - radii[i], x1: p[0] + radii[i], y0: p[1] - radii[i], y1: p[1] + radii[i] }; });
+    order.forEach(function (i) {
+      var L = labels[i];
+      if (!L) return;
+      var keys = sideOrder(px[i][0], px[i][1], cx, cy, i === hubIndex);
+      for (var k = 0; k < keys.length; k++) {
+        var b = labelBox(keys[k], px[i][0], px[i][1], radii[i], L.w, L.h);
+        if (b.x0 < bounds.x0 || b.x1 > bounds.x1 || b.y0 < bounds.y0 || b.y1 > bounds.y1) continue;
+        if (nodeBoxes.some(function (nb, j) { return j !== i && overlap(b, nb, 2); })) continue;
+        if (placed.some(function (pb) { return overlap(b, pb, 2); })) continue;
+        placed.push(b);
+        out[i] = { key: keys[k], box: b };
+        return;
+      }
+    });
+    return out;
+  }
+
   RK.component({
     id: 'network',
     deps: ['echarts'],
@@ -181,14 +311,15 @@
       layout: 'force',          // force (deterministic, solved before paint) | circular (hub centred) | physics (live ECharts force)
       highlight: null,          // node id(s) or name(s) drawn in accent2 (e.g. the target company)
       categoryColors: {},       // {category: colour or theme token}
-      labels: 'auto',           // auto (largest nodes) | true | false
+      labels: 'auto',           // auto (largest nodes) | true | false — placed clear of symbols, hidden (hover) when no room
       labelTop: 10,             // with labels 'auto': label the N largest nodes (+ highlighted)
       nodeSize: [10, 46],       // symbol diameter range (sqrt scale on size)
       edgeWidth: [0.8, 5],      // edge width range (linear on value)
       edgeColor: 'auto',        // auto (colour of the non-highlighted end) | source | target | neutral
       edgeOpacity: 0.45,
       edgeCurve: 0.08,
-      dashedTypes: [],          // edge types drawn dashed (e.g. ['Competition'])
+      dashedTypes: [],          // edge types drawn dashed (listed in the edge key; dashes are otherwise reserved for reference lines)
+      edgeKey: true,            // edge key beside the legend: line-width scale (+ dashed edge types)
       arrows: false,            // arrowheads at the target end
       force: {},                // layout 'physics' overrides: {repulsion, edgeLength, gravity, friction}
       roam: true,
@@ -267,26 +398,60 @@
 
     // ---- layout -------------------------------------------------------------------------
     // force: deterministic spring layout solved here (calm, print-identical), drawn 1:1 in px;
-    // circular: categories around an ellipse, hub in the centre; physics: live ECharts force.
+    // circular: equal angular steps around the hub, categories contiguous; physics: live ECharts force.
     var mode = o.layout === 'circular' ? 'circular' : (o.layout === 'physics' ? 'physics' : 'force');
     var W = ctx.el.clientWidth || 800, H = ctx.el.clientHeight || 420;
-    var legendH = o.legend !== false && cats.length > 1 ? 30 : 6;
     var ordered = m.nodes.slice().sort(function (a, b) {
       return (cats.indexOf(a.category || 'Other') - cats.indexOf(b.category || 'Other')) || (b.size - a.size);
     });
     var idx = new Map(ordered.map(function (n, i) { return [n.id, i]; }));
     var his = ordered.filter(isHi);
     var hub = his.length === 1 && his[0].degree >= ordered.length / 3 ? idx.get(his[0].id) : -1;
-    var sizesPx = ordered.map(symSize);
-    if (mode === 'circular') {
-      // ring slots are ~equal vertical steps: keep symbols smaller than a step
-      var step = (H - legendH - 20) * 0.92 / Math.max(1, Math.ceil((ordered.length - (hub >= 0 ? 1 : 0)) / 2));
-      sizesPx = sizesPx.map(function (d, i) { return i === hub ? d : Math.min(d, Math.max(8, step - 4)); });
+
+    // legend row: categories top-left, then the edge key (width scale, dashed types) on the same row when it fits
+    var showLegend = o.legend !== false && cats.length > 1;
+    var legFont = '11px ' + t.fontSans, dash = [].concat(o.dashedTypes || []);
+    // the plain legend wraps onto more rows when the categories do not fit one line
+    var legRows = showLegend ? 1 : 0, legendW = 0;
+    if (showLegend) cats.forEach(function (c) {
+      var iw = 10 + 5 + measure(c, legFont) + 14;
+      if (legendW && legendW + iw > W - 10) { legRows++; legendW = 0; }
+      legendW += iw;
+    });
+    var keyItems = [];
+    if (o.edgeKey !== false && m.edges.length) {
+      var usedTypes = util.unique(m.edges.map(function (e) { return e.type; }));
+      dash.forEach(function (ty) { if (usedTypes.indexOf(ty) >= 0) keyItems.push({ kind: 'dash', label: String(ty) }); });
+      var vf = ctx.field(enc.value) || {};
+      if (vx[1] > vx[0]) keyItems.push({ kind: 'width', label: 'Line width: ' + ctx.title(enc.value) + (vf.unit ? ' (' + vf.unit + ')' : ''), lo: RK.format(vx[0], fmt), hi: RK.format(vx[1], fmt) });
     }
+    var keyW = keyItems.reduce(function (sw, it) {
+      return sw + (it.kind === 'dash' ? 22 + measure(it.label, legFont) : measure(it.label, legFont) + 8 + 18 + 4 + measure(it.lo, legFont) + 10 + 18 + 4 + measure(it.hi, legFont)) + 16;
+    }, 0);
+    // key on the legend's last row when it fits, else on a row of its own
+    var keyRow = keyItems.length ? (legendW && legendW + 12 + keyW > W ? 1 : 0) : -1;
+    var legendH = (showLegend || keyItems.length ? 22 + Math.max(0, legRows - 1) * 24 : 0) + (keyRow === 1 ? 20 : 0) + 8;
+
+    var sizesPx = ordered.map(symSize);
+    var labFont = '500 11px ' + t.fontSans, LAB_H = 15, labW = 0;
+    var labels = ordered.map(function (n, i) {
+      if (!labelled.has(n.id)) return null;
+      var w = Math.ceil(measure(n.name, isHi(n) ? '700 11px ' + t.fontSans : labFont)) + 6;   // + chip padding
+      labW = Math.max(labW, w);
+      return { w: w, h: LAB_H, hubIndex: hub };
+    });
+    // side margins hold the outermost labels; capped so narrow blocks keep room for the graph
+    // (outer labels that do not fit go above / below / inward instead)
+    var padX = 6 + (labW ? Math.min(labW + LABEL_DIST, Math.max(56, W * (mode === 'circular' ? 0.2 : 0.13))) : 0);
+    if (mode === 'circular') {
+      var ringN = Math.max(1, ordered.length - (hub >= 0 ? 1 : 0));
+      // symbols smaller than the arc step
+      var rr0 = Math.min(W / 2 - padX, (H - legendH - 2 * LAB_H - 16) / 2);
+      var stepPx = 2 * Math.PI * Math.max(30, rr0) / ringN;
+      sizesPx = sizesPx.map(function (d, i) { return i === hub ? d : Math.min(d, Math.max(8, stepPx * 0.55)); });
+    }
+    var radii = sizesPx.map(function (d) { return d / 2; });
     var rMax = Math.max.apply(null, sizesPx.concat([10])) / 2;
-    var labFont = '500 10.5px ' + t.fontSans, labW = 0;
-    ordered.forEach(function (n) { if (labelled.has(n.id)) labW = Math.max(labW, Math.min(170, measure(n.name, labFont))); });
-    var padX = 6 + (labW ? labW + 8 : 0);
     var rect = { x: padX, y: legendH + rMax + 4, w: Math.max(40, W - 2 * padX), h: Math.max(40, H - legendH - 2 * rMax - 10) };
     var cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
     var px = null;
@@ -295,47 +460,86 @@
         ordered.map(function (n, i) { return { r: (sizesPx[i] - o.nodeSize[0]) / Math.max(1, o.nodeSize[1]) * 0.8 }; }),
         m.edges.map(function (e) { return { s: idx.get(e.source), t: idx.get(e.target), w: e.value == null ? 1 : e.value }; }),
         hub);
-      px = fitToRect(lay, sizesPx.map(function (d) { return d / 2; }), rect);
+      px = fitToRect(lay, radii, rect);
+      if (hub >= 0) labels[hub] = labels[hub] ? util.merge({}, labels[hub], { pinned: px[hub].slice() }) : { w: 0, h: 0, pinned: px[hub].slice(), hubIndex: hub };
+      relaxForLabels(px, radii, labels, rect, cx, cy, 80);
+      if (hub >= 0 && labels[hub] && !labels[hub].w) labels[hub] = null;
     } else if (mode === 'circular') {
+      // nodes on a circle (an ellipse when the block is much wider than tall) around the hub, clockwise from
+      // 12 o'clock with categories contiguous. Steps are halfway between equal angles and equal heights:
+      // a true ring, with a little more room at the poles where horizontal labels would otherwise stack.
       var ring = ordered.filter(function (n, i) { return i !== hub; });
-      px = ordered.map(function () { return [cx, cy]; });
-      // two arcs with equal vertical spacing (clockwise: right side top -> bottom, left side bottom -> top)
-      // so horizontal labels never stack at the poles
+      var ry = Math.max(30, rect.h / 2 - LAB_H / 2), rx = Math.max(30, Math.min(rect.w / 2, ry * 1.45));
       var nr = Math.ceil(ring.length / 2), nl = ring.length - nr;
+      px = ordered.map(function () { return [cx, cy]; });
       ring.forEach(function (n, k) {
-        var right = k < nr, cnt = right ? nr : nl, j = right ? k : k - nr;
-        var tt = right ? -0.92 + 1.84 * (j + 0.5) / cnt : 0.92 - 1.84 * (j + 0.5) / cnt;
-        var xx = Math.sqrt(Math.max(0, 1 - tt * tt));
-        px[idx.get(n.id)] = [cx + (right ? 1 : -1) * xx * rect.w / 2, cy + tt * rect.h / 2];
+        var right = k < nr, tt = ((right ? k : k - nr) + 0.5) / (right ? nr : nl);
+        var yy = (-Math.cos(Math.PI * tt) + (2 * tt - 1)) / 2;      // right half: top -> bottom
+        if (!right) yy = -yy;                                       // left half: bottom -> top
+        var xx = Math.sqrt(Math.max(0, 1 - yy * yy)) * (right ? 1 : -1);
+        px[idx.get(n.id)] = [cx + xx * rx, cy + yy * ry];
       });
     }
-    var box = null;
+    var box = null, plan = null;
     if (px) {
       var bx = util.extent(px.map(function (p) { return p[0]; })), by = util.extent(px.map(function (p) { return p[1]; }));
       box = { left: bx[0], top: by[0], width: Math.max(1, bx[1] - bx[0]), height: Math.max(1, by[1] - by[0]) };
+      // labels: highlighted first, then by size; each takes the first free position (outward side first)
+      var prio = ordered.map(function (n, i) { return i; }).filter(function (i) { return labels[i]; })
+        .sort(function (a, b) { return (isHi(ordered[b]) - isHi(ordered[a])) || (ordered[b].size - ordered[a].size); });
+      plan = planLabels(px, radii, prio, labels, { x0: 1, x1: W - 1, y0: legendH - 2, y1: H - 1 }, cx, cy, hub);
     }
 
-    var dash = [].concat(o.dashedTypes || []);
     var data = ordered.map(function (n, i) {
       var c = colorOf(n), dim = active && !active.has(n.id), big = labelled.has(n.id);
       var right = !px || px[i][0] >= cx - 1;
+      var pl = plan ? plan[i] : null;
+      var lab = {
+        show: plan ? !!pl : big,
+        fontWeight: isHi(n) ? 700 : 500,
+        color: isHi(n) ? t.ink : t.ink2,
+        opacity: dim ? 0.35 : 1
+      };
+      if (pl) util.merge(lab, labelPos(pl.key, radii[i]));
+      else lab.position = i === hub ? 'bottom' : (right ? 'right' : 'left');
       var d = {
         id: n.id, name: n.name, rkId: n.id,
         category: cats.indexOf(n.category || 'Other'),
         value: n.size,
         symbolSize: sizesPx[i],
         itemStyle: { color: c, borderColor: t.paper, borderWidth: 1.2, opacity: dim ? 0.2 : 1 },
-        label: {
-          show: big,
-          position: i === hub ? 'bottom' : (right ? 'right' : 'left'),
-          fontWeight: isHi(n) ? 700 : 500,
-          color: isHi(n) ? t.ink : t.ink2,
-          opacity: dim ? 0.35 : 1
-        }
+        label: lab
       };
       if (px) { d.x = px[i][0]; d.y = px[i][1]; }
       return d;
     });
+
+    // edge key drawn as graphics next to (or under) the category legend
+    var graphic = [];
+    if (keyItems.length) {
+      // the group is placed by its bounding box: top 5 lines its text up with the legend (5px padding + 7px half row)
+      var lastRowTop = Math.max(0, legRows - 1) * 24;
+      var gx = keyRow === 0 && legendW ? legendW + 12 : 0, gy = lastRowTop + (keyRow === 1 ? 26 : 5), kids = [], kxp = 0, KY = 7;
+      var txt = function (x, str) { return { type: 'text', x: x, y: KY, style: { text: str, fill: t.ink2, fontSize: 11, fontFamily: t.fontSans, verticalAlign: 'middle' } }; };
+      keyItems.forEach(function (it) {
+        if (it.kind === 'dash') {
+          kids.push({ type: 'line', shape: { x1: kxp, y1: KY, x2: kxp + 18, y2: KY }, style: { stroke: t.ink3, lineWidth: 1.6, lineDash: [4, 3] } });
+          kids.push(txt(kxp + 22, it.label));
+          kxp += 22 + measure(it.label, legFont) + 16;
+        } else {
+          kids.push(txt(kxp, it.label));
+          kxp += measure(it.label, legFont) + 8;
+          kids.push({ type: 'line', shape: { x1: kxp, y1: KY, x2: kxp + 18, y2: KY }, style: { stroke: t.ink3, lineWidth: o.edgeWidth[0] } });
+          kids.push(txt(kxp + 22, it.lo));
+          kxp += 22 + measure(it.lo, legFont) + 10;
+          kids.push({ type: 'line', shape: { x1: kxp, y1: KY, x2: kxp + 18, y2: KY }, style: { stroke: t.ink3, lineWidth: o.edgeWidth[1] } });
+          kids.push(txt(kxp + 22, it.hi));
+          kxp += 22 + measure(it.hi, legFont) + 16;
+        }
+      });
+      graphic.push({ type: 'group', id: 'rk-edge-key', left: gx, top: gy, silent: true, children: kids });
+    }
+
     var links = m.edges.map(function (e) {
       var on = !active || sel.indexOf(e.source) >= 0 || sel.indexOf(e.target) >= 0;
       var a = m.byId.get(e.source), b = m.byId.get(e.target), col;
@@ -348,7 +552,7 @@
         // bend chords towards the centre: sign from the side the control point falls on
         var p1 = px[idx.get(e.source)], p2 = px[idx.get(e.target)];
         var dx = p2[0] - p1[0], dy = p2[1] - p1[1], mx = (p1[0] + p2[0]) / 2, my = (p1[1] + p2[1]) / 2;
-        curve = (dy * (cx - mx) - dx * (cy - my)) >= 0 ? 0.22 : -0.22;
+        curve = idx.get(e.source) === hub || idx.get(e.target) === hub ? 0 : ((dy * (cx - mx) - dx * (cy - my)) >= 0 ? 0.22 : -0.22);
       }
       return {
         source: e.source, target: e.target, value: e.value, rkType: e.type,
@@ -371,7 +575,8 @@
     }, o.force || {});
 
     return {
-      legend: C.legend(ctx, { show: o.legend !== false && cats.length > 1, data: cats, selectedMode: true }),
+      legend: C.legend(ctx, { show: showLegend, data: cats, selectedMode: true, type: 'plain' }),
+      graphic: graphic,
       tooltip: {
         trigger: 'item',
         formatter: function (p) {
@@ -409,11 +614,12 @@
         links: links,
         edgeSymbol: o.arrows ? ['none', 'arrow'] : ['none', 'none'],
         edgeSymbolSize: [0, 7],
+        // paper chip behind each label: edges never cut through the text (labels are planned to clear symbols)
         label: {
-          position: 'right', distance: 4, fontSize: 10.5, fontFamily: t.fontSans, color: t.ink2,
-          textBorderColor: t.paper, textBorderWidth: 2.5
+          position: 'right', distance: LABEL_DIST, fontSize: 11, lineHeight: 13, fontFamily: t.fontSans, color: t.ink2,
+          backgroundColor: RK.theme.alpha(t.paper, 0.86), padding: [1, 3], borderRadius: 2
         },
-        labelLayout: { hideOverlap: true },
+        labelLayout: mode === 'physics' ? { hideOverlap: true } : undefined,
         lineStyle: { opacity: o.edgeOpacity },
         emphasis: {
           focus: 'adjacency',

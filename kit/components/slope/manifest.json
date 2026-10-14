@@ -27,6 +27,7 @@
     "highlight": {"type": "string|string[]", "default": null, "desc": "Label value(s) to emphasise in addition to encode.highlight rows"},
     "median": {"type": "boolean", "default": false, "desc": "Dashed median line across both periods"},
     "change": {"type": "boolean", "default": false, "desc": "Append the % change to the right-hand labels"},
+    "delta": {"type": "boolean|string", "default": "auto", "desc": "▲ / ▼ change token after the right-hand labels (e.g. '#1 Northbridge Capital ▲1'): 'auto' = with direction colours when change is off | true | false"},
     "labels": {"type": "string", "default": "both", "desc": "both = names on both sides | right = names on the right only | values = no names"},
     "inverse": {"type": "boolean", "default": false, "desc": "Reverse the value axis (rank 1 at the top)"},
     "format": {"type": "string", "default": null, "desc": "Value format; defaults to the from / value field format"},

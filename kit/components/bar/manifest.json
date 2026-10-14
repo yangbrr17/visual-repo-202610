@@ -51,7 +51,7 @@
     "labels": {
       "type": "boolean|string",
       "default": "auto",
-      "desc": "Value labels: true | false | 'auto'"
+      "desc": "Value labels: true | false | 'auto' (few bars; fitted in pixels: inside-stack labels that do not fit are dropped, crowded column labels turn vertical)"
     },
     "sort": {
       "type": "string",
@@ -91,12 +91,12 @@
     "format": {
       "type": "string",
       "default": null,
-      "desc": "Value format code; defaults to the y field format"
+      "desc": "Value format code; defaults to the y field format (labels then drop decimals for figures >= 100, e.g. $1,463)"
     },
     "legend": {
       "type": "boolean",
       "default": true,
-      "desc": "Top-left legend (shown with more than one series)"
+      "desc": "Top-left legend (shown with more than one series; wraps onto a second row on narrow blocks)"
     },
     "zoom": {
       "type": "boolean",

@@ -200,10 +200,17 @@
       var wrap = h('div.rk-avp__wrap', table);
       var notesEl = h('div.rk-avp__notes');
       var tip = RK.ui.tip();
+      // the frame carries the horizontal scroll cue (edge fade) for narrow blocks
+      var frame = h('div.rk-avp__frame', wrap);
       root.appendChild(bar);
-      root.appendChild(wrap);
+      root.appendChild(frame);
       root.appendChild(notesEl);
       ctx.el.appendChild(root);
+      function edges() {
+        frame.classList.toggle('is-more-r', wrap.scrollWidth - wrap.clientWidth - wrap.scrollLeft > 1);
+        frame.classList.toggle('is-scrolled-x', wrap.scrollLeft > 1);
+      }
+      wrap.addEventListener('scroll', edges, { passive: true });
 
       // offer stepper
       var stepVal = h('span.rk-avp__stepval.rk-num');
@@ -266,6 +273,7 @@
         (o.footnotes || []).forEach(function (n) { if (n) lines.push(n); });
         lines.forEach(function (l, i) { notesEl.appendChild(h('p', (i === 0 && o.autoNotes !== false && isNum(m.shares) ? 'Note: ' : '') + l)); });
         notesEl.style.display = lines.length ? '' : 'none';
+        edges();
       }
 
       function colClass(c) { return (c.isCurrent ? ' is-current' : '') + (c.isOffer ? ' is-offer' : ''); }
@@ -430,8 +438,10 @@
 
       return {
         update: function (c) { cur = c; defineMissing(c); draw(); },
+        resize: edges,
         destroy: function () {
           unsub();
+          wrap.removeEventListener('scroll', edges);
           table.removeEventListener('mouseover', onOver);
           table.removeEventListener('mouseleave', onLeave);
           table.removeEventListener('click', onClick);

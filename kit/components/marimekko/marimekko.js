@@ -8,6 +8,24 @@
   'use strict';
   var C = RK.chart;
   var OTHERS = /^(others?|other .+|rest of .+|all other.*)$/i;
+  var ef = function () { return window.echarts && window.echarts.format; };
+  function ellipsize(s, w, font) { var f = ef(); return f && f.truncateText ? f.truncateText(String(s), w, font, '…') : String(s); }
+  /** Word-wrap into lines no wider than w (null when one word alone is wider). */
+  function wrapWords(s, w, font) {
+    var words = String(s).split(/\s+/), lines = [''];
+    for (var i = 0; i < words.length; i++) {
+      if (C.measure(words[i], font) > w) return null;
+      var cur = lines[lines.length - 1], next = cur ? cur + ' ' + words[i] : words[i];
+      if (cur && C.measure(next, font) > w) lines.push(words[i]); else lines[lines.length - 1] = next;
+    }
+    return lines;
+  }
+  /** Rows a wrapping (type 'plain') ECharts legend needs within `avail` px — mirrors ECharts' box layout. */
+  function legendRows(names, avail, font) {
+    var rows = 1, x = 0;
+    names.forEach(function (n) { var w = 15 + C.measure(n, font); if (x > 0 && x + w > avail) { rows++; x = 0; } x += w + 14; });
+    return rows;
+  }
 
 
   /** Segments (columns) and players (stacks) with cumulative geometry in [0, 1] x [0, 1]. */
@@ -76,7 +94,7 @@
       maxSeries: 8,            // players beyond this (by overall size) are grouped into othersLabel
       othersLabel: 'Others',   // rows named Others / Other … are merged into this bucket (drawn grey, stacked on top)
       highlight: null,         // player(s) drawn in the accent colour (e.g. the client)
-      labels: 'auto',          // auto (player + share where it fits) | share | none
+      labels: 'auto',          // auto (player + share where it fits, never truncated) | share | none
       showTotals: true,        // segment name + total + share of market above each column
       selectBy: 'x',           // click a cell to cross-filter by the column (x) or the player (series)
       gap: 2,                  // px gutter between columns
@@ -123,44 +141,65 @@
 
     var W = inst.getWidth();
     var showLegend = o.legend !== false && m.players.length > 1;
-    var legendH = showLegend ? 26 : 0, headH = o.showTotals ? 36 : 6;
-    var grid = { left: o.axes ? 38 : 2, right: 6, top: legendH + headH, bottom: o.axes ? 24 : 2, containLabel: false };
+    // plain legend wrapping onto extra rows (no scroll paging: a hidden page is lost in print / PDF)
+    var lRows = showLegend ? legendRows(m.players, W - 10, '11px ' + t.fontSans) : 0;
+    var legendH = showLegend ? 26 + (lRows - 1) * 25 : 0;
+    var grid = { left: o.axes ? 38 : 2, right: 6, top: 0, bottom: o.axes ? 24 : 2, containLabel: false };
     var anim = ctx.motion;
     var gap = Math.max(0, o.gap || 0);
 
-    // header layout: a label wider than its column may borrow the free space of its neighbours' headers
+    /* header layout: a header may borrow the spare room of its neighbours' headers (keeping an 8px gap).
+     * Figures are never cut: "total · share" drops the share, then the total; the name wraps onto two lines
+     * (or, last, ellipsizes); columns narrower than ~40px get no header (the tooltip has it). */
     var nameFont = '600 11px ' + t.fontSans, numFont = '10.5px ' + t.fontNum;
     var plotL = grid.left, plotW = Math.max(1, W - grid.left - grid.right);
     m.segs.forEach(function (sg, i) {
       sg.px0 = plotL + sg.x0 * plotW + (i ? gap / 2 : 0);
       sg.px1 = plotL + sg.x1 * plotW - (i < m.segs.length - 1 ? gap / 2 : 0);
-      sg.totLine = RK.format(sg.total, fmt) + '  ·  ' + RK.format(sg.share, sfmt);
-      sg.tw = Math.max(C.measure(sg.name, nameFont), C.measure(sg.totLine, numFont)) + 4;
+      sg.vals = [RK.format(sg.total, fmt) + '  ·  ' + RK.format(sg.share, sfmt), RK.format(sg.total, fmt)];
+      sg.tw = Math.max(C.measure(sg.name, nameFont), C.measure(sg.vals[0], numFont)) + 4;
     });
+    var headLines = 1;
     m.segs.forEach(function (sg, i) {
       var prev = m.segs[i - 1], next = m.segs[i + 1];
-      var freeL = prev ? Math.max(0, (prev.px1 - prev.px0 - prev.tw) / 2) : 0;
-      var freeR = next ? Math.max(0, (next.px1 - next.px0 - next.tw) / 2) : Math.max(0, W - 2 - sg.px1);
-      var lo = sg.px0 - freeL, hi = sg.px1 + freeR;
-      sg.hw = Math.max(10, Math.min(sg.tw, hi - lo));
+      var freeL = prev ? Math.max(0, (prev.px1 - prev.px0 - prev.tw) / 2 - 8) : 0;
+      var freeR = next ? Math.max(0, (next.px1 - next.px0 - next.tw) / 2 - 8) : Math.max(0, W - 2 - sg.px1);
+      var lo = sg.px0 - freeL, hi = sg.px1 + freeR, room = hi - lo;
+      sg.head = [];
+      if (sg.px1 - sg.px0 >= 40 || room >= 56) {
+        var nameLines = C.measure(sg.name, nameFont) <= room ? [sg.name] : wrapWords(sg.name, room, nameFont);
+        if (!nameLines || nameLines.length > 2) nameLines = [ellipsize(sg.name, room, nameFont)];
+        var val = sg.vals.filter(function (v) { return C.measure(v, numFont) <= room; })[0];
+        sg.head = nameLines.map(function (l) { return { text: l, font: nameFont, name: true }; });
+        if (val) sg.head.push({ text: val, font: numFont });
+      }
+      sg.hw = Math.max.apply(null, [10].concat(sg.head.map(function (l) { return C.measure(l.text, l.font) + 2; })));
       sg.hx = Math.max(lo + sg.hw / 2, Math.min(hi - sg.hw / 2, (sg.px0 + sg.px1) / 2));
+      headLines = Math.max(headLines, sg.head.length);
     });
+    var headH = o.showTotals ? 8 + 14 * Math.max(2, headLines) : 6;
+    grid.top = legendH + headH;
 
+    /**
+     * Cell label: player + share, the name wrapping onto two lines when the cell is tall enough, or on one
+     * line ("Kanemori 8%") in a flat band; never truncated. A share alone would be anonymous, so it is only
+     * shown in labels:'share' mode (legend colours identify the band); otherwise the cell stays clean.
+     */
     function cellLabel(cell, seg, w, hpx, fill) {
       if (o.labels === 'none') return null;
-      var share = RK.format(cell.share, sfmt);
-      var name = cell.player;
-      var font = '600 11px ' + t.fontSans;
+      var share = RK.format(cell.share, sfmt), name = cell.player;
+      var font = '600 11px ' + t.fontSans, vfont = '11px ' + t.fontNum, aw = w - 10;
       var lines = null;
-      var nw = C.measure(name, font);
-      // two lines (player + share) only when the name fits, or can be truncated to something readable
-      if (o.labels !== 'share' && hpx >= 36 && (nw <= w - 10 || w - 10 >= 64)) {
-        if (nw > w - 10) {
-          var ef = window.echarts && window.echarts.format;
-          name = ef && ef.truncateText ? ef.truncateText(name, w - 10, font, '…') : name;
+      if (o.labels === 'share') {
+        if (aw >= C.measure(share, vfont) && hpx >= 17) lines = '{v|' + C.richSafe(share) + '}';
+      } else {
+        var wrapped = C.measure(name, font) <= aw ? [name] : wrapWords(name, aw, font);
+        if (wrapped && wrapped.length <= 2 && hpx >= 8 + 14 * (wrapped.length + 1) && C.measure(share, vfont) <= aw) {
+          lines = wrapped.map(function (l) { return '{n|' + C.richSafe(l) + '}'; }).join('\n') + '\n{v|' + C.richSafe(share) + '}';
+        } else if (hpx >= 17 && C.measure(name, font) + 6 + C.measure(share, vfont) <= aw) {
+          lines = '{n|' + C.richSafe(name) + '}  {v|' + C.richSafe(share) + '}';
         }
-        lines = '{n|' + name + '}\n{v|' + share + '}';
-      } else if (w >= 28 && hpx >= 17) lines = '{v|' + share + '}';
+      }
       if (!lines) return null;
       var ink = RK.theme.textOn(fill);
       return {
@@ -227,19 +266,15 @@
         renderItem: function (params, api) {
           var sg = m.segs[api.value(3)];
           var a = api.coord([sg.x0, 1]), b = api.coord([sg.x1, 1]);
-          var w = sg.hw, cx = sg.hx, y = a[1] - 5;
+          var cx = sg.hx, y = a[1] - 5, n = sg.head.length;
           var dim = faded(sg.name, null) && o.selectBy !== 'series';
-          var ef = window.echarts && window.echarts.format;
-          var trunc = function (s, f) { return ef && ef.truncateText ? ef.truncateText(String(s), w, f, '…') : String(s); };
-          var el = {
-            type: 'group',
-            children: [
-              { type: 'text', style: { text: trunc(sg.name, nameFont), x: cx, y: y - 14, textAlign: 'center', textVerticalAlign: 'bottom', fill: dim ? t.ink3 : t.ink, font: nameFont } },
-              { type: 'text', style: { text: trunc(sg.totLine, numFont), x: cx, y: y, textAlign: 'center', textVerticalAlign: 'bottom', fill: t.ink3, font: numFont } },
-              // invisible hit area so the header is clickable (cross-filter by column)
-              { type: 'rect', shape: { x: a[0], y: y - 28, width: b[0] - a[0], height: 28 }, style: { fill: 'rgba(0,0,0,0)' } }
-            ]
-          };
+          var kids = sg.head.map(function (l, li) {
+            return { type: 'text', style: { text: l.text, x: cx, y: y - 14 * (n - 1 - li), textAlign: 'center', textVerticalAlign: 'bottom',
+              fill: l.name ? (dim ? t.ink3 : t.ink) : t.ink3, font: l.font } };
+          });
+          // invisible hit area so the header is clickable (cross-filter by column)
+          kids.push({ type: 'rect', shape: { x: a[0], y: y - 14 * Math.max(2, n), width: b[0] - a[0], height: 14 * Math.max(2, n) }, style: { fill: 'rgba(0,0,0,0)' } });
+          var el = { type: 'group', children: kids };
           if (anim) { el.enterFrom = { style: { opacity: 0 } }; el.enterAnimation = { duration: 500, delay: 200 + sg.index * 90 }; }
           return el;
         }
@@ -249,7 +284,7 @@
     var axisLabel = { formatter: function (v) { return RK.format(v, '0%'); }, color: t.ink3, fontSize: 11, fontFamily: t.fontNum };
     return {
       legend: C.legend(ctx, {
-        show: showLegend, selectedMode: false,
+        show: showLegend, selectedMode: false, type: 'plain',
         data: m.players.map(function (p) { return { name: p, itemStyle: { color: colorOf[p] } }; })
       }),
       grid: grid,

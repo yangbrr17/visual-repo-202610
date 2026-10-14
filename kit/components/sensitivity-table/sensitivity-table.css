@@ -40,7 +40,8 @@
 .rk-sens:not(.has-heat) .rk-sens__table td.rk-sens__cell { border-color: var(--rk-grid); }
 .rk-sens__table td.rk-sens__cell.is-na { color: var(--rk-ink-3); }
 .rk-sens__table td.rk-sens__cell.is-neg { color: var(--rk-neg); }
-.rk-sens__table td.rk-sens__cell.is-base { font-weight: 700; box-shadow: inset 0 0 0 2px var(--rk-accent-2); }
+/* base case: highlight ring + a paper hairline inside it, so the ring never melts into a same-hue heat cell */
+.rk-sens__table td.rk-sens__cell.is-base { font-weight: 700; box-shadow: inset 0 0 0 2px var(--rk-accent-2), inset 0 0 0 3px var(--rk-paper); }
 .rk-sens__table td.rk-sens__cell::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: transparent; transition: background-color var(--rk-dur-fast); }
 .rk-sens__table td.is-xrow::after, .rk-sens__table td.is-xcol::after { background: color-mix(in srgb, var(--rk-ink) 6%, transparent); }
 .rk-sens__table td.is-hot::after { background: transparent; box-shadow: inset 0 0 0 1.5px var(--rk-ink); }
