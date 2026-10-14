@@ -9,7 +9,8 @@
   'use strict';
   var RK = global.RK || (global.RK = {});
 
-  var reduced = !!(global.matchMedia && global.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var rmq = global.matchMedia ? global.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  var reduced = !!(rmq && rmq.matches);
 
   var easing = {
     outCubic: function (t) { return 1 - Math.pow(1 - t, 3); },
@@ -42,12 +43,14 @@
       });
     },
 
-    /** Animate a number into el.textContent using an RK format code. */
+    /** Animate a number into el.textContent using an RK format code (screen readers get the final value). */
     countUp: function (el, to, opts) {
       opts = opts || {};
       var fmt = opts.format, from = opts.from || 0, dur = opts.duration || 1100;
-      if (!motion.enabled || !RK.util.isNum(to) || opts.animate === false) {
-        el.textContent = RK.format(to, fmt);
+      var finalText = RK.format(to, fmt);
+      el.setAttribute('aria-label', finalText);
+      if (!motion.enabled || !RK.util.isNum(to) || opts.animate === false || document.hidden) {
+        el.textContent = finalText;
         return;
       }
       var start = null;
@@ -64,6 +67,18 @@
       global.requestAnimationFrame(frame);
     },
 
+    /**
+     * Run a DOM update inside a View Transition when supported (filter / sort / tab swaps),
+     * otherwise just run it. Returns a Promise that resolves after the update.
+     */
+    swap: function (update) {
+      if (!motion.enabled || !document.startViewTransition || document.hidden) {
+        update();
+        return Promise.resolve();
+      }
+      try { return document.startViewTransition(update).updateCallbackDone; } catch (e) { update(); return Promise.resolve(); }
+    },
+
     /** Generic tween: tween(600, t => ..., 'outCubic') */
     tween: function (duration, onFrame, ease) {
       var e = easing[ease || 'outCubic'], start = null;
@@ -77,4 +92,10 @@
       global.requestAnimationFrame(frame);
     }
   };
+
+  // follow OS-level changes to the reduced-motion setting while the report is open
+  if (rmq) {
+    var onChange = function (e) { motion.reduced = e.matches; motion.enabled = !e.matches; };
+    if (rmq.addEventListener) rmq.addEventListener('change', onChange); else if (rmq.addListener) rmq.addListener(onChange);
+  }
 })(typeof window !== 'undefined' ? window : this);

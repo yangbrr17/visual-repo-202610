@@ -37,7 +37,7 @@
       renderItem: function (params, api) {
         var cs = params.coordSys, p = api.coord(horiz ? [0, api.value(0)] : [api.value(0), 0]);
         var bw = horiz ? api.size([0, 1])[1] : api.size([1, 0])[0];
-        var shape = horiz ? { x: 0, y: p[1] - bw / 2, width: cs.x + cs.width + 8, height: bw }
+        var shape = horiz ? { x: 0, y: p[1] - bw / 2, width: api.getWidth(), height: bw }
           : { x: p[0] - bw / 2, y: cs.y, width: bw, height: cs.height + 40 };
         return { type: 'rect', shape: shape, style: { fill: RK.theme.alpha(t.accent2, t.dark ? 0.16 : 0.11) } };
       },
@@ -87,12 +87,16 @@
     // ---- value axis bounds with room for end labels ----
     var ext = util.extent(v1.concat(v2, [0, ref], (o.refLines || []).map(function (r) { return r.value; })));
     var span = (ext[1] - ext[0]) || Math.abs(ext[1]) || 1;
-    // room for end labels: approximate label width in px as a share of the plot length
+    // end labels may run into the grid margin: keep the axis on nice steps, widen the margin instead
+    var labelPx = o.labels === false ? 0 : (horiz ? (has2 ? 88 : 44) : 20);
     var plotPx = Math.max(160, horiz ? inst.getWidth() - 190 : inst.getHeight() - 70);
-    var padFrac = o.labels === false ? 0.03 : Math.min(0.45, (horiz ? (has2 ? 92 : 46) : 22) / plotPx * 1.15);
-    var step = util.niceStep(span * (1 + padFrac), horiz ? 6 : 5);
-    var axMax = ext[1] > 0 ? Math.ceil((ext[1] + span * padFrac) / step) * step : 0;
-    var axMin = ext[0] < 0 ? Math.floor((ext[0] - span * padFrac) / step) * step : 0;
+    var step = util.niceStep(span * 1.04, horiz ? 6 : 5);
+    var axMax = ext[1] > 0 ? Math.ceil(ext[1] / step) * step : 0;
+    var axMin = ext[0] < 0 ? Math.floor(ext[0] / step) * step : 0;
+    var room = function (gap) { return labelPx - gap / ((axMax - axMin) || 1) * plotPx; };
+    if (!horiz && room(axMax - ext[1]) > 0) axMax += step;     // vertical: keep labels inside the plot
+    if (ext[0] < 0 && room(ext[0] - axMin) > 0) axMin -= step;      // negative labels never overlap category labels
+    var marginR = horiz ? Math.max(20, room(axMax - ext[1]) + 8) : 20;
 
     var size = o.dotSize || 9;
     var stagger = Math.min(45, 700 / Math.max(1, rows.length));
@@ -222,7 +226,7 @@
 
     return {
       legend: C.legend(ctx, { show: showLegend, data: legendData, selectedMode: groups.length ? true : false }),
-      grid: C.grid(ctx, { top: top, left: 4, right: (o.zoom && horiz ? 30 : 20), bottom: o.zoom && !horiz ? 30 : 4 }),
+      grid: C.grid(ctx, { top: top, left: 4, right: marginR + (o.zoom && horiz ? 14 : 0), bottom: o.zoom && !horiz ? 30 : 4 }),
       tooltip: {
         trigger: 'item',
         formatter: function (p) {

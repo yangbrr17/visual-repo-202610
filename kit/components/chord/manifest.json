@@ -1,0 +1,46 @@
+{
+  "id": "chord",
+  "name": "Chord Diagram",
+  "name_zh": "弦图",
+  "category": "flow",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Bilateral flows within one set of entities — arcs sized by two-way volume, ribbons from source to target (cross-border M&A, trade corridors).",
+  "summary_zh": "同一组实体之间的双向流量：圆弧长度为双向总量，弦带连接来源与去向（跨境并购、贸易走廊、业务单元间转介）。",
+  "description_zh": "每行数据是一条流向（source → target，value 为金额，可选 count 为笔数），相同的来源-去向对会自动汇总，排名靠后的实体合并为“Other”。圆弧长度代表该实体作为来源与去向的合计流量，弦带两端的宽度代表该方向的流量，弦带颜色默认取来源方（例如收购方国家）。适合展示 6–15 个实体之间的相互流动关系，例如跨境并购的收购方国家 → 目标国家；悬停弦带可看到双向对比，点击圆弧可聚焦并交叉筛选。",
+  "best_for": ["Cross-border M&A: acquirer country → target country", "Trade or capital flows between regions", "Inter-segment / inter-entity transactions", "Client referrals between business units"],
+  "avoid_when": ["Flows between two different sets with a clear direction of stages (use sankey)", "More than ~15 entities after grouping", "When exact values matter more than the overall pattern (use a matrix / heatmap)"],
+  "channels": {
+    "source": {"type": "string", "required": true, "desc": "Flow origin (e.g. acquirer country)", "default": "from_country"},
+    "target": {"type": "string", "required": true, "desc": "Flow destination (e.g. target country)", "default": "to_country"},
+    "value": {"type": "number", "required": true, "desc": "Flow size (summed per source → target pair)", "default": "value"},
+    "count": {"type": "number", "required": false, "desc": "Optional count shown in tooltips (e.g. number of deals)", "default": "deals"}
+  },
+  "options": {
+    "top": {"type": "number", "default": 10, "desc": "Keep the N largest entities by two-way total; the rest are grouped into 'Other' (0 = keep all)"},
+    "otherLabel": {"type": "string", "default": "Other", "desc": "Label of the grouped tail"},
+    "includeSelf": {"type": "boolean", "default": false, "desc": "Keep flows where source == target (e.g. domestic deals)"},
+    "sort": {"type": "string", "default": "desc", "desc": "Arc order clockwise from 12 o'clock: desc (largest first) | data"},
+    "colorBy": {"type": "string", "default": "node", "desc": "node: categorical colour per entity | single: spotlight — accent arcs, ribbons touching the highlight emphasised, others faded"},
+    "nodeColors": {"type": "object", "default": {}, "desc": "{name: colour} — theme token ('accent2', 'cat3' …) or CSS colour"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Entity name(s) drawn in accent2 (e.g. the client's home market)"},
+    "ribbonColor": {"type": "string", "default": "source", "desc": "Ribbon colour: source | target | gradient"},
+    "ribbonOpacity": {"type": "number", "default": 0.34, "desc": "Resting ribbon opacity"},
+    "padAngle": {"type": "number", "default": 1.6, "desc": "Gap between arcs (degrees)"},
+    "ringWidth": {"type": "number", "default": 10, "desc": "Arc thickness (px)"},
+    "labels": {"type": "boolean", "default": true, "desc": "Entity labels outside the ring"},
+    "labelValues": {"type": "boolean", "default": true, "desc": "Two-way total under each label"},
+    "minLabelShare": {"type": "number", "default": 0.015, "desc": "Hide labels of arcs below this share of the total (shown on hover)"},
+    "colorKey": {"type": "boolean", "default": true, "desc": "Small reading key, top-left ('Ribbon colour = …' or the spotlighted entity)"},
+    "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field's format"},
+    "crossFilter": {"type": "boolean", "default": true, "desc": "Click an arc to focus its flows and filter other blocks on the source field"},
+    "filterScope": {"type": "string", "default": "dataset", "desc": "dataset: selection only filters blocks bound to the same dataset | global"}
+  },
+  "interactions": ["Hover an arc: adjacency emphasis + outbound / inbound / net tooltip", "Hover a ribbon: flow value, count and reverse flow", "Click an arc to focus and cross-filter (click again to clear)", "Re-lays out on resize and filter changes", "PNG / CSV export"],
+  "samples": [
+    {"title": "Cross-border industrials M&A, 2021–2026 YTD (USD bn) — acquirer → target country", "data": "deal_flows", "height": 460,
+     "options": {"encode": {"source": "from_country", "target": "to_country", "value": "value", "count": "deals"}, "top": 10, "highlight": "United States"}},
+    {"title": "Spotlight on Germany — inbound and outbound corridors", "data": "deal_flows", "height": 380, "span": 6,
+     "options": {"top": 8, "colorBy": "single", "highlight": "Germany", "ribbonColor": "target", "labelValues": false, "ribbonOpacity": 0.3}}
+  ]
+}

@@ -1,0 +1,103 @@
+/* data-grid — Tabulator 6 (tabulator_simple.min.css) re-skinned with ReportKit tokens */
+.rk-dgrid { display: flex; flex-direction: column; gap: 8px; height: 100%; min-height: 0; }
+.rk-dgrid__bar { display: flex; align-items: center; gap: 10px; flex: none; }
+.rk-dgrid__find { position: relative; display: inline-flex; align-items: center; color: var(--rk-ink-3); }
+.rk-dgrid__find svg { position: absolute; left: 9px; pointer-events: none; }
+.rk-dgrid__search { width: min(260px, 46vw); height: 28px; padding-left: 28px; }
+.rk-dgrid__search::-webkit-search-cancel-button { cursor: pointer; }
+.rk-dgrid__spacer { flex: 1; }
+.rk-dgrid__count { font-size: var(--rk-fs-sm); color: var(--rk-ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rk-dgrid__dl { height: 28px; padding: 0 10px; font-size: 12px; }
+.rk-dgrid__table { flex: 1; min-height: 0; }
+.rk-dgrid__table.is-paged { flex: none; }
+
+/* ---------- table chrome ---------- */
+.rk-dgrid .tabulator {
+  border: 0; background: transparent; font-family: var(--rk-font-sans); font-size: 12px; color: var(--rk-ink);
+}
+.rk-dgrid .tabulator .tabulator-header {
+  background: var(--rk-paper); color: var(--rk-ink-2); font-weight: 600; border-bottom: 1.5px solid var(--rk-accent);
+}
+.rk-dgrid .tabulator .tabulator-header .tabulator-col {
+  background: var(--rk-paper); border-right: 0;
+}
+.rk-dgrid .tabulator .tabulator-header .tabulator-col .tabulator-col-content { padding: 6px 8px 5px; }
+.rk-dgrid .tabulator .tabulator-header .tabulator-col .tabulator-col-title { font-size: var(--rk-fs-sm); line-height: 1.25; white-space: normal; }
+.rk-dgrid .tabulator .tabulator-header .tabulator-col.tabulator-sortable .tabulator-col-title { padding-right: 14px; }
+.rk-dgrid .tabulator .tabulator-header .tabulator-col.tabulator-sortable[aria-sort] .tabulator-col-content .tabulator-col-sorter { right: 2px; }
+.rk-dgrid .tabulator .tabulator-header .tabulator-col.tabulator-sortable .tabulator-col-sorter .tabulator-arrow { border-left-width: 4px; border-right-width: 4px; border-bottom: 5px solid var(--rk-ink-3); transition: opacity var(--rk-dur-fast); }
+.rk-dgrid .tabulator .tabulator-header .tabulator-col.tabulator-sortable[aria-sort=none] .tabulator-col-sorter .tabulator-arrow { opacity: 0; }
+.rk-dgrid .tabulator .tabulator-header .tabulator-col.tabulator-sortable[aria-sort=none]:hover .tabulator-col-sorter .tabulator-arrow { opacity: .6; }
+.rk-dgrid .tabulator .tabulator-header .tabulator-col.tabulator-sortable[aria-sort=ascending] .tabulator-col-sorter .tabulator-arrow { border-bottom: 5px solid var(--rk-accent-3); }
+.rk-dgrid .tabulator .tabulator-header .tabulator-col.tabulator-sortable[aria-sort=descending] .tabulator-col-sorter .tabulator-arrow { border-top: 5px solid var(--rk-accent-3); border-bottom: 0; }
+.rk-dgrid .tabulator .tabulator-header .tabulator-col[aria-sort=ascending] .tabulator-col-title,
+.rk-dgrid .tabulator .tabulator-header .tabulator-col[aria-sort=descending] .tabulator-col-title { color: var(--rk-ink); }
+@media (hover: hover) and (pointer: fine) {
+  .rk-dgrid .tabulator .tabulator-header .tabulator-col.tabulator-sortable.tabulator-col-sorter-element:hover { background: var(--rk-surface); color: var(--rk-accent); }
+}
+/* grouped headers: small caps label over a hairline, like the comps table */
+.rk-dgrid .tabulator .tabulator-header .tabulator-col.tabulator-col-group .tabulator-col-group-cols { border-top: 0; }
+.rk-dgrid .tabulator .tabulator-header .tabulator-col.tabulator-col-group > .tabulator-col-content .tabulator-col-title {
+  font-size: var(--rk-fs-xs); letter-spacing: .06em; text-transform: uppercase; color: var(--rk-accent);
+  text-align: center; padding: 0 0 3px; border-bottom: 1px solid var(--rk-rule);
+}
+[data-rk-theme="ink"] .rk-dgrid .tabulator .tabulator-header .tabulator-col.tabulator-col-group > .tabulator-col-content .tabulator-col-title { color: var(--rk-accent); }
+
+/* header filters */
+.rk-dgrid .tabulator .tabulator-header .tabulator-col .tabulator-header-filter { margin-top: 5px; }
+.rk-dgrid .tabulator .tabulator-header .tabulator-col .tabulator-header-filter input {
+  height: 22px; padding: 0 6px !important; border: 1px solid var(--rk-grid) !important; border-radius: 3px;
+  background: var(--rk-surface); color: var(--rk-ink); font-size: 11px; font-weight: 400; font-family: var(--rk-font-sans);
+  transition: border-color var(--rk-dur-fast), background var(--rk-dur-fast);
+}
+.rk-dgrid .tabulator .tabulator-header .tabulator-col .tabulator-header-filter input::placeholder { color: var(--rk-ink-3); opacity: .7; }
+.rk-dgrid .tabulator .tabulator-header .tabulator-col .tabulator-header-filter input:focus { outline: none; border-color: var(--rk-accent-3) !important; background: var(--rk-paper); }
+.rk-dgrid .tabulator .tabulator-header .tabulator-col .tabulator-header-filter input:not(:placeholder-shown) { border-color: var(--rk-accent-3) !important; background: var(--rk-paper); }
+
+/* frozen columns */
+.rk-dgrid .tabulator .tabulator-header .tabulator-frozen.tabulator-frozen-left,
+.rk-dgrid .tabulator-row .tabulator-cell.tabulator-frozen.tabulator-frozen-left { border-right: 1px solid var(--rk-rule); }
+.rk-dgrid .tabulator-row .tabulator-cell.tabulator-frozen { background-color: inherit; }
+
+/* body */
+.rk-dgrid .tabulator .tabulator-tableholder { scrollbar-width: thin; scrollbar-color: var(--rk-rule) transparent; }
+.rk-dgrid .tabulator .tabulator-tableholder .tabulator-table { background: var(--rk-paper); color: var(--rk-ink); }
+.rk-dgrid .tabulator-row, .rk-dgrid .tabulator-row.tabulator-row-even { background-color: var(--rk-paper); border-bottom: 1px solid var(--rk-grid); min-height: 26px; }
+.rk-dgrid .tabulator-row .tabulator-cell { border-right: 0; padding: 5px 8px; font-variant-numeric: tabular-nums; }
+.rk-dgrid .tabulator-row.is-clickable { cursor: pointer; }
+@media (hover: hover) and (pointer: fine) {
+  .rk-dgrid .tabulator-row.tabulator-selectable:hover, .rk-dgrid .tabulator-row:hover { background-color: var(--rk-surface); }
+}
+.rk-dgrid .tabulator-row.is-target { background-color: color-mix(in srgb, var(--rk-accent-2) 15%, var(--rk-paper)); font-weight: 600; }
+.rk-dgrid .tabulator-row.is-target .tabulator-cell:first-child { box-shadow: inset 3px 0 0 var(--rk-accent-2); }
+.rk-dgrid .tabulator-row.is-selected .tabulator-cell:first-child { box-shadow: inset 3px 0 0 var(--rk-accent); font-weight: 600; }
+.rk-dgrid .tabulator-row { transition: opacity var(--rk-dur-fast), background-color var(--rk-dur-fast); }
+.rk-dgrid .tabulator-row.is-dim { opacity: .4; }
+.rk-dgrid .tabulator-row .is-neg { color: var(--rk-neg); }
+.rk-dgrid .tabulator-row .is-pos { color: var(--rk-pos); }
+.rk-dgrid__na { color: var(--rk-ink-3); }
+.rk-dgrid .tabulator .tabulator-tableholder .tabulator-placeholder .tabulator-placeholder-contents { color: var(--rk-ink-3); font-size: 13px; font-weight: 500; }
+.rk-dgrid .tabulator .tabulator-col-resize-handle:hover { background: color-mix(in srgb, var(--rk-accent-3) 30%, transparent); }
+
+/* pagination footer */
+.rk-dgrid .tabulator .tabulator-footer { background: var(--rk-paper); border-top: 1.5px solid var(--rk-accent); color: var(--rk-ink-3); font-weight: 400; font-size: 11.5px; }
+.rk-dgrid .tabulator .tabulator-footer .tabulator-footer-contents { padding: 6px 0 0; }
+.rk-dgrid .tabulator .tabulator-footer .tabulator-paginator { color: var(--rk-ink-3); }
+.rk-dgrid .tabulator .tabulator-footer .tabulator-page {
+  min-width: 26px; height: 24px; margin: 0 1px; padding: 0 7px; border: 1px solid transparent; border-radius: var(--rk-radius);
+  background: transparent; color: var(--rk-ink-2); font-size: 11.5px; font-variant-numeric: tabular-nums;
+}
+.rk-dgrid .tabulator .tabulator-footer .tabulator-page.active { color: var(--rk-accent); border-color: var(--rk-rule); background: var(--rk-surface); font-weight: 600; }
+@media (hover: hover) and (pointer: fine) {
+  .rk-dgrid .tabulator .tabulator-footer .tabulator-page:not(:disabled):hover { background: var(--rk-surface); color: var(--rk-accent); }
+}
+.rk-dgrid .tabulator .tabulator-footer .tabulator-page:disabled { opacity: .35; }
+
+/* tooltips / popups rendered by Tabulator into <body> */
+.tabulator-tooltip { background: var(--rk-tooltip-bg); color: var(--rk-tooltip-ink); border: 1px solid var(--rk-rule); border-radius: 4px; font-family: var(--rk-font-sans); box-shadow: 0 6px 18px rgba(15, 23, 42, .14); }
+
+/* entry */
+.rk-dgrid.is-in .tabulator-tableholder { animation: rk-dgrid-in 480ms var(--rk-ease) both; }
+@keyframes rk-dgrid-in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .rk-dgrid.is-in .tabulator-tableholder { animation: none; } }
+@media print { .rk-dgrid__bar, .rk-dgrid .tabulator-header-filter { display: none !important; } .rk-dgrid.is-in .tabulator-tableholder { animation: none; } }

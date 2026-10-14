@@ -161,14 +161,37 @@
       // label metrics: first column labels sit outside-left, everything else to the right
       var showLabels = o.labels !== false;
       var nameFont = '600 11px ' + t.fontSans, valFont = '10.5px ' + t.fontNum;
+      var top = vert ? (showLabels ? 34 : 6) : 10, bottom = vert ? (showLabels ? 34 : 6) : 10;
       function valueText(n) {
         var s = RK.format(n.value, fmt);
-        if (refNode && refNode.value) s += '  ' + RK.format(n.value / refNode.value, '0.0%');
+        if (refNode && refNode.value && refNode !== n) s += '  ' + RK.format(n.value / refNode.value, '0.0%');
         return s;
+      }
+
+      // Estimate the node layout (same ky rule as ECharts) to find columns where two-line labels
+      // would collide; those nodes get a single-line "Name  value" label instead.
+      var inline = new Set();
+      if (showLabels && o.labelValues && !vert) {
+        var avail = Math.max(60, (ctx.el.clientHeight || 320) - top - bottom);
+        var cols = util.groupBy(nodes, function (n) { return n.depth; });
+        var ky = Infinity;
+        cols.forEach(function (col) {
+          var sum = col.reduce(function (s, n) { return s + n.value; }, 0);
+          if (sum > 0) ky = Math.min(ky, (avail - (col.length - 1) * o.nodeGap) / sum);
+        });
+        if (isFinite(ky)) {
+          cols.forEach(function (col) {
+            var y = 0, centres = col.map(function (n) { var hgt = Math.max(1, n.value * ky), c = y + hgt / 2; y += hgt + o.nodeGap; return c; });
+            col.forEach(function (n, i) {
+              var near = Math.min(i > 0 ? centres[i] - centres[i - 1] : Infinity, i < col.length - 1 ? centres[i + 1] - centres[i] : Infinity);
+              if (near < 30) inline.add(n.name);
+            });
+          });
+        }
       }
       function labelWidth(n) {
         var w = measure(n.name, nameFont);
-        if (o.labelValues) w = Math.max(w, measure(valueText(n), valFont));
+        if (o.labelValues) w = inline.has(n.name) ? w + 8 + measure(valueText(n), valFont) : Math.max(w, measure(valueText(n), valFont));
         return Math.ceil(w);
       }
       var firstW = 0, lastW = 0;
@@ -206,7 +229,6 @@
       });
 
       var linkColor = o.linkColor === 'neutral' ? t.neutral : (o.linkColor || 'source');
-      var top = vert ? (showLabels ? 34 : 6) : 10, bottom = vert ? (showLabels ? 34 : 6) : 10;
 
       return {
         tooltip: {
@@ -255,7 +277,8 @@
             formatter: function (p) {
               var n = g.byName.get(p.name);
               if (!n) return '';
-              return '{n|' + safe(n.name) + '}' + (o.labelValues ? '\n{v|' + safe(valueText(n)) + '}' : '');
+              if (!o.labelValues) return '{n|' + safe(n.name) + '}';
+              return '{n|' + safe(n.name) + '}' + (inline.has(n.name) ? '  ' : '\n') + '{v|' + safe(valueText(n)) + '}';
             },
             rich: {
               n: { fontWeight: 600, fontSize: 11, color: t.ink, fontFamily: t.fontSans, lineHeight: 14, textBorderColor: t.paper, textBorderWidth: 3 },

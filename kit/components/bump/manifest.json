@@ -1,0 +1,42 @@
+{
+  "id": "bump",
+  "name": "Bump Chart (Rank over Time)",
+  "name_zh": "排名变化图（Bump Chart）",
+  "category": "comparison",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "How rankings change across periods or markets: one line per entity, #1 at the top, rank numbers in the nodes and names at both ends.",
+  "summary_zh": "展示排名随时间（或跨市场）的变化：每个主体一条线，第 1 名在最上方，节点内标注名次，两端直接标注名称。",
+  "description_zh": "适合联席顾问排行榜（今年 vs 去年）、业务板块 / 区域收入排名演变、各细分市场中竞争对手的位次对比等“名次比数值更重要”的场景。数据为长表：x（期间或市场）、series（主体）、value（数值，组件按期自动计算名次，rankOrder 控制大者优先或小者优先）或直接给 rank 字段；也支持宽表（encode.rank 为字段数组，如 ['prior_rank','rank']，每个字段是一期）。左侧按首期名次、右侧按末期名次列出名称（末期附数值），highlight 的主体以 accent-2 粗线突出、其余可自动置灰；top 可只显示前 N 名，主体进出前 N 时线条断开。",
+  "best_for": ["League tables: this year vs. last year", "Segment / regional revenue rank over time", "A competitor's position across several market segments", "Any 'who moved up / down' story with 3–15 entities"],
+  "avoid_when": ["Magnitudes matter more than order (use a line or slope chart of values)", "More than ~15 entities or very frequent periods (lines tangle)", "Ranks never change (use a ranked bar)"],
+  "channels": {
+    "x": {"type": "string|date", "required": true, "desc": "Period / ordered dimension (long data)", "default": "period"},
+    "series": {"type": "string", "required": true, "desc": "Entity being ranked (one line each)", "default": "series"},
+    "value": {"type": "number|number[]", "required": false, "desc": "Value used to compute ranks (or wide: one field per period); also shown in tooltip / right label", "default": "value"},
+    "rank": {"type": "number|number[]", "required": false, "desc": "Pre-computed rank (1 = top); wide: one field per period, e.g. ['prior_rank', 'rank']"}
+  },
+  "options": {
+    "rankOrder": {"type": "string", "default": "desc", "desc": "When ranks are computed from value: 'desc' (largest = #1) | 'asc' (smallest = #1)"},
+    "agg": {"type": "string", "default": "sum", "desc": "Aggregation when several rows share period + entity (sum | avg | max ...)"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Entity value(s) drawn in accent-2 with a heavier line"},
+    "muted": {"type": "boolean|string", "default": "auto", "desc": "Grey out non-highlighted lines: 'auto' (when highlight is set) | true | false"},
+    "top": {"type": "number", "default": null, "desc": "Show ranks 1..N only; lines break when an entity drops out"},
+    "smooth": {"type": "boolean", "default": true, "desc": "S-curves between periods"},
+    "rankLabels": {"type": "boolean", "default": true, "desc": "Rank number inside each node"},
+    "endLabels": {"type": "boolean", "default": true, "desc": "Entity names at both ends in rank order (left = first period, right = last period)"},
+    "showValue": {"type": "boolean", "default": true, "desc": "Last-period value after the right-hand name (when values exist)"},
+    "xLabels": {"type": "string[]", "default": null, "desc": "Override period labels (e.g. for wide rank fields)"},
+    "sortX": {"type": "boolean", "default": false, "desc": "Sort periods ascending (long data); otherwise data order"},
+    "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field's format"}
+  },
+  "interactions": ["Axis tooltip: full ranking at that period with value and ▲/▼ change", "Hover a line to isolate it", "Click a line to cross-filter by entity", "Non-selected lines dimmed", "Lines draw in left-to-right; ranks re-animate when filters change", "PNG / CSV export"],
+  "samples": [
+    {"title": "Asia Pacific revenue rank by segment", "data": "segment_revenue", "height": 240,
+     "options": {"encode": {"x": "year", "series": "segment", "value": "revenue"}, "where": "region == \"Asia Pacific\"", "highlight": "Sensors & Instrumentation"}},
+    {"title": "Competitive position by market segment (2025 revenue)", "data": "market_share", "height": 280,
+     "options": {"encode": {"x": "segment", "series": "player", "value": "revenue"}, "where": "player != \"Others\"", "highlight": "Helios Industrial", "muted": false}},
+    {"title": "M&A adviser league table — prior year vs. current", "data": "league_table", "height": 380,
+     "options": {"encode": {"series": "bank", "rank": ["prior_rank", "rank"]}, "xLabels": ["FY2025", "FY2026 YTD"], "highlight": "Kingsgate Advisory"}}
+  ]
+}

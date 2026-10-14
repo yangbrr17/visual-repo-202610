@@ -45,7 +45,7 @@
     var a = RK.theme.parseColor(t.accent2);
     var pool = t.cat.filter(function (c) {
       var b = RK.theme.parseColor(c);
-      return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2)) > 90;
+      return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2)) > 60;
     });
     if (!pool.length) pool = t.cat;
     var map = {};
@@ -90,6 +90,16 @@
     });
     ctx.el.appendChild(bar);
     return bar;
+  }
+
+  /** Current zoom window of the two inside dataZooms, so re-renders (filters, selection) keep it. */
+  function zoomState(inst) {
+    var dz = null;
+    try { dz = inst.getOption() && inst.getOption().dataZoom; } catch (e) { dz = null; }
+    return [0, 1].map(function (i) {
+      var d = dz && dz[i];
+      return d ? { start: d.start, end: d.end } : { start: 0, end: 100 };
+    });
   }
 
   /** Box-select / box-zoom handler (brush component in "rect" mode). */
@@ -182,7 +192,7 @@
       var sz = L.target ? size + 5 : size;
       var data = L.rows.map(function (r) { return item(r, L.color, L.target); });
       series.push({
-        id: L.id, name: L.name, type: 'scatter', symbol: 'circle', symbolSize: sz, z: L.target ? 4 : 2,
+        id: L.id, name: L.name, type: 'scatter', symbol: 'circle', symbolSize: sz, z: L.target ? 7 : 2,  // target above all labels
         itemStyle: { color: L.color, borderWidth: L.target ? 1.5 : 0.8 },
         emphasis: { scale: 1.35, focus: 'none' },
         animationDelay: function (i) { return i * 14; },
@@ -260,6 +270,7 @@
     if (fit) legendNames.push({ name: fitName, icon: 'path://M0 4.2h18v1.6H0z', itemWidth: 16, itemHeight: 9 });
     var showLegend = legendOn && legendNames.length > 1;
     var interactive = !ctx.print && o.zoom !== false;
+    var zs = zoomState(inst), zoomed = zs.some(function (z) { return z.start > 0 || z.end < 100; });
 
     return {
       legend: C.legend(ctx, { show: showLegend, data: legendNames, right: interactive ? 92 : 0, icon: 'circle', itemWidth: 9, itemHeight: 9 }),
@@ -282,21 +293,21 @@
         }
       },
       xAxis: {
-        type: 'value', min: xe.min, max: xe.max, interval: xe.step, name: o.xTitle || ctx.title(enc.x), nameLocation: 'middle', nameGap: 26,
+        type: 'value', min: xe.min, max: xe.max, splitNumber: Math.round((xe.max - xe.min) / xe.step), name: o.xTitle || ctx.title(enc.x), nameLocation: 'middle', nameGap: 26,
         axisLine: { show: true, onZero: false, lineStyle: { color: t.axis } },
-        axisLabel: { formatter: C.axisFmt(xFmt), hideOverlap: true },
+        axisLabel: { formatter: C.axisFmt(xFmt), hideOverlap: true, showMinLabel: !zoomed, showMaxLabel: !zoomed },
         splitLine: { show: true, lineStyle: { color: t.grid } }
       },
       yAxis: {
-        type: 'value', min: ye.min, max: ye.max, interval: ye.step, name: o.yTitle || ctx.title(enc.y), nameLocation: 'middle', nameGap: Math.round(yLabW + 14),
+        type: 'value', min: ye.min, max: ye.max, splitNumber: Math.round((ye.max - ye.min) / ye.step), name: o.yTitle || ctx.title(enc.y), nameLocation: 'middle', nameGap: Math.round(yLabW + 14),
         axisLine: { show: false, onZero: false },
-        axisLabel: { formatter: C.axisFmt(yFmt) },
+        axisLabel: { formatter: C.axisFmt(yFmt), showMinLabel: !zoomed, showMaxLabel: !zoomed },
         splitLine: { show: true, lineStyle: { color: t.grid } }
       },
       toolbox: { show: false },  // the brush is driven from the HTML toolbar
       dataZoom: interactive ? [
-        { type: 'inside', xAxisIndex: 0, filterMode: 'none', zoomOnMouseWheel: 'ctrl', moveOnMouseMove: true, moveOnMouseWheel: false },
-        { type: 'inside', yAxisIndex: 0, filterMode: 'none', zoomOnMouseWheel: 'ctrl', moveOnMouseMove: true, moveOnMouseWheel: false }
+        util.merge({ type: 'inside', xAxisIndex: 0, filterMode: 'none', zoomOnMouseWheel: 'ctrl', moveOnMouseMove: true, moveOnMouseWheel: false }, zs[0]),
+        util.merge({ type: 'inside', yAxisIndex: 0, filterMode: 'none', zoomOnMouseWheel: 'ctrl', moveOnMouseMove: true, moveOnMouseWheel: false }, zs[1])
       ] : [],
       brush: interactive ? {
         toolbox: [], xAxisIndex: 0, yAxisIndex: 0, brushMode: 'single', transformable: false, removeOnClick: true, throttleType: 'debounce', throttleDelay: 120,
@@ -316,6 +327,12 @@
     },
     init: function (inst) {
       inst.on('brushEnd', function (params) { onBrushEnd(params, inst); });
+      inst.on('datazoom', function () {
+        // hide the odd boundary labels (e.g. 15.6x) while zoomed, restore them at full extent
+        var z = zoomState(inst).some(function (d) { return d.start > 0 || d.end < 100; });
+        var lab = { axisLabel: { showMinLabel: !z, showMaxLabel: !z } };
+        inst.setOption({ xAxis: lab, yAxis: lab });
+      });
       inst.on('brush', function (params) {
         // a click on empty canvas removes the box: clear the box selection as well
         if (inst.__rkMode === 'select' && params.areas && !params.areas.length && inst.__rk && inst.__rk.selField) {

@@ -101,10 +101,7 @@
     var fmt = o.format || (o.rebase != null ? '#,##0.0' : data.yFormat) || 'auto';
     var hl = o.highlight;
     var stacked = o.area === 'stacked';
-    // palette without the highlight colour so accent2 means "the target" only
-    var a2 = String(t.accent2).toLowerCase();
-    var pal = hl != null ? t.cat.filter(function (c) { return String(c).toLowerCase() !== a2; }) : t.cat.slice();
-    if (!pal.length) pal = t.cat.slice();
+    var pal = palette(t, hl != null);
     var sel = enc.series && !Array.isArray(enc.y) ? ctx.selected(enc.series) : [];
 
     var pi = 0;
@@ -118,7 +115,7 @@
       var isHl = hl != null && s.name === hl;
       var color = isHl ? t.accent2 : pal[pi++ % pal.length];
       var muted = hl != null && !isHl;
-      if (muted) color = RK.theme.mix(color, t.paper, 0.18);
+      if (muted) color = RK.theme.mix(color, t.paper, 0.12);
       var dimmed = sel.length && sel.indexOf(s.name) < 0;
       return {
         key: 's' + k, name: s.name, field: s.field, raw: raw, values: vals,
@@ -156,6 +153,26 @@
     series.forEach(function (s) { byId[s.key] = s; byId[s.key + 'f'] = s; });
     return { xType: xType, isTime: isTime, isValue: isValue, isCat: !isTime && !isValue, xs: xs, xv: xv,
       series: series, byId: byId, fmt: fmt, stacked: stacked, fIdx: fIdx };
+  }
+
+  /**
+   * Series colours. With a highlight, the context series use the calm semantic tokens first
+   * (accent, accent3, ink3) and nothing close to accent2, so gold always means "the target".
+   */
+  function palette(t, highlight) {
+    var base = highlight ? [t.accent, t.accent3, t.ink3].concat(t.cat) : t.cat.slice();
+    var out = [];
+    base.forEach(function (c) {
+      if (!c) return;
+      if (highlight && colorDist(c, t.accent2) < 72) return;
+      if (out.some(function (x) { return colorDist(x, c) < 46; })) return;
+      out.push(c);
+    });
+    return out.length ? out : t.cat.slice();
+  }
+  function colorDist(a, b) {
+    var x = RK.theme.parseColor(a), y = RK.theme.parseColor(b);
+    return Math.sqrt(Math.pow(x[0] - y[0], 2) + Math.pow(x[1] - y[1], 2) + Math.pow(x[2] - y[2], 2));
   }
 
   /** Events dataset -> pins anchored on one series (nearest x). */
@@ -352,15 +369,19 @@
     if (useZoom) {
       var z = state.zoom || { start: 0, end: 100 };
       dz.push({ id: 'dzi', type: 'inside', xAxisIndex: 0, filterMode: 'none', start: z.start, end: z.end });
-      if (slider) dz.push({ id: 'dzs', type: 'slider', xAxisIndex: 0, filterMode: 'none', start: z.start, end: z.end, height: 18, bottom: 6, showDetail: false, brushSelect: false, left: 56, right: right });
-    }
+      if (slider) {
+        state.slider = state.slider || { left: 56, right: right };
+        dz.push({ id: 'dzs', type: 'slider', xAxisIndex: 0, filterMode: 'none', start: z.start, end: z.end, height: 18, bottom: 6,
+          showDetail: false, brushSelect: false, left: state.slider.left, right: state.slider.right });
+      }
+    } else state.slider = null;
 
     var legendNames = model.series.map(function (s) { return s.name; });
     return {
       animationDurationUpdate: 600,
       legend: C.legend(ctx, {
         show: hasLegend, data: legendNames.map(function (nm) { return { name: nm, icon: 'rect' }; }),
-        itemWidth: 14, itemHeight: 3, selected: state.legendSel || undefined
+        itemWidth: 16, itemHeight: 4, selected: state.legendSel || undefined
       }),
       grid: C.grid(ctx, { top: top, bottom: bottom, right: right, left: 4 }),
       tooltip: {
@@ -419,7 +440,7 @@
       area = {
         silent: true,
         itemStyle: { color: RK.theme.alpha(t.ink3, t.dark ? 0.1 : 0.06) },
-        label: { show: !!o.forecastLabel, position: 'insideTop', distance: 4, color: t.ink3, fontSize: 10.5, fontStyle: 'italic', formatter: o.forecastLabel || '' },
+        label: { show: !!o.forecastLabel, position: 'top', distance: 5, color: t.ink3, fontSize: 10.5, fontStyle: 'italic', formatter: o.forecastLabel || '' },
         data: [[{ xAxis: from }, { xAxis: to }]]
       };
     }
@@ -595,7 +616,17 @@
     }
     state.labelIds.forEach(function (id) { if (!keep[id]) elements.push({ id: id, $action: 'remove' }); });
     state.labelIds = Object.keys(keep);
-    if (elements.length) inst.setOption({ graphic: { elements: elements } });
+    var patch = {};
+    if (elements.length) patch.graphic = { elements: elements };
+    // keep the zoom slider exactly under the plot area (the grid's left edge depends on label widths)
+    if (g && state.slider) {
+      var l = Math.round(g.x), r = Math.round(inst.getWidth() - g.x - g.width);
+      if (state.slider.left !== l || state.slider.right !== r) {
+        state.slider = { left: l, right: r };
+        patch.dataZoom = [{ id: 'dzs', left: l, right: r }];
+      }
+    }
+    if (patch.graphic || patch.dataZoom) inst.setOption(patch);
   }
 
   function animFor(ctx, mode) {

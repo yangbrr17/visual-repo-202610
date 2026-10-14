@@ -1,0 +1,45 @@
+{
+  "id": "choropleth",
+  "name": "Choropleth Map",
+  "name_zh": "分级设色地图",
+  "category": "geo",
+  "engine": "leaflet",
+  "deps": ["leaflet", "topojson-client", "geo-world"],
+  "summary": "Countries shaded by a metric on an offline world basemap — sequential or diverging, continuous or classed with nice-rounded breaks.",
+  "summary_zh": "在离线世界底图上按指标给国家着色：顺序/发散色阶，连续或分级（自动取整的分档）。",
+  "description_zh": "展示按国家汇总的指标（收入、增速、员工数、市场份额）的地理分布。每行数据一个国家，通过 ISO 3166-1 数字代码（如 \"840\"，也兼容国家英文名）与 Natural Earth 底图连接；无数据的国家保持浅色陆地底色。默认按分位数分 5 档并取整为好看的分界值（如 <$20 / $20–50 / …），图例显示每档国家数；增速、相对均值偏离等有正负含义的指标用 diverging 色阶并设置中点。前 N 个国家直接标注数值，悬停显示数值、排名和附加字段，点击国家可交叉筛选其他图表。",
+  "best_for": ["Revenue / employees / market share by country", "Growth vs. a benchmark (diverging around 0 or the group average)", "Regional footprint at a glance"],
+  "avoid_when": ["Precise comparison of values (use a bar chart)", "Sub-national geography (needs another basemap)", "Totals dominated by large countries' area — consider bubble-map for absolute values"],
+  "channels": {
+    "id": {"type": "string", "required": true, "desc": "ISO 3166-1 numeric code (\"840\"; zero-padded automatically) or a country name matching the basemap", "default": "iso_num"},
+    "value": {"type": "number", "required": true, "desc": "Metric that drives the colour", "default": "value"},
+    "label": {"type": "string", "required": false, "desc": "Display name for tooltips / labels; also a name fallback for the join", "default": "country"}
+  },
+  "options": {
+    "basemap": {"type": "string", "default": "world-110m", "desc": "Registered basemap name (RK.geo.register)"},
+    "scale": {"type": "string", "default": "sequential", "desc": "sequential | diverging"},
+    "mid": {"type": "number", "default": 0, "desc": "Diverging midpoint (0 for growth, or e.g. the group average)"},
+    "bins": {"type": "number", "default": 5, "desc": "Number of colour classes; 0 / null = continuous ramp. Diverging uses an even count (classes per side = bins / 2)"},
+    "classify": {"type": "string", "default": "quantile", "desc": "quantile | equal — how sequential class breaks are found (then rounded to nice numbers)"},
+    "breaks": {"type": "number[]", "default": null, "desc": "Explicit class breaks, e.g. [50, 100, 250, 500] (overrides bins / classify)"},
+    "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field format"},
+    "labels": {"type": "number", "default": 5, "desc": "Value labels on the top N countries (largest |value - mid|); 0 = none. Crowded labels hide automatically"},
+    "tooltip": {"type": "string[]", "default": [], "desc": "Extra fields listed in the tooltip"},
+    "fit": {"type": "string|array|object", "default": "data", "desc": "Initial view: 'data' (countries with data) | 'world' | [[south, west], [north, east]] | {center: [lat, lon], zoom}"},
+    "legend": {"type": "boolean", "default": true, "desc": "Show the colour legend (with country counts per class)"},
+    "legendTitle": {"type": "string", "default": null, "desc": "Legend title; defaults to the value field title"},
+    "legendPosition": {"type": "string", "default": "bottomleft", "desc": "Leaflet control corner: bottomleft | bottomright | topleft | topright"},
+    "filterField": {"type": "string", "default": null, "desc": "Field used for click-to-filter; defaults to encode.id. Use 'country' to link with assets_locations"},
+    "scrollZoom": {"type": "boolean|string", "default": "click", "desc": "Mouse-wheel zoom: true | false | 'click' (armed after clicking the map, so page scrolling is not hijacked)"}
+  },
+  "interactions": ["Hover highlight + tooltip (value, rank, extra fields)", "Click a country to cross-filter (dims the others)", "Zoom / pan (wheel zoom after a click)", "Smooth colour transitions when filters change", "PNG export"],
+  "samples": [
+    {"title": "Revenue 2025A by country (USD m)", "data": "revenue_by_country", "height": 460,
+     "options": {"encode": {"id": "iso_num", "value": "revenue", "label": "country"}, "tooltip": ["growth", "employees"], "filterField": "country"}},
+    {"title": "Europe — revenue growth vs. 7% group average", "data": "revenue_by_country", "height": 420, "span": 7,
+     "options": {"encode": {"id": "iso_num", "value": "growth", "label": "country"}, "scale": "diverging", "mid": 0.07, "bins": 6, "labels": 4,
+                 "fit": [[36, -11], [70, 31]], "legendTitle": "Growth vs. 7.0% average", "tooltip": ["revenue"]}},
+    {"title": "Employees by country — continuous scale", "data": "revenue_by_country", "height": 380, "span": 5,
+     "options": {"encode": {"id": "iso_num", "value": "employees", "label": "country"}, "bins": 0, "labels": 0, "fit": "world"}}
+  ]
+}

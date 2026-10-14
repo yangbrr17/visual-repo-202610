@@ -12,12 +12,51 @@
    * geo kit — identical copy in every RK geo component (choropleth, bubble-map, flow-map,
    * cluster-map, geo-heat) so each file stays standalone. Candidate for rk.geo.js.
    * ======================================================================================== */
-  var WORLD = [[-56, -170], [78, 180]];
+  var WORLD = [[-48, -168], [72, 180]];
+
+  /** Latitude where a ring edge a -> b crosses the antimeridian. */
+  function crossLat(a, b) {
+    var bx = b[0] + (a[0] > 0 ? 360 : -360), e = a[0] > 0 ? 180 : -180;
+    return a[1] + (b[1] - a[1]) * (e - a[0]) / ((bx - a[0]) || 1);
+  }
+  /** Split a ring that jumps across +/-180 (Russia, Fiji) into planar pieces; close polar rings (Antarctica). */
+  function splitRing(ring) {
+    var j = [];
+    for (var i = 1; i < ring.length; i++) if (Math.abs(ring[i][0] - ring[i - 1][0]) > 180) j.push(i);
+    if (j.length === 1) {
+      var a = ring[j[0] - 1], b = ring[j[0]], la = crossLat(a, b), pole = a[1] < 0 ? -90 : 90, ea = a[0] > 0 ? 180 : -180;
+      return [ring.slice(0, j[0]).concat([[ea, la], [ea, pole], [-ea, pole], [-ea, la]], ring.slice(j[0]))];
+    }
+    if (j.length !== 2) return [ring];
+    var p = ring[j[0] - 1], q = ring[j[0]], r = ring[j[1] - 1], s = ring[j[1]], l1 = crossLat(p, q), l2 = crossLat(r, s);
+    var side = function (pt) { return pt[0] > 0 ? 180 : -180; };
+    return [
+      [[side(s), l2]].concat(ring.slice(j[1]), ring.slice(0, j[0]), [[side(p), l1]]),
+      [[side(q), l1]].concat(ring.slice(j[0], j[1]), [[side(r), l2]])
+    ];
+  }
+  /** world-atlas is built for spherical renderers; make it planar-safe for Leaflet (once per basemap, in place). */
+  function planar(fc) {
+    if (fc.__rkPlanar) return fc;
+    fc.features.forEach(function (f) {
+      var g = f.geometry;
+      if (!g || (g.type !== 'Polygon' && g.type !== 'MultiPolygon')) return;
+      var out = [], hit = false;
+      (g.type === 'Polygon' ? [g.coordinates] : g.coordinates).forEach(function (poly) {
+        var parts = splitRing(poly[0]);
+        if (parts.length > 1 || parts[0] !== poly[0]) { hit = true; parts.forEach(function (pt) { out.push([pt]); }); } else out.push(poly);
+      });
+      if (hit) f.geometry = { type: 'MultiPolygon', coordinates: out };
+    });
+    fc.__rkPlanar = true;
+    return fc;
+  }
 
   /** Themed Leaflet map (RK.geo.leaflet) + fit / refit-on-resize bookkeeping + clean teardown. */
   function geoView(ctx, o, cls) {
-    var L = window.L, el = ctx.el;
-    var v = RK.geo.leaflet(ctx, { basemap: o.basemap || 'world-110m', minZoom: 0, maxZoom: o.maxZoom || 8 });
+    var L = window.L, el = ctx.el, name = o.basemap || 'world-110m';
+    planar(RK.geo.features(name));     // before RK.geo.leaflet draws the land layer from the same cached features
+    var v = RK.geo.leaflet(ctx, { basemap: name, minZoom: 0, maxZoom: o.maxZoom || 8 });
     var map = v.map, st = { moved: false, fitting: false, target: null, pad: 16 };
     el.classList.add('rk-geo', cls);
     if (ctx.motion) el.classList.add('is-motion');
@@ -64,13 +103,17 @@
     var L = window.L;
     if (fit && typeof fit === 'object' && !Array.isArray(fit)) return fit;
     if (Array.isArray(fit)) return L.latLngBounds(fit);
-    if (fit === 'data' && latlngs && latlngs.length) return L.latLngBounds(latlngs);
+    if (fit === 'data' && latlngs && latlngs.length) {
+      // polar extremes (Tierra del Fuego, the Canadian Arctic) would shrink a world view: clamp what we fit to
+      var b = L.latLngBounds(latlngs);
+      return L.latLngBounds([[Math.max(b.getSouth(), WORLD[0][0]), b.getWest()], [Math.min(b.getNorth(), WORLD[1][0]), b.getEast()]]);
+    }
     return L.latLngBounds(WORLD);
   }
 
-  /** Collision-aware HTML labels in the 'rk-labels' pane; lower-priority labels hide when crowded. */
+  /** Collision-aware HTML labels in the 'rk-labels' pane: the top `max` visible items by priority that fit. */
   function labelLayer(map) {
-    var L = window.L, group = L.layerGroup().addTo(map), items = [];
+    var L = window.L, group = L.layerGroup().addTo(map), items = [], max = Infinity;
     function overlap(a, b) { return a.x < b.x + b.w + 2 && a.x + a.w + 2 > b.x && a.y < b.y + b.h + 1 && a.y + a.h + 1 > b.y; }
     function place() {
       var size = map.getSize(), box0 = map.getContainer().getBoundingClientRect();
@@ -79,9 +122,11 @@
         var r = c.getBoundingClientRect();
         return { x: r.left - box0.left, y: r.top - box0.top, w: r.width, h: r.height };
       });
+      var shown = 0;
       items.slice().sort(function (a, b) { return b.it.prio - a.it.prio; }).forEach(function (x) {
         var icon = x.m.getElement();
         if (!icon) return;
+        if (shown >= max) { icon.firstChild.classList.add('is-hidden'); return; }
         var span = icon.firstChild, w = span.offsetWidth, ht = span.offsetHeight, r = x.it.r || 0, g = 3;
         var p = map.latLngToContainerPoint(x.it.latlng), hit = null;
         (x.it.pos || ['r', 'l', 't', 'b']).some(function (k) {
@@ -94,12 +139,14 @@
         });
         span.style.transform = hit ? 'translate(' + Math.round(hit[0]) + 'px,' + Math.round(hit[1]) + 'px)' : '';
         span.classList.toggle('is-hidden', !hit);
+        if (hit) shown++;
       });
     }
     map.on('zoomend moveend resize', place);
     return {
-      /** list: [{latlng, html, r, prio, pos, cls}] */
-      set: function (list) {
+      /** list: [{latlng, html, r, prio, pos, cls}]; n: max labels shown at once */
+      set: function (list, n) {
+        max = n == null ? Infinity : n;
         group.clearLayers();
         items = list.map(function (it) {
           var m = L.marker(it.latlng, {
@@ -132,6 +179,55 @@
       h('div.rk-legend__ramp', { style: { background: 'linear-gradient(90deg,' + stops.join(',') + ')' } }),
       h('div.rk-map-legend__ticks', ticks.map(function (x) { return h('span', x); })));
   }
+
+  /** Categorical legend rows; clickable (cross-filter) when onClick is given, dimmed when deselected. */
+  function catItems(values, colorOf, sel, onClick, shape) {
+    return h('div.rk-geo-leg__items', values.map(function (v) {
+      var off = sel && sel.length && sel.indexOf(v) < 0;
+      return h('div.rk-geo-leg__item' + (off ? '.is-off' : '') + (onClick ? '.is-click' : ''), { on: onClick ? { click: function () { onClick(v); } } : null },
+        h('i.rk-geo-leg__sw' + (shape ? '.is-' + shape : ''), { style: { background: colorOf(v) } }), h('span', String(v)));
+    }));
+  }
+  /** Nested reference circles (bottom-aligned, leader lines) for a sqrt size scale. */
+  function sizeLegendEl(values, rOf, fmt, ink) {
+    var vs = values.filter(function (v) { return v > 0; }).sort(function (a, b) { return b - a; }), kept = [];
+    vs.forEach(function (v) { var last = kept[kept.length - 1]; if (!last || 2 * (rOf(last) - rOf(v)) >= 11) kept.push(v); });
+    if (!kept.length) return null;
+    var R = rOf(kept[0]), H = Math.ceil(2 * R + 4), W = Math.ceil(2 * R + 64), e = RK.util.escapeHTML, out = '';
+    kept.forEach(function (v) {
+      var r = rOf(v), cy = H - 2 - r, ty = cy - r;
+      out += '<circle cx="' + (R + 1) + '" cy="' + cy.toFixed(1) + '" r="' + r.toFixed(1) + '" fill="none" stroke="' + ink + '" stroke-width="0.9"/>' +
+        '<line x1="' + (R + 1) + '" x2="' + (2 * R + 8) + '" y1="' + ty.toFixed(1) + '" y2="' + ty.toFixed(1) + '" stroke="' + ink + '" stroke-width="0.6" stroke-dasharray="2 2"/>' +
+        '<text x="' + (2 * R + 11) + '" y="' + (ty + 3.5).toFixed(1) + '">' + e(RK.format(v, fmt)) + '</text>';
+    });
+    return h('div.rk-geo-leg__size', { html: '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' + out + '</svg>' });
+  }
+  /** Reference values for a size legend: a nice value below the max, then ~1/3 and ~1/10 of it. */
+  function sizeRefs(max) {
+    if (!(max > 0)) return [];
+    var m = Math.pow(10, Math.floor(Math.log10(max))), top = m;
+    [1, 1.5, 2, 2.5, 3, 4, 5, 6, 7.5, 8].forEach(function (k) { if (k * m <= max) top = k * m; });
+    return RK.util.unique([top, niceRound(top / 3), niceRound(top / 10)]);
+  }
+  /** Field title with its unit, e.g. "Revenue 2025A (USD m)". */
+  function fieldTitle(ctx, f) {
+    var d = ctx.field(f), t = (d && d.title) || f;
+    return d && d.unit && t.indexOf(d.unit) < 0 ? t + ' (' + d.unit + ')' : t;
+  }
+  /** Rows that define scale domains: all rows (after options.where) so colours / sizes stay put when filters change. */
+  function domainRows(ctx) {
+    var rows = ctx.allRows;
+    if (ctx.options.where && ctx.dataset) {
+      try { var c = RK.expr.compile(ctx.options.where, { fields: ctx.dataset.fields }); rows = rows.filter(function (r) { return c.eval(r, { params: RK.store.params() }); }); } catch (e) { rows = ctx.rows; }
+    }
+    return rows;
+  }
+  /** Is a row inside every active self-selection on the given fields? (false -> draw dimmed) */
+  function isOn(ctx, row, fields) {
+    return fields.every(function (f) { if (!f) return true; var s = ctx.selected(f); return !s.length || s.indexOf(row[f]) >= 0; });
+  }
+  /** Sequential stops without the palest steps (they vanish against the land colour). */
+  function seqStops(t) { return t.seq.length >= 6 ? t.seq.slice(2) : t.seq; }
 
   /** Drop decimals from a format code when every value prints with zero decimals ("$#,##0.0" -> "$#,##0"). */
   function tidyFmt(fmt, values) {
@@ -218,10 +314,10 @@
     return RK.util.unique(out).filter(function (b) { return b > ext[0] && b < ext[1]; });
   }
 
-  /** Colour scale + legend body for the current values. */
-  function buildScale(ctx, vals, fmt) {
+  /** Colour scale over the domain values + legend body (class counts use the visible values). */
+  function buildScale(ctx, vals, shown, fmt) {
     var o = ctx.options, t = ctx.theme, ext = RK.util.extent(vals);
-    var seq = t.seq.length >= 6 ? t.seq.slice(2) : t.seq;
+    var seq = seqStops(t);
     var div = o.scale === 'diverging', mid = +o.mid || 0;
     var classed = (o.bins > 0 || (Array.isArray(o.breaks) && o.breaks.length)) && vals.length > 1;
     if (!classed) {
@@ -257,7 +353,7 @@
     var items = colors.map(function (c, j) {
       var lab = j === 0 ? '< ' + RK.format(breaks[0], lf) : j === nCls - 1 ? '≥ ' + RK.format(breaks[j - 1], lf)
         : RK.format(breaks[j - 1], lf) + ' – ' + RK.format(breaks[j], lf);
-      var count = vals.filter(function (v) { return classOf(v) === j; }).length;
+      var count = shown.filter(function (v) { return classOf(v) === j; }).length;
       return h('div.rk-geo-leg__item', h('i.rk-geo-leg__sw.is-square', { style: { background: c } }), h('span', lab), h('span.rk-geo-leg__n', String(count)));
     }).reverse();
     return {
@@ -296,6 +392,7 @@
         if (f.id != null) byId[f.id] = f;
         if (f.properties.name) byName[String(f.properties.name).toLowerCase()] = f;
       });
+      function fid(f) { return f.id != null ? f.id : 'n:' + f.properties.name; }
       var layers = {}, recs = {}, S = null, timer = null;
       var area = L.geoJSON(null, { onEachFeature: wire }).addTo(map);
       var labels = labelLayer(map), legend = legendControl(map, ctx.options.legendPosition);
@@ -316,15 +413,15 @@
         var enc = c.enc, o = c.options, out = {}, list = [];
         c.rows.forEach(function (r) {
           var f = featureOf(r, enc);
-          if (!f || out[f.id]) return;                    // one row per country: first wins
-          out[f.id] = { f: f, row: r, v: num(r[enc.value]) };
-          list.push(out[f.id]);
+          if (!f || out[fid(f)]) return;                  // one row per country: first wins
+          list.push(out[fid(f)] = { f: f, id: fid(f), row: r, v: num(r[enc.value]) });
         });
         var fmt = o.format || c.fmtOf(enc.value) || 'auto';
-        var vals = list.map(function (x) { return x.v; }).filter(function (v) { return v != null; });
+        var shown = list.map(function (x) { return x.v; }).filter(function (v) { return v != null; });
+        var vals = domainRows(c).filter(function (r) { return featureOf(r, enc); }).map(function (r) { return num(r[enc.value]); }).filter(function (v) { return v != null; });
         var ranked = list.filter(function (x) { return x.v != null; }).sort(function (a, b) { return b.v - a.v; });
         ranked.forEach(function (x, i) { x.rank = i + 1; });
-        return { recs: out, list: list, ranked: ranked, fmt: fmt, scale: buildScale(c, vals, fmt), n: ranked.length };
+        return { recs: out, list: list, ranked: ranked, fmt: fmt, scale: buildScale(c, vals.length ? vals : shown, shown, fmt), n: ranked.length };
       }
 
       function styleOf(rec) {
@@ -345,15 +442,16 @@
       }
 
       function wire(f, layer) {
-        layers[f.id] = layer;
-        layer.bindTooltip(function () { return recs[f.id] ? tipOf(recs[f.id]) : ''; }, { sticky: true, direction: 'top', offset: [0, -10], opacity: 1 });
+        var id = fid(f);
+        layers[id] = layer;
+        layer.bindTooltip(function () { return recs[id] ? tipOf(recs[id]) : ''; }, { sticky: true, direction: 'top', offset: [0, -10], opacity: 1 });
         layer.on('mouseover', function () {
           layer.setStyle({ weight: 1.6, color: t.ink });
           layer.bringToFront();
         });
-        layer.on('mouseout', function () { if (recs[f.id]) layer.setStyle(styleOf(recs[f.id])); });
+        layer.on('mouseout', function () { if (recs[id]) layer.setStyle(styleOf(recs[id])); });
         layer.on('click', function () {
-          var rec = recs[f.id], ff = filterField(cur);
+          var rec = recs[id], ff = filterField(cur);
           if (rec && cur.options.crossFilter !== false && rec.row[ff] != null) cur.select(ff, rec.row[ff]);
         });
       }
@@ -364,15 +462,15 @@
         // remove countries that left the data, add newcomers, restyle the rest (CSS transitions the fill)
         Object.keys(layers).forEach(function (id) { if (!recs[id]) { area.removeLayer(layers[id]); delete layers[id]; } });
         S.list.forEach(function (rec, i) {
-          if (!layers[rec.f.id]) {
+          if (!layers[rec.id]) {
             area.addData(rec.f);
-            var el = layers[rec.f.id].getElement();
+            var el = layers[rec.id].getElement();
             if (el) {
               el.classList.add('rk-choro__area');
               if (cur.motion) { el.classList.add('is-enter'); el.style.setProperty('--rk-d', Math.min((rec.rank || i) * 16, 600) + 'ms'); }
             }
           }
-          layers[rec.f.id].setStyle(styleOf(rec));
+          layers[rec.id].setStyle(styleOf(rec));
         });
         if (cur.motion) {
           clearTimeout(timer);
@@ -380,19 +478,19 @@
           timer = setTimeout(function () { [].forEach.call(ctx.el.querySelectorAll('.rk-choro__area.is-enter'), function (n) { n.classList.remove('is-enter'); }); }, 1300);
         }
         // value labels: top N, pill at the main-polygon centroid
-        var o = cur.options, enc = cur.enc, top = o.labels > 0 ? S.ranked.slice(0, o.labels) : [];
-        if (o.scale === 'diverging') top = S.ranked.slice().sort(function (a, b) { return Math.abs(b.v - o.mid) - Math.abs(a.v - o.mid); }).slice(0, Math.max(0, o.labels | 0));
-        labels.set(top.map(function (rec) {
+        var o = cur.options, enc = cur.enc, mid = o.scale === 'diverging' ? +o.mid || 0 : 0;
+        var n = Math.max(0, o.labels | 0);
+        labels.set((n ? S.ranked : []).map(function (rec) {
           var name = (enc.label && rec.row[enc.label]) || rec.f.properties.name;
           return {
-            latlng: RK.geo.centroid(rec.f) || [0, 0], prio: Math.abs(rec.v), pos: ['c'], cls: 'rk-choro__label',
+            latlng: RK.geo.centroid(rec.f) || [0, 0], prio: Math.abs(rec.v - mid), pos: ['c'], cls: 'rk-choro__label',
             html: '<b>' + RK.util.escapeHTML(name) + '</b><span>' + RK.util.escapeHTML(RK.format(rec.v, S.fmt)) + '</span>'
           };
-        }));
+        }), n);
         if (o.legend !== false) {
           var hasNull = S.list.some(function (x) { return x.v == null; });
           legend.set(h('div.rk-geo-leg',
-            legSec(o.legendTitle || cur.title(enc.value), S.scale.legend),
+            legSec(o.legendTitle || fieldTitle(cur, enc.value), S.scale.legend),
             h('div.rk-geo-leg__item.rk-geo-leg__nodata', h('i.rk-geo-leg__sw.is-square', { style: { background: t.mapLand || t.surface2 } }), h('span', hasNull ? 'No data / n.a.' : 'No data'))));
         } else legend.set(null);
         if (first) {

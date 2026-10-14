@@ -1,0 +1,47 @@
+{
+  "id": "bubble-map",
+  "name": "Bubble Map",
+  "name_zh": "气泡地图",
+  "category": "geo",
+  "engine": "leaflet",
+  "deps": ["leaflet", "topojson-client", "geo-world"],
+  "summary": "Proportional symbols at lat / lon — area-true bubble size, colour by category or value, size legend, labelled top N, grow-in animation.",
+  "summary_zh": "按经纬度绘制比例气泡：面积与数值成正比，按类别或数值着色，嵌套尺寸图例，标注前 N 个，入场生长动画。",
+  "description_zh": "适合展示点位类数据的规模与分布：工厂/办公室/仓库的产能或面积、各国收入、同业公司总部与市值。每行一个点（lat / lon），气泡面积按 sqrt 比例对应数值（嵌套参考圆图例可读出大小），颜色可以是类别（图例可点击筛选）或数值（顺序/发散色阶）。尺寸与色阶基于全量数据计算，筛选时保持可比。最大的 N 个点自动标注名称和数值（拥挤时自动避让隐藏），目标公司可用 accent-2 高亮；悬停显示详情，点击交叉筛选。",
+  "best_for": ["Plant / office / warehouse footprint sized by capacity", "Revenue by country when absolute size matters more than area", "Peer HQ map sized by market cap with the target highlighted"],
+  "avoid_when": ["Hundreds of overlapping points (use cluster-map or geo-heat)", "Values that are rates or ratios (bubble area implies an additive quantity — use choropleth)"],
+  "channels": {
+    "lat": {"type": "number", "required": true, "desc": "Latitude", "default": "lat"},
+    "lon": {"type": "number", "required": true, "desc": "Longitude", "default": "lon"},
+    "size": {"type": "number", "required": true, "desc": "Value driving bubble area (sqrt radius scale)", "default": "value"},
+    "color": {"type": "string|number", "required": false, "desc": "Category (categorical colours + clickable legend) or numeric field (ramp)"},
+    "label": {"type": "string", "required": false, "desc": "Name for labels / tooltips; also the default click-to-filter field", "default": "name"}
+  },
+  "options": {
+    "basemap": {"type": "string", "default": "world-110m", "desc": "Registered basemap name"},
+    "sizeRange": {"type": "number[]", "default": [4, 26], "desc": "Min / max bubble radius in px"},
+    "colorScale": {"type": "string", "default": "auto", "desc": "auto (categorical for text fields, sequential for numbers) | categorical | sequential | diverging"},
+    "mid": {"type": "number", "default": 0, "desc": "Diverging midpoint"},
+    "opacity": {"type": "number", "default": 0.78, "desc": "Bubble fill opacity"},
+    "labels": {"type": "number", "default": 5, "desc": "Label the top N bubbles by size (0 = none); crowded labels hide automatically"},
+    "labelValue": {"type": "boolean", "default": true, "desc": "Append the size value to labels"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Label value(s) drawn in accent-2 and always labelled (e.g. the target company)"},
+    "format": {"type": "string", "default": null, "desc": "Size value format; defaults to the size field format"},
+    "tooltip": {"type": "string[]", "default": [], "desc": "Extra fields listed in the tooltip"},
+    "fit": {"type": "string|array|object", "default": "data", "desc": "Initial view: 'data' | 'world' | [[south, west], [north, east]] | {center: [lat, lon], zoom}"},
+    "legend": {"type": "boolean", "default": true, "desc": "Show the legend (colour + size)"},
+    "sizeLegend": {"type": "boolean", "default": true, "desc": "Nested reference circles for the size scale"},
+    "legendPosition": {"type": "string", "default": "bottomleft", "desc": "Leaflet control corner"},
+    "filterField": {"type": "string", "default": null, "desc": "Field used for click-to-filter; defaults to encode.label"},
+    "scrollZoom": {"type": "boolean|string", "default": "click", "desc": "Mouse-wheel zoom: true | false | 'click' (armed after clicking the map)"}
+  },
+  "interactions": ["Hover tooltip", "Click a bubble to cross-filter (others dim)", "Click a legend category to filter by it", "Zoom / pan; labels re-place on zoom", "Grow-in animation, smooth radius transitions on filter", "PNG export"],
+  "samples": [
+    {"title": "Global footprint — sites by floor area", "data": "assets_locations", "height": 460,
+     "options": {"encode": {"lat": "lat", "lon": "lon", "size": "capacity", "color": "type", "label": "name"}, "labels": 6, "tooltip": ["city", "country", "utilization", "opened"]}},
+    {"title": "Revenue 2025A by country — size = revenue, colour = growth", "data": "revenue_by_country", "height": 440, "span": 8,
+     "options": {"encode": {"lat": "lat", "lon": "lon", "size": "revenue", "color": "growth", "label": "country"}, "labels": 6, "sizeRange": [3, 30], "tooltip": ["employees"]}},
+    {"title": "Peer headquarters by market cap", "data": "peers", "height": 440, "span": 4,
+     "options": {"encode": {"lat": "lat", "lon": "lon", "size": "mkt_cap", "color": "sector", "label": "company"}, "highlight": "Helios Industrial", "labels": 3, "labelValue": false, "tooltip": ["hq_city", "ev_ebitda_25e"]}}
+  ]
+}

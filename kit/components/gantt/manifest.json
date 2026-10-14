@@ -1,0 +1,68 @@
+{
+  "id": "gantt",
+  "name": "Gantt / Transaction Timetable",
+  "name_zh": "交易时间表 / 甘特图",
+  "category": "timeline",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Process timetable: tasks grouped by workstream, bars coloured by phase, milestone diamonds, two-tier calendar header, today line and time zoom.",
+  "summary_zh": "交易流程时间表：按工作流分组的任务条（按阶段着色）、里程碑菱形、双层日历表头、“今天”线与时间缩放。",
+  "description_zh": "投行交易流程页（出售流程、IPO、再融资）的标准时间表。每行一个任务，按工作流（encode.group）分组并带粗体分组标题行与汇总括线；任务条按阶段（encode.phase）着色并在左上角给出图例；milestone 为 true 或开始=结束日期的任务画成菱形并标注日期。顶部为双层日历表头（月/周起始日，随缩放自动切换为年/月或年/季度），可用 today 画出“今天”竖线并淡化已过去的时间段。鼠标悬停显示起止日期、工期（天/周）和负责人；点击任务或分组标题可按工作流交叉筛选其他组件；滚轮或底部滑块缩放时间轴。",
+  "best_for": [
+    "Sell-side / buy-side process timetable",
+    "IPO, refinancing or integration workplans",
+    "Regulatory approval tracks with key dates",
+    "Showing where the process stands today"
+  ],
+  "avoid_when": [
+    "More than ~35 task rows on one page (summarise by workstream)",
+    "Only a handful of dated events without durations (use timeline)",
+    "Hour-level scheduling"
+  ],
+  "channels": {
+    "group": {"type": "string", "required": false, "desc": "Workstream used for grouping rows and header rows", "default": "workstream"},
+    "label": {"type": "string", "required": true, "desc": "Task name shown on the row axis", "default": "task"},
+    "start": {"type": "date", "required": true, "desc": "Start date (ISO YYYY-MM-DD)", "default": "start"},
+    "end": {"type": "date", "required": false, "desc": "End date (inclusive); missing or equal to start = milestone", "default": "end"},
+    "phase": {"type": "string", "required": false, "desc": "Phase used for bar colour and the legend", "default": "phase"},
+    "milestone": {"type": "boolean", "required": false, "desc": "Explicit milestone flag (diamond instead of bar)", "default": "milestone"},
+    "owner": {"type": "string", "required": false, "desc": "Responsible party, shown in the tooltip (or as bar label via barLabel)", "default": "owner"}
+  },
+  "options": {
+    "today": {"type": "string", "default": null, "desc": "Date of the vertical 'today' line ('YYYY-MM-DD' or 'now'); null hides it"},
+    "todayLabel": {"type": "string", "default": "Today", "desc": "Text under the today line (date is appended)"},
+    "shadePast": {"type": "boolean", "default": true, "desc": "Shade the elapsed period left of the today line"},
+    "groupHeaders": {"type": "boolean", "default": true, "desc": "Bold workstream header rows (otherwise groups are separated by a rule)"},
+    "summary": {"type": "boolean", "default": true, "desc": "Summary bracket from first start to last end on each header row"},
+    "sort": {"type": "string", "default": "start", "desc": "'start' orders workstreams and tasks by start date; 'data' keeps dataset order"},
+    "groupOrder": {"type": "array", "default": null, "desc": "Explicit workstream order (unlisted groups follow)"},
+    "palette": {"type": "string", "default": "categorical", "desc": "Phase colours: categorical | sequential (ordered phases in shades of the theme ramp)"},
+    "milestoneLabel": {"type": "string", "default": "date", "desc": "Text right of each diamond: date | label | none"},
+    "milestoneName": {"type": "string", "default": "Milestone", "desc": "Legend / tooltip name for milestones"},
+    "barLabel": {"type": "string", "default": null, "desc": "Field shown right of each bar (e.g. 'owner'), 'duration', or null"},
+    "endInclusive": {"type": "boolean", "default": true, "desc": "Treat the end date as the last day of the task (bar runs to the end of that day)"},
+    "calendar": {"type": "string", "default": "auto", "desc": "Header granularity: auto | weeks (months / week-commencing) | months (years / months) | quarters"},
+    "weekStart": {"type": "number", "default": 1, "desc": "First day of the week for week-commencing labels: 1 = Monday, 0 = Sunday"},
+    "domain": {"type": "array", "default": null, "desc": "[start, end] fixed time window; default = whole months around the data"},
+    "labelWidth": {"type": "number|string", "default": "auto", "desc": "Row label column width in px, or 'auto' (longest label, max 38% of the width)"},
+    "dateFormat": {"type": "string", "default": null, "desc": "Tooltip date format; defaults to the start field format"},
+    "selectBy": {"type": "string", "default": "group", "desc": "Channel used for click-to-filter and highlighting: group | phase | label | null"},
+    "legend": {"type": "boolean", "default": true, "desc": "Phase / milestone legend, top-left"},
+    "zoom": {"type": "boolean", "default": true, "desc": "Time zoom (wheel / pinch + slider); the calendar header re-tiers as you zoom"}
+  },
+  "interactions": [
+    "Tooltip with start / end dates, duration in days and weeks, owner and status vs. today",
+    "Click a task or a workstream label to cross-filter by workstream (others dim)",
+    "Wheel / pinch / slider zoom on the time axis; header switches between weeks, months and quarters",
+    "Legend toggles phases and milestones",
+    "Staggered bar wipe-in and milestone pop on entry; smooth updates on filter changes",
+    "PNG / CSV export"
+  ],
+  "samples": [
+    {"title": "Project Atlas — indicative sale process timetable", "data": "deal_timeline", "height": 560,
+     "options": {"today": "2026-10-14"}},
+    {"title": "Key workstreams with owners (sequential phase shades, no header rows)", "data": "deal_timeline", "height": 360,
+     "options": {"where": "workstream in [\"Process management\", \"Due diligence\", \"Regulatory\"]", "groupHeaders": false, "palette": "sequential",
+                 "barLabel": "owner", "milestoneLabel": "label", "today": "2026-10-14", "calendar": "months"}}
+  ]
+}

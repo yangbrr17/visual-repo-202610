@@ -1,0 +1,12 @@
+/* bubble — hover toolbar (box select, box zoom, reset) inside the chart body; same rules as scatter.css so either file works alone */
+.rk-xy-tools {
+  position: absolute; top: 0; right: 0; z-index: 2;
+  display: flex; gap: 2px; padding: 1px;
+  border-radius: var(--rk-radius);
+  background: color-mix(in srgb, var(--rk-paper) 88%, transparent);
+  opacity: 0; transition: opacity var(--rk-dur-fast);
+}
+.rk-block:hover .rk-xy-tools, .rk-xy-tools:focus-within, .rk-xy-tools.has-on { opacity: 1; }
+.rk-xy-tools .rk-iconbtn.is-on { color: var(--rk-accent); background: var(--rk-surface); border-color: var(--rk-rule); }
+@media (hover: none) { .rk-xy-tools { opacity: 1; } }
+@media print { .rk-xy-tools { display: none; } }

@@ -45,8 +45,8 @@
      "options": {"encode": {"x": "ebitda_margin_25e", "y": "ev_revenue_25e", "label": "ticker", "name": "company"},
                  "quadrants": "median",
                  "quadrantLabels": ["Low margin, premium multiple", "High margin, premium multiple", "Low margin, discount multiple", "High margin, discount multiple"]}},
-    {"title": "Regression with equation", "data": "peers", "height": 340, "span": 6,
-     "options": {"encode": {"x": "ebitda_margin_25e", "y": "ev_ebitda_25e", "label": "ticker", "name": "company"},
-                 "regression": true, "equation": true, "legend": false}}
+    {"title": "EV / EBITDA vs. EBITDA margin by region — fitted equation", "data": "peers", "height": 360, "span": 7,
+     "options": {"encode": {"x": "ebitda_margin_25e", "y": "ev_ebitda_25e", "label": "ticker", "name": "company", "color": "region"},
+                 "regression": true, "equation": true}}
   ]
 }

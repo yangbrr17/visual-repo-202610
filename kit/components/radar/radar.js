@@ -9,6 +9,16 @@
   var C = RK.chart, util = RK.util;
 
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
+  /** Categorical palette without colours too close to accent-2 (reserved for the target). */
+  function paletteFor(t) {
+    var a = RK.theme.parseColor(t.accent2);
+    var pal = t.cat.filter(function (c) {
+      var b = RK.theme.parseColor(c), d = Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
+      return d > 64;
+    });
+    return pal.length ? pal : t.cat;
+  }
+  var DASH_ICON = 'path://M0,4h5v2H0z M7.5,4h5v2h-5z M15,4h5v2h-5z';   // dashed legend swatch for the median
   function median(vals) {
     var a = vals.filter(util.isNum).sort(function (x, y) { return x - y; });
     return a.length ? RK.expr.quantile(a, 0.5) : null;
@@ -94,8 +104,7 @@
     });
 
     /* ---------- colours ---------- */
-    var pal = t.cat.filter(function (c) { return !same(c, t.accent2); });
-    if (!pal.length) pal = t.cat;
+    var pal = paletteFor(t);
     var sel = ctx.selected(sf);
     var colorOf = function (n) {
       if (isHL(n)) return t.accent2;
@@ -145,17 +154,18 @@
 
     // legend: target(s) first, then peers, then median; vertical at top-left when the block is wide
     var legendNames = targets.concat(peers).map(String).concat(o.median && peers.length > 1 ? ['Peer median'] : []);
+    var legendData = legendNames.map(function (n) { return n === 'Peer median' && peers.indexOf(n) < 0 ? { name: n, icon: DASH_ICON } : n; });
     var W = ctx.el.clientWidth || 600, H = ctx.el.clientHeight || 320;
     var vertical = W > H * 1.45 && o.legend !== false;
     var legendW = vertical ? Math.min(200, 26 + Math.max.apply(null, legendNames.map(function (n) { return n.length * 6.3; }))) : 0;
     var top = o.legend !== false && !vertical ? 30 : 0;
     var cx = vertical ? legendW + (W - legendW) / 2 : W / 2;
-    var radius = Math.max(40, Math.min((W - legendW) / 2 - 80, (H - top) / 2 - 26));
+    var radius = Math.max(40, Math.min((W - legendW) / 2 - 90, (H - top) / 2 - 32));
 
     return {
       legend: C.legend(ctx, {
-        data: legendNames, orient: vertical ? 'vertical' : 'horizontal', top: vertical ? 4 : 0, left: 0, itemGap: vertical ? 9 : 14,
-        icon: 'roundRect', itemWidth: 14, itemHeight: 3
+        data: legendData, orient: vertical ? 'vertical' : 'horizontal', top: vertical ? 4 : 0, left: 0, itemGap: vertical ? 9 : 14,
+        icon: 'roundRect', itemWidth: 14, itemHeight: 3, itemStyle: { borderWidth: 0 }
       }),
       tooltip: {
         trigger: 'item', confine: true,
@@ -167,14 +177,14 @@
             var dtxt = d == null ? '' : '  (' + (d > 0 ? '+' : d < 0 ? '-' : '±') + RK.format(Math.abs(d), fmts[j]) + ')';
             return { label: ind.name, value: RK.format(v, fmts[j]) + dtxt };
           });
-          return C.tip(n, tr, isMed || !peers.length ? null : '(vs. peer median' + (isHL(n) ? '' : ', incl. this peer') + ')');
+          return C.tip(n, tr, isMed || !peers.length ? null : '( ) difference vs. peer median');
         }
       },
       radar: {
         indicator: indicator,
         shape: o.shape,
         splitNumber: o.splitNumber,
-        center: [cx, top + (H - top) / 2 + 4],
+        center: [cx, top + (H - top) / 2 + 1],
         radius: radius,
         axisName: {
           color: t.ink2, fontSize: 11, fontWeight: 600, fontFamily: t.fontSans,

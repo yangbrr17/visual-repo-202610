@@ -1,0 +1,43 @@
+{
+  "id": "treemap",
+  "name": "Treemap",
+  "name_zh": "矩形树图",
+  "category": "composition",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Squarified treemap of a hierarchy — area = value, colour = top-level group or a metric such as growth; drill down with a breadcrumb.",
+  "summary_zh": "层级结构的矩形树图：面积代表数值，颜色代表一级分组或某个指标（如增长率），点击下钻并通过面包屑返回。",
+  "description_zh": "用面积展示层级构成，例如集团 > 业务板块 > 产品线的收入结构，或细分市场 > 竞争者的市场规模。数据可以是 id / parent 一行一个节点的树表（父节点数值自动取子节点之和），也可以是平表加 encode.path 字段列表（如 [segment, player]）。颜色可按一级分组区分，也可按指标（如增长率）用发散色阶着色，中点可设为 0 或加权平均值，从而一眼看出“哪块大、哪块增长快”。点击分组下钻、面包屑返回，在当前层点击叶子节点交叉筛选其他图表。",
+  "best_for": ["Revenue by segment and product line", "Market size by segment and player", "Portfolio / exposure breakdown", "Size vs. growth at a glance (colour by growth)"],
+  "avoid_when": ["Fewer than ~4 parts (use a donut or bar)", "Values can be negative", "Precise comparison of similar-sized items is required (use a bar)"],
+  "channels": {
+    "id": {"type": "string", "required": false, "desc": "Node id (id / parent mode)", "default": "id"},
+    "parent": {"type": "string", "required": false, "desc": "Parent node id; '' or missing for the root", "default": "parent"},
+    "name": {"type": "string", "required": false, "desc": "Node label (id / parent mode); also the cross-filter field", "default": "name"},
+    "value": {"type": "number", "required": true, "desc": "Size of each leaf (parents are summed)", "default": "value"},
+    "path": {"type": "string[]", "required": false, "desc": "Flat data: hierarchy fields from top to leaf, e.g. ['segment', 'player'] (overrides id / parent)"},
+    "color": {"type": "number", "required": false, "desc": "Metric for diverging colour, e.g. growth (parents use their own value or the value-weighted average)"}
+  },
+  "options": {
+    "colorBy": {"type": "string", "default": "auto", "desc": "auto | group | metric — auto = metric when encode.color is set"},
+    "colorMid": {"type": "number|string", "default": 0, "desc": "Midpoint of the diverging metric scale: a number or 'avg' (value-weighted average)"},
+    "sort": {"type": "string", "default": "desc", "desc": "desc | asc — order in which cells are squarified"},
+    "labels": {"type": "string", "default": "auto", "desc": "auto (name + value + metric) | name | value | none"},
+    "showShare": {"type": "boolean", "default": false, "desc": "Add the % of total to leaf labels"},
+    "drill": {"type": "boolean", "default": true, "desc": "Click a group to zoom in; breadcrumb navigates back"},
+    "rootName": {"type": "string", "default": null, "desc": "Breadcrumb root label (defaults to the single root node, else 'Total')"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Node name(s) outlined in the accent colour (e.g. the client)"},
+    "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field format"},
+    "metricFormat": {"type": "string", "default": null, "desc": "Metric format; defaults to the color field format"},
+    "legend": {"type": "boolean", "default": true, "desc": "Colour-scale legend (metric mode)"}
+  },
+  "interactions": ["Hover tooltip with value, % of total, % of parent and metric", "Click a group (or a cell of another group) to drill down; breadcrumb to go back", "Click a leaf in the current view to cross-filter (non-selected leaves fade)", "Animated re-layout when filters change; drill level is kept", "PNG / CSV export"],
+  "samples": [
+    {"title": "Revenue by segment and product line — FY2025A (USD m), coloured by growth", "data": "segments_tree", "height": 380,
+     "options": {"encode": {"id": "id", "parent": "parent", "name": "name", "value": "value", "color": "growth"}, "colorMid": "avg"}},
+    {"title": "Addressable market by segment and player — 2025 (USD m)", "data": "market_share", "height": 380,
+     "options": {"encode": {"path": ["segment", "player"], "value": "revenue"}, "highlight": "Helios Industrial", "showShare": false, "rootName": "Addressable market"}},
+    {"title": "Revenue by segment — FY2025A (USD m)", "data": "segments_tree", "height": 300, "span": 7,
+     "options": {"encode": {"id": "id", "parent": "parent", "name": "name", "value": "value"}, "showShare": true}}
+  ]
+}

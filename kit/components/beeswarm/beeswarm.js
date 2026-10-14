@@ -16,6 +16,15 @@
     return measure.measureText(String(s)).width;
   }
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
+  /** Categorical palette without colours too close to accent-2 (reserved for the target). */
+  function paletteFor(t) {
+    var a = RK.theme.parseColor(t.accent2);
+    var pal = t.cat.filter(function (c) {
+      var b = RK.theme.parseColor(c), d = Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
+      return d > 64;
+    });
+    return pal.length ? pal : t.cat;
+  }
 
   /** Summary stats of a numeric array (sorted copy, quartiles by linear interpolation). */
   function stats(vals) {
@@ -110,8 +119,7 @@
       var isHL = function (r) { return (enc.target && r[enc.target] === true) || hl.some(function (h) { return same(h, r[lf]); }); };
 
       // colours (accent-2 is reserved for the target, so it is skipped in categorical palettes)
-      var pal = t.cat.filter(function (c) { return !same(c, t.accent2); });
-      if (!pal.length) pal = t.cat;
+      var pal = paletteFor(t);
       var peerColor = t.accent3 || t.cat[1];
       var colorField = o.colorBy && o.colorBy !== 'single' && o.colorBy !== 'group' && ctx.dataset && ctx.dataset.has(o.colorBy) ? o.colorBy : null;
       var cats = colorField ? util.unique(rows.map(function (r) { return r[colorField]; })) : [];

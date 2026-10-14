@@ -1,0 +1,39 @@
+{
+  "id": "multiple-history",
+  "name": "Trading Multiple History",
+  "name_zh": "历史估值倍数走势图",
+  "category": "trend",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "NTM EV/EBITDA (or P/E) over time with the period mean, ±1σ / ±2σ shaded bands, current-value labels and an optional peer-median comparison.",
+  "summary_zh": "NTM EV/EBITDA（或 P/E）历史走势：期间均值线、±1σ / ±2σ 阴影带、当前值标签，可叠加同业中位数对比。",
+  "description_zh": "投行“交易倍数历史”页的标准图。数据为时间序列（日期 + 目标公司倍数，可选同业中位数等对比列）；以回看期（lookback，默认全区间）计算均值和标准差，画出均值虚线与 ±1σ/±2σ 阴影带，右侧自动排布当前值胶囊标签和均值/σ 数值，互不重叠。用来判断当前估值相对历史区间是高还是低、相对同业是溢价还是折价（提示框给出溢价/折价与偏离均值的 σ 数）。支持滚轮/滑块缩放时间轴。",
+  "best_for": ["NTM EV/EBITDA or P/E history vs. own average and ±1σ", "Target vs. peer-median re-rating / de-rating", "Premium / discount over time"],
+  "avoid_when": ["Fewer than ~20 observations (bands are not meaningful)", "More than two series (use a line chart)", "Comparing many companies' multiples at one date (use bar)"],
+  "channels": {
+    "x": {"type": "date", "required": true, "desc": "Observation date (ISO YYYY-MM-DD)", "default": "date"},
+    "y": {"type": "number", "required": true, "desc": "Multiple of the subject company; mean and σ bands are computed on it", "default": "target"},
+    "compare": {"type": "number", "required": false, "desc": "Comparison series, e.g. peer median (set null to hide)", "default": "peer_median"}
+  },
+  "options": {
+    "sigma": {"type": "number", "default": 1, "desc": "Standard-deviation bands around the mean: 0 | 1 | 2"},
+    "meanLine": {"type": "boolean", "default": true, "desc": "Dashed mean line with label"},
+    "lookback": {"type": "number", "default": null, "desc": "Years used to compute mean / σ (null = full history); bands span the same window"},
+    "compareMean": {"type": "boolean", "default": false, "desc": "Also draw the comparison series' mean"},
+    "endLabels": {"type": "boolean", "default": true, "desc": "Current-value pills and mean / σ labels at the right edge (collision-free)"},
+    "premium": {"type": "boolean", "default": true, "desc": "Show premium / (discount) vs. the comparison series in the tooltip"},
+    "format": {"type": "string", "default": null, "desc": "Value format; defaults to the y field format (else 0.0x)"},
+    "dateFormat": {"type": "string", "default": "mmm yy", "desc": "Time-axis label format"},
+    "legend": {"type": "boolean", "default": true, "desc": "Top-left legend (when a comparison series is shown)"},
+    "zoom": {"type": "boolean", "default": true, "desc": "Wheel / pinch zoom plus a compact slider on the time axis"}
+  },
+  "interactions": ["Crosshair tooltip with value, peer value, premium / (discount) and deviation from the mean in σ", "Zoom and pan the time axis (wheel, pinch, slider)", "Legend toggle", "Animated update when filters change", "PNG / CSV export"],
+  "samples": [
+    {"title": "NTM EV / EBITDA — Helios Industrial vs. peer median", "data": "ntm_multiple", "height": 340,
+     "options": {"encode": {"x": "date", "y": "target", "compare": "peer_median"}, "sigma": 1}},
+    {"title": "NTM EV / EBITDA — last 12 months, ±1σ and ±2σ", "data": "ntm_multiple", "height": 320,
+     "options": {"encode": {"x": "date", "y": "target", "compare": null}, "sigma": 2, "lookback": 1, "zoom": false}},
+    {"title": "Target vs. peer averages", "data": "ntm_multiple", "height": 300, "span": 8,
+     "options": {"encode": {"x": "date", "y": "target", "compare": "peer_median"}, "sigma": 0, "compareMean": true, "zoom": false}}
+  ]
+}

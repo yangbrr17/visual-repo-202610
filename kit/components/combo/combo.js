@@ -7,6 +7,8 @@
 (function () {
   'use strict';
   var C = RK.chart, U = RK.util;
+  // legend glyph for line series: a rule with a dot; the two empty sub-paths keep the 14x14 box square
+  var LINE_ICON = 'path://M7,0L7,0Z M7,14L7,14Z M0,6.4L14,6.4L14,7.6L0,7.6Z M9.4,6L9.4,8L8,9.4L6,9.4L4.6,8L4.6,6L6,4.6L8,4.6Z';
 
   RK.component({
     id: 'combo',
@@ -69,50 +71,63 @@
       var hasLine = lineVals.length > 0;
 
       /* ---------------- value axes ---------------- */
-      // share of the plot height used by the bars; the rest holds the CAGR brackets and the line band
-      var barTop = band && hasLine ? (cagrs.length ? 0.5 : 0.58) : (cagrs.length ? 0.78 : null);
-      var yLeft = { type: 'value', axisLabel: {}, splitLine: { show: true } };
-      if (barTop) {
-        var bstep = U.niceStep(hi - lo || 1, 4);
-        var bmin = lo < 0 ? Math.floor(lo / bstep) * bstep : 0;
-        var bmax = bmin + (hi - bmin) / barTop;
-        var bticks = [];
-        for (var bv = bmin; bv <= Math.ceil(hi / bstep) * bstep + 1e-9 && bv <= bmax; bv += bstep) bticks.push(+bv.toPrecision(12));
-        yLeft = {
-          type: 'value', min: bmin, max: bmax,
-          axisLabel: { customValues: bticks, formatter: axisFmt(bfmt, bstep) },
-          axisTick: { show: false, customValues: bticks },
-          splitLine: { show: true }
-        };
-      } else {
-        yLeft.min = lo < 0 ? null : 0;
-        yLeft.axisLabel.formatter = axisFmt(bfmt);
-      }
-      var yAxes = [yLeft];
-      if (hasLine) {
-        var lmin = Math.min.apply(null, lineVals), lmax = Math.max.apply(null, lineVals);
-        var lspan = lmax - lmin || Math.abs(lmax) * 0.25 || 1;
-        var lstep = U.niceStep(lspan, 3);
-        var lAxisFmt = o.lineAxisFormat || lfmt;
-        if (band) {
-          var lineLo = cagrs.length ? 0.72 : 0.7, lineHi = 0.9;
+      var hasLegend = o.legend !== false && bars.length + lines.length > 1;
+      var gridTop = hasLegend ? 40 : (fi >= 0 && o.forecastLabel ? 24 : 12);
+      var plotH = Math.max(120, inst.getHeight() - gridTop - (o.zoom ? 56 : 26));
+      var lineLo = 0.72, lineHi = 0.92;
+      var yLeft, yRight = null, lAxisFmt = o.lineAxisFormat || lfmt;
+      var lmin = hasLine ? Math.min.apply(null, lineVals) : 0, lmax = hasLine ? Math.max.apply(null, lineVals) : 0;
+      if (band) {
+        // share of the plot height used by the bars: leave room for bar labels, CAGR pills and the line band
+        var room = labelPad + (cagrs.length ? 16 + 18 : 14);
+        var barTop = hasLine ? Math.min(0.62, Math.max(0.4, (lineLo * plotH - room) / plotH))
+          : (cagrs.length ? Math.min(0.84, (plotH - room - 12) / plotH) : null);
+        if (barTop) {
+          var bstep = U.niceStep(hi - lo || 1, 4);
+          var bmin = lo < 0 ? Math.floor(lo / bstep) * bstep : 0;
+          var bmax = bmin + (hi - bmin) / barTop;
+          var bticks = [];
+          for (var bv = bmin; bv <= Math.ceil(hi / bstep) * bstep + 1e-9 && bv <= bmax; bv += bstep) bticks.push(+bv.toPrecision(12));
+          yLeft = {
+            type: 'value', min: bmin, max: bmax,
+            axisLabel: { customValues: bticks, formatter: axisFmt(bfmt, bstep) },
+            axisTick: { show: false, customValues: bticks }
+          };
+        } else {
+          yLeft = { type: 'value', min: lo < 0 ? null : 0, axisLabel: { formatter: axisFmt(bfmt) } };
+        }
+        if (hasLine) {
+          // the line gets its own band [lineLo, lineHi] of the plot; right-axis labels only inside it
+          var lspan = lmax - lmin || Math.abs(lmax) * 0.25 || 1;
+          var lstep = U.niceStep(lspan, 3);
           var range = lspan / (lineHi - lineLo);
           var A = lmin - lineLo * range, B = A + range;
           var lticks = [];
           for (var lv = Math.floor(lmin / lstep) * lstep; lv <= Math.ceil(lmax / lstep) * lstep + 1e-9; lv += lstep) {
             if (lv >= A && lv <= B) lticks.push(+lv.toPrecision(12));
           }
-          yAxes.push({
-            type: 'value', position: 'right', min: A, max: B,
-            splitLine: { show: false },
+          yRight = {
+            type: 'value', position: 'right', min: A, max: B, splitLine: { show: false },
             axisLabel: { customValues: lticks, formatter: axisFmt(lAxisFmt, o.lineAxisFormat ? null : lstep) },
             axisTick: { show: false, customValues: lticks }
-          });
-        } else {
-          yAxes.push({ type: 'value', position: 'right', scale: true, alignTicks: true, splitLine: { show: false },
-            axisLabel: { formatter: axisFmt(lAxisFmt) } });
+          };
+        }
+      } else {
+        // overlay: classic dual axes; both scales computed here so ticks align and formats are stable
+        var top = cagrs.length ? hi / 0.8 : hi;
+        var ostep = U.niceStep(top - lo || 1, 5);
+        var omin = lo < 0 ? Math.floor(lo / ostep) * ostep : 0;
+        var omax = Math.ceil(top / ostep) * ostep;
+        var k = Math.max(1, Math.round((omax - omin) / ostep));
+        yLeft = { type: 'value', min: omin, max: omax, interval: ostep, axisLabel: { formatter: axisFmt(bfmt, ostep) } };
+        if (hasLine) {
+          var al = alignScale(lmin, lmax, k);
+          yRight = { type: 'value', position: 'right', min: al.min, max: al.max, interval: al.step, splitLine: { show: false },
+            axisLabel: { formatter: axisFmt(lAxisFmt, o.lineAxisFormat ? null : al.step) } };
         }
       }
+      yLeft.splitLine = { show: true };
+      var yAxes = yRight ? [yLeft, yRight] : [yLeft];
 
       /* ---------------- series ---------------- */
       function estStyle(base) {
@@ -156,31 +171,34 @@
         var col = lineColor(li);
         var labCol = RK.theme.mix(col, t.ink, 0.35);
         var common = {
-          type: 'line', name: l.name, yAxisIndex: 1, z: 5,
+          type: 'line', name: l.name, yAxisIndex: yRight ? 1 : 0, z: 5,
           symbol: 'circle', symbolSize: 6, showSymbol: true,
           lineStyle: { width: 2, color: col },
           itemStyle: { color: col, borderColor: t.paper, borderWidth: 1 },
           emphasis: { focus: 'none', scale: 1.3 },
           label: showLineLabels ? { show: true, position: 'top', distance: 6, color: labCol, fontSize: 10.5, fontWeight: 600, fontFamily: t.fontNum,
+            // overlay: the line crosses the bars, so its labels sit on small paper chips
+            backgroundColor: band ? null : RK.theme.alpha(t.paper, 0.92), padding: band ? 0 : [1, 3], borderRadius: 2,
             formatter: function (p) { return RK.format(p.value, lfmt); } } : { show: false }
         };
         var split = fi > 0 && fi < n;
+        // estimate points are hollow (per item, so the legend keeps the solid series colour)
+        var hollow = { color: t.paper, borderColor: col, borderWidth: 1.5 };
         if (!split) {
-          series.push(U.merge({}, common, { id: 'l-' + li, data: l.values }, fi === 0 ? estLine(col) : {}));
+          series.push(U.merge({}, common, { id: 'l-' + li, data: l.values.map(function (v, i) {
+            return isEst(i) ? { value: v, itemStyle: hollow } : v;
+          }) }, fi === 0 ? { lineStyle: { type: [4, 3] } } : {}));
           return;
         }
         series.push(U.merge({}, common, { id: 'l-' + li, data: l.values.map(function (v, i) { return i < fi ? v : null; }) }));
-        series.push(U.merge({}, common, estLine(col), {
-          id: 'l-' + li + '-e',
+        series.push(U.merge({}, common, {
+          id: 'l-' + li + '-e', lineStyle: { type: [4, 3] },
           data: l.values.map(function (v, i) {
             if (i < fi - 1) return null;
-            return i === fi - 1 ? { value: v, symbolSize: 0, label: { show: false } } : v;
+            return i === fi - 1 ? { value: v, symbolSize: 0, label: { show: false } } : { value: v, itemStyle: hollow };
           })
         }));
       });
-      function estLine(col) {
-        return { lineStyle: { type: [4, 3] }, itemStyle: { color: t.paper, borderColor: col, borderWidth: 1.5 } };
-      }
 
       // estimate band + divider + caption (custom series so it tracks zoom / resize)
       if (fi >= 0 && fi < n) {
@@ -205,7 +223,9 @@
       if (cagrs.length) {
         var level = 0;
         cagrs.forEach(function (s) {
-          s.values = s.field ? seriesValues(bars, s.field) : (o.barStack ? pos : bars[0] ? bars[0].values : []);
+          s.idx = s.field ? Math.max(0, seriesIndex(bars, s.field)) : 0;
+          s.values = o.barStack ? (s.field ? bars[s.idx].values : pos) : (bars[s.idx] ? bars[s.idx].values : []);
+          s.end = o.barStack ? pos : s.values;
           s.rate = cagrRate(s.values[s.from], s.values[s.to], periodsBetween(cats[s.from], cats[s.to], s.to - s.from));
           s.text = (s.label || (cagrs.length > 1 ? shortX(cats[s.from]) + '–' + shortX(cats[s.to]) + ' CAGR' : 'CAGR')) + ': ' + RK.format(s.rate, o.cagrFormat);
           for (var k = s.from; k <= s.to; k++) level = Math.max(level, tops[k]);
@@ -219,10 +239,16 @@
           renderItem: function (params, api) {
             var s = cagrs[params.dataIndex];
             if (!s) return null;
-            var x1 = api.coord([s.from, 0])[0] + s.padL, x2 = api.coord([s.to, 0])[0] - s.padR;
+            // grouped bars: offset the legs onto the series' own bar (barCategoryGap 30%, barGap 14%)
+            var off = 0;
+            if (!o.barStack && groups > 1) {
+              var area = api.size([1, 0])[0] * 0.7, bw = area / (groups + (groups - 1) * 0.14);
+              off = -area / 2 + s.idx * bw * 1.14 + bw / 2;
+            }
+            var x1 = api.coord([s.from, 0])[0] + off + s.padL, x2 = api.coord([s.to, 0])[0] + off - s.padR;
             var yTop = api.coord([0, level])[1] - labelPad - 16;
-            var y1 = api.coord([s.from, tops[s.from]])[1] - labelPad - 2;
-            var y2 = api.coord([s.to, tops[s.to]])[1] - labelPad - 1;
+            var y1 = api.coord([s.from, Math.max(0, s.end[s.from] || 0)])[1] - labelPad - 2;
+            var y2 = api.coord([s.to, Math.max(0, s.end[s.to] || 0)])[1] - labelPad - 1;
             var accent = t.dark ? t.ink : t.accent;
             var fade = { style: { opacity: 0 } };
             return {
@@ -241,13 +267,10 @@
 
       return {
         legend: C.legend(ctx, {
-          show: o.legend !== false && bars.length + lines.length > 1,
-          data: bars.map(function (b) { return b.name; }).concat(lines.map(function (l) { return { name: l.name, icon: 'path://M0 4.2h14v1.6H0z M7 1.6a3.4 3.4 0 1 1 0 6.8a3.4 3.4 0 1 1 0-6.8z', itemStyle: { color: lineColor(lines.indexOf(l)) } }; }))
+          show: hasLegend,
+          data: bars.map(function (b) { return b.name; }).concat(lines.map(function (l) { return { name: l.name, icon: LINE_ICON, itemStyle: { color: lineColor(lines.indexOf(l)), borderWidth: 0 } }; }))
         }),
-        grid: C.grid(ctx, {
-          top: o.legend !== false && bars.length + lines.length > 1 ? 40 : (fi >= 0 && o.forecastLabel ? 24 : 12),
-          right: hasLine ? 6 : 12, bottom: o.zoom ? 30 : 4
-        }),
+        grid: C.grid(ctx, { top: gridTop, right: hasLine ? 6 : 12, bottom: o.zoom ? 30 : 4 }),
         tooltip: {
           trigger: 'axis',
           axisPointer: { type: 'shadow' },
@@ -346,9 +369,21 @@
     }).filter(function (s) { return s.from >= 0 && s.to > s.from; });
   }
 
-  function seriesValues(bars, key) {
-    for (var i = 0; i < bars.length; i++) if (bars[i].field === key || bars[i].name === key) return bars[i].values;
-    return bars[0] ? bars[0].values : [];
+  function seriesIndex(bars, key) {
+    for (var i = 0; i < bars.length; i++) if (bars[i].field === key || bars[i].name === key) return i;
+    return -1;
+  }
+
+  /** Line-axis scale with exactly k nice intervals covering [lo, hi] (ticks align with the bar axis). */
+  function alignScale(lo, hi, k) {
+    var raw = (hi - lo) / k || Math.abs(hi) / k || 1;
+    var mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    var cands = [1, 2, 2.5, 5, 10, 20, 25, 50];
+    for (var i = 0; i < cands.length; i++) {
+      var st = cands[i] * mag, mn = Math.floor(lo / st + 1e-9) * st;
+      if (mn + k * st >= hi - 1e-12) return { min: +mn.toPrecision(12), max: +(mn + k * st).toPrecision(12), step: st };
+    }
+    return { min: lo, max: hi, step: (hi - lo) / k };
   }
 
   /** Number of years between two x labels ("2019A" -> "2025A" = 6), else the index distance. */

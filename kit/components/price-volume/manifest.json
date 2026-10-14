@@ -1,0 +1,44 @@
+{
+  "id": "price-volume",
+  "name": "Share Price & Volume",
+  "name_zh": "股价与成交量图",
+  "category": "trend",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Daily share price line over a volume panel with moving averages, 52-week high / low, VWAP, event pins, current-price tag and a shared zoom.",
+  "summary_zh": "日度股价折线 + 成交量副图：移动均线、52 周高低点、VWAP、事件编号标注、最新价标签，两图共享缩放。",
+  "description_zh": "投行“股价表现”页的标准图：上方为收盘价走势（可带浅色面积），下方为成交量柱，两个面板共用横轴与缩放（滚轮、拖动滑块或右上角 1M/3M/6M/YTD/1Y/All 快捷区间），纵轴随可见区间自动重算。可叠加 50/200 日均线、滚动 VWAP、52 周最高/最低价线（或区间底纹）、要约价等参考线；绑定 price_events 后在价格线上显示编号事件，悬停查看说明。十字准星提示框给出日期、收盘价、单日涨跌、区间涨跌、成交量与均线值。数据为每个交易日一行（date、close、volume，可选 high/low）。",
+  "best_for": ["Share price history and trading context for a target", "Unaffected price / premium discussions with an offer reference line", "Event-driven price commentary (results, M&A rumours, guidance)", "52-week range and liquidity (volume) review"],
+  "avoid_when": ["Comparing several stocks (use line with rebase: 100)", "Intraday OHLC detail matters (use candlestick)", "Fewer than ~20 observations"],
+  "channels": {
+    "x": {"type": "date", "required": true, "desc": "Trading date", "default": "date"},
+    "close": {"type": "number", "required": true, "desc": "Closing price", "default": "close"},
+    "volume": {"type": "number", "required": false, "desc": "Traded volume (shares); omit to hide the volume panel", "default": "volume"},
+    "high": {"type": "number", "required": false, "desc": "Daily high (52-week high, VWAP typical price)", "default": "high"},
+    "low": {"type": "number", "required": false, "desc": "Daily low (52-week low, VWAP typical price)", "default": "low"}
+  },
+  "options": {
+    "area": {"type": "boolean", "default": true, "desc": "Light fill under the price line"},
+    "ma": {"type": "number[]", "default": [50, 200], "desc": "Simple moving averages in trading days; [] for none"},
+    "vwap": {"type": "boolean|number", "default": false, "desc": "Rolling VWAP line: true (20-day) or a number of days"},
+    "range52w": {"type": "string|boolean", "default": "lines", "desc": "'lines' | 'band' | false — 52-week high / low"},
+    "lastPrice": {"type": "boolean", "default": true, "desc": "Current price tag on the right axis with a dotted guide"},
+    "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] horizontal price lines (offer, unaffected price)"},
+    "eventsData": {"type": "string", "default": null, "desc": "Dataset id of events (date, label, kind, detail) drawn as numbered pins"},
+    "eventsEncode": {"type": "object", "default": {"date": "date", "label": "label", "kind": "kind", "detail": "detail"}, "desc": "Field mapping of the events dataset"},
+    "range": {"type": "string|number", "default": "all", "desc": "Initial window: 'all' | '1m' | '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | number of days"},
+    "rangeSelector": {"type": "boolean|string[]", "default": true, "desc": "Quick range buttons (top-right); true or a subset such as ['3m','1y','all']"},
+    "volumeShare": {"type": "number", "default": 0.24, "desc": "Share of the plot height used by the volume panel (0.1–0.5)"},
+    "format": {"type": "string", "default": null, "desc": "Price format (defaults to the close field format)"},
+    "volumeFormat": {"type": "string", "default": null, "desc": "Volume format in the tooltip (defaults to the volume field format)"},
+    "zoom": {"type": "boolean", "default": true, "desc": "Wheel / pinch and slider zoom shared by both panels; value axes re-fit to the window"},
+    "legend": {"type": "boolean", "default": true, "desc": "Legend top-left"}
+  },
+  "interactions": ["Crosshair tooltip: date, close, 1-day and period change, volume, MAs", "Hover near a pin to read the event", "Wheel / pinch / slider zoom shared by price and volume", "1M / 3M / 6M / YTD / 1Y / All range buttons", "Legend toggles MAs / VWAP / volume", "PNG / CSV export"],
+  "samples": [
+    {"title": "Helios Industrial share price and volume (USD)", "data": "price_ohlc", "height": 420,
+     "options": {"eventsData": "price_events", "refLines": [{"value": 52.0, "label": "Indicative offer $52.00"}]}},
+    {"title": "Last 12 months with 52-week range and 20-day VWAP", "data": "price_ohlc", "height": 360, "span": 7,
+     "options": {"range": "1y", "ma": [50], "vwap": 20, "range52w": "band", "area": false, "rangeSelector": ["3m", "6m", "1y", "all"]}}
+  ]
+}

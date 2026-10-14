@@ -27,14 +27,19 @@
 .rk-ps__reset:hover { color: var(--rk-accent); background: var(--rk-surface); }
 .rk-ps__item.is-changed .rk-ps__reset { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
 
-.rk-ps__track { position: relative; height: 18px; display: flex; align-items: center; }
+.rk-ps__track { position: relative; height: 20px; display: flex; align-items: center; }
 .rk-ps__range { position: relative; z-index: 1; margin: 0; cursor: pointer; background: linear-gradient(90deg, var(--rk-accent) var(--rk-fill, 50%), var(--rk-grid) var(--rk-fill, 50%)); }
 .rk-ps__range:focus-visible { outline: none; }
 .rk-ps__range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px color-mix(in srgb, var(--rk-accent-3) 25%, transparent); }
 .rk-ps__range:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px color-mix(in srgb, var(--rk-accent-3) 25%, transparent); }
 .rk-ps__range:active::-webkit-slider-thumb { cursor: grabbing; transform: scale(1.08); }
 .rk-ps__range::-webkit-slider-thumb { transition: transform var(--rk-dur-fast), box-shadow var(--rk-dur-fast); }
-.rk-ps__base { position: absolute; top: 1px; width: 2px; height: 16px; margin-left: -1px; border-radius: 1px; background: var(--rk-ink-3); opacity: .55; pointer-events: none; }
+.rk-ps__base {                           /* caret under the track marking the base value */
+  position: absolute; top: 14px; width: 0; height: 0; margin-left: -4px; pointer-events: none;
+  border-left: 4px solid transparent; border-right: 4px solid transparent; border-bottom: 5px solid var(--rk-ink-3);
+  opacity: .7;
+}
+.rk-ps__item.is-changed .rk-ps__base { border-bottom-color: var(--rk-accent-2); opacity: 1; }
 .rk-ps__minmax { display: flex; justify-content: space-between; font-size: var(--rk-fs-xs); color: var(--rk-ink-3); margin-top: -2px; }
 
 /* live readout table */

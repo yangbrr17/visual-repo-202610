@@ -1,0 +1,41 @@
+/* choropleth */
+
+/* ---- geo kit (identical block in every RK geo component css) ---- */
+.rk-geo .leaflet-control-zoom a { font-size: 15px; }
+.rk-geo .leaflet-interactive { cursor: pointer; }
+.rk-geo .rk-map-legend { max-width: 240px; box-shadow: none; }
+.rk-geo-leg__sec + .rk-geo-leg__sec, .rk-geo-leg__sec + .rk-geo-leg__item { margin-top: 8px; }
+.rk-geo-leg__items { display: flex; flex-direction: column; gap: 2px; }
+.rk-geo-leg__item { display: flex; align-items: center; gap: 7px; white-space: nowrap; font-variant-numeric: tabular-nums; transition: opacity var(--rk-dur-fast); }
+.rk-geo-leg__item.is-click { cursor: pointer; }
+.rk-geo-leg__item.is-click:hover span { color: var(--rk-ink); }
+.rk-geo-leg__item.is-off { opacity: .38; }
+.rk-geo-leg__sw { flex: none; width: 9px; height: 9px; border-radius: 50%; }
+.rk-geo-leg__sw.is-square { width: 12px; height: 10px; border-radius: 1px; }
+.rk-geo-leg__sw.is-line { width: 16px; height: 3px; border-radius: 2px; }
+.rk-geo-leg__n { margin-left: auto; padding-left: 10px; color: var(--rk-ink-3); font-size: 10px; }
+.rk-geo-leg__ramp .rk-legend__ramp { width: 150px; }
+.rk-geo-label-anchor { pointer-events: none; }
+.rk-geo-label {
+  position: absolute; left: 0; top: 0; white-space: nowrap; pointer-events: none;
+  font-size: 10.5px; line-height: 1.2; color: var(--rk-ink); font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 2px var(--rk-paper), 0 0 2px var(--rk-paper), 0 0 3px var(--rk-paper);
+}
+.rk-geo-label.is-hidden { visibility: hidden; }
+.rk-geo.is-motion .rk-geo-label { transition: opacity var(--rk-dur) var(--rk-ease); }
+@media print { .rk-geo .leaflet-control-zoom, .rk-geo .rk-geo-toggle { display: none; } }
+/* ---- end geo kit ---- */
+
+.rk-choro__area { transition: none; }
+.rk-choro.is-motion .rk-choro__area { transition: fill 450ms var(--rk-ease), fill-opacity 450ms var(--rk-ease), stroke 200ms; }
+.rk-choro.is-motion .rk-choro__area.is-enter { animation: rk-choro-in 650ms var(--rk-ease) var(--rk-d, 0ms) both; }
+@keyframes rk-choro-in { from { fill-opacity: 0; } }
+.rk-choro__label {
+  display: flex; flex-direction: column; align-items: center; gap: 0;
+  padding: 2px 6px 3px; border-radius: 3px; text-shadow: none;
+  background: color-mix(in srgb, var(--rk-paper) 90%, transparent); border: 1px solid var(--rk-rule);
+}
+.rk-choro__label b { font-weight: 500; font-size: 9.5px; color: var(--rk-ink-3); letter-spacing: .01em; }
+.rk-choro__label span { font-weight: 600; color: var(--rk-ink); }
+.rk-geo-leg__nodata span { color: var(--rk-ink-3); }
+@media (prefers-reduced-motion: reduce) { .rk-choro .rk-choro__area { animation: none !important; transition: none !important; } }

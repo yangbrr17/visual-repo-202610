@@ -1,0 +1,35 @@
+{
+  "id": "parallel",
+  "name": "Parallel Coordinates",
+  "name_zh": "平行坐标图",
+  "category": "comparison",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Multi-criteria screening: one vertical axis per metric, one line per company; brush ranges on any axis to cross-filter the rest of the report.",
+  "summary_zh": "多指标筛选：每个指标一条纵轴、每家公司一条折线；在任意轴上拖选区间即可交叉筛选报告中的其他图表。",
+  "description_zh": "用于同业筛选与多维对比：把估值倍数、利润率、增长、杠杆、股东回报等 4–8 个数值字段并排成纵轴（各轴沿用字段格式，可单独 inverse 让“越低越好”的指标朝上），每家公司是一条穿过各轴的折线。目标公司以 accent-2 粗线置顶，虚线为同业中位数，其余公司可按行业 / 地区着色（图例可开关）。在轴上拖动即可框选区间，多轴条件取交集，被选中的公司名会作为 'in' 筛选条件同步到其他组件（如可比公司表、散点图）；点击轴上空白处清除该轴框选。",
+  "best_for": ["Screening a peer set on 4–8 metrics at once", "Showing trade-offs (growth vs. margin vs. leverage)", "Interactive peer-group selection that drives the comps table"],
+  "avoid_when": ["More than ~150 lines (over-plotting)", "Only two metrics (use a scatter)", "Audiences unfamiliar with the chart in a printed deck (static reading is hard)"],
+  "channels": {
+    "label": {"type": "string", "required": true, "desc": "Row name (company) — tooltip title and the cross-filter field", "default": "label"},
+    "color": {"type": "string", "required": false, "desc": "Category field colouring the peer lines (one legend entry each)"},
+    "target": {"type": "boolean", "required": false, "desc": "Flag field marking the target line", "default": "is_target"}
+  },
+  "options": {
+    "dims": {"type": "array", "default": [], "desc": "Axes: field names or {field, title, format, inverse, min, max}; string fields become category axes; [] = first 6 numeric fields"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Label value(s) drawn in accent-2 on top (in addition to rows flagged by encode.target)"},
+    "median": {"type": "boolean", "default": true, "desc": "Dashed peer-median line (target excluded; mode on category axes)"},
+    "brush": {"type": "boolean", "default": true, "desc": "Publish brushed rows as a cross-filter ('in' on encode.label)"},
+    "smooth": {"type": "boolean", "default": false, "desc": "Curved lines"},
+    "opacity": {"type": "number", "default": 0.55, "desc": "Peer line opacity"},
+    "format": {"type": "string", "default": null, "desc": "Fallback axis format for fields without one"},
+    "legend": {"type": "boolean", "default": true, "desc": "Legend (colour groups, target, peer median); click to toggle"}
+  },
+  "interactions": ["Drag on any axis to brush a range (several axes = AND)", "Brushed companies cross-filter every other block on the same dataset", "Click an axis outside the brush to clear it; external filter reset clears brushes", "Hover a line: all metrics formatted", "Legend toggle by colour group", "PNG / CSV export"],
+  "samples": [
+    {"title": "Peer screening — valuation, profitability, growth, leverage", "data": "peers", "height": 380,
+     "options": {"encode": {"label": "company", "color": "sector"}, "dims": ["ev_ebitda_25e", "pe_25e", "ebitda_margin_25e", "rev_growth_25e", {"field": "net_debt_ebitda", "inverse": true}, "tsr_1y"]}},
+    {"title": "Peers by region — target vs. muted peer set", "data": "peers", "height": 340,
+     "options": {"encode": {"label": "company"}, "dims": ["region", "mkt_cap", "ev_revenue_25e", "ev_ebitda_26e", "dividend_yield"], "smooth": true, "opacity": 0.45}}
+  ]
+}

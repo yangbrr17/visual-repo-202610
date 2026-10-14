@@ -1,0 +1,49 @@
+{
+  "id": "data-grid",
+  "name": "Interactive Data Grid",
+  "name_zh": "交互式数据表格",
+  "category": "table",
+  "engine": "tabulator",
+  "deps": ["tabulator"],
+  "summary": "Sortable, filterable, searchable grid (Tabulator 6) for appendix-style detail data, with frozen columns, grouped headers, paging and CSV download.",
+  "summary_zh": "可排序、可筛选、可搜索的明细数据表（Tabulator 6），支持冻结列、分组表头、分页 / 虚拟滚动和 CSV 下载。",
+  "description_zh": "用于附录或明细页：列默认取自数据集 schema（标题、RK 格式码，数字右对齐），也可用 columns 指定顺序、分组表头与宽度。每列表头带筛选框（文本为包含匹配，数字支持“>10”“<=2.5”“5-10”“30%”），顶部有全局搜索和 CSV 下载，固定高度内虚拟滚动或按页显示。点击行会按 key 字段交叉筛选其他图表，全局筛选变化时以 replaceData 平滑刷新并保留排序与筛选；适合 20–5,000 行的交易清单、可比公司全表等。",
+  "best_for": ["Full precedent-transaction or peer lists in an appendix", "Detail data behind a chart that clients want to search and download", "Long lists (hundreds to thousands of rows) with paging or virtual scroll"],
+  "avoid_when": ["A formatted pitchbook comps page with statistic rows (use comps-table)", "Fewer than ~8 rows (a plain table reads better)"],
+  "channels": {
+    "key": {"type": "string", "required": false, "desc": "Cross-filter / row identity field (defaults to the first text field)"},
+    "highlight": {"type": "boolean", "required": false, "desc": "Boolean flag marking rows to highlight (e.g. is_target)"}
+  },
+  "options": {
+    "columns": {"type": "array", "default": null, "desc": "[{field, title?, format?, group?, width?, minWidth?, align?, sign?, headerFilter?}] or field names; null = every schema field"},
+    "hidden": {"type": "string[]", "default": [], "desc": "Fields left out when columns is null"},
+    "columnGroups": {"type": "boolean", "default": true, "desc": "Build grouped headers from columns[].group"},
+    "frozen": {"type": "number|boolean", "default": 1, "desc": "Number of leading columns frozen during horizontal scroll"},
+    "headerFilters": {"type": "boolean", "default": true, "desc": "Per-column filter inputs (text contains; numbers >, <, =, a-b, %)"},
+    "search": {"type": "boolean", "default": true, "desc": "Global search box over all columns (raw and formatted values)"},
+    "searchFilters": {"type": "boolean", "default": false, "desc": "Also publish the search text as a global filter so other blocks on the same dataset follow"},
+    "download": {"type": "boolean", "default": true, "desc": "CSV download button (filtered rows, raw values, UTF-8 BOM)"},
+    "pagination": {"type": "boolean|number", "default": false, "desc": "false = virtual scroll inside the block height; a number = rows per page"},
+    "sort": {"type": "object|array", "default": null, "desc": "{field, dir} or [{field, dir}] initial sort"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Key value(s) to highlight in addition to encode.highlight"},
+    "layout": {"type": "string", "default": "fitDataStretch", "desc": "Tabulator layout: fitDataStretch | fitColumns | fitData"},
+    "crossFilter": {"type": "boolean", "default": true, "desc": "Click a row to cross-filter other blocks on the key field"}
+  },
+  "interactions": ["Click headers to sort", "Per-column header filters", "Global search", "Paging or virtual scroll", "Frozen first column", "Row click cross-filter (others dim)", "CSV download", "Live update with global filters"],
+  "samples": [
+    {"title": "Precedent transactions — full list", "data": "precedents", "height": 470,
+     "options": {"sort": {"field": "date", "dir": "desc"}, "highlight": "Brennick Robotics",
+       "columns": [
+         {"field": "date", "title": "Announced"}, "target", "acquirer", {"field": "target_country", "title": "Country"}, "sector",
+         {"field": "ev", "title": "EV (USD m)"},
+         {"field": "ev_revenue", "title": "EV / Revenue", "group": "LTM multiples"},
+         {"field": "ev_ebitda", "title": "EV / EBITDA", "group": "LTM multiples"},
+         {"field": "premium_1d", "title": "1-day", "group": "Premium"},
+         {"field": "premium_30d", "title": "30-day VWAP", "group": "Premium"},
+         "consideration", "status"
+       ]}},
+    {"title": "Peer universe — paged, schema-driven columns", "data": "peers", "height": 440,
+     "options": {"encode": {"highlight": "is_target"}, "pagination": 10, "sort": {"field": "ev", "dir": "desc"},
+       "hidden": ["lat", "lon", "is_target", "country", "hq_city", "price_52w_low", "price_52w_high", "revenue_24a", "revenue_26e", "ebitda_26e"]}}
+  ]
+}
