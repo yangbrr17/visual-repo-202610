@@ -7840,6 +7840,16 @@
      "type": "object",
      "default": null,
      "desc": "Position overrides {key: [row, col]}, keys as for encode.id (e.g. {\"TW\": [5, 6]})"
+    },
+    "note": {
+     "type": "boolean|string",
+     "default": false,
+     "desc": "Small schematic disclaimer drawn in the free bottom-right corner (true: 'Schematic; no boundaries implied' / '示意图，不代表实际边界'), or your own text"
+    },
+    "uiLang": {
+     "type": "string",
+     "default": null,
+     "desc": "Language of legend / tooltip UI strings ('zh' | 'en'); defaults to the report locale or <html lang>, independent of the tile-label language"
     }
    },
    "interactions": [
@@ -7908,7 +7918,9 @@
       "bins": 0,
       "values": false,
       "legendTitle": "服务网点（个）",
-      "filterField": "province"
+      "filterField": "province",
+      "note": true,
+      "uiLang": "zh"
      }
     }
    ],
