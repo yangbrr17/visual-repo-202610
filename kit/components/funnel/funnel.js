@@ -84,8 +84,13 @@
         if (o.cumulative !== false) cols.push({ title: o.conversion === 'first' ? tr('funnel.pctOfFirst', '% of first') : tr('funnel.pctOfTop', '% of top'), text: vals.map(function (v) { return RK.format(v == null ? null : (first ? v / first : NaN), '0.0%'); }) });
         if (!o.cumulative && !hasSec) cols = [];
       }
+      // column width: one-line header (wf), or compact (wc) with the header wrapped onto two lines
       cols.forEach(function (c) {
-        c.w = Math.ceil(Math.max(measure(String(c.title).toUpperCase(), headFont) + 6, Math.max.apply(null, c.text.map(function (s) { return measure(s, numFont); }))) + 22);
+        var head = String(c.title).toUpperCase(), vw = Math.max.apply(null, c.text.map(function (s) { return measure(s, numFont); }));
+        var word = Math.max.apply(null, head.split(/\s+/).map(function (s) { return measure(s, headFont); }));
+        c.wf = Math.ceil(Math.max(measure(head, headFont) + 6, vw) + 22);
+        c.wc = Math.min(c.wf, Math.ceil(Math.max(word + 6, vw, measure(head, headFont) / 2 + 10) + 16));
+        c.w = c.wf;
       });
 
       // value labels: one placement rule for the whole chart — inside every bar when all of them fit,
@@ -93,29 +98,32 @@
       var W0 = ctx.el.clientWidth || 600, valFont = '600 ' + numFont;
       var tws = vals.map(function (v) { return measure(RK.format(v, fmt), valFont); });
       /** Layout for a set of right-hand columns: column width, label placement, grid right edge and bar track width. */
-      function fit(cs, tight) {
-        var cw = cs.reduce(function (s, c) { return s + c.w; }, 0);
+      function fit(cs, tight, compact) {
+        var cw = cs.reduce(function (s, c) { return s + (compact ? c.wc : c.wf); }, 0);
         var plot0 = Math.max(40, W0 - (labW + 18) - (cw + (center ? 8 : 40)));
         var inside = vals.every(function (v, i) { return !util.isNum(v) || v / max * plot0 > tws[i] + 14; });
         var room = inside || o.labels === false ? 0 : Math.max.apply(null, tws.concat([0])) + 10;
         // a centred funnel normally sits mid-way between the names and the columns (room on both sides);
         // tight: only the widest bar's label needs room, on its right
         var right = cw + (center ? 8 : 40) + (room ? (center ? room * (tight ? 1 : 2) : Math.max(0, room - 32)) : 0);
-        return { cols: cs, colsW: cw, allInside: inside, gridRight: right, track: W0 - (labW + 18) - right };
+        return { cols: cs, colsW: cw, allInside: inside, gridRight: right, track: W0 - (labW + 18) - right, compact: !!compact };
       }
       // narrow blocks (e.g. ~420px with a secondary and a "% of top" column): the bar track keeps a minimum width.
       // Stage names give way first (truncated, full name in the tooltip) and outside labels reserve room on one
-      // side only; then the "% of top" column goes, then the secondary column (both stay in the tooltip).
+      // side only; then the column headers wrap onto two lines; then the "% of top" column goes, then the
+      // secondary column (both stay in the tooltip).
       var minTrack = Math.max(90, Math.min(160, W0 * 0.3));
       var L = fit(cols);
       if (L.track < minTrack) {
         labW = Math.min(labW, Math.max(64, Math.floor(W0 * 0.3)));
         L = fit(cols, true);
-        while (L.track < minTrack && L.cols.length) L = fit(L.cols.slice(0, -1), true);
+        if (L.track < minTrack) L = fit(cols, true, true);
+        while (L.track < minTrack && L.cols.length) L = fit(L.cols.slice(0, -1), true, true);
       }
       cols = L.cols;
+      cols.forEach(function (c) { c.w = L.compact ? c.wc : c.wf; });
       var colsW = L.colsW, allInside = L.allInside, gridRight = L.gridRight;
-      var headH = cols.length ? 24 : 4;
+      var headH = cols.length ? (L.compact ? 34 : 24) : 4;
 
       function renderItem(params, api) {
         var i = params.dataIndex, v = vals[i];
@@ -202,7 +210,9 @@
         cols.slice().reverse().forEach(function (c, k) {
           graphic.push({
             type: 'text', id: 'h' + k, right: xr + 2, top: 4, silent: true,
-            style: { text: String(c.title).toUpperCase(), font: headFont, fill: t.ink3, align: 'right' }
+            style: L.compact
+              ? { text: String(c.title).toUpperCase(), font: headFont, fill: t.ink3, align: 'right', width: c.w - 8, overflow: 'break', lineHeight: 12 }
+              : { text: String(c.title).toUpperCase(), font: headFont, fill: t.ink3, align: 'right' }
           });
           xr += c.w;
         });

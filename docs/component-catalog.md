@@ -115,7 +115,7 @@
 | id | 名称 | 引擎 | 能展示什么 | 数据通道 |
 |---|---|---|---|---|
 | `bubble-map` | 气泡地图 / Bubble Map | leaflet | 按经纬度绘制比例气泡：面积与数值成正比，按类别或数值着色，嵌套尺寸图例，标注前 N 个，入场生长动画。 | `lat`*, `lon`*, `size`*, `color`, `label`, `target` |
-| `china-tilemap` | 中国省份方块地图 / China Tile Map | echarts | 合规友好的中国省级方块地图：34 个省级行政区各占一个等大的方块（或六边形），按近似地理位置排布并按指标着色；不绘制任何边界线，客户材料中无需审图号。 | `id`*, `value`* |
+| `china-tilemap` | 中国省份方块地图 / China Tile Map | echarts | 不画边界线的中国省级方块地图：34 个省级行政区各占一个等大的方块（或六边形），按近似地理位置排布并按指标着色；瓦片示意图不含行政区划边界，通常不涉及审图号，但对外发布前请法务确认。 | `id`*, `value`* |
 | `choropleth` | 分级设色地图 / Choropleth Map | leaflet | 在离线世界底图上按指标给国家着色：顺序/发散色阶，连续或分级（自动取整的分档）。 | `id`*, `value`*, `label`, `lat`, `lon` |
 | `cluster-map` | 聚合点地图 / Cluster Map | leaflet | 密集点位自动聚合为主题化的聚合气泡（显示数量或数值合计，外环按类别占比分段），缩放时逐级展开，最大缩放时蛛网展开重叠点。 | `lat`*, `lon`*, `label`, `color`, `value` |
 | `flow-map` | 流向地图 / Flow Map | leaflet | 以弧线展示起点到终点的流向：线宽表示金额，颜色区分类别，箭头指向目的地，节点大小表示总流量，悬停时显示流动光点。 | `from`*, `to`*, `fromLat`*, `fromLon`*, `toLat`*, `toLon`*, `value`*, `count`, `color` |

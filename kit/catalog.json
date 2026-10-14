@@ -307,7 +307,7 @@
    "deps": [],
    "summary": "Headline numbers with count-up animation, favourable/unfavourable delta and a sparkline.",
    "summary_zh": "关键指标数字卡片：数字滚动动画、同比/环比变化（自动判断好坏方向）与迷你趋势线。",
-   "description_zh": "用于执行摘要页或每个章节开头，突出 4–6 个核心数字（营收、EBITDA 利润率、EV/EBITDA、净杠杆、股东回报等）。每行数据是一张卡片，可以单独为每张卡片设置格式码；good 字段决定涨跌哪个方向是“好”（如杠杆率下降是好）。spark 字段是数字数组，绘制迷你趋势线。",
+   "description_zh": "用于执行摘要页或每个章节开头，突出 4–6 个核心数字（营收、EBITDA 利润率、EV/EBITDA、净杠杆、股东回报等）。每行数据是一张卡片，可以单独为每张卡片设置格式码；good 字段决定涨跌哪个方向是“好”（如杠杆率下降是好），默认按好坏着色；红涨绿跌模式（updown=\"cn\"）下按方向着色：上升一律为红色，下降一律为绿色。spark 字段是数字数组，绘制迷你趋势线。",
    "best_for": [
     "Executive summary headline metrics",
     "Section openers",
@@ -362,7 +362,7 @@
     "good": {
      "type": "string",
      "required": false,
-     "desc": "'up' or 'down' — which direction is favourable",
+     "desc": "'up' or 'down' — which direction is favourable (colours the delta; in the cn up/down convention deltas are coloured by direction: rise red, fall green)",
      "default": "good"
     }
    },
@@ -875,7 +875,7 @@
    "needs_data": false,
    "summary": "What-if sliders bound to report parameters (@wacc, @tgr …); every computed field using them recalculates and the charts update live.",
    "summary_zh": "绑定报告参数（@wacc、@tgr 等）的假设分析滑块：拖动后所有引用该参数的计算字段实时重算，图表同步更新。",
-   "description_zh": "用于 DCF / LBO / 情景分析页面，让客户自己调整 WACC、永续增长率、退出倍数等假设。每个滑块显示格式化的当前值、相对基准值的变化（百分比参数以 bps 表示）、轨道上的基准刻度和一键还原；点击数值可直接输入精确值。参数默认取报告 manifest.params，可在 options.params 中覆盖标签、范围、步长与格式。options.computed 可向绑定数据集添加引用 @参数 的公式字段，options.preview 则在滑块下方渲染一个实时读数表（当前值及相对基准假设的变化：金额与倍数显示相对变化 %，基准为零或负数时显示 n.m.；百分比字段显示百分点 pp，变动小于 1 pp 时显示 bps，负数用括号），便于在单个区块中演示参数驱动的计算。",
+   "description_zh": "用于 DCF / LBO / 情景分析页面，让客户自己调整 WACC、永续增长率、退出倍数等假设。每个滑块显示格式化的当前值、相对基准值的变化（百分比参数变动小于 1 个百分点时以基点表示，否则以百分点表示）、轨道上的基准刻度和一键还原；点击数值可直接输入精确值。参数默认取报告 manifest.params，可在 options.params 中覆盖标签、范围、步长与格式。options.computed 可向绑定数据集添加引用 @参数 的公式字段，options.preview 则在滑块下方渲染一个实时读数表（遵守本页 / 本区块的筛选开关；当前值及相对基准假设的变化：金额与倍数显示相对变化 %，基准为零或负数时显示 n.m.；百分比字段显示百分点 pp，变动小于 1 pp 时显示 bps，负数用括号），便于在单个区块中演示参数驱动的计算。",
    "best_for": [
     "DCF WACC / terminal growth what-if",
     "LBO exit multiple and leverage assumptions",
@@ -911,7 +911,7 @@
     "showDelta": {
      "type": "boolean",
      "default": true,
-     "desc": "Change vs. base value next to the value (bps for % formats)"
+     "desc": "Change vs. base value next to the value (% formats: bps under 1 pp, percentage points from 1 pp)"
     },
     "computed": {
      "type": "array",
@@ -1122,7 +1122,7 @@
    "needs_data": false,
    "summary": "Client self-service analysis console: a pivot-style Builder and a validated query editor over the report's datasets, with a formatted results table, an automatic chart, CSV export, history and 'Add as metric'.",
    "summary_zh": "客户自助分析控制台：透视表式“构建器”与带实时校验的查询编辑器，结果以格式化表格 + 自动图表呈现，支持 CSV 导出、查询历史和“保存为指标”。",
-   "description_zh": "让客户在报告内自己做分析：选择数据集，在 Builder 中按“值（聚合 × 字段）/ 分组 / 筛选 / 排序 / 前 N”拼出查询，或在 Query 中直接写 RK.query 语句（如 median(ev_ebitda_25e) by sector where region != \"Latin America\" sort 2 desc），编辑器带语法高亮、自动补全、防抖实时校验（错误信息 + 行列位置 + 波浪下划线）和 Ctrl/Cmd+Enter 运行。右侧参考面板列出字段（标题、名称、格式）、@参数与函数，点击即插入光标处。结果以按字段格式显示的可排序表格 + 自动图表（一个类别列用柱状图，年份 / 日期用折线图，单位不同则双轴，单行汇总显示为大数字）分屏呈现；结果遵循全局筛选并在筛选变化时自动重跑。行级公式可“Add as metric”写回数据集（Dataset.addComputed），其他图表随即可用；这些客户自定义指标按报告保存在本浏览器中，下次打开自动恢复，并列在参考面板的“My metrics”中（点击插入，× 删除）。界面文字随报告语言（RK.i18n，en / zh-CN）切换。",
+   "description_zh": "让客户在报告内自己做分析：选择数据集，在 Builder 中按“值（聚合 × 字段）/ 分组 / 筛选 / 排序 / 前 N”拼出查询，或在 Query 中直接写 RK.query 语句（如 median(ev_ebitda_25e) by sector where region != \"Latin America\" sort 2 desc），编辑器带语法高亮、自动补全、防抖实时校验（错误信息 + 行列位置 + 波浪下划线）和 Ctrl/Cmd+Enter 运行。右侧参考面板列出字段（标题、名称、格式）、@参数与函数，点击即插入光标处。结果以按字段格式显示的可排序表格 + 自动图表（一个类别列用柱状图，年份 / 日期用折线图，单位不同则双轴，单行汇总显示为大数字）分屏呈现；结果遵循全局筛选并在筛选变化时自动重跑。行级公式可“Add as metric”写回数据集（Dataset.addComputed），其他图表随即可用；这些客户自定义指标按报告保存在本浏览器中，下次打开自动恢复，并列在参考面板的“My metrics”中（点击插入，× 删除）。界面文字随报告语言（RK.i18n，en / zh-CN）切换，输入框示例与语法说明取自当前数据集的真实字段；打印时隐藏编辑区，在结果上方印出查询语句，表格与图表占满整个区块。",
    "best_for": [
     "Letting clients answer their own follow-up questions on the comps / precedents / financials",
     "Ad-hoc medians, averages and rankings by sector or region",
@@ -1225,7 +1225,8 @@
     "Results respect global filters and re-run when filters or @parameters change",
     "Add as metric (Dataset.addComputed, user: true) — the new field appears in every field list and is saved in this browser for this report",
     "Reference panel 'My metrics': the client's saved formulas, click to insert (or switch to their dataset), × to delete",
-    "CSV export, query history, example chips, dataset picker"
+    "CSV export, query history, example chips, dataset picker",
+    "Print: the query text above the table and a full-height chart (editor and controls hidden)"
    ],
    "samples": [
     {
@@ -1705,12 +1706,12 @@
        },
        {
         "label": "30-day VWAP",
-        "value": 41.1
+        "value": 42.53
        },
        {
         "label": "52-week high",
-        "value": 47.9,
-        "note": "52-week intraday high."
+        "value": 47.14,
+        "note": "52-week closing high (09-Oct-2025 to 09-Oct-2026)."
        },
        {
         "label": "Unaffected",
@@ -1770,11 +1771,11 @@
        },
        {
         "label": "30-day VWAP",
-        "value": 41.1
+        "value": 42.53
        },
        {
         "label": "52-week high",
-        "value": 47.9
+        "value": 47.14
        }
       ],
       "metrics": [
@@ -1826,7 +1827,7 @@
        },
        {
         "label": "52-week high",
-        "value": 47.9
+        "value": 47.14
        }
       ],
       "metrics": [
@@ -7384,7 +7385,7 @@
     "regression": {
      "type": "boolean",
      "default": false,
-     "desc": "Ordinary least-squares fit across peers (target excluded) with R² label"
+     "desc": "Ordinary least-squares fit across peers (target excluded) with R² label (in the legend, or in a free plot corner when legend is false)"
     },
     "equation": {
      "type": "boolean",
@@ -7459,7 +7460,7 @@
     "legend": {
      "type": "boolean",
      "default": true,
-     "desc": "Category legend (top-left; wraps onto extra rows, never pages)"
+     "desc": "Category legend (top-left; wraps onto extra rows, never pages). false: the regression caption (R²) moves to a free inner corner of the plot, clear of points and labels"
     }
    },
    "interactions": [
@@ -7728,7 +7729,7 @@
    ],
    "summary": "Pipeline / process funnel as flat stage bars (centred or left-aligned) with conversion % between stages and optional value / % of first columns.",
    "summary_zh": "以扁平条形表示各阶段的管道 / 流程漏斗（居中或左对齐），阶段之间标注转化率，右侧可附金额与占首阶段比例列。",
-   "description_zh": "每行数据是一个阶段（按数据顺序自上而下），条形宽度与该阶段数量成正比，相邻阶段之间的浅色连接带标注转化率（相对上一阶段，或相对首阶段）。左侧为阶段名称，右侧可附加第二指标（如管道金额）和“占首阶段比例”两列，形成图表与表格结合的投行风格版式。适合销售管道、交易流程（接触 → 签署保密协议 → 非约束性报价 → 约束性报价 → 签约）、客户转化、招聘流程等 3–8 个阶段的单调递减数据；点击阶段可交叉筛选。",
+   "description_zh": "每行数据是一个阶段（按数据顺序自上而下），条形宽度与该阶段数量成正比，相邻阶段之间的浅色连接带标注转化率（相对上一阶段，或相对首阶段）。左侧为阶段名称，右侧可附加第二指标（如管道金额）和“占首阶段比例”两列，形成图表与表格结合的投行风格版式。适合销售管道、交易流程（接触 → 签署保密协议 → 非约束性报价 → 约束性报价 → 签约）、客户转化、招聘流程等 3–8 个阶段的单调递减数据；点击阶段可交叉筛选。区块较窄时（如约 420px）为保证条形宽度，依次截断阶段名称、将列标题折为两行、隐藏“占首阶段比例”列和第二指标列（两者仍在悬停提示中显示）。",
    "best_for": [
     "Commercial pipeline: leads → qualified → proposal → negotiation → won",
     "M&A process funnel: buyers contacted → NDAs → IOIs → final bids",
@@ -7779,7 +7780,7 @@
     "columns": {
      "type": "boolean",
      "default": true,
-     "desc": "Right-hand columns (secondary value, % of top) with headers"
+     "desc": "Right-hand columns (secondary value, % of top) with headers. Narrow blocks keep a minimum bar track: stage names truncate first, then the column headers wrap onto two lines, then the % of top column and then the secondary column are dropped (both stay in the tooltip)"
     },
     "colorBy": {
      "type": "string",
@@ -8776,11 +8777,11 @@
    "deps": [
     "echarts"
    ],
-   "summary": "Compliance-safe China cartogram: the 34 provincial-level divisions as equal-size squares or hexagons on a geography-like grid, shaded by a metric — no boundaries, so no map-review (审图号) issue in client decks.",
-   "summary_zh": "合规友好的中国省级方块地图：34 个省级行政区各占一个等大的方块（或六边形），按近似地理位置排布并按指标着色；不绘制任何边界线，客户材料中无需审图号。",
-   "description_zh": "用于在客户材料中展示按省汇总的指标（收入、增速、门店数、市场份额）。每个省级行政区（含台湾、香港、澳门，共 34 个）是一个同样大小的方块（或六边形），按地理相对位置排成 7 × 8 网格：黑龙江在右上，新疆、西藏在左侧，长江沿线（西藏—四川—重庆—湖北—安徽—江苏—上海）占一整行，海南在底部，港澳在广东下方，台湾在福建东侧；70 条省际陆地边界中有 63 条保留为相邻方块。因为不画边界、不涉及比例尺和领土轮廓，图表是示意图而非需要送审的“地图”，不会因边界画法引发合规问题（可选在空白角落标注“示意图，不代表实际边界”）；同时每个省面积相等，避免新疆、西藏、内蒙古等大省在视觉上压倒东部经济大省。数据可按 6 位行政区划代码（adcode，市/县级代码自动汇总到省）、中文或英文省名（带不带“省/市/自治区”均可，含 Inner Mongolia / Xizang / Macau 等常见写法）或 ISO 3166-2:CN 字母代码连接。方块颜色表示数值：顺序色阶或以中点为中心的发散色阶（如增速相对集团平均），默认按自然断点（Jenks）分 5 档，分界值取两档之间最整的数（取整不会把省份移到别的档），头部省份自成一档，图例显示每档省份数；也可用分位数、等距分档、自定义分界或连续色阶；无数据省份用斜线填充，与最浅一档区分。方块上显示中文简称（空间不足时用一字简称）或英文名（空间不足时用 ISO 代码，长名自动换行），空间足够时第二行显示格式化数值；重点省份在方块外侧加 2px 强调色描边（中间留纸色间隔，强调色与填充色过近时改用墨色）并加粗标签。图例默认放在网格左上角的空白处（放不下时自动换行，或移到网格旁边/下方）。悬停显示全部字段、排名（多行汇总时注明合计/平均）；点击方块交叉筛选其他图表；悬停图例高亮该档省份，点击图例按档筛选；被其他图表筛掉的省份变为浅色“幽灵”方块，颜色变化平滑过渡，布局保持不变。",
+   "summary": "Boundary-free China cartogram: the 34 provincial-level divisions as equal-size squares or hexagons on a geography-like grid, shaded by a metric. It draws no administrative boundaries, so it usually avoids map-review (审图号) requirements — have legal confirm before external publication.",
+   "summary_zh": "不画边界线的中国省级方块地图：34 个省级行政区各占一个等大的方块（或六边形），按近似地理位置排布并按指标着色；瓦片示意图不含行政区划边界，通常不涉及审图号，但对外发布前请法务确认。",
+   "description_zh": "用于在客户材料中展示按省汇总的指标（收入、增速、门店数、市场份额）。每个省级行政区（含台湾、香港、澳门，共 34 个）是一个同样大小的方块（或六边形），按地理相对位置排成 7 × 8 网格：黑龙江在右上，新疆、西藏在左侧，长江沿线（西藏—四川—重庆—湖北—安徽—江苏—上海）占一整行，海南在底部，港澳在广东下方，台湾在福建东侧；70 条省际陆地边界中有 63 条保留为相邻方块。因为不画边界、不涉及比例尺和领土轮廓，图表属于瓦片示意图而非标准地图，通常不涉及审图号，也不会因边界画法出错引发问题，但对外发布前请法务确认（可选在空白角落标注“示意图，不代表实际边界”）；同时每个省面积相等，避免新疆、西藏、内蒙古等大省在视觉上压倒东部经济大省。数据可按 6 位行政区划代码（adcode，市/县级代码自动汇总到省）、中文或英文省名（带不带“省/市/自治区”均可，含 Inner Mongolia / Xizang / Macau 等常见写法）或 ISO 3166-2:CN 字母代码连接。方块颜色表示数值：顺序色阶或以中点为中心的发散色阶（如增速相对集团平均），默认按自然断点（Jenks）分 5 档，分界值取两档之间最整的数（取整不会把省份移到别的档），头部省份自成一档，图例显示每档省份数；也可用分位数、等距分档、自定义分界或连续色阶；无数据省份用斜线填充，与最浅一档区分。方块上显示中文简称（空间不足时用一字简称）或英文名（空间不足时用 ISO 代码，长名自动换行），空间足够时第二行显示格式化数值；重点省份在方块外侧加 2px 强调色描边（中间留纸色间隔，强调色与填充色过近时改用墨色）并加粗标签。图例默认放在网格左上角的空白处（放不下时自动换行，或移到网格旁边/下方）。悬停显示全部字段、排名（多行汇总时注明合计/平均）；点击方块交叉筛选其他图表；悬停图例高亮该档省份，点击图例按档筛选；被其他图表筛掉的省份变为浅色“幽灵”方块，颜色变化平滑过渡，布局保持不变。",
    "best_for": [
-    "Revenue / stores / headcount by province for China-client decks (no 审图号 needed)",
+    "Revenue / stores / headcount by province for China-client decks (no boundaries drawn; confirm 审图号 needs with legal before external publication)",
     "Growth vs. a group average by province (diverging around the average)",
     "Provincial footprint where area-based maps would over-weight Xinjiang / Tibet / Inner Mongolia",
     "Small, print-safe national overview next to a table or commentary"
@@ -10224,7 +10225,7 @@
    ],
    "summary": "Sortable, filterable, searchable grid (Tabulator 6) for appendix-style detail data, with frozen columns, grouped headers, paging and CSV download.",
    "summary_zh": "可排序、可筛选、可搜索的明细数据表（Tabulator 6），支持冻结列、分组表头、分页 / 虚拟滚动和 CSV 下载。",
-   "description_zh": "用于附录或明细页：列默认取自数据集 schema（标题、RK 格式码，数字右对齐），也可用 columns 指定顺序、分组表头与宽度。每列表头带筛选框（文本为包含匹配，数字支持“>10”“<=2.5”“5-10”“30%”），顶部有全局搜索和 CSV 下载，固定高度内虚拟滚动或按页显示。点击行会按 key 字段交叉筛选其他图表，全局筛选变化时以 replaceData 平滑刷新并保留排序与筛选；适合 20–5,000 行的交易清单、可比公司全表等。",
+   "description_zh": "用于附录或明细页：列默认取自数据集 schema（标题、RK 格式码，数字右对齐），也可用 columns 指定顺序、分组表头与宽度。每列表头带筛选框（文本为包含匹配，数字支持“>10”“<=2.5”“5-10”“30%”），顶部有全局搜索和 CSV 下载，固定高度内虚拟滚动或按页显示。点击行会按 key 字段交叉筛选其他图表，全局筛选变化时以 replaceData 平滑刷新并保留排序与筛选；适合 20–5,000 行的交易清单、可比公司全表等。打印时换成静态表格（与当前排序、搜索和列筛选一致），只印出块高度内放得下的行，并以“… 另有 n 行”脚注说明其余行。",
    "best_for": [
     "Full precedent-transaction or peer lists in an appendix",
     "Detail data behind a chart that clients want to search and download",
@@ -10321,7 +10322,8 @@
     "Frozen first column",
     "Row click cross-filter (others dim)",
     "CSV download",
-    "Live update with global filters"
+    "Live update with global filters",
+    "Prints as a static table in the grid's order: the rows that fit + “… n more rows”"
    ],
    "samples": [
     {
