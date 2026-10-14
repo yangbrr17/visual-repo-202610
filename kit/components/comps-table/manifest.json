@@ -8,336 +8,74 @@
   "summary": "Pitchbook trading-comps or precedent-transactions table with grouped headers, sector sections, mean / median / high / low rows and the target highlighted.",
   "summary_zh": "投行标准的可比公司 / 先例交易表：多级表头、按行业分节、均值 / 中位数 / 最高 / 最低统计行、目标公司高亮。",
   "description_zh": "估值章节的核心表格：每行一家公司（或一笔交易），列为市场数据、估值倍数和经营指标，可用 group 组成“EV / EBITDA → 2025E / 2026E”式多级表头。groupBy 按行业分节，统计行可放在每节之后和 / 或表尾（默认剔除目标公司），超出合理区间的倍数显示为 n.m. 并不计入统计；列可加热力底色、正负着色或用 RK 公式派生（如股价 / 52 周高点）。点击表头在分节内排序，点击行交叉筛选其他图表；适合 8–30 行的同业对标、先例交易和经营对标。",
-  "best_for": [
-    "Trading comparables (EV / EBITDA, P / E, growth, margins) by peer group",
-    "Precedent transactions with LTM multiples and premiums",
-    "Operating benchmarking with heat-mapped columns"
-  ],
-  "avoid_when": [
-    "More than ~40 rows (use data-grid with paging and filters)",
-    "Two-dimensional grids of one metric (use sensitivity-table or pivot-table)"
-  ],
+  "best_for": ["Trading comparables (EV / EBITDA, P / E, growth, margins) by peer group", "Precedent transactions with LTM multiples and premiums", "Operating benchmarking with heat-mapped columns"],
+  "avoid_when": ["More than ~40 rows (use data-grid with paging and filters)", "Two-dimensional grids of one metric (use sensitivity-table or pivot-table)"],
   "channels": {
-    "label": {
-      "type": "string",
-      "required": true,
-      "desc": "Row label (company / target); also the cross-filter field",
-      "default": "company"
-    },
-    "highlight": {
-      "type": "boolean",
-      "required": false,
-      "desc": "Boolean flag marking the target row(s)",
-      "default": "is_target"
-    },
-    "note": {
-      "type": "string",
-      "required": false,
-      "desc": "Per-row footnote marker shown after the label, e.g. '(1)'"
-    }
+    "label": {"type": "string", "required": true, "desc": "Row label (company / target); also the cross-filter field", "default": "company"},
+    "highlight": {"type": "boolean", "required": false, "desc": "Boolean flag marking the target row(s)", "default": "is_target"},
+    "note": {"type": "string", "required": false, "desc": "Per-row footnote marker shown after the label, e.g. '(1)'"}
   },
   "options": {
-    "columns": {
-      "type": "array",
-      "default": null,
-      "desc": "[{field, expr?, title?, format?, group?, heat?: 'seq'|'div'|false, mid?, reverse?, nm?: [lo, hi], sign?, stats?: false, align?, width?, note?}] — field names or specs; null = every numeric field. Include the label field to position it; expr derives a column with an RK formula"
-    },
-    "groupBy": {
-      "type": "string",
-      "default": null,
-      "desc": "Field that splits rows into sections with a header row (e.g. sector)"
-    },
-    "stats": {
-      "type": "string[]",
-      "default": [
-        "mean",
-        "median"
-      ],
-      "desc": "Statistic rows: mean | median | high | low"
-    },
-    "statsScope": {
-      "type": "string",
-      "default": "overall",
-      "desc": "overall | group | both — where statistic rows appear (group / both need groupBy)"
-    },
-    "groupStats": {
-      "type": "string[]",
-      "default": null,
-      "desc": "Statistics shown per section (defaults to stats)"
-    },
-    "statsExcludeTarget": {
-      "type": "boolean",
-      "default": true,
-      "desc": "Leave the highlighted target out of all statistics"
-    },
-    "highlight": {
-      "type": "string|string[]",
-      "default": null,
-      "desc": "Label value(s) to highlight in addition to the encode.highlight flag"
-    },
-    "pinTarget": {
-      "type": "boolean|string",
-      "default": false,
-      "desc": "false | 'top' | 'bottom' — lift the target rows out of their section"
-    },
-    "labelTitle": {
-      "type": "string",
-      "default": null,
-      "desc": "Header of the label column (defaults to the field title)"
-    },
-    "labelWidth": {
-      "type": "number|string",
-      "default": null,
-      "desc": "Width of the label column (px or CSS length)"
-    },
-    "notes": {
-      "type": "object",
-      "default": {},
-      "desc": "{\"<label value>\": \"(1)\"} footnote markers after row labels (the note text goes in the block footer)"
-    },
-    "sort": {
-      "type": "object",
-      "default": null,
-      "desc": "{field, dir: 'asc'|'desc'} initial sort; rows always sort within their section"
-    },
-    "sortable": {
-      "type": "boolean",
-      "default": true,
-      "desc": "Click headers to sort (numbers descending first; third click restores data order)"
-    },
-    "heatIntensity": {
-      "type": "number",
-      "default": 0.5,
-      "desc": "0–1 strength of heat-map tints"
-    },
-    "scroll": {
-      "type": "boolean",
-      "default": true,
-      "desc": "true: fixed block height with sticky header, first column and overall-statistics footer; false: the block grows to fit the table"
-    },
-    "dense": {
-      "type": "boolean",
-      "default": false,
-      "desc": "Tighter row padding"
-    },
-    "stagger": {
-      "type": "boolean",
-      "default": true,
-      "desc": "Staggered row reveal on first paint"
-    },
-    "crossFilter": {
-      "type": "boolean",
-      "default": true,
-      "desc": "Click a row to cross-filter other blocks on the label field"
-    }
+    "columns": {"type": "array", "default": null, "desc": "[{field, expr?, title?, format?, group?, heat?: 'seq'|'div'|false, mid?, reverse?, nm?: [lo, hi], sign?, stats?: false, align?, width?, note?}] — field names or specs; null = every numeric field. Include the label field to position it; expr derives a column with an RK formula"},
+    "groupBy": {"type": "string", "default": null, "desc": "Field that splits rows into sections with a header row (e.g. sector)"},
+    "stats": {"type": "string[]", "default": ["mean", "median"], "desc": "Statistic rows: mean | median | high | low"},
+    "statsScope": {"type": "string", "default": "overall", "desc": "overall | group | both — where statistic rows appear (group / both need groupBy)"},
+    "groupStats": {"type": "string[]", "default": null, "desc": "Statistics shown per section (defaults to stats)"},
+    "statsExcludeTarget": {"type": "boolean", "default": true, "desc": "Leave the highlighted target out of all statistics"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Label value(s) to highlight in addition to the encode.highlight flag"},
+    "pinTarget": {"type": "boolean|string", "default": false, "desc": "false | 'top' | 'bottom' — lift the target rows out of their section"},
+    "labelTitle": {"type": "string", "default": null, "desc": "Header of the label column (defaults to the field title)"},
+    "labelWidth": {"type": "number|string", "default": null, "desc": "Width of the label column (px or CSS length)"},
+    "notes": {"type": "object", "default": {}, "desc": "{\"<label value>\": \"(1)\"} footnote markers after row labels (the note text goes in the block footer)"},
+    "sort": {"type": "object", "default": null, "desc": "{field, dir: 'asc'|'desc'} initial sort; rows always sort within their section"},
+    "sortable": {"type": "boolean", "default": true, "desc": "Click headers to sort (numbers descending first; third click restores data order)"},
+    "heatIntensity": {"type": "number", "default": 0.5, "desc": "0–1 strength of heat-map tints"},
+    "scroll": {"type": "boolean", "default": true, "desc": "true: fixed block height with sticky header, first column and overall-statistics footer; false: the block grows to fit the table"},
+    "dense": {"type": "boolean", "default": false, "desc": "Tighter row padding"},
+    "stagger": {"type": "boolean", "default": true, "desc": "Staggered row reveal on first paint"},
+    "crossFilter": {"type": "boolean", "default": true, "desc": "Click a row to cross-filter other blocks on the label field"}
   },
-  "interactions": [
-    "Click a header to sort within sections (FLIP row animation)",
-    "Click a row to cross-filter (others dim)",
-    "Sticky header, first column and statistics footer while scrolling",
-    "Staggered row reveal",
-    "Live update with global filters",
-    "CSV export of the underlying rows"
-  ],
+  "interactions": ["Click a header to sort within sections (FLIP row animation)", "Click a row to cross-filter (others dim)", "Sticky header, first column and statistics footer while scrolling", "Staggered row reveal", "Live update with global filters", "CSV export of the underlying rows"],
   "samples": [
-    {
-      "title": "Trading comparables — industrial technology peers",
-      "data": "peers",
-      "height": 640,
-      "options": {
-        "groupBy": "sector",
-        "pinTarget": "top",
-        "statsScope": "both",
-        "groupStats": [
-          "median"
-        ],
-        "stats": [
-          "mean",
-          "median"
-        ],
-        "columns": [
-          {
-            "field": "share_price",
-            "title": "Share price",
-            "group": "Market data",
-            "stats": false
-          },
-          {
-            "field": "pct_high",
-            "expr": "share_price / price_52w_high",
-            "title": "% of 52-wk high",
-            "format": "0%",
-            "group": "Market data"
-          },
-          {
-            "field": "mkt_cap",
-            "title": "Equity value",
-            "group": "Market data"
-          },
-          {
-            "field": "ev",
-            "title": "EV",
-            "group": "Market data"
-          },
-          {
-            "field": "ev_revenue_25e",
-            "title": "2025E",
-            "group": "EV / Revenue"
-          },
-          {
-            "field": "ev_ebitda_25e",
-            "title": "2025E",
-            "group": "EV / EBITDA",
-            "heat": "seq"
-          },
-          {
-            "field": "ev_ebitda_26e",
-            "title": "2026E",
-            "group": "EV / EBITDA",
-            "heat": "seq"
-          },
-          {
-            "field": "pe_25e",
-            "title": "2025E",
-            "group": "P / E",
-            "nm": [
-              0,
-              50
-            ]
-          },
-          {
-            "field": "rev_growth_25e",
-            "title": "Rev. growth",
-            "group": "2025E operating"
-          },
-          {
-            "field": "ebitda_margin_25e",
-            "title": "EBITDA margin",
-            "group": "2025E operating"
-          },
-          {
-            "field": "net_debt_ebitda",
-            "title": "ND / EBITDA",
-            "group": "2025E operating"
-          }
-        ],
-        "dense": true
-      }
-    },
-    {
-      "title": "Selected precedent transactions",
-      "data": "precedents",
-      "height": 600,
-      "options": {
-        "encode": {
-          "label": "target"
-        },
-        "labelTitle": "Target",
-        "sort": {
-          "field": "date",
-          "dir": "desc"
-        },
-        "stats": [
-          "mean",
-          "median",
-          "high",
-          "low"
-        ],
-        "highlight": "Brennick Robotics",
-        "notes": {
-          "Upland Drives": "(1)",
-          "Tarrant Automation": "(1)"
-        },
-        "columns": [
-          {
-            "field": "date",
-            "title": "Announced",
-            "format": "mmm yyyy"
-          },
-          {
-            "field": "target"
-          },
-          {
-            "field": "acquirer",
-            "title": "Acquirer"
-          },
-          {
-            "field": "ev",
-            "title": "EV (USD m)"
-          },
-          {
-            "field": "ev_revenue",
-            "title": "EV / Revenue",
-            "group": "LTM multiples"
-          },
-          {
-            "field": "ev_ebitda",
-            "title": "EV / EBITDA",
-            "group": "LTM multiples",
-            "heat": "seq"
-          },
-          {
-            "field": "premium_1d",
-            "title": "1-day",
-            "group": "Premium paid"
-          },
-          {
-            "field": "premium_30d",
-            "title": "30-day VWAP",
-            "group": "Premium paid"
-          },
-          {
-            "field": "consideration",
-            "title": "Consideration"
-          }
-        ]
-      }
-    },
-    {
-      "title": "Operating benchmarking (heat-mapped)",
-      "data": "peers",
-      "height": 500,
-      "span": 8,
-      "options": {
-        "dense": true,
-        "stats": [
-          "median",
-          "high",
-          "low"
-        ],
-        "sort": {
-          "field": "ebitda_margin_25e",
-          "dir": "desc"
-        },
-        "columns": [
-          {
-            "field": "region",
-            "title": "Region"
-          },
-          {
-            "field": "rev_growth_25e",
-            "title": "Revenue growth 25E",
-            "heat": "div",
-            "mid": 0.08
-          },
-          {
-            "field": "ebitda_margin_25e",
-            "title": "EBITDA margin 25E",
-            "heat": "seq"
-          },
-          {
-            "field": "net_debt_ebitda",
-            "title": "ND / EBITDA",
-            "heat": "seq",
-            "reverse": true
-          },
-          {
-            "field": "tsr_1y",
-            "title": "1-yr TSR",
-            "sign": true
-          }
-        ]
-      }
-    }
+    {"title": "Trading comparables — industrial technology peers", "data": "peers", "height": 640,
+     "options": {
+       "groupBy": "sector", "pinTarget": "top", "statsScope": "both", "groupStats": ["median"], "stats": ["mean", "median"], "dense": true,
+       "columns": [
+         {"field": "share_price", "title": "Share price", "group": "Market data", "stats": false},
+         {"field": "pct_high", "expr": "share_price / price_52w_high", "title": "% of 52-wk high", "format": "0%", "group": "Market data"},
+         {"field": "mkt_cap", "title": "Equity value", "group": "Market data"},
+         {"field": "ev", "title": "EV", "group": "Market data"},
+         {"field": "ev_revenue_25e", "title": "2025E", "group": "EV / Revenue"},
+         {"field": "ev_ebitda_25e", "title": "2025E", "group": "EV / EBITDA", "heat": "seq"},
+         {"field": "ev_ebitda_26e", "title": "2026E", "group": "EV / EBITDA", "heat": "seq"},
+         {"field": "pe_25e", "title": "2025E", "group": "P / E", "nm": [0, 50]},
+         {"field": "rev_growth_25e", "title": "Rev. growth", "group": "2025E operating"},
+         {"field": "ebitda_margin_25e", "title": "EBITDA margin", "group": "2025E operating"},
+         {"field": "net_debt_ebitda", "title": "ND / EBITDA", "group": "2025E operating"}
+       ]}},
+    {"title": "Selected precedent transactions", "data": "precedents", "height": 600,
+     "options": {
+       "encode": {"label": "target"}, "labelTitle": "Target", "sort": {"field": "date", "dir": "desc"}, "stats": ["mean", "median", "high", "low"], "highlight": "Brennick Robotics", "notes": {"Upland Drives": "(1)", "Tarrant Automation": "(1)"},
+       "columns": [
+         {"field": "date", "title": "Announced", "format": "mmm yyyy"},
+         {"field": "target"},
+         {"field": "acquirer", "title": "Acquirer"},
+         {"field": "ev", "title": "EV (USD m)"},
+         {"field": "ev_revenue", "title": "EV / Revenue", "group": "LTM multiples"},
+         {"field": "ev_ebitda", "title": "EV / EBITDA", "group": "LTM multiples", "heat": "seq"},
+         {"field": "premium_1d", "title": "1-day", "group": "Premium paid"},
+         {"field": "premium_30d", "title": "30-day VWAP", "group": "Premium paid"},
+         {"field": "consideration", "title": "Consideration"}
+       ]}},
+    {"title": "Operating benchmarking (heat-mapped)", "data": "peers", "height": 500, "span": 8,
+     "options": {
+       "dense": true, "stats": ["median", "high", "low"], "sort": {"field": "ebitda_margin_25e", "dir": "desc"},
+       "columns": [
+         {"field": "region", "title": "Region"},
+         {"field": "rev_growth_25e", "title": "Revenue growth 25E", "heat": "div", "mid": 0.08},
+         {"field": "ebitda_margin_25e", "title": "EBITDA margin 25E", "heat": "seq"},
+         {"field": "net_debt_ebitda", "title": "ND / EBITDA", "heat": "seq", "reverse": true},
+         {"field": "tsr_1y", "title": "1-yr TSR", "sign": true}
+       ]}}
   ]
 }

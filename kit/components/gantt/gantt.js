@@ -39,7 +39,7 @@
       for (t = weekStart(lo, o.weekStart); t < hi; t = n) { n = addDays(t, 7); out.push({ s: t, e: n, tier: 1, text: String(new Date(t).getDate()) }); }
     } else if (mode === 'months') {
       for (t = new Date(new Date(lo).getFullYear(), 0, 1).getTime(); t < hi; t = n) { n = addMonths(t, 12); out.push({ s: t, e: n, tier: 0, text: RK.format(new Date(t), 'yyyy'), grid: true }); }
-      for (t = monthStart(lo); t < hi; t = n) { n = addMonths(t, 1); out.push({ s: t, e: n, tier: 1, text: RK.format(new Date(t), monthPx >= 26 ? 'mmm' : 'mmm').slice(0, monthPx >= 26 ? 3 : 1), grid: monthPx >= 26 }); }
+      for (t = monthStart(lo); t < hi; t = n) { n = addMonths(t, 1); out.push({ s: t, e: n, tier: 1, text: RK.format(new Date(t), 'mmm').slice(0, monthPx >= 26 ? 3 : 1), grid: monthPx >= 26 }); }   // 'Jan' or 'J'
     } else {
       for (t = new Date(new Date(lo).getFullYear(), 0, 1).getTime(); t < hi; t = n) { n = addMonths(t, 12); out.push({ s: t, e: n, tier: 0, text: RK.format(new Date(t), 'yyyy'), grid: true }); }
       for (t = monthStart(lo, 3); t < hi; t = n) { n = addMonths(t, 3); out.push({ s: t, e: n, tier: 1, text: 'Q' + RK.format(new Date(t), 'q'), grid: false }); }
@@ -140,14 +140,17 @@
       });
 
       /* ---------- colours ---------- */
+      // colours are keyed on the phases of all rows, so they do not shift when filters remove a phase
       var phases = RK.util.unique(tasks.map(function (k) { return k.phase; }).filter(function (p) { return p != null; }));
+      var allPhases = enc.phase ? RK.util.unique(ctx.allRows.map(function (r) { return r[enc.phase] == null ? null : String(r[enc.phase]); }).filter(function (p) { return p != null; })) : [];
+      phases.sort(function (a, b) { return allPhases.indexOf(a) - allPhases.indexOf(b); });
       var phaseColor;
       if (o.palette === 'sequential') {
         var seqStops = t.seq.slice(Math.min(2, t.seq.length - 2));
-        var sq = RK.theme.sequential([0, Math.max(1, phases.length - 1)], seqStops);
-        phaseColor = function (p) { return sq(phases.indexOf(p)); };
+        var sq = RK.theme.sequential([0, Math.max(1, allPhases.length - 1)], seqStops);
+        phaseColor = function (p) { return sq(allPhases.indexOf(p)); };
       } else {
-        var cat = RK.theme.categorical(phases);
+        var cat = RK.theme.categorical(allPhases);
         phaseColor = function (p) { return p == null ? t.accent : cat(p); };
       }
       var selField = o.selectBy ? enc[o.selectBy] : null;
@@ -176,7 +179,8 @@
       var gridTop = (hasLegend ? 28 : 4) + TIER * 2;
       var gridBottom = (todayTs != null ? 18 : 4) + (slider ? 28 : 0);
       var grid = { left: labW + 14, right: 16, top: gridTop, bottom: gridBottom, containLabel: false };
-      S.lo = lo; S.hi = hi; S.plotW = W - grid.left - grid.right;
+      S.lo = lo; S.hi = hi; S.plotW = W - grid.left - grid.right; S.builtW = W;
+      S.rebuild = function (c) { return build(c, inst); };   // used to re-flow on resize (see 'finished' hook)
 
       // preserve the zoom window across filter updates
       var prevZoom = null;
@@ -305,11 +309,13 @@
       function renderToday(params, api) {
         var cs = params.coordSys, x = api.coord([todayTs, 0])[0];
         if (x < cs.x || x > cs.x + cs.width) return null;
+        var label = o.todayLabel + ' ' + RK.format(new Date(todayTs), 'd mmm'), font = '600 10.5px ' + t.fontSans;
+        var half = textWidth(label, font) / 2, lx = Math.max(cs.x + half, Math.min(cs.x + cs.width + 12 - half, x));   // keep the label inside the chart
         return { type: 'group', children: [
           { type: 'line', silent: true, shape: { x1: x, y1: cs.y, x2: x, y2: cs.y + cs.height + 3 }, style: { stroke: t.neg, lineWidth: 1.25 } },
           { type: 'polygon', silent: true, shape: { points: [[x - 3.5, cs.y - 3], [x + 3.5, cs.y - 3], [x, cs.y + 1.5]] }, style: { fill: t.neg } },
-          { type: 'text', silent: true, x: x, y: cs.y + cs.height + 5,
-            style: { text: o.todayLabel + ' ' + RK.format(new Date(todayTs), 'd mmm'), fill: t.neg, font: '600 10.5px ' + t.fontSans, align: 'center', verticalAlign: 'top' } }
+          { type: 'text', silent: true, x: lx, y: cs.y + cs.height + 5,
+            style: { text: label, fill: t.neg, font: font, align: 'center', verticalAlign: 'top' } }
         ] };
       }
 
@@ -398,6 +404,7 @@
       if (prevZoom) dataZoom.forEach(function (d) { d.start = prevZoom[0]; d.end = prevZoom[1]; });
 
       return {
+        animation: !!ctx.motion,
         legend: C.legend(ctx, {
           show: hasLegend,
           data: series.filter(function (s) { return s.name; }).map(function (s) { return s.id === 'ms' ? { name: s.name, icon: 'diamond' } : { name: s.name }; })
@@ -425,6 +432,20 @@
         return k ? { field: G.selField, value: G.selValue(k) } : null;
       },
       on: {
+        // label column, calendar tiers and bar geometry depend on the width: rebuild after a resize
+        finished: function (params, ctx, inst) {
+          var S = inst.__rkGantt;
+          if (!S || !S.rebuild || S._resizing || Math.abs(inst.getWidth() - S.builtW) < 2) return;
+          S._resizing = true;
+          setTimeout(function () {
+            try {
+              if (inst.isDisposed()) return;
+              var opt = S.rebuild(ctx);
+              opt.animation = false;
+              inst.setOption(opt, { replaceMerge: ['series', 'xAxis', 'yAxis', 'grid', 'legend', 'dataZoom'] });
+            } finally { S._resizing = false; }
+          }, 0);
+        },
         datazoom: function (params, ctx, inst) {
           var S = inst.__rkGantt;
           if (!S) return;

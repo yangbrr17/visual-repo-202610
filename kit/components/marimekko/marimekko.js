@@ -99,8 +99,8 @@
       axes: true               // 0–100% axes (left: share of segment, bottom: cumulative share of market)
     },
     render: function (ctx) {
-      var state = { m: null };
-      return C(function (c, inst) { return build(c, inst, state); }, {
+      var state = { m: null, w: 0, h: 0, ctx: ctx };
+      var base = C(function (c, inst) { state.ctx = c; state.w = inst.getWidth(); state.h = inst.getHeight(); return build(c, inst, state); }, {
         select: function (p, c) {
           if (p.seriesId === 'hdr') return { field: c.enc.x, value: p.name };
           if (!/^p-/.test(p.seriesId || '')) return null;
@@ -108,6 +108,13 @@
           return { field: c.enc.x, value: p.name };
         }
       })(ctx);
+      // header placement is computed in pixels: re-layout when the block is resized
+      var resize = base.resize;
+      base.resize = function () {
+        resize();
+        if (Math.abs(base.chart.getWidth() - state.w) > 1 || Math.abs(base.chart.getHeight() - state.h) > 1) base.update(state.ctx);
+      };
+      return base;
     }
   });
 
@@ -139,20 +146,39 @@
     var anim = ctx.motion;
     var gap = Math.max(0, o.gap || 0);
 
+    // header layout: a label wider than its column may borrow the free space of its neighbours' headers
+    var nameFont = '600 11px ' + t.fontSans, numFont = '10.5px ' + t.fontNum;
+    var plotL = grid.left, plotW = Math.max(1, W - grid.left - grid.right);
+    m.segs.forEach(function (sg, i) {
+      sg.px0 = plotL + sg.x0 * plotW + (i ? gap / 2 : 0);
+      sg.px1 = plotL + sg.x1 * plotW - (i < m.segs.length - 1 ? gap / 2 : 0);
+      sg.totLine = RK.format(sg.total, fmt) + '  ·  ' + RK.format(sg.share, sfmt);
+      sg.tw = Math.max(textWidth(sg.name, nameFont), textWidth(sg.totLine, numFont)) + 4;
+    });
+    m.segs.forEach(function (sg, i) {
+      var prev = m.segs[i - 1], next = m.segs[i + 1];
+      var freeL = prev ? Math.max(0, (prev.px1 - prev.px0 - prev.tw) / 2) : 0;
+      var freeR = next ? Math.max(0, (next.px1 - next.px0 - next.tw) / 2) : Math.max(0, W - 2 - sg.px1);
+      var lo = sg.px0 - freeL, hi = sg.px1 + freeR;
+      sg.hw = Math.max(10, Math.min(sg.tw, hi - lo));
+      sg.hx = Math.max(lo + sg.hw / 2, Math.min(hi - sg.hw / 2, (sg.px0 + sg.px1) / 2));
+    });
+
     function cellLabel(cell, seg, w, hpx, fill) {
       if (o.labels === 'none') return null;
       var share = RK.format(cell.share, sfmt);
       var name = cell.player;
       var font = '600 11px ' + t.fontSans;
       var lines = null;
-      if (o.labels !== 'share' && w >= 46 && hpx >= 30) {
-        var nw = textWidth(name, font);
-        if (nw > w - 10) {           // truncate the name to the cell width
+      var nw = textWidth(name, font);
+      // two lines (player + share) only when the name fits, or can be truncated to something readable
+      if (o.labels !== 'share' && hpx >= 36 && (nw <= w - 10 || w - 10 >= 64)) {
+        if (nw > w - 10) {
           var ef = window.echarts && window.echarts.format;
           name = ef && ef.truncateText ? ef.truncateText(name, w - 10, font, '…') : name;
         }
         lines = '{n|' + name + '}\n{v|' + share + '}';
-      } else if (w >= 26 && hpx >= 15) lines = '{v|' + share + '}';
+      } else if (w >= 28 && hpx >= 17) lines = '{v|' + share + '}';
       if (!lines) return null;
       var ink = inkOn(fill, t);
       return {
@@ -219,17 +245,15 @@
         renderItem: function (params, api) {
           var sg = m.segs[api.value(3)];
           var a = api.coord([sg.x0, 1]), b = api.coord([sg.x1, 1]);
-          var w = Math.max(0, b[0] - a[0] - gap - 2);
-          var cx = (a[0] + b[0]) / 2, y = a[1] - 5;
+          var w = sg.hw, cx = sg.hx, y = a[1] - 5;
           var dim = faded(sg.name, null) && o.selectBy !== 'series';
           var ef = window.echarts && window.echarts.format;
           var trunc = function (s, f) { return ef && ef.truncateText ? ef.truncateText(String(s), w, f, '…') : String(s); };
-          var nameFont = '600 11px ' + t.fontSans, numFont = '10.5px ' + t.fontNum;
           var el = {
             type: 'group',
             children: [
               { type: 'text', style: { text: trunc(sg.name, nameFont), x: cx, y: y - 14, textAlign: 'center', textVerticalAlign: 'bottom', fill: dim ? t.ink3 : t.ink, font: nameFont } },
-              { type: 'text', style: { text: trunc(RK.format(sg.total, fmt) + '  ·  ' + RK.format(sg.share, sfmt), numFont), x: cx, y: y, textAlign: 'center', textVerticalAlign: 'bottom', fill: t.ink3, font: numFont } },
+              { type: 'text', style: { text: trunc(sg.totLine, numFont), x: cx, y: y, textAlign: 'center', textVerticalAlign: 'bottom', fill: t.ink3, font: numFont } },
               // invisible hit area so the header is clickable (cross-filter by column)
               { type: 'rect', shape: { x: a[0], y: y - 28, width: b[0] - a[0], height: 28 }, style: { fill: 'rgba(0,0,0,0)' } }
             ]

@@ -24,6 +24,7 @@
     "bandLabels": {"type": "string[]", "default": null, "desc": "Legend names, one per band (default derived from the thresholds)"},
     "goodDirection": {"type": "string", "default": "up", "desc": "'up' | 'down' — which end is good (lightest band; variance colours)"},
     "target": {"type": "number|string", "default": null, "desc": "Constant target when there is no target field: a number | 'median' | 'mean' of the values"},
+    "targetExcludeHighlight": {"type": "boolean", "default": true, "desc": "A 'median' / 'mean' target is computed without the highlighted (target) rows"},
     "targetLabel": {"type": "string", "default": null, "desc": "Legend / tooltip name of the target tick"},
     "valueLabel": {"type": "string", "default": null, "desc": "Legend / tooltip name of the actual bar"},
     "scale": {"type": "string", "default": "shared", "desc": "shared (one value axis) | row (each row scaled to its own max; axis hidden)"},

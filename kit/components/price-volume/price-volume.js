@@ -226,10 +226,10 @@
     if (state.pins && state.pins.length) ext[1] += (ext[1] - ext[0]) * 0.16;
     var gh = state.priceH || 220;
     var step = util.niceStep((ext[1] - ext[0]) || Math.abs(ext[1]) * 0.1 || 1, util.clamp(Math.round(gh / 50), 3, 7));
-    var p = { min: rnd(Math.floor(ext[0] / step - 1e-9) * step), max: rnd(Math.ceil(ext[1] / step - 1e-9) * step), interval: step };
+    var p = { min: rnd(Math.floor(ext[0] / step + 1e-9) * step), max: rnd(Math.ceil(ext[1] / step - 1e-9) * step), interval: step };
     if (p.min === p.max) p.max = rnd(p.max + step);
     var vmax = vv.length ? Math.max.apply(null, vv) : 1;
-    var vstep = util.niceStep(vmax || 1, 2);
+    var vstep = util.niceStep(vmax || 1, util.clamp(Math.round((state.volH || 60) / 34), 1, 3));
     var v = { max: rnd(Math.ceil(vmax / vstep) * vstep) || 1, interval: vstep };
     return { p: p, v: v, first: first };
   }
@@ -255,15 +255,16 @@
     var slider = useZoom && o.zoomSlider !== false && !ctx.print;
     var hasLegend = o.legend !== false;
     var H = state.h = inst.getHeight();
-    var top = hasLegend ? 34 : 14, gap = 16, xLab = 22, bottom = slider ? 32 : 4;
+    var hasSelector = o.rangeSelector && !ctx.print && useZoom && m.n >= 30;
+    var top = hasLegend || hasSelector ? 34 : 14, gap = 16, xLab = 22, bottom = slider ? 32 : 4;
     var avail = Math.max(120, H - top - gap - xLab - bottom);
     var hasVol = m.vol.length > 0;
-    var volH = hasVol ? Math.max(36, Math.round(avail * util.clamp(o.volumeShare || 0.24, 0.1, 0.5))) : 0;
+    var volH = state.volH = hasVol ? Math.max(36, Math.round(avail * util.clamp(o.volumeShare || 0.24, 0.1, 0.5))) : 0;
     var priceH = state.priceH = avail - volH - (hasVol ? 0 : -gap);
 
     var ax = state.axes = axesFor(ctx, state);
     // fixed left margin so both panels share one x scale
-    var pAxisFmt = axisFmt(fmt);
+    var pAxisFmt = axisFmt(fmt, function () { return state.axes && state.axes.p.interval; });
     var left = Math.ceil(Math.max(
       textWidth(pAxisFmt(ax.p.max), t), textWidth(pAxisFmt(ax.p.min), t),
       textWidth(RK.format(-ax.p.max, fmt), t) * 0.92,
@@ -373,10 +374,11 @@
   /** Reference lines, 52-week range and current price on a silent helper series. */
   function markSeries(ctx, m, priceColor) {
     var o = ctx.options, t = ctx.theme, fmt = m.fmt;
+    var chip = RK.theme.alpha(t.paper, 0.85);       // label background: legible where it crosses the line
     var lines = [], area = null;
     (o.refLines || []).forEach(function (r) {
       lines.push({ yAxis: r.value, lineStyle: { color: r.color || t.accent2, type: r.type || 'dashed', width: 1.25 },
-        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: r.color || t.accent2, fontWeight: 600, fontSize: 10.5 } });
+        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: r.color || t.accent2, fontWeight: 600, fontSize: 10.5, backgroundColor: chip, padding: [1, 4], borderRadius: 2 } });
     });
     if (m.r52 && o.range52w === 'band') {
       area = { silent: true, itemStyle: { color: RK.theme.alpha(t.accent3 || t.accent, t.dark ? 0.12 : 0.07) },
@@ -385,9 +387,9 @@
         data: [[{ xAxis: m.r52.from, yAxis: m.r52.low }, { xAxis: m.r52.to, yAxis: m.r52.high }]] };
     } else if (m.r52 && o.range52w) {
       lines.push({ yAxis: m.r52.high, lineStyle: { color: t.pos, type: [4, 3], width: 1 },
-        label: { formatter: '52-wk high ' + RK.format(m.r52.high, fmt), position: 'insideStartTop', color: t.pos, fontSize: 10.5 } });
+        label: { formatter: '52-wk high ' + RK.format(m.r52.high, fmt), position: 'insideStartTop', color: t.pos, fontSize: 10.5, backgroundColor: chip, padding: [1, 4], borderRadius: 2 } });
       lines.push({ yAxis: m.r52.low, lineStyle: { color: t.neg, type: [4, 3], width: 1 },
-        label: { formatter: '52-wk low ' + RK.format(m.r52.low, fmt), position: 'insideStartBottom', color: t.neg, fontSize: 10.5 } });
+        label: { formatter: '52-wk low ' + RK.format(m.r52.low, fmt), position: 'insideStartBottom', color: t.neg, fontSize: 10.5, backgroundColor: chip, padding: [1, 4], borderRadius: 2 } });
     }
     if (o.lastPrice) {
       var last = m.close[m.n - 1];
@@ -488,6 +490,10 @@
       var s = rangeStart(m.xv[m.n - 1], r[0]);
       return s != null && m.xv[m.n - 1] - s < span * 0.98;
     });
+    // narrow blocks keep the essential buttons only
+    var w = ctx.el.clientWidth || 600;
+    var keepNarrow = w < 340 ? ['3m', '1y', 'all'] : w < 480 ? ['1m', '3m', '6m', '1y', 'all'] : null;
+    if (keepNarrow && !keys) items = items.filter(function (r) { return keepNarrow.indexOf(r[0]) >= 0; });
     var btns = {};
     var bar = h('div.rk-seg.rk-pv-range', { role: 'group', 'aria-label': 'Date range' }, items.map(function (r) {
       var b = h('button', { type: 'button', 'aria-pressed': 'false', on: { click: function () {
@@ -530,11 +536,19 @@
     return Math.sqrt(Math.pow(x[0] - y[0], 2) + Math.pow(x[1] - y[1], 2) + Math.pow(x[2] - y[2], 2));
   }
 
-  /** Axis labels: no decimals on round ticks ("$40" not "$40.00"). */
-  function axisFmt(fmt) {
+  /**
+   * Axis labels: drop the decimals when every tick is a whole number ("$40" not "$40.00", "100" not "100.0"),
+   * keep them on all ticks otherwise ("9.5x", "10.0x"). getStep returns the live tick interval when known.
+   */
+  function axisFmt(fmt, getStep) {
     var code = String(RK.format.presets[fmt] || fmt);
     var intFmt = code.replace(/\.[0#]+/g, '');
-    return function (v) { return RK.format(v, Math.abs(v - Math.round(v)) < 1e-9 && !/%/.test(code) ? intFmt : fmt); };
+    var isInt = function (v) { return Math.abs(v - Math.round(v)) < 1e-9; };
+    return function (v) {
+      var step = getStep ? getStep() : null;
+      var whole = /%/.test(code) ? false : util.isNum(step) ? isInt(step) && isInt(v) : isInt(v);
+      return RK.format(v, whole ? intFmt : fmt);
+    };
   }
 
   /**
@@ -543,6 +557,7 @@
    */
   var STEPS = [[1, 'd'], [2, 'd'], [7, 'w'], [14, 'w'], [1, 'm'], [2, 'm'], [3, 'm'], [6, 'm'], [12, 'm'], [24, 'm'], [60, 'm']];
   function dateTicks(win, width) {
+    if (!util.isNum(win[0]) || !util.isNum(win[1])) return { values: [], unit: 'd', key: 'none' };
     var a = win[0], b = win[1], target = util.clamp(Math.floor((width || 600) / 100), 3, 12);
     var days = (b - a) / DAY, step = STEPS[STEPS.length - 1];
     for (var k = 0; k < STEPS.length; k++) {

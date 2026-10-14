@@ -145,7 +145,7 @@
             value: [ix, iy, v],
             raw: [rawX[xk], rawY[yk]],
             itemStyle: dim ? { opacity: 0.22 } : undefined,
-            label: { color: v == null ? t.ink3 : RK.theme.onColor(fill, t.ink, '#ffffff') }
+            label: { color: v == null ? t.ink3 : RK.theme.onColor(fill, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#ffffff') }
           });
         });
       });
@@ -178,7 +178,7 @@
         legend: { show: false },
         // containLabel:false + outerBounds: ECharts 6 keeps top-positioned column labels below the colour legend
         grid: C.grid(ctx, { top: (legendOn ? 30 : 6) + (top ? 4 : 0), left: 2, right: 6, bottom: 2, containLabel: false,
-          outerBounds: { left: 0, right: 0, bottom: 0, top: legendOn ? 26 : 0 } }),
+          outerBounds: { left: 0, right: 0, bottom: 0, top: legendOn ? (top ? 32 : 26) : 0 } }),
         tooltip: {
           trigger: 'item',
           formatter: function (p) {

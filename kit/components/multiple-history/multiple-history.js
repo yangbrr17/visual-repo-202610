@@ -162,7 +162,7 @@
               tr.push({ label: 'Premium / (discount)', value: U.isNum(v) && U.isNum(c) && c ? RK.format(v / c - 1, '+0.0%;(0.0%);0.0%') : RK.format(null) });
             }
             if (st && U.isNum(v)) {
-              tr.push({ label: 'vs. ' + avgName.toLowerCase(), value: RK.format(v - st.mean, signed(fmt)) + (st.sd ? '  (' + RK.format((v - st.mean) / st.sd, '+0.0;−0.0;0.0') + 'σ)' : '') });
+              tr.push({ label: 'vs. ' + (o.lookback ? avgName : 'average'), value: RK.format(v - st.mean, signed(fmt)) + (st.sd ? '  (' + RK.format((v - st.mean) / st.sd, '+0.0;−0.0;0.0') + 'σ)' : '') });
             }
             return C.tip(RK.format(r[xf], 'dd mmm yyyy'), tr);
           }

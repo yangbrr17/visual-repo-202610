@@ -29,9 +29,10 @@
     "valueAxis": {"type": "boolean", "default": false, "desc": "Show the value axis and gridlines (off by default: labels carry the numbers)"},
     "axisBreak": {"type": "boolean|string|object", "default": false, "desc": "false | 'auto' | {start, end, gap}: break the value axis between zero and the walk so small deltas stay readable"},
     "pctOfStart": {"type": "boolean", "default": true, "desc": "Tooltip shows each delta as % of the opening total"},
-    "legend": {"type": "boolean", "default": true, "desc": "Legend (only shown for colorBy: 'category')"}
+    "legend": {"type": "boolean", "default": true, "desc": "Legend (only shown for colorBy: 'category')"},
+    "crossFilter": {"type": "boolean", "default": false, "desc": "Click a step to cross-filter / highlight on the label field (off by default: step names rarely key other datasets)"}
   },
-  "interactions": ["Hover tooltip with change, % of opening total and running total", "Click a step to cross-filter / highlight", "Animated build-up of the walk; smooth transitions on filter change", "PNG / CSV export"],
+  "interactions": ["Hover tooltip with change, % of opening total and running total", "Optional click-to-cross-filter on steps (crossFilter: true)", "Animated build-up of the walk; smooth transitions on filter change", "PNG / CSV export"],
   "samples": [
     {"title": "EBITDA bridge FY25A to FY26E (USD m)", "data": "ebitda_bridge", "height": 360,
      "options": {"encode": {"label": "step", "value": "value", "kind": "kind", "category": "category"}, "axisBreak": "auto"}},

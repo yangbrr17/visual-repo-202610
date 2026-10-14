@@ -1,0 +1,27 @@
+/* waffle — unit grid (SVG), focus-on-hover, fill-in animation on reveal */
+.rk-waffle { position: absolute; inset: 0; }
+.rk-waffle__svg { display: block; overflow: visible; }
+.rk-waffle__cell { transition: fill 420ms var(--rk-ease), opacity var(--rk-dur-fast) var(--rk-ease); cursor: pointer; }
+.rk-waffle__cell[data-cat=""] { cursor: default; }
+.rk-waffle__row { cursor: pointer; }
+.rk-waffle__sw { transition: fill 420ms var(--rk-ease); }
+/* focus: everything except the hovered category recedes */
+.rk-waffle__svg.is-focus .rk-waffle__cell:not(.is-hot) { opacity: .28; }
+.rk-waffle__svg.is-focus .rk-waffle__row:not(.is-hot) { opacity: .45; }
+/* entry: cells pop in one after another (row by row), waffles staggered */
+.rk-waffle__svg.is-animated .rk-waffle__cell {
+  transform-box: fill-box; transform-origin: center;
+  animation: rk-waffle-in 420ms var(--rk-ease) backwards;   /* backwards: hover opacity still applies afterwards */
+  animation-delay: calc(var(--i, 0) * 6ms + var(--w, 0) * 110ms + 80ms);
+}
+@keyframes rk-waffle-in { from { opacity: 0; transform: scale(.35); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .rk-waffle__svg.is-animated .rk-waffle__cell { animation: none; } }
+@media print { .rk-waffle__svg.is-animated .rk-waffle__cell { animation: none; } }
+/* tooltip (same look as chart tooltips) */
+.rk-waffle__tip {
+  position: absolute; left: 0; top: 0; z-index: 5; pointer-events: none;
+  padding: 8px 10px; border: 1px solid var(--rk-rule); border-radius: 6px;
+  background: var(--rk-tooltip-bg); color: var(--rk-tooltip-ink); box-shadow: 0 8px 24px rgba(15, 23, 42, .14);
+  opacity: 0; transition: opacity var(--rk-dur-fast) var(--rk-ease);
+}
+.rk-waffle__tip.is-on { opacity: 1; }

@@ -600,7 +600,7 @@ RK.data.preload({"manifest": {"reportkit": "0.1", "report": {"title": "Project K
     {"label": "Market cap", "value": 4358.9, "format": "$#,##0\"m\"", "delta": null, "delta_format": null, "period": "182.0m diluted shares", "spark": null, "good": "up"},
     {"label": "Enterprise value", "value": 5623.9, "format": "$#,##0\"m\"", "delta": null, "delta_format": null, "period": "incl. $1,265m net debt & minorities", "spark": null, "good": "up"},
     {"label": "EV / EBITDA NTM", "value": 9.600785, "format": "0.0x", "delta": -3.497791, "delta_format": "+0.0x;-0.0x;0.0x", "period": "vs. peer median 13.1x", "spark": null, "good": "up"},
-    {"label": "Revenue CAGR FY22A–25A", "value": 0.090352, "format": "0.0%", "delta": 128.4, "delta_format": "+#,##0\" bps\";-#,##0\" bps\";0\" bps\"", "period": "vs. peer median 7.8%", "spark": null, "good": "up"},
+    {"label": "Revenue CAGR 3y", "value": 0.090352, "format": "0.0%", "delta": 128.4, "delta_format": "+#,##0\" bps\";-#,##0\" bps\";0\" bps\"", "period": "vs. peer median 7.8%", "spark": null, "good": "up"},
     {"label": "30-day volatility", "value": 0.329731, "format": "0.0%", "delta": 90.9, "delta_format": "+#,##0\" bps\";-#,##0\" bps\";0\" bps\"", "period": "vs. peer median 32.1%", "spark": [0.38862, 0.372559, 0.361345, 0.345615, 0.352245, 0.32107, 0.30977, 0.296179, 0.299876, 0.301204, 0.262107, 0.258018, 0.24043, 0.258983, 0.308946, 0.352486, 0.351556, 0.351081, 0.355785, 0.352888, 0.328946, 0.288128, 0.294194, 0.320879, 0.327144, 0.329731], "good": "down"}
   ],
   "meta": {"source": "Synthetic market data (sqlite3 pipeline, random.Random(7)); prices to 13-Oct-2026"}
@@ -647,7 +647,7 @@ RK.data.preload({"manifest": {"reportkit": "0.1", "report": {"title": "Project K
   "id": "offer",
   "title": "Illustrative offer at a premium to reference prices",
   "schema": {"fields": [
-    {"name": "reference", "type": "string", "title": "Reference price"},
+    {"name": "reference", "type": "string", "title": "Reference"},
     {"name": "ref_price", "type": "number", "title": "Reference price", "format": "$#,##0.00", "unit": "USD"},
     {"name": "shares_out", "type": "number", "title": "Diluted shares", "format": "#,##0.0", "unit": "m"},
     {"name": "adj_net_debt", "type": "number", "title": "Net debt & minorities", "format": "$#,##0", "unit": "USD m"},
@@ -655,7 +655,7 @@ RK.data.preload({"manifest": {"reportkit": "0.1", "report": {"title": "Project K
     {"name": "ntm_ebitda", "type": "number", "title": "EBITDA NTM", "format": "$#,##0", "unit": "USD m"}
   ]},
   "data": [
-    {"reference": "Current share price", "ref_price": 23.95, "shares_out": 182.0, "adj_net_debt": 1265.0, "ltm_ebitda": 535.7, "ntm_ebitda": 585.8},
+    {"reference": "Current price", "ref_price": 23.95, "shares_out": 182.0, "adj_net_debt": 1265.0, "ltm_ebitda": 535.7, "ntm_ebitda": 585.8},
     {"reference": "30-day VWAP", "ref_price": 23.93, "shares_out": 182.0, "adj_net_debt": 1265.0, "ltm_ebitda": 535.7, "ntm_ebitda": 585.8},
     {"reference": "52-week high", "ref_price": 36.61, "shares_out": 182.0, "adj_net_debt": 1265.0, "ltm_ebitda": 535.7, "ntm_ebitda": 585.8}
   ],
@@ -679,13 +679,13 @@ RK.data.preload({"manifest": {"reportkit": "0.1", "report": {"title": "Project K
     {"name": "python", "type": "string", "title": "Python step"}
   ]},
   "data": [
-    {"dataset": "comps", "sql": "comps ← v_market, v_fundamentals, v_tsr, v_vol", "raw": "companies, prices, dividends, financials", "rows": 10, "python": "is_target 0/1 → boolean; computed net_leverage, ebitda_growth_ntm"},
-    {"dataset": "deals", "sql": "v_deals", "raw": "transactions, deal_prices", "rows": 14, "python": "announced → date; undisclosed EBITDA stays null (n.a.)"},
-    {"dataset": "premiums", "sql": "v_deals", "raw": "transactions, deal_prices", "rows": 28, "python": "melt 1-day / 30-day columns to long format; drop nulls"},
+    {"dataset": "comps", "sql": "comps ← v_market, v_fundamentals, v_tsr, v_vol", "raw": "companies, prices, dividends, financials", "rows": 10, "python": "0/1 → boolean; 2 computed fields"},
+    {"dataset": "deals", "sql": "v_deals", "raw": "transactions, deal_prices", "rows": 14, "python": "announced → date; NULL stays null (n.a.)"},
+    {"dataset": "premiums", "sql": "v_deals", "raw": "transactions, deal_prices", "rows": 28, "python": "melt to long format; drop missing premiums"},
     {"dataset": "consideration_mix", "sql": "v_deals + GROUP BY", "raw": "transactions", "rows": 3, "python": "—"},
-    {"dataset": "perf / vol", "sql": "weekly sample of v_vol", "raw": "prices, companies", "rows": 408, "python": "peer median per week; target vs. peers long format"},
-    {"dataset": "valuation", "sql": "comps, v_deals", "raw": "all", "rows": 6, "python": "peer / deal quartiles applied to target EBITDA, EPS and price"},
-    {"dataset": "kpis, ev_bridge, offer", "sql": "comps, v_peer_stats", "raw": "all", "rows": 14, "python": "presentation rows; offer uses @premium computed fields"}
+    {"dataset": "perf, vol", "sql": "weekly sample of v_vol", "raw": "prices, companies", "rows": 408, "python": "peer median per week; long format"},
+    {"dataset": "valuation", "sql": "comps, v_deals", "raw": "all", "rows": 6, "python": "quartiles applied to the target's EBITDA, EPS, price"},
+    {"dataset": "kpis, ev_bridge, offer", "sql": "comps, v_peer_stats", "raw": "all", "rows": 14, "python": "presentation rows; offer uses @premium"}
   ],
   "meta": {"source": "Northbridge Partners analysis"}
 }

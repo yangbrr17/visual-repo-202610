@@ -42,13 +42,14 @@
         it.tb = RK.format(it.b, fmt);
         if (o.change && U.isNum(it.a) && U.isNum(it.b) && it.a) it.tb += '  ' + RK.format(it.b / it.a - 1, '(+0%);(−0%);(0%)');
         it.dim = sel.length > 0 && !it.median && sel.indexOf(it.label) < 0;
+        it.sel = sel.length > 0 && sel.indexOf(it.label) >= 0;
         it.color = colorOf(it);
       });
 
       /* ---------------- horizontal layout: label columns + centred slope area ---------------- */
       var fName = '11px ' + t.fontSans, fNameB = '600 11px ' + t.fontSans, fVal = '600 11px ' + t.fontNum;
       var W = inst.getWidth(), MIN_SLOPE = 180;
-      function nameFont(it) { return it.hl || it.median ? fNameB : fName; }
+      function nameFont(it) { return it.hl || it.median || it.sel ? fNameB : fName; }
       var valAW = Math.max.apply(null, items.map(function (it) { return measure(it.ta, fVal); }).concat([0]));
       var valBW = Math.max.apply(null, items.map(function (it) { return measure(it.tb, fVal); }).concat([0]));
       var fullW = Math.min(o.labelWidth || 170, Math.max.apply(null, items.map(function (it) { return measure(String(it.label), nameFont(it)); }).concat([0])));
@@ -86,7 +87,7 @@
         if (it.median) return t.ink;
         if (it.hl) return t.accent2;
         if (o.colorBy === 'category') return catColor(it.group != null ? it.group : it.label);
-        if (o.colorBy === 'neutral') return t.dark ? t.ink3 : RK.theme.mix(t.ink3, t.paper, 0.15);
+        if (o.colorBy === 'neutral') return it.sel ? t.accent : t.dark ? t.ink3 : RK.theme.mix(t.ink3, t.paper, 0.15);
         if (!U.isNum(it.a) || !U.isNum(it.b) || it.a === it.b) return t.neutral;
         var up = it.b > it.a;
         return (o.good === 'down' ? !up : up) ? t.pos : t.neg;
@@ -96,16 +97,17 @@
       function labelText(it, side) {
         var v = side === 'a' ? it.ta : it.tb;
         var named = mode === 'both' || (mode === 'right' && side === 'b');
-        var key = it.hl ? 'h' : it.median ? 'm' : '';
+        var key = it.dim ? 'd' : it.hl ? 'h' : it.median || it.sel ? 'm' : '';
         var val = '{v' + key + side + '|' + esc(v) + '}';
         if (!named) return val;
         return side === 'a' ? '{n' + key + '|' + esc(it.name) + '}  ' + val : val + '  {n' + key + '|' + esc(it.name) + '}';
       }
       var hlInk = t.dark ? t.accent2 : RK.theme.mix(t.accent2, t.ink, 0.35);
       var rich = {
-        n: { font: fName, fill: t.ink2 }, nh: { font: fNameB, fill: hlInk }, nm: { font: fNameB, fill: t.ink }
+        n: { font: fName, fill: t.ink2 }, nh: { font: fNameB, fill: hlInk }, nm: { font: fNameB, fill: t.ink },
+        nd: { font: fName, fill: RK.theme.alpha(t.ink3, 0.55) }
       };
-      [['', t.ink], ['h', hlInk], ['m', t.ink]].forEach(function (k) {
+      [['', t.ink], ['h', hlInk], ['m', t.ink], ['d', RK.theme.alpha(t.ink3, 0.55)]].forEach(function (k) {
         rich['v' + k[0] + 'a'] = { font: fVal, fill: k[1], width: valAW, align: 'right' };
         rich['v' + k[0] + 'b'] = { font: fVal, fill: k[1], width: valBW, align: 'left' };
       });
@@ -120,8 +122,10 @@
           if (params.dataIndex === 0 || !lay) lay = layout(api, cs);
           var i = params.dataIndex, it = items[i];
           if (!it) return null;
-          var col = it.color, op = it.dim ? 0.2 : 1;
-          var lw = it.hl ? 2.6 : it.median ? 1.6 : 1.4;
+          // dimming is carried by colour alpha, not style.opacity, so it never fights an enter fade
+          var a = it.dim ? 0.2 : 1, col = RK.theme.alpha(it.color, a * (it.hl || it.median || it.sel ? 1 : 0.85));
+          var dotCol = RK.theme.alpha(it.color, a);
+          var lw = it.hl ? 2.6 : it.sel ? 2.2 : it.median ? 1.6 : 1.4;
           var kids = [];
           var hasA = U.isNum(it.a), hasB = U.isNum(it.b);
           var pa = hasA ? api.coord([0, it.a]) : null, pb = hasB ? api.coord([1, it.b]) : null;
@@ -129,7 +133,7 @@
             kids.push({
               type: 'line', z2: it.hl ? 20 : it.median ? 15 : 1,
               shape: { x1: pa[0], y1: pa[1], x2: pb[0], y2: pb[1] },
-              style: { stroke: col, lineWidth: lw, opacity: op * (it.hl || it.median ? 1 : 0.85), lineDash: it.median ? [5, 3] : null },
+              style: { stroke: col, lineWidth: lw, lineDash: it.median ? [5, 3] : null },
               emphasis: { style: { lineWidth: lw + 1 } },
               blur: { style: { opacity: 0.15 } },
               enterFrom: { shape: { x2: pa[0], y2: pa[1] } }
@@ -140,17 +144,17 @@
             if (!p) return;
             if (!it.median) {
               kids.push({ type: 'circle', z2: it.hl ? 21 : 2, shape: { cx: p[0], cy: p[1], r: it.hl ? 4 : 3 },
-                style: { fill: col, stroke: t.paper, lineWidth: 1, opacity: op }, blur: { style: { opacity: 0.15 } },
+                style: { fill: dotCol, stroke: t.paper, lineWidth: 1 }, blur: { style: { opacity: 0.15 } },
                 enterFrom: key === 'b' ? { style: { opacity: 0 } } : undefined });
             }
             var ly = lay[key][i], x = p[0] + dir * 10;
             if (Math.abs(ly - p[1]) > 1.5) {
               kids.push({ type: 'polyline', z2: 1, shape: { points: [[p[0] + dir * 4, p[1]], [x - dir * 2, ly]] },
-                style: { stroke: t.rule, lineWidth: 1, fill: null, opacity: op } });
+                style: { stroke: RK.theme.alpha(t.rule, a), lineWidth: 1, fill: null } });
             }
             kids.push({
               type: 'text', z2: it.hl ? 22 : 3, x: x, y: ly,
-              style: { text: labelText(it, key), rich: rich, align: dir < 0 ? 'right' : 'left', verticalAlign: 'middle', opacity: it.dim ? 0.35 : 1 },
+              style: { text: labelText(it, key), rich: rich, align: dir < 0 ? 'right' : 'left', verticalAlign: 'middle' },
               blur: { style: { opacity: 0.25 } },
               enterFrom: { style: { opacity: 0 } }
             });

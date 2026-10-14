@@ -119,7 +119,7 @@
 
       var base = t.accent3 || t.cat[1];
       var data = bins.map(function (b) {
-        return { value: [b.x0, b.x1, yOf(b.rows.length), b.rows.length, b.i], bin: b };
+        return { value: [b.x0, b.x1, yOf(b.rows.length), b.rows.length, b.i], bin: b, last: b.i === k - 1 };
       });
 
       function renderItem(params, api) {
@@ -180,7 +180,9 @@
       }) : [];
 
       var maxY = Math.max.apply(null, data.map(function (d) { return d.value[2]; }).concat(curve.map(function (c) { return c[1]; })));
-      var tickEvery = Math.max(1, Math.ceil(k / 10));
+      // one tick per bin edge while labels fit (~56px each), else every 2nd / 5th ... edge
+      var maxTicks = Math.max(4, Math.floor(((ctx.el.clientWidth || 600) - 80) / 56));
+      var tickEvery = Math.max(1, Math.ceil(k / maxTicks));
       var graphic = [];
       if (o.showN) {
         graphic.push({ type: 'text', right: 4, top: 0, silent: true,
@@ -212,8 +214,8 @@
           type: 'value', min: start, max: +(start + k * w).toPrecision(12), interval: w * tickEvery,
           name: o.title || ctx.title(enc.value), nameLocation: 'middle', nameGap: o.rug ? 34 : 26,
           axisLine: { show: true, onZero: false, lineStyle: { color: t.axis } },
-          axisTick: { show: true, length: 3, lineStyle: { color: t.axis } },
-          axisLabel: { formatter: axisFmt(fmt), margin: o.rug ? 14 : 8, hideOverlap: true },
+          axisTick: { show: !o.rug, length: 3, lineStyle: { color: t.axis } },   // the rug already marks the axis
+          axisLabel: { formatter: axisFmt(fmt), margin: o.rug ? 14 : 8, hideOverlap: true, showMaxLabel: k % tickEvery === 0 },
           splitLine: { show: false }
         },
         yAxis: {
@@ -245,7 +247,7 @@
           if (!b) return;
           if (cur && cur.op === 'between' && cur.min === b.x0) { RK.store.clearFilter(key); return; }
           // [x0, x1): nudge the inclusive "between" max just below the next edge (last bin stays closed)
-          var max = p.data.value[4] === p.data.value.length ? b.x1 : b.x1 - Math.abs(b.x1 - b.x0) * 1e-9;
+          var max = p.data.last ? b.x1 : b.x1 - Math.abs(b.x1 - b.x0) * 1e-9;
           RK.store.setFilter(key, { field: ctx.enc.value, op: 'between', min: b.x0, max: max, source: ctx.id });
         }
       }

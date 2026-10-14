@@ -39,7 +39,7 @@
   },
   "interactions": ["Collapse / expand row groups", "Hover tooltip with % of column / row and record count", "Click a row label or column header to cross-filter", "Sticky header, label column and totals row", "Numbers tween when filters change"],
   "samples": [
-    {"title": "Revenue by segment and region (USD m)", "data": "segment_revenue", "height": 560,
+    {"title": "Revenue by segment and region (USD m)", "data": "segment_revenue", "height": 620,
      "options": {"rows": ["segment", "region"], "cols": "year", "value": "revenue", "agg": "sum", "format": "#,##0", "cagr": true, "sort": "total-desc"}},
     {"title": "Segment mix — % of annual revenue", "data": "segment_revenue", "height": 200, "span": 8,
      "options": {"rows": ["segment"], "cols": "year", "value": "revenue", "show": "pctCol", "heat": "seq", "sort": "total-desc"}},

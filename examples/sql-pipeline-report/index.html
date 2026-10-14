@@ -67,7 +67,7 @@
             <p class="rk-block__subtitle">Implied value per share (USD)</p>
           </figcaption>
           <div class="rk-block__body" style="--rk-h:340px"></div>
-          <script type="application/json" data-rk-options>{"refLines": [{"value": 23.95, "label": "Current $23.95"}, {"value": 31.14, "label": "30% premium $31.14"}], "encode": {"label": "method", "low": "low", "high": "high", "group": "group", "note": "basis"}}</script>
+          <script type="application/json" data-rk-options>{"refLines": [{"value": 23.95, "label": "Current $23.95"}], "encode": {"label": "method", "low": "low", "high": "high", "group": "group", "note": "basis"}}</script>
         </figure>
       </div>
       <footer class="rk-page__foot"><span class="rk-page__source">Sources: Synthetic market data (sqlite3 pipeline, random.Random(7)); prices to 13-Oct-2026; Synthetic precedent transactions 2019–2026 and pre-announcement trading<span class="rk-page__notes">Note: Illustrative only: fictional companies and synthetic data.</span></span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
@@ -94,7 +94,7 @@
           <script type="application/json" data-rk-options>{"groupBy": "sector", "pinTarget": "top", "stats": ["mean", "median"], "scroll": false, "dense": true, "notes": {"Cardwell Software": "(1)", "Vedrix Robotics": "(2)"}, "columns": [{"field": "company"}, {"field": "price", "title": "Price", "group": "Market data", "stats": false}, {"field": "pct_52w_high", "title": "% 52w high", "group": "Market data"}, {"field": "mkt_cap", "title": "Mkt cap", "group": "Market data"}, {"field": "ev", "title": "EV", "group": "Market data"}, {"field": "ev_ltm_ebitda", "title": "LTM", "group": "EV / EBITDA", "heat": "seq"}, {"field": "ev_ntm_ebitda", "title": "NTM", "group": "EV / EBITDA", "heat": "seq"}, {"field": "ev_ntm_revenue", "title": "NTM", "group": "EV / Revenue"}, {"field": "pe_ntm", "title": "NTM", "group": "P / E", "nm": [0, 60.0]}, {"field": "rev_cagr_3y", "title": "Rev. CAGR 3y", "group": "Operating", "heat": "div"}, {"field": "ebitda_margin_ltm", "title": "EBITDA mgn LTM", "group": "Operating"}, {"field": "margin_delta_3y_bps", "title": "Δ mgn 3y", "group": "Operating"}, {"field": "net_leverage", "title": "ND / EBITDA", "group": "Operating"}, {"field": "tsr_1y", "title": "1y TSR", "group": "Trading", "heat": "div", "mid": 0}, {"field": "vol_30d", "title": "30d vol.", "group": "Trading"}], "encode": {"label": "company", "highlight": "is_target"}}</script>
         </figure>
       </div>
-      <footer class="rk-page__foot"><span class="rk-page__source">Source: Synthetic market data (sqlite3 pipeline, random.Random(7)); prices to 13-Oct-2026; Synthetic company financials FY21A–FY27E<span class="rk-page__notes">Notes: (1) (1) Listed in 2023; no FY22A financials, so CAGR and margin change are n.a. (2) (2) P / E n.m. (≤ 0x or &gt; 60x). (3) Mean and median exclude the target.</span></span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
+      <footer class="rk-page__foot"><span class="rk-page__source">Source: Synthetic market data (sqlite3 pipeline, random.Random(7)); prices to 13-Oct-2026; Synthetic company financials FY21A–FY27E<span class="rk-page__notes">Notes: (1) Listed in 2023; no FY22A financials, so CAGR and margin change are n.a. (2) P / E n.m. (≤ 0x or &gt; 60x). (3) Mean and median exclude the target.</span></span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
     </section>
     <section class="rk-page" id="multiples" data-rk-page="Multiples">
       <header class="rk-page__head">
@@ -125,7 +125,7 @@
       <header class="rk-page__head">
         <p class="rk-page__kicker">Trading performance</p>
         <h2 class="rk-page__title">Kestrel shares lagged the peer median by 30 pts over the last year</h2>
-        <p class="rk-page__subtitle">Total shareholder return; rolling 30-day volatility, annualised</p>
+        <p class="rk-page__subtitle">Share price performance and total shareholder return</p>
       </header>
       <div class="rk-page__body rk-grid">
         <figure class="rk-block" style="--rk-span:7" data-rk="line" data-rk-data="perf" id="trading-performance-share-price-rebased-to-100">
@@ -133,25 +133,45 @@
             <h3 class="rk-block__title">Share price, rebased to 100</h3>
             <p class="rk-block__subtitle">Weekly closes since 14-Oct-2024; peer median of rebased prices</p>
           </figcaption>
-          <div class="rk-block__body" style="--rk-h:330px"></div>
-          <script type="application/json" data-rk-options>{"highlight": "Kestrel Automation", "refLines": [{"value": 100, "label": "Start = 100"}], "encode": {"x": "date", "y": "perf_index", "series": "series"}}</script>
+          <div class="rk-block__body" style="--rk-h:360px"></div>
+          <script type="application/json" data-rk-options>{"highlight": "Kestrel Automation", "encode": {"x": "date", "y": "perf_index", "series": "series"}}</script>
         </figure>
         <figure class="rk-block" style="--rk-span:5" data-rk="bar" data-rk-data="comps" id="trading-performance-1-year-total-shareholder-return">
           <figcaption class="rk-block__head">
             <h3 class="rk-block__title">1-year total shareholder return</h3>
+            <p class="rk-block__subtitle">Price change plus dividends</p>
           </figcaption>
-          <div class="rk-block__body" style="--rk-h:330px"></div>
+          <div class="rk-block__body" style="--rk-h:360px"></div>
           <script type="application/json" data-rk-options>{"orientation": "horizontal", "sort": "desc", "highlight": "Kestrel Automation", "refLines": [{"value": 0.010741, "label": "Peer median"}], "encode": {"x": "company", "y": "tsr_1y"}}</script>
         </figure>
-        <figure class="rk-block" style="--rk-span:12" data-rk="line" data-rk-data="vol" id="trading-performance-rolling-30-day-volatility">
+      </div>
+      <footer class="rk-page__foot"><span class="rk-page__source">Source: Synthetic market data (sqlite3 pipeline, random.Random(7)); prices to 13-Oct-2026</span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
+    </section>
+    <section class="rk-page" id="trading-risk" data-rk-page="Trading risk">
+      <header class="rk-page__head">
+        <p class="rk-page__kicker">Trading risk</p>
+        <h2 class="rk-page__title">Kestrel&#x27;s 30-day volatility of 33% is 0.9 pts above the peer median</h2>
+        <p class="rk-page__subtitle">Rolling 30-day volatility of daily log returns, annualised</p>
+      </header>
+      <div class="rk-page__body rk-grid">
+        <figure class="rk-block" style="--rk-span:8" data-rk="line" data-rk-data="vol" id="trading-risk-rolling-30-day-volatility">
           <figcaption class="rk-block__head">
-            <h3 class="rk-block__title">Rolling 30-day volatility (annualised)</h3>
+            <h3 class="rk-block__title">Rolling 30-day volatility</h3>
+            <p class="rk-block__subtitle">Weekly sample; peer median of the peers&#x27; volatilities</p>
           </figcaption>
-          <div class="rk-block__body" style="--rk-h:230px"></div>
+          <div class="rk-block__body" style="--rk-h:360px"></div>
           <script type="application/json" data-rk-options>{"highlight": "Kestrel Automation", "encode": {"x": "date", "y": "vol_30d", "series": "series"}}</script>
         </figure>
+        <figure class="rk-block" style="--rk-span:4" data-rk="bar" data-rk-data="comps" id="trading-risk-current-30-day-volatility">
+          <figcaption class="rk-block__head">
+            <h3 class="rk-block__title">Current 30-day volatility</h3>
+            <p class="rk-block__subtitle">As of 13-Oct-2026</p>
+          </figcaption>
+          <div class="rk-block__body" style="--rk-h:360px"></div>
+          <script type="application/json" data-rk-options>{"orientation": "horizontal", "sort": "desc", "highlight": "Kestrel Automation", "refLines": [{"value": 0.320643, "label": "Peer median"}], "encode": {"x": "company", "y": "vol_30d"}}</script>
+        </figure>
       </div>
-      <footer class="rk-page__foot"><span class="rk-page__source">Sources: Synthetic market data (sqlite3 pipeline, random.Random(7)); prices to 13-Oct-2026; Synthetic market data (sqlite3 pipeline, random.Random(7)); prices to 13-Oct-2026; Synthetic company financials FY21A–FY27E</span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
+      <footer class="rk-page__foot"><span class="rk-page__source">Source: Synthetic market data (sqlite3 pipeline, random.Random(7)); prices to 13-Oct-2026</span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
     </section>
     <section class="rk-page" id="capital-structure" data-rk-page="Capital structure">
       <header class="rk-page__head">
@@ -208,19 +228,20 @@
         <p class="rk-page__subtitle">Offer price vs. last undisturbed close and 30-day VWAP before announcement</p>
       </header>
       <div class="rk-page__body rk-grid">
-        <figure class="rk-block" style="--rk-span:7" data-rk="beeswarm" data-rk-data="premiums" id="premiums-paid-premium-distribution">
+        <figure class="rk-block" style="--rk-span:6" data-rk="beeswarm" data-rk-data="premiums" id="premiums-paid-premium-distribution">
           <figcaption class="rk-block__head">
             <h3 class="rk-block__title">Premium distribution</h3>
           </figcaption>
           <div class="rk-block__body" style="--rk-h:300px"></div>
           <script type="application/json" data-rk-options>{"labels": "extremes", "refLines": [{"value": 0.3, "label": "Illustrative offer 30%"}], "encode": {"label": "target", "value": "premium", "group": "measure"}}</script>
         </figure>
-        <figure class="rk-block" style="--rk-span:5" data-rk="donut" data-rk-data="consideration_mix" id="premiums-paid-deal-value-by-consideration">
+        <figure class="rk-block" style="--rk-span:6" data-rk="donut" data-rk-data="consideration_mix" id="premiums-paid-deal-value-by-consideration">
           <figcaption class="rk-block__head">
             <h3 class="rk-block__title">Deal value by consideration</h3>
+            <p class="rk-block__subtitle">USD m, all precedents</p>
           </figcaption>
           <div class="rk-block__body" style="--rk-h:300px"></div>
-          <script type="application/json" data-rk-options>{"centerLabel": "Deal value", "encode": {"label": "consideration", "value": "deal_value"}}</script>
+          <script type="application/json" data-rk-options>{"layout": "labels", "display": "both", "centerLabel": "Deal value", "encode": {"label": "consideration", "value": "deal_value"}}</script>
         </figure>
       </div>
       <footer class="rk-page__foot"><span class="rk-page__source">Source: Synthetic precedent transactions 2019–2026 and pre-announcement trading</span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
@@ -256,21 +277,31 @@
       </div>
       <footer class="rk-page__foot"><span class="rk-page__source">Source: Northbridge Partners analysis<span class="rk-page__notes">Notes: (1) Offer value = offer price × diluted shares; implied EV adds net debt and minorities. (2) Illustrative only: fictional companies and synthetic data.</span></span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
     </section>
-    <section class="rk-page" id="appendix" data-rk-page="Appendix">
+    <section class="rk-page" id="methodology" data-rk-page="Methodology">
       <header class="rk-page__head">
-        <p class="rk-page__kicker">Appendix</p>
+        <p class="rk-page__kicker">Methodology</p>
         <h2 class="rk-page__title">Appendix: how the numbers were built</h2>
         <p class="rk-page__subtitle">Raw tables → SQL views → Python → ReportKit datasets</p>
       </header>
       <div class="rk-page__body rk-grid">
-        <figure class="rk-block" style="--rk-span:12" data-rk="text-block" id="appendix-methodology">
+        <figure class="rk-block" style="--rk-span:12" data-rk="text-block" id="methodology-metric-definitions">
           <figcaption class="rk-block__head">
-            <h3 class="rk-block__title">Methodology</h3>
+            <h3 class="rk-block__title">Metric definitions</h3>
           </figcaption>
           <div class="rk-block__body"></div>
-          <script type="application/json" data-rk-options>{"variant": "prose", "text": "**How every number was produced** — one in-memory SQLite database, five SQL views, one Python step.\n\n- **Market cap / EV** — latest close × diluted shares; EV = market cap + total debt + minorities − cash (`v_market`, `ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC)`).\n- **LTM / NTM** — calendarised to the last reported quarter (Q3-26): LTM = 25% FY25A + 75% FY26E, NTM = 25% FY26E + 75% FY27E (`v_fundamentals`, conditional aggregation).\n- **Revenue CAGR / margin change** — FY22A → FY25A; `LAG(…, 3)` guarded so gaps in the history return NULL, never a wrong base year.\n- **1-year TSR** — (close today + dividends with ex-date in the window) / close one year earlier − 1 (`v_tsr`).\n- **30-day volatility** — sample standard deviation of daily log returns over a 30-row window × √252 (`v_vol`, `AVG(…) OVER (ROWS BETWEEN 29 PRECEDING AND CURRENT ROW)`).\n- **Premiums** — offer price vs. the last undisturbed close (1-day) and the 30-day VWAP before announcement (`v_deals`).\n- **Peer medians** — target excluded; P / E ≤ 0x or > 60x is n.m. and excluded (`v_peer_stats`, `ROW_NUMBER` / `COUNT` median, cross-checked in Python).\n- **Ranges** — football-field ranges use the peer interquartile range (25th–75th percentile, linear interpolation)."}</script>
+          <script type="application/json" data-rk-options>{"variant": "prose", "text": "**One in-memory SQLite database, six SQL views and one staging table, one Python step.** SQL objects are in *italics*; run the script with --dump-db to open them in any SQL client.\n\n- **Market cap / EV** — latest close × diluted shares; EV = market cap + total debt + minorities − cash (*v_market*, ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC)).\n- **LTM / NTM** — calendarised to the last reported quarter (Q3-26): LTM = 25% FY25A + 75% FY26E, NTM = 25% FY26E + 75% FY27E (*v_fundamentals*, conditional aggregation).\n- **Revenue CAGR / margin change** — FY22A → FY25A; LAG(…, 3) is guarded so a gap in the history returns NULL, never a wrong base year.\n- **1-year TSR** — (close today + dividends with an ex-date in the window) / close one year earlier − 1 (*v_tsr*).\n- **30-day volatility** — sample standard deviation of daily log returns over a 30-row window × √252 (*v_vol*, AVG(…) OVER (ROWS BETWEEN 29 PRECEDING AND CURRENT ROW)).\n- **Premiums** — offer price vs. the last undisturbed close (1-day) and the 30-day VWAP before the announcement (*v_deals*).\n- **Peer medians** — target excluded; P / E ≤ 0x or > 60x is n.m. and excluded (*v_peer_stats*, ROW_NUMBER / COUNT median, cross-checked against the Python median).\n- **Ranges** — football-field ranges apply the peer / deal interquartile range (25th–75th percentile, linear interpolation) to the target's own EBITDA, EPS and share price."}</script>
         </figure>
-        <figure class="rk-block" style="--rk-span:12" data-rk="comps-table" data-rk-data="lineage" id="appendix-data-lineage">
+      </div>
+      <footer class="rk-page__foot"><span class="rk-page__source">Source: Northbridge Partners analysis</span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
+    </section>
+    <section class="rk-page" id="data-lineage" data-rk-page="Data lineage">
+      <header class="rk-page__head">
+        <p class="rk-page__kicker">Data lineage</p>
+        <h2 class="rk-page__title">Appendix: every dataset traces back to a raw table</h2>
+        <p class="rk-page__subtitle">One file per dataset in data/datasets/; open the CSV export from any chart toolbar</p>
+      </header>
+      <div class="rk-page__body rk-grid">
+        <figure class="rk-block" style="--rk-span:12" data-rk="comps-table" data-rk-data="lineage" id="data-lineage-data-lineage">
           <figcaption class="rk-block__head">
             <h3 class="rk-block__title">Data lineage</h3>
             <p class="rk-block__subtitle">Raw: 5,220 daily prices, 68 financial years, 56 dividends, 14 deals with 840 pre-announcement closes</p>

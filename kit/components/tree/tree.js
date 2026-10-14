@@ -12,12 +12,14 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
+  /** Canvas text width (margins and wraps are sized from measured labels). */
   var measure = (function () {
     var c2d = null;
     return function (text, font) {
       c2d = c2d || document.createElement('canvas').getContext('2d');
       c2d.font = font;
-      return c2d.measureText(String(text)).width;
+      // +7%: the canvas may measure with a fallback face before the webfont has loaded
+      return c2d.measureText(String(text)).width * 1.07;
     };
   })();
 
@@ -379,34 +381,61 @@
           symbol: 'circle', symbolSize: center ? 18 : (n.children.length ? 12 : 9), category: cats.indexOf(n.cat || 'Entity'),
           itemStyle: { color: c, borderColor: isHi(n) ? t.accent2 : t.paper, borderWidth: isHi(n) ? 2.5 : 1 },
           label: {
-            show: true, position: center ? 'bottom' : (right ? 'right' : 'left'), distance: 5,
+            show: true, position: center ? 'bottom' : (kids(n).length ? 'top' : (right ? 'right' : 'left')), distance: 5,
             formatter: safe(n.name), fontSize: 10.5, fontWeight: n.depth === 0 || isHi(n) ? 700 : 500,
             color: n.children.length ? t.ink : t.ink2, textBorderColor: t.paper, textBorderWidth: 3,
             width: labW, overflow: 'truncate'
           },
           cursor: n.children.length && o.collapsible !== false ? 'pointer' : 'default'
         });
-        // polar elbow connectors: spoke out to a bus ring half a level beyond the parent, arc along
-        // the ring across the children's angles, spoke out to each child
-        var ks = kids(n);
-        if (ks.length) {
-          var fb = n._f + 0.5 / levels;
-          var pts = [{ a: n._a, id: 'rp:' + n.id }];
-          ks.forEach(function (k) { pts.push({ a: k._a, id: 'rk:' + k.id, child: k }); });
-          var lo = Math.min.apply(null, pts.map(function (q) { return q.a; })), hi2 = Math.max.apply(null, pts.map(function (q) { return q.a; }));
-          for (var a = lo + 0.08; a < hi2 - 0.04; a += 0.08) pts.push({ a: a, id: 'ra:' + n.id + ':' + pts.length });
-          pts.sort(function (p1, p2) { return p1.a - p2.a; });
-          pts.forEach(function (q) { var d = point(q.id), xy = polar(q.a, fb); d.x = xy[0]; d.y = xy[1]; });
-          for (var i = 1; i < pts.length; i++) link(pts[i - 1].id, pts[i].id, null, false);
-          link('n:' + n.id, 'rp:' + n.id, null, false);
-          ks.forEach(function (k) {
-            link('rk:' + k.id, 'n:' + k.id, null, o.dashMinority && k.pct != null && k.pct < 0.5);
-            var txt = pctText(k);
-            if (txt) { var mxy = polar(k._a, (fb + k._f) / 2); pill('pct:' + k.id, mxy[0], mxy[1], txt, null, false); }
-          });
+        // radial Bezier link (as d3.linkRadial): control points on the mid ring at the parent's
+        // and the child's angle, sampled into a short polyline of invisible points
+        if (n.parent && !collapsed.has(n.parent.id)) {
+          var pr = n.parent, fm = (pr._f + n._f) / 2;
+          var P0 = pr._p, P1 = polar(pr._a, fm), P2 = polar(n._a, fm), P3 = n._p, prevId = 'n:' + pr.id;
+          var dashed = o.dashMinority && n.pct != null && n.pct < 0.5;
+          for (var si = 1; si <= 12; si++) {
+            var tt = si / 12, u = 1 - tt;
+            var bx2 = u * u * u * P0[0] + 3 * u * u * tt * P1[0] + 3 * u * tt * tt * P2[0] + tt * tt * tt * P3[0];
+            var by2 = u * u * u * P0[1] + 3 * u * u * tt * P1[1] + 3 * u * tt * tt * P2[1] + tt * tt * tt * P3[1];
+            var curId = si === 12 ? 'n:' + n.id : 'rc:' + n.id + ':' + si;
+            if (si < 12) { var d = point(curId); d.x = bx2; d.y = by2; }
+            link(prevId, curId, null, dashed);
+            if (si === 9) { var txt = pctText(n); if (txt) pill('pct:' + n.id, bx2, by2, txt, null, false); }
+            prevId = curId;
+          }
         }
         if (collapsed.has(n.id) && n.children.length) {
           pill('more:' + n.id, n._p[0] + Math.cos(n._a) * 16, n._p[1] + Math.sin(n._a) * 16 + 12, '+' + n.descendants, n.id, true);
+        }
+      });
+    }
+
+    // zoom-to-fit: when the drawing (incl. box extents) is larger than the block, scale positions,
+    // boxes and fonts together (floor 55%; beyond that the user pans / zooms)
+    var ext = [Infinity, Infinity, -Infinity, -Infinity];
+    nodes.forEach(function (d) {
+      var sz = Array.isArray(d.symbolSize) ? d.symbolSize : [d.symbolSize || 0, d.symbolSize || 0];
+      var lw = d.label && d.label.show && !d.rkDummy && radial ? 140 : 0;   // radial labels sit beside the dot
+      ext[0] = Math.min(ext[0], d.x - sz[0] / 2 - lw); ext[1] = Math.min(ext[1], d.y - sz[1] / 2 - 8);
+      ext[2] = Math.max(ext[2], d.x + sz[0] / 2 + lw); ext[3] = Math.max(ext[3], d.y + sz[1] / 2 + 8);
+    });
+    var availW = W - 2 * pad, availH = H - legendH - 2 * pad;
+    var fit = Math.min(1, availW / Math.max(1, ext[2] - ext[0]), availH / Math.max(1, ext[3] - ext[1]));
+    if (!radial && fit < 0.999) {
+      fit = Math.max(0.55, fit);
+      var ox = pad + Math.max(0, (availW - (ext[2] - ext[0]) * fit) / 2), oy = legendH + pad + Math.max(0, (availH - (ext[3] - ext[1]) * fit) / 2);
+      var scaleRich = function (r) {
+        Object.keys(r || {}).forEach(function (k) { if (r[k].fontSize) r[k].fontSize *= fit; if (r[k].lineHeight) r[k].lineHeight *= fit; });
+      };
+      nodes.forEach(function (d) {
+        d.x = ox + (d.x - ext[0]) * fit;
+        d.y = oy + (d.y - ext[1]) * fit;
+        if (Array.isArray(d.symbolSize)) d.symbolSize = [d.symbolSize[0] * fit, d.symbolSize[1] * fit];
+        else if (d.symbolSize) d.symbolSize *= fit;
+        if (d.label) {
+          if (d.label.fontSize) d.label.fontSize = Math.max(7.5, d.label.fontSize * fit);
+          scaleRich(d.label.rich);
         }
       });
     }

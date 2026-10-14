@@ -24,6 +24,15 @@
     return best;
   }
 
+  /** Fixed tooltip centred above the cell (below when there is no room), kept inside the viewport. */
+  function placeTip(tip, cell) {
+    var r = cell.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+    var x = util.clamp(r.left + r.width / 2 - tw / 2, 6, Math.max(6, window.innerWidth - tw - 6));
+    var y = r.top - th - 8;
+    if (y < 6) y = r.bottom + 8;
+    tip.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+  }
+
   function cmp(a, b) { return typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b)); }
 
   /** Long rows -> {rows:[...], cols:[...], cell(i, j) -> value}. */
@@ -69,17 +78,17 @@
       ctx.el.classList.add('is-auto');
 
       var root = h('div.rk-sens');
-      var bar = h('div.rk-sens__bar.rk-noprint');
+      var bar = h('div.rk-sens__bar');
       var caption = h('div.rk-sens__caption');
-      var seg = h('div.rk-seg.rk-sens__seg', { role: 'group', 'aria-label': 'Display mode' });
+      var seg = h('div.rk-seg.rk-sens__seg.rk-noprint', { role: 'group', 'aria-label': 'Display mode' });
       var table = h('table.rk-table.rk-sens__table');
       var tip = h('div.rk-sens__tip', { 'aria-hidden': 'true' });
       bar.appendChild(caption);
       bar.appendChild(seg);
       root.appendChild(bar);
       root.appendChild(h('div.rk-sens__wrap', table));
-      root.appendChild(tip);
       ctx.el.appendChild(root);
+      document.body.appendChild(tip); // fixed-position tooltip: never clipped by the page
 
       MODES.forEach(function (m) {
         seg.appendChild(h('button', { type: 'button', dataset: { mode: m[0] }, 'aria-pressed': 'false' }, m[1]));
@@ -175,6 +184,8 @@
             var x = k >= 1 || !util.isNum(to) || !util.isNum(from) ? to : from + (to - from) * k;
             var isB = a === b.i && c === b.j;
             cells[a][c].textContent = RK.format(x, isB ? F.value : fmt);
+            // without heat, negative changes read in the negative colour
+            cells[a][c].classList.toggle('is-neg', !scale && !isB && mode !== 'value' && util.isNum(to) && to < 0);
           }
         }
         if (how === 'tween' && prev && cur.motion) RK.motion.tween(420, paint, 'outCubic');
@@ -262,13 +273,8 @@
         tip.innerHTML = RK.chart.tip((o.rowTitle || cur.title(enc.row)) + ' ' + RK.format(p.row, F.row) + '  ·  ' +
           (o.colTitle || cur.title(enc.col)) + ' ' + RK.format(p.col, F.col), rows,
           isBase ? 'Base case' : (o.rebase !== false ? 'Click to set as base case' : null));
-        var box = root.getBoundingClientRect(), r = td.getBoundingClientRect();
         tip.classList.add('is-on');
-        var tw = tip.offsetWidth, th = tip.offsetHeight;
-        var x = r.left - box.left + r.width / 2 - tw / 2;
-        var y = r.top - box.top - th - 8;
-        if (y < 0) y = r.bottom - box.top + 8;
-        tip.style.transform = 'translate(' + Math.round(util.clamp(x, 0, Math.max(0, box.width - tw))) + 'px,' + Math.round(y) + 'px)';
+        placeTip(tip, td);
       }
       function onOver(e) {
         var td = e.target.closest('td.rk-sens__cell');
@@ -300,6 +306,7 @@
       }
       table.addEventListener('mouseover', onOver);
       table.addEventListener('mouseleave', onLeave);
+      window.addEventListener('scroll', onLeave, { passive: true, capture: true });
       table.addEventListener('click', onClick);
       seg.addEventListener('click', onSeg);
 
@@ -319,9 +326,11 @@
           unsub();
           table.removeEventListener('mouseover', onOver);
           table.removeEventListener('mouseleave', onLeave);
+          window.removeEventListener('scroll', onLeave, { capture: true });
           table.removeEventListener('click', onClick);
           seg.removeEventListener('click', onSeg);
           root.remove();
+          tip.remove();
           cur.el.classList.remove('is-auto');
         }
       };

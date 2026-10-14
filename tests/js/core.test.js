@@ -6,11 +6,13 @@ const vm = require('vm');
 const assert = require('assert');
 
 const root = path.resolve(__dirname, '../..');
+// RK_CORE_DIR=/path/to/patched/kit/core runs this suite against a patched copy (see research/engine-audit.md)
+const coreDir = process.env.RK_CORE_DIR ? path.resolve(process.env.RK_CORE_DIR) : path.join(root, 'kit/core');
 const sandbox = { console, Promise, setTimeout, clearTimeout, Map, Set, Math, JSON, Date };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
 for (const f of ['rk.core.js', 'rk.format.js', 'rk.expr.js', 'rk.data.js']) {
-  vm.runInContext(fs.readFileSync(path.join(root, 'kit/core', f), 'utf8'), sandbox, { filename: f });
+  vm.runInContext(fs.readFileSync(path.join(coreDir, f), 'utf8'), sandbox, { filename: f });
 }
 const RK = sandbox.RK;
 let passed = 0;

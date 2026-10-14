@@ -10,6 +10,19 @@
   var MINUS = '−';
 
   function isNum(v) { return typeof v === 'number' && isFinite(v); }
+
+  /** Re-run the layout without animation when the width changes (label room is measured in px). */
+  function relayout(render) {
+    return function (ctx) {
+      var api = render(ctx), last = ctx, update = api.update, w = api.chart.getWidth();
+      api.update = function (c) { last = c; w = api.chart.getWidth(); update(c); };
+      api.resize = function () {
+        api.chart.resize();
+        if (Math.abs(api.chart.getWidth() - w) > 4) { w = api.chart.getWidth(); update(Object.assign({}, last, { motion: false })); }
+      };
+      return api;
+    };
+  }
   function median(a) {
     a = a.filter(isNum).sort(function (x, y) { return x - y; });
     if (!a.length) return null;
@@ -231,8 +244,8 @@
       highlightBand: true,
       format: null
     },
-    render: C(build, {
+    render: relayout(C(build, {
       select: function (p, ctx) { return p.seriesId === 'bars' ? { field: ctx.enc.label, value: p.name } : null; }
-    })
+    }))
   });
 })();

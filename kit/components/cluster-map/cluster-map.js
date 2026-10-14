@@ -264,6 +264,14 @@
     values.forEach(function (v, i) { m[v] = pal[i % pal.length]; });
     return function (v) { return m[v] || t.neutral; };
   }
+  /** Text colour with the best contrast on a fill (theme ink, paper or white). */
+  function textOn(t, fill) {
+    var lf = RK.theme.luminance(fill);
+    return [t.ink, t.paper, '#ffffff'].map(function (c) {
+      var lc = RK.theme.luminance(c);
+      return { c: c, r: (Math.max(lf, lc) + 0.05) / (Math.min(lf, lc) + 0.05) };
+    }).sort(function (a, b) { return b.r - a.r; })[0].c;
+  }
   /** Sequential stops without the palest steps (they vanish against the land colour). */
   function seqStops(t) { return t.seq.length >= 6 ? t.seq.slice(2) : t.seq; }
 
@@ -283,11 +291,11 @@
   }
 
   /** PNG snapshot of the map container (SVG foreignObject + inlined computed styles). */
-  var SNAP = ['position', 'left', 'top', 'right', 'bottom', 'width', 'height', 'display', 'transform', 'transform-origin', 'z-index', 'overflow',
+  var SNAP = ['position', 'left', 'top', 'right', 'bottom', 'display', 'float', 'clear', 'transform', 'transform-origin', 'z-index', 'overflow',
     'opacity', 'visibility', 'margin-left', 'margin-top', 'padding', 'box-sizing', 'background-color', 'background-image', 'border', 'border-radius',
     'color', 'font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'white-space', 'text-align', 'text-shadow',
     'flex-direction', 'flex-wrap', 'align-items', 'justify-content', 'gap', 'fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-opacity',
-    'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin'];
+    'stroke-dasharray', 'stroke-dashoffset', 'stroke-linecap', 'stroke-linejoin'];
   function snapshot(ctx, map) {
     var src = map.getContainer(), w = src.clientWidth, ht = src.clientHeight, t = ctx.theme;
     var clone = src.cloneNode(true);
@@ -295,6 +303,9 @@
     a.forEach(function (n, i) {
       var cs = getComputedStyle(n), css = '';
       SNAP.forEach(function (p) { css += p + ':' + cs.getPropertyValue(p) + ';'; });
+      // legend text boxes keep auto size: the export falls back to a system font of another width
+      var flow = n.childNodes.length && /^(static|relative)$/.test(cs.position) && !(n instanceof SVGElement) && n.closest && n.closest('.leaflet-control');
+      if (!flow) css += 'width:' + cs.width + ';height:' + cs.height + ';';
       b[i].setAttribute('style', css + 'animation:none;transition:none;');
       if (n.tagName === 'CANVAS' && b[i].parentNode) {
         try { var img = document.createElement('img'); img.setAttribute('src', n.toDataURL()); img.setAttribute('style', b[i].getAttribute('style')); b[i].parentNode.replaceChild(img, b[i]); } catch (e) { /* tainted */ }
@@ -337,7 +348,7 @@
     var fs = size < 36 ? 10.5 : size < 48 ? 11.5 : 12.5;
     return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">' + ring +
       '<circle cx="' + c + '" cy="' + c + '" r="' + (rr - 3.5).toFixed(2) + '" fill="' + t.accent + '" stroke="' + t.paper + '" stroke-width="1"/>' +
-      '<text x="' + c + '" y="' + (c + fs * 0.36).toFixed(1) + '" text-anchor="middle" font-size="' + fs + '" fill="' + RK.theme.onColor(t.accent, t.ink, '#fff') + '">' +
+      '<text x="' + c + '" y="' + (c + fs * 0.36).toFixed(1) + '" text-anchor="middle" font-size="' + fs + '" fill="' + textOn(t, t.accent) + '">' +
       RK.util.escapeHTML(text) + '</text></svg>';
   }
 

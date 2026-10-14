@@ -90,7 +90,7 @@
         formatter: function (p) {
           var d = p.value && p.value[0], v = p.value && p.value[1];
           var dt = RK.format.toDate(d);
-          var rows = [{ label: ctx.title(vf), value: RK.format(v, fmt), bold: true }];
+          var rows = [{ label: ctx.title(vf), value: RK.format(v, fmt) }];
           if (avg) rows.push({ label: 'vs. period average', value: RK.format(v / avg - 1, '+0.0%;−0.0%;0.0%') });
           return C.tip((dt ? WEEKDAYS[dt.getDay()] + ' ' : '') + RK.format(d, 'dd mmm yyyy'), rows);
         }
@@ -175,9 +175,10 @@
     var showText = o.labels !== false;
 
     function cellRect(api, x, y, shift) {
-      var c = api.coord([x, y]), s = api.size([1, 1]);
+      // the year axis is inverse, so api.size() can be negative: normalise or hit-testing (tooltips) fails
+      var c = api.coord([x, y]), s = api.size([1, 1]), w = Math.abs(s[0]), h = Math.abs(s[1]);
       var g = 1.5;
-      return { x: c[0] - s[0] / 2 + g + (shift || 0), y: c[1] - s[1] / 2 + g, width: s[0] - 2 * g - (shift || 0), height: s[1] - 2 * g };
+      return { x: c[0] - w / 2 + g + (shift || 0), y: c[1] - h / 2 + g, width: w - 2 * g - (shift || 0), height: h - 2 * g };
     }
     function enter(x, y) {
       return { enterFrom: { style: { opacity: 0 } }, enterAnimation: { delay: (x + y) * 22, duration: 420 } };
@@ -189,7 +190,8 @@
         var x = api.value(0), y = api.value(1), v = api.value(2);
         var fill = api.visual('color') || t.surface;
         var r = cellRect(api, x, y);
-        var kids = [U.merge({ type: 'rect', shape: U.merge(r, { r: 2 }), style: { fill: fill } }, enter(x, y))];
+        var kids = [U.merge({ type: 'rect', shape: U.merge(r, { r: 2 }), style: { fill: fill, stroke: null },
+          emphasis: { style: { stroke: t.ink, lineWidth: 1.5 } } }, enter(x, y))];
         if (showText && r.width > 26) {
           kids.push(U.merge({ type: 'text', x: r.x + r.width / 2, y: r.y + r.height / 2,
             style: { text: RK.format(v, fmt), fill: textOn(fill, t), font: font, align: 'center', verticalAlign: 'middle' } }, enter(x, y)));
@@ -224,14 +226,14 @@
           var d = p.data;
           if (!d) return '';
           if (p.seriesId === 'cells') {
-            return C.tip(MONTHS[d[0]] + ' ' + yCats[d[1]], [{ label: ctx.title(vf), value: RK.format(d[2], fmt), bold: true }]);
+            return C.tip(MONTHS[d[0]] + ' ' + yCats[d[1]], [{ label: ctx.title(vf), value: RK.format(d[2], fmt) }]);
           }
           if (d[4] === 'total') {
             var partial = d[3] < 12;
-            return C.tip(String(d[5]) + (partial ? ' YTD' : ''), [{ label: (o.compound !== false ? 'Compounded ' : 'Sum of ') + 'monthly ' + ctx.title(vf).toLowerCase(), value: RK.format(d[2], fmt), bold: true }],
+            return C.tip(String(d[5]) + (partial ? ' YTD' : ''), [{ label: (o.compound !== false ? 'Compounded ' : 'Sum of ') + 'monthly ' + ctx.title(vf).toLowerCase(), value: RK.format(d[2], fmt) }],
               partial ? d[3] + ' months of data' : null);
           }
-          return C.tip(MONTHS[d[0]] + ' average', [{ label: ctx.title(vf), value: RK.format(d[2], fmt), bold: true }], d[3] + ' years');
+          return C.tip(MONTHS[d[0]] + ' average', [{ label: ctx.title(vf), value: RK.format(d[2], fmt) }], d[3] + ' years');
         }
       },
       visualMap: {

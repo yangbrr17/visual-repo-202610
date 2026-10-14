@@ -107,8 +107,9 @@
       var thead = h('thead'), tbody = h('tbody'), tfoot = h('tfoot');
       var table = h('table.rk-table.rk-pivot__table', thead, tbody, tfoot);
       var tip = h('div.rk-pivot__tip', { 'aria-hidden': 'true' });
-      var root = h('div.rk-pivot', { class: auto ? 'is-auto' : null }, h('div.rk-pivot__scroll', table), tip);
+      var root = h('div.rk-pivot', { class: auto ? 'is-auto' : null }, h('div.rk-pivot__scroll', table));
       ctx.el.appendChild(root);
+      document.body.appendChild(tip); // fixed-position tooltip: never clipped by the page
       var model = null;
 
       /* ---------------- model ---------------- */
@@ -124,8 +125,13 @@
 
         var counting = o.agg === 'count' || o.agg === 'countd';
         function agg(list) { return list && list.length ? fn(list) : (counting ? 0 : null); }
-        function cell(n, ck) { return agg(n.cells.get(ck)); }
-        function total(n) { return agg(n.all); }
+        // memoised per node (the tree is rebuilt on every compute)
+        function cell(n, ck) {
+          var memo = n.memo || (n.memo = new Map());
+          if (!memo.has(ck)) memo.set(ck, agg(n.cells.get(ck)));
+          return memo.get(ck);
+        }
+        function total(n) { if (!('tot' in n)) n.tot = agg(n.all); return n.tot; }
         // sort siblings at every level
         (function sortKids(n) {
           if (o.sort === 'label') n.kids.sort(function (a, b) { return cmp(a.value, b.value); });
@@ -359,17 +365,17 @@
         var cnt = ck === '\u0002' ? n.n : (n.cells.get(ck) || []).length;
         tip.innerHTML = RK.chart.tip(title, rows, cnt + (cnt === 1 ? ' record' : ' records'));
         tip.classList.add('is-on');
-        var box = root.getBoundingClientRect(), r = td.getBoundingClientRect();
-        var tw = tip.offsetWidth, th = tip.offsetHeight;
-        var x = util.clamp(r.left - box.left + r.width / 2 - tw / 2, 0, Math.max(0, box.width - tw));
-        var y = r.top - box.top - th - 6;
-        if (y < 0) y = r.bottom - box.top + 6;
+        var r = td.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+        var x = util.clamp(r.left + r.width / 2 - tw / 2, 6, Math.max(6, window.innerWidth - tw - 6));
+        var y = r.top - th - 8;
+        if (y < 6) y = r.bottom + 8;
         tip.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
       }
       function onLeave() { tip.classList.remove('is-on'); }
       table.addEventListener('click', onClick);
       table.addEventListener('mouseover', onOver);
       table.addEventListener('mouseleave', onLeave);
+      window.addEventListener('scroll', onLeave, { passive: true, capture: true });
 
       draw(false);
 
@@ -379,7 +385,9 @@
           table.removeEventListener('click', onClick);
           table.removeEventListener('mouseover', onOver);
           table.removeEventListener('mouseleave', onLeave);
+          window.removeEventListener('scroll', onLeave, { capture: true });
           root.remove();
+          tip.remove();
           if (auto) cur.el.classList.remove('is-auto');
         }
       };

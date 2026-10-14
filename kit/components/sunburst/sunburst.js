@@ -272,7 +272,7 @@
         ? { width: Math.max(16, Math.min(arc - 10, rMid * 1.6)), height: Math.max(12, thick - 8), overflow: arc > 50 ? 'break' : 'truncate' }
         : { width: Math.max(16, thick - 12), height: Math.max(12, Math.min(arc - 4, 42)), overflow: arc > 30 ? 'break' : 'truncate' };
       // never split inside a word: if the longest word does not fit, use one truncated line instead
-      if (box.overflow === 'break' && longestWord(n.name, font) > box.width) box.overflow = 'truncate';
+      if (box.overflow === 'break' && longestWord(n.name, font) * 1.08 + 6 > box.width) box.overflow = 'truncate';
       return box;
     }
 

@@ -264,6 +264,14 @@
     values.forEach(function (v, i) { m[v] = pal[i % pal.length]; });
     return function (v) { return m[v] || t.neutral; };
   }
+  /** Text colour with the best contrast on a fill (theme ink, paper or white). */
+  function textOn(t, fill) {
+    var lf = RK.theme.luminance(fill);
+    return [t.ink, t.paper, '#ffffff'].map(function (c) {
+      var lc = RK.theme.luminance(c);
+      return { c: c, r: (Math.max(lf, lc) + 0.05) / (Math.min(lf, lc) + 0.05) };
+    }).sort(function (a, b) { return b.r - a.r; })[0].c;
+  }
   /** Sequential stops without the palest steps (they vanish against the land colour). */
   function seqStops(t) { return t.seq.length >= 6 ? t.seq.slice(2) : t.seq; }
 
@@ -283,11 +291,11 @@
   }
 
   /** PNG snapshot of the map container (SVG foreignObject + inlined computed styles). */
-  var SNAP = ['position', 'left', 'top', 'right', 'bottom', 'width', 'height', 'display', 'transform', 'transform-origin', 'z-index', 'overflow',
+  var SNAP = ['position', 'left', 'top', 'right', 'bottom', 'display', 'float', 'clear', 'transform', 'transform-origin', 'z-index', 'overflow',
     'opacity', 'visibility', 'margin-left', 'margin-top', 'padding', 'box-sizing', 'background-color', 'background-image', 'border', 'border-radius',
     'color', 'font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'white-space', 'text-align', 'text-shadow',
     'flex-direction', 'flex-wrap', 'align-items', 'justify-content', 'gap', 'fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-opacity',
-    'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin'];
+    'stroke-dasharray', 'stroke-dashoffset', 'stroke-linecap', 'stroke-linejoin'];
   function snapshot(ctx, map) {
     var src = map.getContainer(), w = src.clientWidth, ht = src.clientHeight, t = ctx.theme;
     var clone = src.cloneNode(true);
@@ -295,6 +303,9 @@
     a.forEach(function (n, i) {
       var cs = getComputedStyle(n), css = '';
       SNAP.forEach(function (p) { css += p + ':' + cs.getPropertyValue(p) + ';'; });
+      // legend text boxes keep auto size: the export falls back to a system font of another width
+      var flow = n.childNodes.length && /^(static|relative)$/.test(cs.position) && !(n instanceof SVGElement) && n.closest && n.closest('.leaflet-control');
+      if (!flow) css += 'width:' + cs.width + ';height:' + cs.height + ';';
       b[i].setAttribute('style', css + 'animation:none;transition:none;');
       if (n.tagName === 'CANVAS' && b[i].parentNode) {
         try { var img = document.createElement('img'); img.setAttribute('src', n.toDataURL()); img.setAttribute('style', b[i].getAttribute('style')); b[i].parentNode.replaceChild(img, b[i]); } catch (e) { /* tainted */ }
@@ -356,7 +367,9 @@
         seq.forEach(function (c, i) { grad[(0.2 + 0.8 * i / Math.max(1, seq.length - 1)).toFixed(3)] = c; });
       }
       var heat = L.heatLayer([], { radius: o0.radius, blur: o0.blur, minOpacity: o0.minOpacity, max: 1, gradient: grad }).addTo(map);
-      var pts = L.layerGroup();
+      // points get their own svg renderer in a pane above the density canvas
+      map.createPane('rk-heat-points').style.zIndex = 450;
+      var ptsRenderer = L.svg({ pane: 'rk-heat-points' }), pts = L.layerGroup();
 
       function ff(c) { return c.options.filterField || c.enc.label; }
 
@@ -384,7 +397,7 @@
           var on = isOn(cur, it.row, [field]);
           var m = L.circleMarker(it.ll, {
             radius: on && anySel ? 4.5 : 3.2, color: t.paper, weight: 1, fillColor: on && anySel ? t.accent2 : t.ink2,
-            fillOpacity: on ? 0.95 : 0.3, opacity: on ? 1 : 0.4, className: 'rk-heat__pt'
+            fillOpacity: on ? 0.95 : 0.3, opacity: on ? 1 : 0.4, className: 'rk-heat__pt', renderer: ptsRenderer, pane: 'rk-heat-points'
           });
           m.bindTooltip(function () { return tipOf(it); }, { direction: 'top', offset: [0, -5], opacity: 1 });
           m.on('click', function () {

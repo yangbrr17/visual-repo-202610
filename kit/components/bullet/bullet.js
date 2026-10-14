@@ -11,6 +11,19 @@
   var MINUS = '−';
 
   function isNum(v) { return typeof v === 'number' && isFinite(v); }
+
+  /** Re-run the layout without animation when the width changes (label room is measured in px). */
+  function relayout(render) {
+    return function (ctx) {
+      var api = render(ctx), last = ctx, update = api.update, w = api.chart.getWidth();
+      api.update = function (c) { last = c; w = api.chart.getWidth(); update(c); };
+      api.resize = function () {
+        api.chart.resize();
+        if (Math.abs(api.chart.getWidth() - w) > 4) { w = api.chart.getWidth(); update(Object.assign({}, last, { motion: false })); }
+      };
+      return api;
+    };
+  }
   function median(a) {
     a = a.filter(isNum).sort(function (x, y) { return x - y; });
     if (!a.length) return null;
@@ -63,8 +76,9 @@
 
     // constant target (number / median / mean of the values) when there is no target field
     var constTarget = null;
+    var isHi = function (r) { return (hf && !!r[hf] && r[hf] !== 'false') || hlist.indexOf(r[enc.label]) >= 0; };
     if (!hasTarget) {
-      var all = ctx.rows.map(function (r) { return r[enc.value]; });
+      var all = ctx.rows.filter(function (r) { return !(o.targetExcludeHighlight && isHi(r)); }).map(function (r) { return r[enc.value]; });
       constTarget = o.target === 'median' ? median(all) : o.target === 'mean' ? mean(all) : isNum(o.target) ? o.target : null;
     }
 
@@ -80,7 +94,7 @@
         fmt: (enc.format && r[enc.format]) || baseFmt,
         varAbs: v != null && tg != null ? v - tg : null,
         varPct: v != null && tg != null ? (tg ? v / tg - 1 : NaN) : null,
-        hi: (hf && !!r[hf] && r[hf] !== 'false') || hlist.indexOf(r[enc.label]) >= 0
+        hi: isHi(r)
       };
     });
     if (o.sort) {
@@ -296,6 +310,7 @@
       bandLabels: null,           // legend names, one per band (default derived from thresholds)
       goodDirection: 'up',        // 'up' | 'down' — which end of the scale is good (lightest band)
       target: null,               // constant target without a target field: number | 'median' | 'mean'
+      targetExcludeHighlight: true, // a median / mean target is computed without the highlighted (target) rows
       targetLabel: null,          // legend / tooltip name of the target tick
       valueLabel: null,           // legend / tooltip name of the actual bar
       scale: 'shared',            // shared (one value axis) | row (each row scaled to its own max)
@@ -312,8 +327,8 @@
       format: null,
       legend: true
     },
-    render: C(build, {
+    render: relayout(C(build, {
       select: function (p, ctx) { return p.seriesId === 'actual' || p.seriesId === 'target' ? { field: ctx.enc.label, value: p.name } : null; }
-    })
+    }))
   });
 })();

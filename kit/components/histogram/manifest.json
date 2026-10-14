@@ -1,0 +1,46 @@
+{
+  "id": "histogram",
+  "name": "Histogram",
+  "name_zh": "直方图（分布）",
+  "category": "distribution",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Binned distribution of one metric with automatic nice bins, optional density curve, median / mean lines, the target's bin highlighted and a rug of observations.",
+  "summary_zh": "单一指标的分箱分布：自动取整的组距、可选核密度曲线、中位数/均值线、目标所在组高亮及观测值地毯线。",
+  "description_zh": "把一列数值（如可比公司 EV/EBITDA、先例交易 30 日溢价）分组计数，柱高为个数或占比。组距可指定组数、组宽，或按 Freedman–Diaconis 规则自动计算并取整到 1/2/2.5/5 的整数倍，坐标刻度正好落在组边界上。虚线标出中位数和均值，强调色标出目标公司（或报价溢价等指定值）所在的组及其精确位置；可叠加高斯核密度曲线，横轴下方的地毯线显示每个观测值，悬停可看公司名称。点击某个柱子会以“区间”条件交叉筛选同页其他图表。",
+  "best_for": ["Distribution of peer multiples with the target positioned", "Precedent premium ranges (where does the offer premium sit?)", "Any single metric with 10–500 observations"],
+  "avoid_when": ["Fewer than ~8 observations (show the points: scatter / bar)", "Comparing several groups (use boxplot)", "Categorical data (use bar)"],
+  "channels": {
+    "value": {"type": "number", "required": true, "desc": "Metric to bin (null values are excluded and counted in the n note)", "default": "value"},
+    "label": {"type": "string", "required": false, "desc": "Short label listed in bin tooltips and on rug hover", "default": "label"},
+    "name": {"type": "string", "required": false, "desc": "Full name for the rug tooltip title"},
+    "target": {"type": "boolean", "required": false, "desc": "Rows where this field is true are marked as the target", "default": "is_target"}
+  },
+  "options": {
+    "bins": {"type": "number", "default": null, "desc": "Approximate number of bins (rounded to a nice width); null = automatic (Freedman–Diaconis)"},
+    "binWidth": {"type": "number", "default": null, "desc": "Explicit bin width — overrides bins"},
+    "binStart": {"type": "number", "default": null, "desc": "First bin edge (default: the width multiple just below the minimum)"},
+    "yScale": {"type": "string", "default": "count", "desc": "'count' | 'percent'"},
+    "density": {"type": "boolean", "default": false, "desc": "Gaussian kernel density curve scaled to the bars"},
+    "bandwidth": {"type": "number", "default": null, "desc": "KDE bandwidth (default: Silverman's rule of thumb)"},
+    "stats": {"type": "string[]", "default": ["median", "mean"], "desc": "Dashed reference lines: 'median' | 'mean' | 'p25' | 'p75'"},
+    "targetValue": {"type": "number", "default": null, "desc": "Explicit value to mark (e.g. proposed offer premium); default: the target row's value"},
+    "targetLabel": {"type": "string", "default": null, "desc": "Label of the target marker (default: target label + value)"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Label / name value(s) treated as the target; default uses the target channel"},
+    "labels": {"type": "boolean", "default": true, "desc": "Count / share above each bar"},
+    "rug": {"type": "boolean", "default": true, "desc": "One tick per observation under the axis (hover for the name)"},
+    "showN": {"type": "boolean", "default": true, "desc": "'n = …' note (with excluded n.a. count), top-right"},
+    "format": {"type": "string", "default": null, "desc": "Value format (defaults to the value field format)"},
+    "title": {"type": "string", "default": null, "desc": "X axis title (defaults to the value field title)"}
+  },
+  "interactions": ["Hover a bin for its range, count, share and the names inside", "Hover a rug tick for the observation", "Click a bin to cross-filter other blocks to that value range (click again to clear)", "Animated transitions when filters change", "PNG / CSV export"],
+  "samples": [
+    {"title": "Distribution of peer EV / EBITDA 2025E", "data": "peers", "height": 320,
+     "options": {"encode": {"value": "ev_ebitda_25e", "label": "ticker", "name": "company"}, "binWidth": 1}},
+    {"title": "Precedent premiums to 30-day VWAP vs. proposed offer", "data": "precedents", "height": 320,
+     "options": {"encode": {"value": "premium_30d", "label": "target", "name": "target"}, "binWidth": 0.05, "density": true,
+                 "targetValue": 0.35, "targetLabel": "Proposed offer 35.0%", "yScale": "percent", "format": "0%"}},
+    {"title": "Precedent EV / LTM EBITDA (automatic bins)", "data": "precedents", "height": 300, "span": 6,
+     "options": {"encode": {"value": "ev_ebitda", "label": "target", "name": "target"}, "density": true, "stats": ["median"]}}
+  ]
+}

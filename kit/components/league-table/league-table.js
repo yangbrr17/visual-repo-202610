@@ -193,10 +193,27 @@
       tbody.addEventListener('click', onClick);
       tbody.addEventListener('keydown', onKey);
 
+      /* selection-only change (same rows): toggle classes so the dimming animates */
+      function sameRows(a, b) {
+        if (a.length !== b.length) return false;
+        for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+        return true;
+      }
+      function selKey(c) { return JSON.stringify(c.selected(c.enc.name)); }
+      function restyle() {
+        var sel = cur.selected(cur.enc.name);
+        root.classList.toggle('has-sel', sel.length > 0);
+        Array.prototype.forEach.call(tbody.children, function (tr) { tr.classList.toggle('is-selected', sel.indexOf(tr._rkName) >= 0); });
+      }
+
       draw(false);
 
       return {
-        update: function (c) { cur = c; draw(true); },
+        update: function (c) {
+          var selOnly = sameRows(cur.rows, c.rows) && selKey(cur) !== selKey(c);
+          cur = c;
+          if (selOnly) restyle(); else draw(true);
+        },
         destroy: function () {
           thead.removeEventListener('click', onHead);
           tbody.removeEventListener('click', onClick);

@@ -13,7 +13,8 @@
     return function (text, font) {
       c2d = c2d || document.createElement('canvas').getContext('2d');
       c2d.font = font;
-      return c2d.measureText(String(text)).width;
+      // +7%: the canvas may measure with a fallback face before the webfont has loaded
+      return c2d.measureText(String(text)).width * 1.07;
     };
   })();
 
@@ -65,15 +66,27 @@
   }
 
   /** Toggle a value in this block's selection, scoped to its own dataset by default. */
-  function selectScoped(ctx, field, value) {
-    if (ctx.options.crossFilter === false || field == null) return;
-    if (ctx.options.filterScope === 'global' || !ctx.dataset) { ctx.select(field, value); return; }
-    var key = ctx.id + ':' + field, cur = RK.store.filter(key);
-    var vals = cur && cur.op === 'in' ? cur.values.slice() : [];
+  /**
+   * Toggle a node in this block's selection. A node matches links at either end, so the filter is
+   * an expression (`source in [..] or target in [..]`), scoped to this block's dataset unless
+   * filterScope = 'global'. `values` is kept on the spec so ctx.selected(enc.source) still works.
+   */
+  function selectNode(ctx, value) {
+    var enc = ctx.enc;
+    if (ctx.options.crossFilter === false || value == null || !enc.source || !enc.target) return;
+    var key = ctx.id + ':' + enc.source, cur = RK.store.filter(key);
+    var vals = cur && cur.values ? cur.values.slice() : [];
     var i = vals.indexOf(value);
     if (i >= 0) vals.splice(i, 1); else vals.push(value);
-    RK.store.setFilter(key, { field: field, op: 'in', values: vals, source: ctx.id, datasets: [ctx.dataset.id] });
+    if (!vals.length) { RK.store.clearFilter(key); return; }
+    var list = '[' + vals.map(function (v) { return JSON.stringify(String(v)); }).join(', ') + ']';
+    RK.store.setFilter(key, {
+      op: 'expr', field: enc.source, values: vals, source: ctx.id,
+      expr: '`' + enc.source + '` in ' + list + ' or `' + enc.target + '` in ' + list,
+      datasets: ctx.options.filterScope === 'global' || !ctx.dataset ? undefined : [ctx.dataset.id]
+    });
   }
+
 
   RK.component({
     id: 'sankey',
@@ -298,7 +311,7 @@
     }, {
       on: {
         click: function (p, ctx) {
-          if (p.dataType === 'node') selectScoped(ctx, ctx.enc.source, p.name);
+          if (p.dataType === 'node') selectNode(ctx, p.name);
         }
       }
     })

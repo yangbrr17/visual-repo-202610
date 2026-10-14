@@ -16,7 +16,7 @@ body {
 h1, h2, h3, h4 { margin: 0; font-weight: 600; line-height: 1.2; color: var(--rk-ink); }
 p { margin: 0 0 .6em; }
 a { color: var(--rk-accent-3); text-decoration-thickness: 1px; text-underline-offset: 2px; }
-img, svg { max-width: 100%; }
+img { max-width: 100%; }
 button, input, select, textarea { font: inherit; color: inherit; }
 table { border-collapse: collapse; }
 .rk-num, .is-num { font-family: var(--rk-font-num); font-variant-numeric: tabular-nums lining-nums; }

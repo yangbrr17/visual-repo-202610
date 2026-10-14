@@ -34,6 +34,7 @@
       var cats = d.cats, bars = d.bars, lines = d.lines, n = cats.length;
       var fi = forecastIndex(ctx, cats, d.byX);
       var isEst = function (i) { return fi >= 0 && i >= fi; };
+      var sel = ctx.selected(enc.x);
       var bfmt = o.format || ctx.fmtOf(bars.length ? bars[0].field : null) || 'auto';
       var lfmt = o.lineFormat || ctx.fmtOf(lines.length ? lines[0].field : null) || '0.0%';
       var band = o.layout !== 'overlay';
@@ -99,7 +100,7 @@
         if (hasLine) {
           // the line gets its own band [lineLo, lineHi] of the plot; right-axis labels only inside it
           var lspan = lmax - lmin || Math.abs(lmax) * 0.25 || 1;
-          var lstep = U.niceStep(lspan, 3);
+          var lstep = U.niceStep(lspan, 2);
           var range = lspan / (lineHi - lineLo);
           var A = lmin - lineLo * range, B = A + range;
           var lticks = [];
@@ -152,6 +153,10 @@
           data: b.values.map(function (v, i) {
             var st = isEst(i) ? estStyle(base) : { color: base };
             st.color = C.dim(ctx, enc.x, cats[i], st.color);
+            if (isEst(i) && sel.length && sel.indexOf(cats[i]) < 0) {   // dim the hatch and outline too
+              st.borderColor = RK.theme.alpha(base, 0.25);
+              st.decal.color = RK.theme.alpha(base, 0.12);
+            }
             if (o.barStack && isEst(i)) st.color = C.dim(ctx, enc.x, cats[i], RK.theme.mix(base, t.paper, 0.45));
             return { value: v, itemStyle: st, label: o.barStack && isEst(i) ? { color: textOn(RK.theme.mix(base, t.paper, 0.45), t) } : undefined };
           })

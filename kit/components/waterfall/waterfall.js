@@ -13,6 +13,19 @@
 
   function isNum(v) { return typeof v === 'number' && isFinite(v); }
 
+  /** Re-run the layout without animation when the width changes (label room is measured in px). */
+  function relayout(render) {
+    return function (ctx) {
+      var api = render(ctx), last = ctx, update = api.update, w = api.chart.getWidth();
+      api.update = function (c) { last = c; w = api.chart.getWidth(); update(c); };
+      api.resize = function () {
+        api.chart.resize();
+        if (Math.abs(api.chart.getWidth() - w) > 4) { w = api.chart.getWidth(); update(Object.assign({}, last, { motion: false })); }
+      };
+      return api;
+    };
+  }
+
   /** Greedy word wrap that may also break after hyphens / slashes (ECharts 'break' splits words mid-way). */
   var measureCtx = null;
   function wrap(text, width, font) {
@@ -126,7 +139,6 @@
 
     // ---- category labels: wrap to the band width (re-laid out on resize) ----
     var W = inst.getWidth() || ctx.el.clientWidth || 800;
-    inst.__rkW = W;
     var bandPx = Math.max(40, (W - 24) / Math.max(1, steps.length));
     var labelW = horiz ? Math.min(200, Math.max(110, W * 0.22)) : bandPx - 6;
     var bold = { fontWeight: 600, color: t.ink, lineHeight: 13 };
@@ -275,20 +287,11 @@
       valueAxis: false,          // pitchbook default: no value axis, labels carry the numbers
       axisBreak: false,          // false | 'auto' | {start, end, gap} — break the axis between zero and the walk
       pctOfStart: true,          // tooltip: delta as % of the opening total
-      legend: true
+      legend: true,
+      crossFilter: false         // true = click a step to cross-filter on the label field
     },
-    render: function (ctx) {
-      var api = C(build, {
-        select: function (p, c) { return p.seriesId === 'bars' ? { field: c.enc.label, value: p.name } : null; }
-      })(ctx);
-      // category labels wrap to the band width, so re-run the layout (without animation) on resize
-      var last = ctx, update = api.update;
-      api.update = function (c) { last = c; update(c); };
-      api.resize = function () {
-        api.chart.resize();
-        if (Math.abs(api.chart.getWidth() - (api.chart.__rkW || 0)) > 4) update(Object.assign({}, last, { motion: false }));
-      };
-      return api;
-    }
+    render: relayout(C(build, {
+      select: function (p, c) { return p.seriesId === 'bars' ? { field: c.enc.label, value: p.name } : null; }
+    }))
   });
 })();

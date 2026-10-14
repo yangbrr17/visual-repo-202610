@@ -1,0 +1,7 @@
+/* line: event rows appended to the axis tooltip when the pointer is near a numbered pin */
+.rk-tip .rk-ln-tip-event {
+  max-width: 290px; white-space: normal; line-height: 1.4;
+  margin-top: 6px; padding-top: 5px; border-top: 1px solid var(--rk-rule);
+}
+.rk-tip .rk-ln-tip-event b { color: var(--rk-tooltip-ink); font-weight: 600; }
+.rk-tip .rk-ln-tip-kind { font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--rk-ink-3); }

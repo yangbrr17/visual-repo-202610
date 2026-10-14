@@ -308,10 +308,12 @@
   RK.store.subscribe(function (changes) {
     blocks.forEach(function (b) {
       if (b.state === 'idle' || b.state === 'destroyed') return;
-      if (!b.def || !b.def.needsData) {
+      // pure UI blocks (no dataset) get the raw change list; bound blocks refresh like data blocks
+      if (!b.def || (!b.def.needsData && !b.datasetId)) {
         if (b.instance && b.instance.onStore) b.instance.onStore(changes);
         return;
       }
+      if (b.instance && b.instance.onStore && !b.def.needsData) { b.instance.onStore(changes); return; }
       var ids = b.datasetIds();
       var hit = ids.some(function (id) {
         var ds = RK.data.get(id);
@@ -328,7 +330,7 @@
     blocks.forEach(function (b) { b.rerender(); });
   });
   RK.bus.on('data:changed', util.debounce(function () {
-    blocks.forEach(function (b) { if (b.def && b.def.needsData) b.refresh(); });
+    blocks.forEach(function (b) { if (b.def && (b.def.needsData || b.datasetId) && !(b.instance && b.instance.onStore && !b.def.needsData)) b.refresh(); });
   }, 30));
 
   /* ------------------------------------------------------------------ *

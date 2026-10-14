@@ -9,6 +9,19 @@
   var C = RK.chart, util = RK.util;
 
   function isNum(v) { return typeof v === 'number' && isFinite(v); }
+
+  /** Re-run the layout without animation when the width changes (label room is measured in px). */
+  function relayout(render) {
+    return function (ctx) {
+      var api = render(ctx), last = ctx, update = api.update, w = api.chart.getWidth();
+      api.update = function (c) { last = c; w = api.chart.getWidth(); update(c); };
+      api.resize = function () {
+        api.chart.resize();
+        if (Math.abs(api.chart.getWidth() - w) > 4) { w = api.chart.getWidth(); update(Object.assign({}, last, { motion: false })); }
+      };
+      return api;
+    };
+  }
   function median(a) {
     a = a.filter(isNum).sort(function (x, y) { return x - y; });
     if (!a.length) return null;
@@ -21,6 +34,13 @@
     return Math.sqrt(Math.pow(x[0] - y[0], 2) + Math.pow(x[1] - y[1], 2) + Math.pow(x[2] - y[2], 2)) < 64;
   }
   function mean(a) { a = a.filter(isNum); return a.length ? a.reduce(function (s, v) { return s + v; }, 0) / a.length : null; }
+
+  /** Signed percentage with a true minus sign (matches the other comparison components). */
+  function pct(v) {
+    if (!isNum(v)) return RK.format(v, '0.0%');
+    var s = RK.format(Math.abs(v), '0.0%');
+    return v > 0 ? '+' + s : v < 0 && /[1-9]/.test(s) ? '\u2212' + s : s;
+  }
 
   /** Is row r highlighted (boolean field such as is_target, or label listed in options.highlight)? */
   function highlighter(ctx) {
@@ -235,9 +255,9 @@
           var tr = [{ color: colors[i], label: ctx.title(enc.value), value: RK.format(v1[i], fmt), bold: p.seriesId === 'dot' }];
           if (has2) {
             tr.push({ label: ctx.title(enc.value2), value: RK.format(v2[i], fmt), bold: p.seriesId === 'dot2' });
-            if (v1[i] != null && v2[i] != null) tr.push({ label: 'Change', value: RK.format(v1[i] ? v2[i] / v1[i] - 1 : NaN, '+0.0%;-0.0%;0.0%') });
+            if (v1[i] != null && v2[i] != null) tr.push({ label: 'Change', value: pct(v1[i] ? v2[i] / v1[i] - 1 : NaN) });
           }
-          if (ref != null && v1[i] != null && ref > 0 && v1[i] > 0) tr.push({ label: 'vs. ' + refName.toLowerCase(), value: RK.format(v1[i] / ref - 1, '+0.0%;-0.0%;0.0%') });
+          if (ref != null && v1[i] != null && ref > 0 && v1[i] > 0) tr.push({ label: 'vs. ' + refName.toLowerCase(), value: pct(v1[i] / ref - 1) });
           if (enc.group) tr.unshift({ label: ctx.title(enc.group), value: r[enc.group] });
           return C.tip(labels[i], tr);
         }
@@ -268,8 +288,8 @@
       legend: true,
       zoom: false
     },
-    render: C(build, {
+    render: relayout(C(build, {
       select: function (p, ctx) { return p.seriesId === 'dot' || p.seriesId === 'dot2' ? { field: ctx.enc.label, value: p.name } : null; }
-    })
+    }))
   });
 })();

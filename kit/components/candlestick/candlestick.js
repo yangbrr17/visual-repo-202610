@@ -197,9 +197,9 @@
     var pinsIn = (state.pins || []).some(function (p) { return p.i >= a && p.i <= b; });
     if (pinsIn) hi += (hi - lo) * 0.16;
     var step = util.niceStep((hi - lo) || Math.abs(hi) * 0.1 || 1, util.clamp(Math.round((state.priceH || 220) / 50), 3, 7));
-    var p = { min: rnd(Math.floor(lo / step - 1e-9) * step), max: rnd(Math.ceil(hi / step - 1e-9) * step), interval: step };
+    var p = { min: rnd(Math.floor(lo / step + 1e-9) * step), max: rnd(Math.ceil(hi / step - 1e-9) * step), interval: step };
     if (p.max === p.min) p.max = rnd(p.max + step);
-    var vstep = util.niceStep(vmax || 1, 2);
+    var vstep = util.niceStep(vmax || 1, util.clamp(Math.round((state.volH || 60) / 34), 1, 3));
     return { p: p, v: { max: rnd(Math.ceil((vmax || 1) / vstep) * vstep), interval: vstep }, first: a, last: b };
   }
   function rnd(v) { return Math.round(v * 1e10) / 1e10; }
@@ -224,13 +224,14 @@
     var hasLegend = o.legend !== false;
     var hasVol = m.V.length > 0;
     var H = state.h = inst.getHeight();
-    var top = hasLegend ? 34 : 14, gap = 16, xLab = 22, bottom = slider ? 32 : 4;
+    var hasSelector = o.rangeSelector && !ctx.print && useZoom && m.n >= 30;
+    var top = hasLegend || hasSelector ? 34 : 14, gap = 16, xLab = 22, bottom = slider ? 32 : 4;
     var avail = Math.max(120, H - top - gap - xLab - bottom);
-    var volH = hasVol ? Math.max(36, Math.round(avail * util.clamp(o.volumeShare || 0.22, 0.1, 0.5))) : 0;
+    var volH = state.volH = hasVol ? Math.max(36, Math.round(avail * util.clamp(o.volumeShare || 0.22, 0.1, 0.5))) : 0;
     var priceH = state.priceH = hasVol ? avail - volH : avail + gap;
 
     var ax = state.axes = axesFor(ctx, state);
-    var pAxisFmt = axisFmt(fmt);
+    var pAxisFmt = axisFmt(fmt, function () { return state.axes && state.axes.p.interval; });
     var left = Math.ceil(Math.max(textWidth(pAxisFmt(ax.p.max), t), textWidth(pAxisFmt(ax.p.min), t),
       textWidth(RK.format(m.C[m.n - 1], fmt), t), hasVol ? textWidth(RK.format(ax.v.max, 'auto'), t) : 0)) + 14;
     var right = o.lastPrice ? Math.ceil(textWidth(RK.format(m.C[m.n - 1], fmt), t, '600 10.5px ') + 18) : 14;
@@ -323,9 +324,10 @@
   /** Last close tag + reference lines on a silent helper series. */
   function markSeries(ctx, m) {
     var o = ctx.options, t = ctx.theme, fmt = m.fmt;
+    var chip = RK.theme.alpha(t.paper, 0.85);       // label background: legible where it crosses the candles
     var lines = (o.refLines || []).map(function (r) {
       return { yAxis: r.value, lineStyle: { color: r.color || t.accent2, type: r.type || 'dashed', width: 1.25 },
-        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: r.color || t.accent2, fontWeight: 600, fontSize: 10.5 } };
+        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: r.color || t.accent2, fontWeight: 600, fontSize: 10.5, backgroundColor: chip, padding: [1, 4], borderRadius: 2 } };
     });
     if (o.lastPrice) {
       var i = m.n - 1, c = m.C[i];
@@ -431,6 +433,10 @@
       var s = rangeStart(m.xv[m.n - 1], r[0]);
       return s != null && m.xv[m.n - 1] - s < span * 0.98;
     });
+    // narrow blocks keep the essential buttons only
+    var w = ctx.el.clientWidth || 600;
+    var keepNarrow = w < 340 ? ['3m', '1y', 'all'] : w < 480 ? ['1m', '3m', '6m', '1y', 'all'] : null;
+    if (keepNarrow && !keys) items = items.filter(function (r) { return keepNarrow.indexOf(r[0]) >= 0; });
     var btns = {};
     var bar = h('div.rk-seg.rk-cs-range', { role: 'group', 'aria-label': 'Date range' }, items.map(function (r) {
       var b = h('button', { type: 'button', 'aria-pressed': 'false', on: { click: function () {
@@ -473,10 +479,19 @@
     return Math.sqrt(Math.pow(x[0] - y[0], 2) + Math.pow(x[1] - y[1], 2) + Math.pow(x[2] - y[2], 2));
   }
 
-  function axisFmt(fmt) {
+  /**
+   * Axis labels: drop the decimals when every tick is a whole number ("$40" not "$40.00", "100" not "100.0"),
+   * keep them on all ticks otherwise ("9.5x", "10.0x"). getStep returns the live tick interval when known.
+   */
+  function axisFmt(fmt, getStep) {
     var code = String(RK.format.presets[fmt] || fmt);
     var intFmt = code.replace(/\.[0#]+/g, '');
-    return function (v) { return RK.format(v, Math.abs(v - Math.round(v)) < 1e-9 && !/%/.test(code) ? intFmt : fmt); };
+    var isInt = function (v) { return Math.abs(v - Math.round(v)) < 1e-9; };
+    return function (v) {
+      var step = getStep ? getStep() : null;
+      var whole = /%/.test(code) ? false : util.isNum(step) ? isInt(step) && isInt(v) : isInt(v);
+      return RK.format(v, whole ? intFmt : fmt);
+    };
   }
 
   var STEPS = [[1, 'd'], [2, 'd'], [7, 'w'], [14, 'w'], [1, 'm'], [2, 'm'], [3, 'm'], [6, 'm'], [12, 'm'], [24, 'm'], [60, 'm']];

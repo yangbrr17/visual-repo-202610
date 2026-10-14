@@ -475,7 +475,7 @@
       function defaultBuilder(dsId, given) {
         var ds = RK.data.get(dsId);
         var b = { values: [], rows: [], where: '', sort: { col: null, dir: 'desc' }, top: null };
-        if (given) return RK.util.merge(b, given);
+        if (given) return RK.util.merge(b, JSON.parse(JSON.stringify(given)));   // options must not be mutated
         if (!ds) return b;
         var nums = numericFields(ds).filter(function (f) { return !/^(lat|lon|lng|latitude|longitude|year|fiscal_year|order|rank|id)$/i.test(f.name); });
         var pref = nums.filter(function (f) { return fmtKind(f.format) === 'mult'; })[0] || nums.filter(function (f) { return /\$|€|£/.test(f.format || ''); })[0] || nums[0];
@@ -662,7 +662,7 @@
       }
       function autosize() {
         ta.style.height = 'auto';
-        var hgt = Math.max(84, Math.min(184, ta.scrollHeight + 2));
+        var hgt = Math.max(62, Math.min(184, ta.scrollHeight + 2));
         ta.style.height = hgt + 'px';
         mirror.style.height = hgt + 'px';
       }
@@ -938,7 +938,7 @@
         if (!opts.keepSort) st.tsort = null;
         st.last = { text: text, ds: res.dataset };
         if (!opts.silent) pushHistory(text, res.dataset);
-        if (!opts.rerun && st.tab === 'builder') setStatus('ok', 'Ran ' + (opts.silent ? 'automatically' : '') + ' — ' + res.rows.length + ' row' + (res.rows.length === 1 ? '' : 's'), (MAC ? '⌘' : 'Ctrl') + ' + Enter or Run to save to history');
+        if (!opts.rerun && st.tab === 'builder') setStatus('ok', res.rows.length + ' row' + (res.rows.length === 1 ? '' : 's') + ' — results update as you edit', 'Run saves to history');
         if (!opts.rerun && st.tab === 'query' && !opts.silent) setStatus('ok', 'Ran — ' + res.rows.length + ' row' + (res.rows.length === 1 ? '' : 's') + ' in ' + res.ms.toFixed(1) + ' ms');
         result = res;
         paintResults(opts.rerun);
@@ -995,7 +995,8 @@
           h('strong.rk-num', RK.format(result.rows.length, '#,##0')), ' row' + (result.rows.length === 1 ? '' : 's'),
           h('span.rk-qc-dot', '·'), result.columns.length + ' col' + (result.columns.length === 1 ? '' : 's'),
           h('span.rk-qc-dot', '·'), h('span.rk-num', (result.ms || 0).toFixed(1) + ' ms'),
-          nf.length ? h('span.rk-qc-badge', { title: 'Results respect the report filters: ' + nf.join(', ') }, h('span', { html: icon('filter', 11) }), nf.length + ' global filter' + (nf.length > 1 ? 's' : '')) : null));
+          nf.length ? h('span.rk-qc-badge', { title: 'Results respect the report filters: ' + nf.join(', ') }, h('span', { html: icon('filter', 11) }), nf.length + ' global filter' + (nf.length > 1 ? 's' : '')) : null,
+          h('span.rk-qc-rh__note')));
         resHead.appendChild(h('span.rk-qc__spacer'));
         var viewSeg = h('div.rk-seg.rk-qc-seg', { role: 'group', 'aria-label': 'Result view' }, [['split', 'Split'], ['table', 'Table'], ['chart', 'Chart']].map(function (v) {
           return h('button', { type: 'button', class: st.view === v[0] ? 'is-on' : null, 'aria-pressed': st.view === v[0] ? 'true' : 'false', on: { click: function () { st.view = v[0]; paintResults(true); } } }, v[1]);
@@ -1049,7 +1050,19 @@
       }
 
       /* ---------------- auto chart ---------------- */
+      // bar  : one category column (horizontal ranking when labels are long / many; side-by-side
+      //        panels when the measures have different units — the pitchbook "comps bar" layout)
+      // line : category looks like a year / date; short annual series with mixed units become the
+      //        classic columns + line combo (e.g. revenue bars + margin line on the right axis)
+      var lastRows = null, panelMode = false;
+      function axisFmt(fmt) {
+        var code = String(RK.format.presets[fmt] || fmt || '');
+        var whole = fmtKind(code) === 'num' && /\.0+/.test(code) ? code.replace(/\.0+/g, '') : null;   // $#,##0.0 -> $#,##0 on axes
+        return function (v) { return RK.format(v, whole && Math.abs(v) >= 100 ? whole : (fmt || 'auto')); };
+      }
+      function isEstimate(c) { return typeof c === 'string' && /\d{2}\s?[EFPB]$/i.test(c.trim()); }
       function paintChart(rows, rerun) {
+        lastRows = rows;
         var cols = result.columns;
         var dims = cols.filter(function (c) { return rows.some(function (r) { return r[c.name] != null && typeof r[c.name] !== 'number'; }) || (c.type !== 'number' && c.type !== undefined && !rows.some(function (r) { return isNum(r[c.name]); })); });
         var meas = cols.filter(function (c) { return dims.indexOf(c) < 0 && rows.some(function (r) { return isNum(r[c.name]); }); });
@@ -1057,113 +1070,169 @@
         if (!dims.length && meas.length > 1 && rows.every(function (r) { return isTimeLike(r[meas[0].name]); })) dims = [meas.shift()];
         chartMsg.innerHTML = '';
         chartWrap.classList.remove('has-msg', 'has-kpi');
+        panelMode = false;
+        st.chartNote = '';
         if (!rows.length || !meas.length) return chartMessage(!rows.length ? 'Nothing to chart' : 'No numeric column to chart');
         if (!dims.length) {
           if (rows.length === 1) return chartKpi(rows[0], meas);
-          return chartMessage('Add a label column (e.g. ' + (dimFields(DS())[0] ? dimFields(DS())[0].name : 'company') + ') to chart these values');
+          var lab = dimFields(DS())[0];
+          return chartMessage('Add a label column (e.g. ' + (lab ? lab.name : 'company') + ') to chart these values');
         }
         var x = dims[0];
         var sdim = dims.length > 1 && meas.length === 1 ? dims[1] : null;
         var cats = RK.util.unique(rows.map(function (r) { return r[x.name]; }));
         var timeLike = cats.length > 1 && cats.every(isTimeLike);
-        var kind = o.chart === 'bar' || o.chart === 'line' ? o.chart : (timeLike ? 'line' : 'bar');
-        if (kind === 'line' && timeLike && !st.tsort) cats.sort(function (a, b) { return String(a).localeCompare(String(b)); });
-        var labelLen = Math.max.apply(null, cats.map(function (c) { return String(RK.format(c, x.format)).length; }));
+        var kinds = RK.util.unique(meas.map(function (m) { return fmtKind(m.format); }));
+        var combo = timeLike && !sdim && kinds.length > 1 && cats.length <= 15 && o.chart !== 'line';
+        var kind = o.chart === 'bar' || o.chart === 'line' ? o.chart : (timeLike && !combo ? 'line' : 'bar');
+        if (timeLike && !st.tsort) cats.sort(function (a, b) { return String(a).localeCompare(String(b)); });
+        var catLabels = cats.map(function (c) { return c == null ? 'n.a.' : String(RK.format(c, x.format)); });
+        var labelLen = Math.max.apply(null, catLabels.map(function (c) { return c.length; }));
         var horiz = kind === 'bar' && !timeLike && (cats.length > 7 || labelLen > 11);
-        var primaryKind = fmtKind(meas[0].format), secondary = null, plotted = [], dropped = 0;
-        meas.forEach(function (m) {
-          var k = fmtKind(m.format);
-          if (k === primaryKind && plotted.length < 4) plotted.push({ col: m, axis: 0 });
-          else if (!horiz && !sdim && (!secondary || secondary === k) && plotted.length < 4) { secondary = k; plotted.push({ col: m, axis: 1 }); }
-          else dropped++;
-        });
-        var series = [], legend = [];
         function byCat(list, field) {
           var mp = new Map();
           list.forEach(function (r) { if (!mp.has(r[x.name])) mp.set(r[x.name], r[field]); });
           return cats.map(function (c) { return mp.has(c) ? mp.get(c) : null; });
         }
-        var single = !sdim && plotted.length === 1;
-        var showLabels = (kind === 'bar' && cats.length <= 24 && (single || plotted.length <= 2 && cats.length <= 8)) || (kind === 'line' && cats.length <= 12 && plotted.length <= 2);
-        if (sdim) {
-          var groups = RK.util.groupBy(rows, function (r) { return r[sdim.name]; });
-          var gi = 0;
-          groups.forEach(function (list, name) {
-            var color = RK.theme.color(gi++);
-            legend.push(String(name));
-            series.push(makeSeries(String(name), byCat(list, meas[0].name), meas[0], 0, color, kind, false));
-          });
-        } else {
-          plotted.forEach(function (p, i) {
-            var asLine = kind === 'line' || p.axis === 1;
-            var color = p.axis === 1 && kind === 'bar' ? t.accent2 : RK.theme.color(i);
-            legend.push(p.col.title);
-            series.push(makeSeries(p.col.title, byCat(rows, p.col.name), p.col, p.axis, color, asLine ? 'line' : 'bar', single));
+        function valueOf(p) { return p && typeof p === 'object' && 'value' in p ? p.value : p; }
+        function barData(values, color, single) {
+          return values.map(function (v, i) {
+            var c = color;
+            if (single && highlights.indexOf(String(cats[i]).toLowerCase()) >= 0) c = t.accent2;
+            if (isEstimate(cats[i])) c = RK.theme.mix(c, t.paper, 0.42);    // projected periods in a lighter shade
+            return { value: v, itemStyle: { color: c } };
           });
         }
-        function makeSeries(name, values, col, axis, color, type, isSingle) {
-          var fmt = col.format || 'auto';
-          var s = {
-            name: name, type: type, yAxisIndex: horiz ? 0 : axis, xAxisIndex: 0,
-            data: values.map(function (v, i) {
-              var c = color;
-              if (isSingle && type === 'bar' && highlights.indexOf(String(cats[i]).toLowerCase()) >= 0) c = t.accent2;
-              return { value: v, itemStyle: { color: c } };
+        function labelCfg(fmt, pos) {
+          return { show: true, position: pos, distance: 4, color: t.ink2, fontSize: 10.5, fontFamily: t.fontNum, formatter: function (p) { return RK.format(valueOf(p.value), fmt); } };
+        }
+        var opt, dropped = 0;
+
+        if (horiz && !sdim) {
+          // ---- side-by-side horizontal panels sharing the category axis ----
+          var panels = meas.slice(0, 3);
+          dropped = meas.length - panels.length;
+          panelMode = panels.length > 1;
+          var W = chartHost.clientWidth || 420;
+          var labelW = Math.min(170, Math.max(70, labelLen * 6.3 + 14));
+          var valPad = cats.length <= 24 ? 40 : 10, gap = 14, n = panels.length;
+          var pw = Math.max(50, (W - labelW - n * valPad - (n - 1) * gap) / n);
+          var top = n > 1 ? 24 : 8;
+          var showVals = cats.length <= 24;
+          opt = {
+            animation: ctx.motion, color: t.cat,
+            title: n > 1 ? panels.map(function (p, i) {
+              return { text: p.title, left: labelW + i * (pw + valPad + gap), top: 2, textStyle: { fontSize: 11, fontWeight: 600, color: t.ink2, fontFamily: t.fontSans } };
+            }) : [],
+            grid: panels.map(function (p, i) { return { left: labelW + i * (pw + valPad + gap), width: pw, top: top, bottom: 22, containLabel: false }; }),
+            tooltip: {
+              trigger: 'axis', axisPointer: { type: 'shadow' }, confine: true,
+              formatter: function (ps) {
+                if (!ps.length) return '';
+                var i = ps[0].dataIndex, r = rows.filter(function (row) { return row[x.name] === cats[i]; })[0] || {};
+                return RK.chart.tip(catLabels[i], panels.map(function (p, k) { return { color: k === 0 ? undefined : null, label: p.title, value: RK.format(r[p.name], p.format) }; }));
+              }
+            },
+            xAxis: panels.map(function (p, i) {
+              return { type: 'value', gridIndex: i, splitNumber: n > 1 ? 3 : 5, axisLabel: { formatter: axisFmt(p.format), hideOverlap: true }, splitLine: { lineStyle: { color: t.grid } } };
             }),
-            itemStyle: { color: color }, lineStyle: { color: color, width: 2 },
-            emphasis: { focus: 'series' },
-            label: showLabels ? { show: true, position: type === 'bar' ? (horiz ? 'right' : 'top') : 'top', color: t.ink2, fontSize: 10.5, fontFamily: t.fontNum, distance: 4,
-              formatter: function (p) { return RK.format(p.value && typeof p.value === 'object' ? p.value.value : p.value, fmt); } } : { show: false }
+            yAxis: panels.map(function (p, i) {
+              return { type: 'category', gridIndex: i, data: catLabels, inverse: true, axisTick: { show: false },
+                axisLabel: { show: i === 0, interval: 0, width: labelW - 12, overflow: 'truncate', color: t.ink2 } };
+            }),
+            series: panels.map(function (p, i) {
+              return {
+                name: p.title, type: 'bar', xAxisIndex: i, yAxisIndex: i, barMaxWidth: 26, barCategoryGap: '32%',
+                data: barData(byCat(rows, p.name), RK.theme.color(i), true),
+                label: showVals ? labelCfg(p.format || 'auto', 'right') : { show: false },
+                emphasis: { focus: 'none' }
+              };
+            })
           };
-          if (type === 'bar') { s.barMaxWidth = 34; s.barGap = '15%'; s.barCategoryGap = isSingle ? '34%' : '26%'; }
-          else { s.symbol = 'circle'; s.symbolSize = cats.length > 30 ? 0 : 5; s.showSymbol = cats.length <= 30; s.smooth = false; }
-          return s;
+        } else {
+          // ---- vertical bars / lines / combo, optional right axis for a second unit ----
+          var primaryKind = fmtKind(meas[0].format), secondary = null, plotted = [];
+          meas.forEach(function (m) {
+            var k = fmtKind(m.format);
+            if (k === primaryKind && plotted.length < 4) plotted.push({ col: m, axis: 0 });
+            else if (!horiz && !sdim && (!secondary || secondary === k) && plotted.length < 4) { secondary = k; plotted.push({ col: m, axis: 1 }); }
+            else dropped++;
+          });
+          var series = [], legend = [];
+          var single = !sdim && plotted.length === 1;
+          var nBars = sdim ? 1 : plotted.filter(function (p) { return kind === 'bar' && p.axis === 0; }).length;
+          var showLabels = (kind === 'bar' && cats.length <= 24 && (single || (nBars <= 2 && cats.length <= 12))) || (kind === 'line' && cats.length <= 12 && plotted.length <= 2);
+          if (sdim) {
+            var gi = 0;
+            RK.util.groupBy(rows, function (r) { return r[sdim.name]; }).forEach(function (list, name) {
+              var color = RK.theme.color(gi++);
+              legend.push(String(name));
+              series.push(mk(String(name), byCat(list, meas[0].name), meas[0], 0, color, kind, false));
+            });
+          } else {
+            plotted.forEach(function (p, i) {
+              var asLine = kind === 'line' || p.axis === 1;
+              var color = p.axis === 1 && kind === 'bar' ? t.accent2 : RK.theme.color(i);
+              legend.push(p.col.title);
+              series.push(mk(p.col.title, byCat(rows, p.col.name), p.col, p.axis, color, asLine ? 'line' : 'bar', single));
+            });
+          }
+          function mk(name, values, col, axis, color, type, isSingle) {
+            var fmt = col.format || 'auto';
+            var se = {
+              name: name, type: type, yAxisIndex: horiz ? 0 : axis,
+              data: type === 'bar' ? barData(values, color, isSingle) : values,
+              itemStyle: { color: color }, lineStyle: { color: color, width: 2 }, emphasis: { focus: 'series' },
+              label: showLabels && (type === 'bar' || axis === 1 || kind === 'line') ? labelCfg(fmt, type === 'bar' ? (horiz ? 'right' : 'top') : 'top') : { show: false }
+            };
+            if (type === 'bar') { se.barMaxWidth = 34; se.barGap = '12%'; se.barCategoryGap = isSingle ? '36%' : '28%'; }
+            else { se.symbol = 'circle'; se.symbolSize = cats.length > 30 ? 0 : 6; se.showSymbol = cats.length <= 30; se.z = 3; }
+            return se;
+          }
+          var p1 = plotted.filter(function (p) { return p.axis === 1; })[0];
+          var catAxis = { type: 'category', data: catLabels, inverse: horiz, boundaryGap: kind === 'bar',
+            axisLabel: { interval: horiz || cats.length <= 16 ? 0 : 'auto', hideOverlap: true, width: horiz ? 150 : 90, overflow: 'truncate' } };
+          var valAxis = [{ type: 'value', scale: kind === 'line' && primaryKind !== 'num', axisLabel: { formatter: axisFmt(plotted[0] ? plotted[0].col.format : meas[0].format) }, splitLine: { lineStyle: { color: t.grid } } }];
+          if (p1) valAxis.push({ type: 'value', scale: true, position: 'right', axisLabel: { formatter: axisFmt(p1.col.format) }, splitLine: { show: false } });
+          var zoom = kind === 'line' && cats.length > 40 ? [{ type: 'inside', xAxisIndex: 0, filterMode: 'none' }, { type: 'slider', xAxisIndex: 0, height: 16, bottom: 4, showDetail: false, brushSelect: false, filterMode: 'none' }] : [];
+          var showLegend = legend.length > 1;
+          opt = {
+            animation: ctx.motion, color: t.cat,
+            legend: { show: showLegend, top: 0, left: 0, type: 'scroll', data: legend },
+            grid: { left: 4, right: p1 ? 8 : (horiz && showLabels ? 36 : 14), top: showLegend ? 34 : 14, bottom: zoom.length ? 28 : 4, containLabel: true },
+            tooltip: {
+              trigger: 'axis', axisPointer: { type: kind === 'bar' ? 'shadow' : 'line' }, confine: true,
+              formatter: function (ps) {
+                if (!ps.length) return '';
+                var i = ps[0].dataIndex;
+                return RK.chart.tip(catLabels[i], ps.map(function (p) {
+                  var col = sdim ? meas[0] : (plotted[p.seriesIndex] || plotted[0]).col;
+                  return { color: p.color, label: p.seriesName, value: RK.format(valueOf(p.value), col.format) };
+                }), isEstimate(cats[i]) ? 'Estimate' : null);
+              }
+            },
+            xAxis: horiz ? valAxis[0] : catAxis,
+            yAxis: horiz ? catAxis : valAxis,
+            dataZoom: zoom,
+            series: series
+          };
         }
-        var fmt0 = plotted.length ? plotted[0].col.format : meas[0].format;
-        var fmt1 = plotted.filter(function (p) { return p.axis === 1; })[0];
-        var catAxis = {
-          type: 'category', data: cats.map(function (c) { return c == null ? 'n.a.' : RK.format(c, x.format); }), inverse: horiz,
-          axisLabel: { interval: horiz ? 0 : 'auto', hideOverlap: true, width: horiz ? 150 : 90, overflow: 'truncate' },
-          boundaryGap: kind === 'bar'
-        };
-        var valAxis = [{ type: 'value', scale: kind === 'line' && primaryKind !== 'num', axisLabel: { formatter: RK.chart.axisFmt(fmt0) }, splitLine: { lineStyle: { color: t.grid } } }];
-        if (fmt1) valAxis.push({ type: 'value', scale: true, position: 'right', axisLabel: { formatter: RK.chart.axisFmt(fmt1.col.format) }, splitLine: { show: false } });
-        var zoom = kind === 'line' && cats.length > 40 ? [{ type: 'inside', xAxisIndex: 0, filterMode: 'none' }, { type: 'slider', xAxisIndex: 0, height: 16, bottom: 4, showDetail: false, brushSelect: false, filterMode: 'none' }] : [];
-        var showLegend = legend.length > 1;
-        var opt = {
-          animation: ctx.motion,
-          color: t.cat,
-          legend: { show: showLegend, top: 0, left: 0, type: 'scroll', data: legend },
-          grid: { left: 4, right: fmt1 ? 8 : (horiz && showLabels ? 36 : 14), top: showLegend ? 30 : 12, bottom: zoom.length ? 28 : 4, containLabel: true },
-          tooltip: {
-            trigger: 'axis', axisPointer: { type: kind === 'bar' ? 'shadow' : 'line' }, confine: true,
-            formatter: function (ps) {
-              if (!ps.length) return '';
-              var i = ps[0].dataIndex;
-              return RK.chart.tip(catAxis.data[i], ps.map(function (p) {
-                var col = sdim ? meas[0] : (plotted[p.seriesIndex] || plotted[0]).col;
-                var v = p.value && typeof p.value === 'object' ? p.value.value : p.value;
-                return { color: p.color, label: p.seriesName, value: RK.format(v, col.format) };
-              }));
-            }
-          },
-          xAxis: horiz ? valAxis[0] : catAxis,
-          yAxis: horiz ? catAxis : valAxis,
-          dataZoom: zoom,
-          series: series
-        };
-        var key = kind + '|' + horiz + '|' + (fmt1 ? 2 : 1) + '|' + series.length;
-        chartWrap.classList.remove('has-msg', 'has-kpi');
+        var key = (opt.grid.length || 1) + '|' + horiz + '|' + kind + '|' + (opt.yAxis.length || 1) + '|' + opt.series.length;
         if (!chart) {
           chart = window.echarts.init(chartHost, 'rk', { renderer: 'svg' });
-          ro = 'ResizeObserver' in window ? new ResizeObserver(RK.util.rafThrottle(function () { if (chart) chart.resize(); })) : null;
+          ro = 'ResizeObserver' in window ? new ResizeObserver(RK.util.rafThrottle(function () {
+            if (!chart) return;
+            if (panelMode && lastRows) paintChart(lastRows, true); else chart.resize();
+          })) : null;
           if (ro) ro.observe(chartHost);
         }
-        if (key !== chartKey) chart.setOption(opt, { notMerge: true });
-        else chart.setOption(opt, { replaceMerge: ['series', 'xAxis', 'yAxis', 'legend', 'dataZoom', 'grid'] });
-        chartKey = key;
         chart.resize();
-        if (dropped) chartMsg.appendChild(h('span.rk-qc-chart__note', dropped + ' column' + (dropped > 1 ? 's' : '') + ' with other units shown in the table only'));
+        if (key !== chartKey) chart.setOption(opt, { notMerge: true });
+        else chart.setOption(opt, { replaceMerge: ['series', 'xAxis', 'yAxis', 'legend', 'dataZoom', 'grid', 'title'] });
+        chartKey = key;
+        if (dropped) st.chartNote = dropped + ' column' + (dropped > 1 ? 's' : '') + ' not charted (other units)';
+        var note = resHead.querySelector('.rk-qc-rh__note');
+        if (note) note.textContent = st.chartNote ? '· ' + st.chartNote : '';
       }
       function chartMessage(text) {
         if (chart) { chart.clear(); chartKey = null; }
@@ -1280,10 +1349,12 @@
         update: function (c) { ctx = c; },
         onStore: function (changes) {
           if (!alive) return;
-          if (changes.some(function (ch) { return ch.type === 'param'; })) paintRef();
+          var params = changes.some(function (ch) { return ch.type === 'param'; });
+          if (params) paintRef();
           if (!result) return;
           var ds = RK.data.get(result.dataset);
-          if (ds && RK.data.affected(ds, changes)) runText(st.last.text, { silent: true, rerun: true, keepSort: true });
+          // re-run when a global filter touches the dataset, or a parameter used by the query / its fields changes
+          if ((ds && RK.data.affected(ds, changes)) || (params && /@/.test(st.last.text))) runText(st.last.text, { silent: true, rerun: true, keepSort: true });
         },
         resize: function () { if (chart) chart.resize(); },
         exportImage: function () {

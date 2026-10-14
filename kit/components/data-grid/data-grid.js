@@ -175,6 +175,8 @@
         layout: o.layout,
         renderVertical: 'virtual',
         headerFilterLiveFilterDelay: 200,
+        printAsHtml: true,          // browser print shows every (filtered) row, not the virtual window
+        printRowRange: 'active',
         initialSort: sorts,
         placeholder: 'No matching rows',
         headerSortClickElement: 'header',

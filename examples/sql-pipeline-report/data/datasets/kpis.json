@@ -16,7 +16,7 @@
     {"label": "Market cap", "value": 4358.9, "format": "$#,##0\"m\"", "delta": null, "delta_format": null, "period": "182.0m diluted shares", "spark": null, "good": "up"},
     {"label": "Enterprise value", "value": 5623.9, "format": "$#,##0\"m\"", "delta": null, "delta_format": null, "period": "incl. $1,265m net debt & minorities", "spark": null, "good": "up"},
     {"label": "EV / EBITDA NTM", "value": 9.600785, "format": "0.0x", "delta": -3.497791, "delta_format": "+0.0x;-0.0x;0.0x", "period": "vs. peer median 13.1x", "spark": null, "good": "up"},
-    {"label": "Revenue CAGR FY22A–25A", "value": 0.090352, "format": "0.0%", "delta": 128.4, "delta_format": "+#,##0\" bps\";-#,##0\" bps\";0\" bps\"", "period": "vs. peer median 7.8%", "spark": null, "good": "up"},
+    {"label": "Revenue CAGR 3y", "value": 0.090352, "format": "0.0%", "delta": 128.4, "delta_format": "+#,##0\" bps\";-#,##0\" bps\";0\" bps\"", "period": "vs. peer median 7.8%", "spark": null, "good": "up"},
     {"label": "30-day volatility", "value": 0.329731, "format": "0.0%", "delta": 90.9, "delta_format": "+#,##0\" bps\";-#,##0\" bps\";0\" bps\"", "period": "vs. peer median 32.1%", "spark": [0.38862, 0.372559, 0.361345, 0.345615, 0.352245, 0.32107, 0.30977, 0.296179, 0.299876, 0.301204, 0.262107, 0.258018, 0.24043, 0.258983, 0.308946, 0.352486, 0.351556, 0.351081, 0.355785, 0.352888, 0.328946, 0.288128, 0.294194, 0.320879, 0.327144, 0.329731], "good": "down"}
   ],
   "meta": {"source": "Synthetic market data (sqlite3 pipeline, random.Random(7)); prices to 13-Oct-2026"}

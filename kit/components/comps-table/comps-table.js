@@ -363,10 +363,32 @@
       thead.addEventListener('click', onHeadClick);
       bodies.forEach(function (b) { b.addEventListener('click', onBodyClick); b.addEventListener('keydown', onKey); });
 
+      /* selection-only change (same rows): toggle classes so the dimming animates */
+      function sameRows(a, b) {
+        if (a.length !== b.length) return false;
+        for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+        return true;
+      }
+      function selKey(c) { return JSON.stringify(c.selected(c.enc.label)); }
+      function restyle() {
+        var sel = cur.selected(cur.enc.label);
+        root.classList.toggle('has-sel', sel.length > 0);
+        bodyRows().forEach(function (tr) {
+          if (!tr.classList.contains('is-data')) return;
+          var on = sel.indexOf(tr._rkValue) >= 0;
+          tr.classList.toggle('is-selected', on);
+          if (tr.hasAttribute('aria-selected')) tr.setAttribute('aria-selected', String(on));
+        });
+      }
+
       draw(false);
 
       return {
-        update: function (c) { cur = c; draw(true); },
+        update: function (c) {
+          var selOnly = sameRows(cur.rows, c.rows) && selKey(cur) !== selKey(c);
+          cur = c;
+          if (selOnly) restyle(); else draw(true);
+        },
         destroy: function () {
           thead.removeEventListener('click', onHeadClick);
           bodies.forEach(function (b) { b.removeEventListener('click', onBodyClick); b.removeEventListener('keydown', onKey); });

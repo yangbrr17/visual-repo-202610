@@ -38,22 +38,32 @@
   /** Regression coefficient in compact, unit-free form for the equation label. */
   function coef(v) {
     var a = Math.abs(v);
-    return RK.format(v, a >= 100 ? '#,##0' : a >= 10 ? '0.0' : a >= 1 ? '0.00' : '0.000');
+    return RK.format(v, a >= 100 ? '#,##0' : a >= 10 ? '0.0' : '0.00');
   }
-  function cdist(a, b) {
-    a = RK.theme.parseColor(a); b = RK.theme.parseColor(b);
-    return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
+  /** Perceptual-ish similarity: close hue and lightness (or near-identical greys). */
+  function similar(a, b) {
+    function hsl(c) {
+      var p = RK.theme.parseColor(c), r = p[0] / 255, g = p[1] / 255, bl = p[2] / 255;
+      var mx = Math.max(r, g, bl), mn = Math.min(r, g, bl), l = (mx + mn) / 2, d = mx - mn, h = 0;
+      var s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
+      if (d) h = mx === r ? ((g - bl) / d) % 6 : mx === g ? (bl - r) / d + 2 : (r - g) / d + 4;
+      return [(h * 60 + 360) % 360, s, l, p];
+    }
+    var x = hsl(a), y = hsl(b);
+    if (x[1] < 0.15 || y[1] < 0.15) {
+      return Math.sqrt(Math.pow(x[3][0] - y[3][0], 2) + Math.pow(x[3][1] - y[3][1], 2) + Math.pow(x[3][2] - y[3][2], 2)) < 40;
+    }
+    var dh = Math.abs(x[0] - y[0]); dh = Math.min(dh, 360 - dh);
+    return dh < 22 && Math.abs(x[2] - y[2]) < 0.22;
   }
   /**
-   * Category palette: theme order, but skipping colours close to accent2 (reserved for the target)
-   * or close to a colour already picked, so neighbouring categories stay distinguishable.
+   * Category palette: theme order, but skipping colours similar to accent2 (reserved for the target)
+   * or to a colour already picked, so neighbouring categories stay distinguishable.
    */
   function catPalette(values, t) {
     var pool = [];
-    t.cat.forEach(function (c) {
-      if (cdist(c, t.accent2) > 60 && pool.every(function (p) { return cdist(c, p) > 60; })) pool.push(c);
-    });
-    t.cat.forEach(function (c) { if (pool.indexOf(c) < 0 && cdist(c, t.accent2) > 60) pool.push(c); });  // reuse the rest if needed
+    t.cat.forEach(function (c) { if (!similar(c, t.accent2) && pool.every(function (p) { return !similar(c, p); })) pool.push(c); });
+    t.cat.forEach(function (c) { if (pool.indexOf(c) < 0 && !similar(c, t.accent2)) pool.push(c); });  // reuse the rest if needed
     if (!pool.length) pool = t.cat;
     var map = {};
     values.forEach(function (v, i) { map[v] = pool[i % pool.length]; });

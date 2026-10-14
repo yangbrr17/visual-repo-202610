@@ -33,20 +33,30 @@
     var mag = Math.pow(10, Math.floor(Math.log10(v))), n = v / mag;
     return (n >= 5 ? 5 : n >= 2.5 ? 2.5 : n >= 2 ? 2 : 1) * mag;
   }
-  function cdist(a, b) {
-    a = RK.theme.parseColor(a); b = RK.theme.parseColor(b);
-    return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
+  /** Perceptual-ish similarity: close hue and lightness (or near-identical greys). */
+  function similar(a, b) {
+    function hsl(c) {
+      var p = RK.theme.parseColor(c), r = p[0] / 255, g = p[1] / 255, bl = p[2] / 255;
+      var mx = Math.max(r, g, bl), mn = Math.min(r, g, bl), l = (mx + mn) / 2, d = mx - mn, h = 0;
+      var s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
+      if (d) h = mx === r ? ((g - bl) / d) % 6 : mx === g ? (bl - r) / d + 2 : (r - g) / d + 4;
+      return [(h * 60 + 360) % 360, s, l, p];
+    }
+    var x = hsl(a), y = hsl(b);
+    if (x[1] < 0.15 || y[1] < 0.15) {
+      return Math.sqrt(Math.pow(x[3][0] - y[3][0], 2) + Math.pow(x[3][1] - y[3][1], 2) + Math.pow(x[3][2] - y[3][2], 2)) < 40;
+    }
+    var dh = Math.abs(x[0] - y[0]); dh = Math.min(dh, 360 - dh);
+    return dh < 22 && Math.abs(x[2] - y[2]) < 0.22;
   }
   /**
-   * Category palette: theme order, but skipping colours close to accent2 (reserved for the target)
-   * or close to a colour already picked, so neighbouring categories stay distinguishable.
+   * Category palette: theme order, but skipping colours similar to accent2 (reserved for the target)
+   * or to a colour already picked, so neighbouring categories stay distinguishable.
    */
   function catPalette(values, t) {
     var pool = [];
-    t.cat.forEach(function (c) {
-      if (cdist(c, t.accent2) > 60 && pool.every(function (p) { return cdist(c, p) > 60; })) pool.push(c);
-    });
-    t.cat.forEach(function (c) { if (pool.indexOf(c) < 0 && cdist(c, t.accent2) > 60) pool.push(c); });  // reuse the rest if needed
+    t.cat.forEach(function (c) { if (!similar(c, t.accent2) && pool.every(function (p) { return !similar(c, p); })) pool.push(c); });
+    t.cat.forEach(function (c) { if (pool.indexOf(c) < 0 && !similar(c, t.accent2)) pool.push(c); });  // reuse the rest if needed
     if (!pool.length) pool = t.cat;
     var map = {};
     values.forEach(function (v, i) { map[v] = pool[i % pool.length]; });
@@ -179,6 +189,7 @@
     var periods = tf ? sortPeriods(util.unique(rows.map(function (r) { return r[tf]; }).filter(function (v) { return v != null; }))) : [null];
     var frameRows = periods.map(function (p) { return tf ? rows.filter(function (r) { return r[tf] === p; }) : rows; });
     var timeline = !!tf && periods.length > 1;
+    var tlShown = timeline && !ctx.print;   // print: static last period, no player
 
     /* axes: fixed across frames so motion is meaningful */
     var xs = rows.map(function (r) { return r[enc.x]; }), ys = rows.map(function (r) { return r[enc.y]; });
@@ -223,7 +234,7 @@
             value: it.value, name: name, symbolSize: d,
             label: {
               position: inside ? 'inside' : 'right', distance: 3,
-              color: dim ? RK.theme.alpha(t.ink2, 0.35) : inside ? RK.theme.onColor(eff, t.ink, '#ffffff') : (L.target ? t.ink : t.ink2),
+              color: dim ? RK.theme.alpha(t.ink2, 0.35) : inside ? RK.theme.onColor(eff, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#ffffff') : (L.target ? t.ink : t.ink2),
               textBorderWidth: inside ? 0 : 2.5, fontWeight: L.target ? 700 : 500
             }
           });
@@ -289,7 +300,7 @@
     /* size key (nested circles, bottom-aligned) in the right gutter */
     var showKey = o.sizeLegend !== false && !!sizeF && sMax > 0;
     var keyVals = showKey ? util.unique([niceBelow(sMax), niceBelow(sMax / 4), niceBelow(sMax / 16)]).filter(function (v) { return v > 0; }) : [];
-    var keyLabW = Math.max.apply(null, [24].concat(keyVals.map(function (v) { return textW(RK.format(v, sFmt), 10); })));
+    var keyLabW = Math.max.apply(null, [24].concat(keyVals.map(function (v) { return textW(axisFmt(sFmt, true)(v), 10); })));
     var gutter = showKey ? Math.max(Math.round(dMax + 14 + keyLabW), textW(ctx.title(sizeF), 10) * 0.6) : 0;
     var graphic = [];
     var top0 = 34;
@@ -302,7 +313,7 @@
         var r = diam(v) / 2, ty = base - 2 * r;
         kids.push({ type: 'circle', shape: { cx: dMax / 2, cy: base - r, r: r }, style: { fill: 'none', stroke: t.ink3, lineWidth: 0.8 } });
         kids.push({ type: 'line', shape: { x1: dMax / 2, y1: ty, x2: dMax + 6, y2: ty }, style: { stroke: t.ink3, lineWidth: 0.6, lineDash: [2, 2] } });
-        kids.push({ type: 'text', x: dMax + 8, y: ty, style: { text: RK.format(v, sFmt), fill: t.ink2, font: '10px ' + t.fontNum, verticalAlign: 'middle' } });
+        kids.push({ type: 'text', x: dMax + 8, y: ty, style: { text: axisFmt(sFmt, true)(v), fill: t.ink2, font: '10px ' + t.fontNum, verticalAlign: 'middle' } });
       });
       graphic.push({ type: 'group', id: 'rk-size', right: 2, top: top0, silent: true, children: kids });
     }
@@ -369,8 +380,8 @@
     var common = {
       legend: C.legend(ctx, { show: showLegend, data: legendNames, right: (interactive ? 92 : 0) + gutter, icon: 'circle', itemWidth: 9, itemHeight: 9 }),
       // containLabel:false -> ECharts 6 keeps axis labels + names inside outerBounds (above the timeline)
-      grid: C.grid(ctx, { top: gridTop, right: gutter ? gutter + 14 : 8, left: 2, bottom: timeline ? 50 : 2, containLabel: false,
-        outerBounds: { left: 0, right: 0, top: 0, bottom: timeline ? 48 : 0 } }),
+      grid: C.grid(ctx, { top: gridTop, right: gutter ? gutter + 14 : 8, left: 2, bottom: tlShown ? 50 : 2, containLabel: false,
+        outerBounds: { left: 0, right: 0, top: 0, bottom: tlShown ? 48 : 0 } }),
       tooltip: tooltip,
       xAxis: xAxis,
       yAxis: yAxis,
@@ -393,7 +404,7 @@
     var idx = timelineIndex(inst);
     if (idx == null || idx >= periods.length) idx = ctx.print || o.startAt !== 'first' ? periods.length - 1 : 0;
     var wm = function (p) {
-      return { type: 'text', id: 'rk-wm', right: (gutter ? gutter + 26 : 18), bottom: 106, silent: true, z: 0,
+      return { type: 'text', id: 'rk-wm', right: (gutter ? gutter + 26 : 18), bottom: tlShown ? 106 : 56, silent: true, z: 0,
         style: { text: String(p), fill: RK.theme.alpha(t.ink, t.dark ? 0.12 : 0.08), font: '700 46px ' + t.fontNum, align: 'right' } };
     };
     var dur = Math.round(o.playInterval * 0.7);

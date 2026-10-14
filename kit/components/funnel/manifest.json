@@ -1,0 +1,38 @@
+{
+  "id": "funnel",
+  "name": "Funnel",
+  "name_zh": "漏斗图",
+  "category": "flow",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Pipeline / process funnel as flat stage bars (centred or left-aligned) with conversion % between stages and optional value / % of first columns.",
+  "summary_zh": "以扁平条形表示各阶段的管道 / 流程漏斗（居中或左对齐），阶段之间标注转化率，右侧可附金额与占首阶段比例列。",
+  "description_zh": "每行数据是一个阶段（按数据顺序自上而下），条形宽度与该阶段数量成正比，相邻阶段之间的浅色连接带标注转化率（相对上一阶段，或相对首阶段）。左侧为阶段名称，右侧可附加第二指标（如管道金额）和“占首阶段比例”两列，形成图表与表格结合的投行风格版式。适合销售管道、交易流程（接触 → 签署保密协议 → 非约束性报价 → 约束性报价 → 签约）、客户转化、招聘流程等 3–8 个阶段的单调递减数据；点击阶段可交叉筛选。",
+  "best_for": ["Commercial pipeline: leads → qualified → proposal → negotiation → won", "M&A process funnel: buyers contacted → NDAs → IOIs → final bids", "Customer conversion / onboarding", "Recruiting or approval processes"],
+  "avoid_when": ["Stages that are not sequential subsets", "More than ~8 stages", "Comparing several funnels side by side (use a grouped bar chart)"],
+  "channels": {
+    "stage": {"type": "string", "required": true, "desc": "Stage name (rows in process order)", "default": "stage"},
+    "value": {"type": "number", "required": true, "desc": "Stage size → bar width", "default": "count"},
+    "secondary": {"type": "number", "required": false, "desc": "Second measure shown in a right-hand column and the tooltip (e.g. pipeline value)", "default": "value"}
+  },
+  "options": {
+    "align": {"type": "string", "default": "center", "desc": "center (symmetric funnel) | left (bar-chart style)"},
+    "conversion": {"type": "string|boolean", "default": "previous", "desc": "Conversion % in the connector below each stage: previous | first | false"},
+    "cumulative": {"type": "boolean", "default": true, "desc": "Right-hand '% of top' column"},
+    "columns": {"type": "boolean", "default": true, "desc": "Right-hand columns (secondary value, % of top) with headers"},
+    "colorBy": {"type": "string", "default": "stage", "desc": "stage: ordinal ramp (dark → light) down the funnel | single: accent"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Stage name(s) drawn in accent2 (e.g. 'Closed won')"},
+    "barRatio": {"type": "number", "default": 0.6, "desc": "Bar thickness as a share of the row (the rest is the connector)"},
+    "labels": {"type": "boolean", "default": true, "desc": "Value labels on the bars (inside when they fit)"},
+    "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field's format"},
+    "secondaryFormat": {"type": "string", "default": null, "desc": "Secondary column format; defaults to its field's format"},
+    "crossFilter": {"type": "boolean", "default": true, "desc": "Click a stage to cross-filter other blocks"}
+  },
+  "interactions": ["Hover a stage: value, secondary value, conversion vs. previous and vs. first stage", "Click a stage to cross-filter (others dim)", "Animated bar / connector transitions when filters change", "PNG / CSV export"],
+  "samples": [
+    {"title": "Commercial pipeline, LTM Sep-26 — opportunities by stage", "data": "pipeline_funnel", "height": 330,
+     "options": {"encode": {"stage": "stage", "value": "count", "secondary": "value"}, "highlight": "Closed won"}},
+    {"title": "Pipeline value — left-aligned, conversion vs. first stage", "data": "pipeline_funnel", "height": 300, "span": 7,
+     "options": {"encode": {"stage": "stage", "value": "value", "secondary": "count"}, "align": "left", "conversion": "first", "cumulative": false, "colorBy": "single", "highlight": "Closed won"}}
+  ]
+}

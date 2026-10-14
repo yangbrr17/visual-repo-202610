@@ -11,6 +11,19 @@
 
   function isNum(v) { return typeof v === 'number' && isFinite(v); }
 
+  /** Re-run the layout without animation when the width changes (label room is measured in px). */
+  function relayout(render) {
+    return function (ctx) {
+      var api = render(ctx), last = ctx, update = api.update, w = api.chart.getWidth();
+      api.update = function (c) { last = c; w = api.chart.getWidth(); update(c); };
+      api.resize = function () {
+        api.chart.resize();
+        if (Math.abs(api.chart.getWidth() - w) > 4) { w = api.chart.getWidth(); update(Object.assign({}, last, { motion: false })); }
+      };
+      return api;
+    };
+  }
+
   var measureCtx = null;
   /** Text width in px (used to size the delta column and the room needed by end labels). */
   function textW(s, font) {
@@ -335,8 +348,8 @@
       format: null,
       legend: true
     },
-    render: C(build, {
+    render: relayout(C(build, {
       select: function (p, ctx) { return p.seriesType === 'scatter' && p.name ? { field: ctx.enc.label, value: p.name } : null; }
-    })
+    }))
   });
 })();

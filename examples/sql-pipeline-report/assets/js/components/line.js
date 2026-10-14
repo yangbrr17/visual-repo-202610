@@ -71,7 +71,9 @@
         if (dz) state.zoom = { start: dz.start, end: dz.end };
         refit();
       });
-      inst.on('legendselectchanged', function (p) { state.legendSel = util.merge({}, p.selected); refit(); });
+      ['legendselectchanged', 'legendselected', 'legendunselected', 'legendselectall', 'legendinverseselect'].forEach(function (ev) {
+        inst.on(ev, function (p) { state.legendSel = util.merge({}, p.selected); refit(); });
+      });
 
       layoutEndLabels(inst, ctx, state, 'enter');
       return {
@@ -166,15 +168,16 @@
   }
 
   /**
-   * Series colours. With a highlight, the context series use the calm semantic tokens first
-   * (accent, accent3, ink3) and nothing close to accent2, so gold always means "the target".
+   * Series colours. accent2 is reserved for the highlighted series (the target), so nothing close to it
+   * is used for other lines; with a highlight, the context series use the calm semantic tokens first
+   * (accent, accent3, ink3).
    */
   function palette(t, highlight) {
     var base = highlight ? [t.accent, t.accent3, t.ink3].concat(t.cat) : t.cat.slice();
     var out = [];
     base.forEach(function (c) {
       if (!c) return;
-      if (highlight && colorDist(c, t.accent2) < 72) return;
+      if (colorDist(c, t.accent2) < 72) return;
       if (out.some(function (x) { return colorDist(x, c) < 46; })) return;
       out.push(c);
     });
@@ -637,12 +640,13 @@
         var s = it.s, id = 'el-' + s.key;
         var vtxt = RK.format(s.values[it.i], model.fmt);
         var rich = {
-          v: { backgroundColor: s.color, color: RK.theme.onColor(s.solid, t.ink, '#ffffff'), padding: [2, 4, 1, 4], borderRadius: 2,
+          // graphic elements take zrender style names: fill (not color)
+          v: { backgroundColor: s.color, fill: RK.theme.onColor(s.solid, t.ink, '#ffffff'), padding: [2, 4, 1, 4], borderRadius: 2,
                fontSize: 10.5, fontWeight: 600, fontFamily: t.fontNum, lineHeight: 14 },
-          n: { color: s.dimmed ? RK.theme.alpha(t.ink2, 0.4) : (s.hl ? t.ink : t.ink2), fontSize: 11, fontWeight: s.hl ? 600 : 400, fontFamily: t.fontSans, padding: [0, 0, 0, 4], lineHeight: 14 }
+          n: { fill: s.dimmed ? RK.theme.alpha(t.ink2, 0.4) : (s.hl ? t.ink : t.ink2), fontSize: 11, fontWeight: s.hl ? 600 : 400, fontFamily: t.fontSans, padding: [0, 0, 0, 4], lineHeight: 14 }
         };
         var text = o.endLabels === 'value' ? '{v|' + vtxt + '}' : o.endLabels === 'name' ? '{n|' + esc(s.name) + '}' : '{v|' + vtxt + '}{n|' + esc(s.name) + '}';
-        if (o.endLabels === 'name') rich.n.color = s.color;
+        if (o.endLabels === 'name') rich.n.fill = s.dimmed ? s.color : (t.dark ? RK.theme.mix(s.solid, t.ink, 0.25) : s.solid);
         var needLeader = Math.abs(it.ly - it.py) > 1.5 || lx - it.px > 10;
         var anim = animFor(ctx, mode);
         elements.push(util.merge({ id: id + '-l', type: 'polyline', z: 8, silent: true, invisible: !needLeader,

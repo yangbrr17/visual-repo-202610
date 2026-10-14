@@ -255,10 +255,15 @@
         var padX = 10, plotW = Math.max(60, W - padX * 2);
         var X = function (v) { return padX + (v - lo) / Math.max(DAY, hi - lo) * plotW; };
 
+        var sides = o.side === 'above' ? ['above'] : o.side === 'below' ? ['below'] : null;
+
+        // one layout attempt at label width lw -> lanes + number of unavoidable conflicts
         function attempt(lw) {
+          var maxH = 0;
           list.forEach(function (it) {
             it.label.style.maxWidth = lw + 'px';
             it.w = it.label.offsetWidth; it.h = it.label.offsetHeight;
+            maxH = Math.max(maxH, it.h);
             it.x = X(it.ev.t);
             var bw = it.w + (flag ? 6 : 0);
             if (flag) {
@@ -268,26 +273,34 @@
               it.l = Math.max(0, Math.min(W - bw, it.x - bw / 2)); it.rr = it.l + bw;
             }
           });
-          var placed = [], order = flag ? list.slice().reverse() : list.slice();
-          var sides = o.side === 'above' ? ['above'] : o.side === 'below' ? ['below'] : null;
-          var pref = 'above';
-          function valid(it, side, k) {
+          // lanes that fit the block height (per side)
+          var pitch = maxH + LANE_GAP, room = availH - AXIS_ROW - 8 - (sides ? 10 : 0);
+          var maxL = Math.max(1, Math.min(12, Math.floor((sides ? room - STEM + LANE_GAP : room / 2 - STEM + LANE_GAP) / pitch)));
+          var placed = [], order = flag ? list.slice().reverse() : list.slice(), pref = 'above', conflicts = 0;
+          // cost of a slot: overlapping another label is bad (10), crossing a leader is tolerable (1)
+          function cost(it, side, k) {
+            var c = 0;
             for (var i = 0; i < placed.length; i++) {
               var p = placed[i];
               if (p.side !== side) continue;
-              if (p.lane === k) { if (!(it.l >= p.rr + GAP || it.rr <= p.l - GAP)) return false; }
-              else if (p.lane > k) { if (p.x >= it.l - 4 && p.x <= it.rr + 4) return false; }
-              else if (it.x >= p.l - 4 && it.x <= p.rr + 4) return false;
+              if (p.lane === k) { if (!(it.l >= p.rr + GAP || it.rr <= p.l - GAP)) c += 10; }
+              else if (p.lane > k) { if (p.x >= it.l - 4 && p.x <= it.rr + 4) c += 1; }
+              else if (it.x >= p.l - 4 && it.x <= p.rr + 4) c += 1;
             }
-            return true;
+            return c;
           }
           order.forEach(function (it) {
             var cands = sides || (pref === 'above' ? ['above', 'below'] : ['below', 'above']);
-            it.side = null;
-            for (var k = 0; k < 12 && !it.side; k++) {
-              for (var s = 0; s < cands.length; s++) if (valid(it, cands[s], k)) { it.side = cands[s]; it.lane = k; break; }
+            // score: leader crossing (1) < extra lane beyond the height budget (3+) < label overlap (10)
+            var best = null;
+            for (var k = 0; k < 12 && !(best && best.score === 0); k++) {
+              for (var s = 0; s < cands.length; s++) {
+                var c = cost(it, cands[s], k), score = c + (k >= maxL ? 3 + (k - maxL) : 0);
+                if (!best || score < best.score) best = { c: c, score: score, side: cands[s], lane: k };
+                if (score === 0) break;
+              }
             }
-            if (!it.side) { it.side = cands[0]; it.lane = 11; }
+            it.side = best.side; it.lane = best.lane; conflicts += best.c;
             placed.push(it);
             pref = it.side === 'above' ? 'below' : 'above';
           });
@@ -298,11 +311,17 @@
           });
           var pA = hA + LANE_GAP, pB = hB + LANE_GAP;
           var aboveH = A ? STEM + A * pA - LANE_GAP : 10, belowH = B ? STEM + B * pB - LANE_GAP : 10;
-          return { A: A, B: B, pA: pA, pB: pB, aboveH: aboveH, belowH: belowH, need: aboveH + belowH + AXIS_ROW + 8 };
+          return { lw: lw, conflicts: conflicts, A: A, B: B, pA: pA, pB: pB, aboveH: aboveH, belowH: belowH, need: aboveH + belowH + AXIS_ROW + 8 };
         }
 
-        var lw = +o.labelWidth || 160, L = attempt(lw);
-        for (var tries = 0; tries < 3 && L.need > availH && lw > 104; tries++) { lw = Math.max(100, Math.round(lw * 0.84)); L = attempt(lw); }
+        // narrow the labels step by step until the layout is conflict-free (keep the best attempt)
+        var lw = +o.labelWidth || 160, L = attempt(lw), bestL = L;
+        while ((L.conflicts > 0 || L.need > availH) && lw > 96) {
+          lw = Math.max(92, Math.round(lw * 0.86));
+          L = attempt(lw);
+          if (L.conflicts < bestL.conflicts || (L.conflicts === bestL.conflicts && L.need < bestL.need)) bestL = L;
+        }
+        if (L !== bestL) L = attempt(bestL.lw);
         var H = Math.max(availH, L.need);
         var extra = H - L.need;
         var axisY = 4 + L.aboveH + extra * (L.aboveH / Math.max(1, L.aboveH + L.belowH));
@@ -346,8 +365,10 @@
         });
         if (todayX != null && todayX >= padX && todayX <= padX + plotW) {
           gridLayer.appendChild(h('div.rk-tl__today', { style: { left: todayX + 'px', top: '0px', height: (plotBottom + 2) + 'px' } }));
-          gridLayer.appendChild(h('div.rk-tl__todaylab', { style: { left: todayX + 'px', top: (plotBottom + 3) + 'px' } },
+          var tl = gridLayer.appendChild(h('div.rk-tl__todaylab', { style: { left: '0px', top: (plotBottom + 3) + 'px' } },
             (o.todayLabel ? o.todayLabel + ' ' : '') + RK.format(new Date(todayTs), 'd mmm')));
+          var tlw = tl.offsetWidth;   // centred under the line, but kept inside the block
+          tl.style.left = Math.max(0, Math.min(W - tlw, todayX - tlw / 2)) + 'px';
         }
         return H;
       }

@@ -1,0 +1,43 @@
+{
+  "id": "waffle",
+  "name": "Waffle Chart",
+  "name_zh": "华夫饼图（百格图）",
+  "category": "composition",
+  "engine": "svg",
+  "deps": [],
+  "summary": "10 × 10 unit grid (1 square = 1%) for part-to-whole — one stacked waffle with a legend table, waffles faceted by a field, or small multiples per category.",
+  "summary_zh": "10 × 10 百格图（每格 = 1%）表达部分与整体：单个堆叠百格图配图例表、按字段分面的多个百格图，或每个类别一个小百格图。",
+  "description_zh": "用 100 个方格直观展示占比，比饼图更容易数清楚“几成”，适合股东结构、收入构成、客户集中度等。数据为长表：label 为类别、value 为数值（同类多行自动汇总），按最大余数法分配格数，保证合计正好 100 格；超过 maxCategories 的小类合并为灰色“Others”。三种用法：单个堆叠百格图（右侧图例表列出数值与占比）；设置 encode.facet 按地区等字段拆成多个百格图横向对比；mode = 'facet' 时每个类别一个小百格图，只填充该类别份额并在下方给出大号百分比。悬停聚焦某一类别，点击交叉筛选。",
+  "best_for": ["Shareholder structure (institutional / retail / insider …)", "Headline 'x in 10' messages on summary pages", "Comparing the same mix across regions or years (facet)", "Single-share small multiples (e.g. % recurring revenue by segment)"],
+  "avoid_when": ["More than ~6 categories", "Shares below ~1% matter (one square = 1%)", "Precise values must be read (pair with the legend table or use a bar)"],
+  "channels": {
+    "label": {"type": "string", "required": true, "desc": "Category (rows sharing a label are aggregated)", "default": "label"},
+    "value": {"type": "number", "required": true, "desc": "Size of each category", "default": "value"},
+    "facet": {"type": "string", "required": false, "desc": "Split into one stacked waffle per value of this field (e.g. region, year)"}
+  },
+  "options": {
+    "mode": {"type": "string", "default": "stacked", "desc": "stacked (one waffle, or one per encode.facet value) | facet (one small waffle per category)"},
+    "grid": {"type": "number", "default": 10, "desc": "Cells per side (10 → 1 square = 1%)"},
+    "scale": {"type": "string", "default": "auto", "desc": "auto (absolute when the value is a % field summing to ≤ 100%, else share) | share (normalise to the total) | absolute (values are fractions 0–1 of a whole; the rest stays empty)"},
+    "maxCategories": {"type": "number", "default": 6, "desc": "Categories beyond this are grouped into othersLabel"},
+    "othersLabel": {"type": "string", "default": "Others", "desc": "Name of the grey grouped category"},
+    "sort": {"type": "string", "default": "desc", "desc": "desc | asc | null (data order)"},
+    "agg": {"type": "string", "default": "sum", "desc": "Aggregation for rows sharing a label"},
+    "fillOrder": {"type": "string", "default": "row", "desc": "row (left → right, top → bottom) | column (bottom → top, left → right)"},
+    "shape": {"type": "string", "default": "square", "desc": "square | circle"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Category drawn in the accent colour"},
+    "legend": {"type": "boolean", "default": true, "desc": "Legend table beside a single waffle, inline legend above several"},
+    "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field format"},
+    "pctFormat": {"type": "string", "default": "0.0%", "desc": "Share format"},
+    "maxSize": {"type": "number", "default": 280, "desc": "Maximum side of one waffle (px)"}
+  },
+  "interactions": ["Squares fill in sequence when the block scrolls into view", "Hover a square or legend row: that category stays in focus, tooltip with value / share / squares", "Click to cross-filter ('Others' toggles all of its members)", "Colours cross-fade and numbers count when filters change", "PNG / SVG export"],
+  "samples": [
+    {"title": "Shareholder structure by investor type (% of shares outstanding)", "data": "ownership", "height": 280,
+     "options": {"encode": {"label": "type", "value": "pct"}}},
+    {"title": "Share of register by investor type", "data": "ownership", "height": 230,
+     "options": {"encode": {"label": "type", "value": "shares_m"}, "mode": "facet", "highlight": "Strategic", "pctFormat": "0%"}},
+    {"title": "FY2025A revenue mix by region", "data": "segment_revenue", "height": 250,
+     "options": {"encode": {"label": "segment", "value": "revenue", "facet": "region"}, "where": "year == \"2025A\"", "shape": "circle", "fillOrder": "column"}}
+  ]
+}

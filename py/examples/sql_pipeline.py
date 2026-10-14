@@ -852,16 +852,24 @@ DEAL_FIELDS = {
     "premium_30d_vwap": {"title": "Premium 30-day VWAP", "format": PCT},
 }
 
-DEFINITIONS = f"""**How every number was produced** — one in-memory SQLite database, five SQL views, one Python step.
+DEFINITIONS = f"""**One in-memory SQLite database, six SQL views and one staging table, one Python step.** \
+SQL objects are in *italics*; run the script with --dump-db to open them in any SQL client.
 
-- **Market cap / EV** — latest close × diluted shares; EV = market cap + total debt + minorities − cash (`v_market`, `ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC)`).
-- **LTM / NTM** — calendarised to the last reported quarter (Q3-26): LTM = 25% FY25A + 75% FY26E, NTM = 25% FY26E + 75% FY27E (`v_fundamentals`, conditional aggregation).
-- **Revenue CAGR / margin change** — FY22A → FY25A; `LAG(…, 3)` guarded so gaps in the history return NULL, never a wrong base year.
-- **1-year TSR** — (close today + dividends with ex-date in the window) / close one year earlier − 1 (`v_tsr`).
-- **30-day volatility** — sample standard deviation of daily log returns over a 30-row window × √252 (`v_vol`, `AVG(…) OVER (ROWS BETWEEN 29 PRECEDING AND CURRENT ROW)`).
-- **Premiums** — offer price vs. the last undisturbed close (1-day) and the 30-day VWAP before announcement (`v_deals`).
-- **Peer medians** — target excluded; P / E ≤ 0x or > {PE_NM_MAX:.0f}x is n.m. and excluded (`v_peer_stats`, `ROW_NUMBER` / `COUNT` median, cross-checked in Python).
-- **Ranges** — football-field ranges use the peer interquartile range (25th–75th percentile, linear interpolation)."""
+- **Market cap / EV** — latest close × diluted shares; EV = market cap + total debt + minorities − cash \
+(*v_market*, ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC)).
+- **LTM / NTM** — calendarised to the last reported quarter (Q3-26): LTM = 25% FY25A + 75% FY26E, \
+NTM = 25% FY26E + 75% FY27E (*v_fundamentals*, conditional aggregation).
+- **Revenue CAGR / margin change** — FY22A → FY25A; LAG(…, 3) is guarded so a gap in the history \
+returns NULL, never a wrong base year.
+- **1-year TSR** — (close today + dividends with an ex-date in the window) / close one year earlier − 1 (*v_tsr*).
+- **30-day volatility** — sample standard deviation of daily log returns over a 30-row window × √252 \
+(*v_vol*, AVG(…) OVER (ROWS BETWEEN 29 PRECEDING AND CURRENT ROW)).
+- **Premiums** — offer price vs. the last undisturbed close (1-day) and the 30-day VWAP before the \
+announcement (*v_deals*).
+- **Peer medians** — target excluded; P / E ≤ 0x or > {PE_NM_MAX:.0f}x is n.m. and excluded \
+(*v_peer_stats*, ROW_NUMBER / COUNT median, cross-checked against the Python median).
+- **Ranges** — football-field ranges apply the peer / deal interquartile range (25th–75th percentile, \
+linear interpolation) to the target's own EBITDA, EPS and share price."""
 
 
 def _x(v: float | None) -> str:
@@ -1021,20 +1029,24 @@ def build_report(a: Analysis, available: set[str]) -> Report:
 
     lineage = [
         {"dataset": "comps", "sql": "comps ← v_market, v_fundamentals, v_tsr, v_vol",
-         "raw": "companies, prices, dividends, financials", "rows": a_rows(a.comps),
-         "python": "is_target 0/1 → boolean; computed net_leverage, ebitda_growth_ntm"},
-        {"dataset": "deals", "sql": "v_deals", "raw": "transactions, deal_prices", "rows": a_rows(a.deals),
-         "python": "announced → date; undisclosed EBITDA stays null (n.a.)"},
-        {"dataset": "premiums", "sql": "v_deals", "raw": "transactions, deal_prices", "rows": a_rows(a.premiums),
-         "python": "melt 1-day / 30-day columns to long format; drop nulls"},
+         "raw": "companies, prices, dividends, financials", "rows": len(a.comps),
+         "python": "0/1 → boolean; 2 computed fields"},
+        {"dataset": "deals", "sql": "v_deals", "raw": "transactions, deal_prices", "rows": len(a.deals),
+         "python": "announced → date; NULL stays null (n.a.)"},
+        {"dataset": "premiums", "sql": "v_deals", "raw": "transactions, deal_prices", "rows": len(a.premiums),
+         "python": "melt to long format; drop missing premiums"},
         {"dataset": "consideration_mix", "sql": "v_deals + GROUP BY", "raw": "transactions",
-         "rows": a_rows(a.mix), "python": "—"},
-        {"dataset": "perf / vol", "sql": "weekly sample of v_vol", "raw": "prices, companies",
-         "rows": a_rows(a.perf) + a_rows(a.vol), "python": "peer median per week; target vs. peers long format"},
+         "rows": len(a.mix), "python": "—"},
+    ]
+    if has("line"):
+        lineage.append({"dataset": "perf, vol", "sql": "weekly sample of v_vol", "raw": "prices, companies",
+                        "rows": len(a.perf) + len(a.vol), "python": "peer median per week; long format"})
+    lineage += [
         {"dataset": "valuation", "sql": "comps, v_deals", "raw": "all", "rows": len(valuation),
-         "python": "peer / deal quartiles applied to target EBITDA, EPS and price"},
-        {"dataset": "kpis, ev_bridge, offer", "sql": "comps, v_peer_stats", "raw": "all", "rows": 14,
-         "python": "presentation rows; offer uses @premium computed fields"},
+         "python": "quartiles applied to the target's EBITDA, EPS, price"},
+        {"dataset": "kpis, ev_bridge, offer", "sql": "comps, v_peer_stats", "raw": "all",
+         "rows": sum(len(r.datasets[d]["data"]) for d in ("kpis", "ev_bridge", "offer")),
+         "python": "presentation rows; offer uses @premium"},
     ]
     r.dataset("lineage", lineage, title="Data lineage", source=SRC_ANALYSIS,
               fields={"dataset": "Dataset", "sql": "SQL object", "raw": "Raw tables",
@@ -1146,7 +1158,7 @@ def build_report(a: Analysis, available: set[str]) -> Report:
 
     gap_vol = t["vol_30d"] - med["vol_30d"]
     p = r.page(f"{short}'s 30-day volatility of {_pct(t['vol_30d'], 0)} is "
-               f"{abs(gap_vol) * 100:.0f} pts {'above' if gap_vol > 0 else 'below'} the peer median",
+               f"{abs(gap_vol) * 100:.1f} pts {'above' if gap_vol > 0 else 'below'} the peer median",
                kicker="Trading risk", subtitle="Rolling 30-day volatility of daily log returns, annualised",
                source=SRC_MARKET)
     if has("line"):
@@ -1205,7 +1217,8 @@ def build_report(a: Analysis, available: set[str]) -> Report:
                 {"value": BASE_PREMIUM, "label": f"Illustrative offer {BASE_PREMIUM:.0%}"}]})
     p.block("donut", data="consideration_mix", span=6, height=300, title="Deal value by consideration",
             subtitle="USD m, all precedents",
-            encode={"label": "consideration", "value": "deal_value"}, options={"centerLabel": "Deal value"})
+            encode={"label": "consideration", "value": "deal_value"},
+            options={"layout": "labels", "display": "both", "centerLabel": "Deal value"})
 
     offer_ntm = (t["price"] * (1 + BASE_PREMIUM) * t["shares_out"] + adj_net_debt) / t["ntm_ebitda"]
     p = r.page(f"A {BASE_PREMIUM:.0%} premium implies {_x(offer_ntm)} NTM EBITDA vs. {_x(med['ev_ntm_ebitda'])} "
@@ -1230,7 +1243,7 @@ def build_report(a: Analysis, available: set[str]) -> Report:
     p = r.page("Appendix: how the numbers were built", kicker="Methodology",
                subtitle="Raw tables → SQL views → Python → ReportKit datasets", source=SRC_ANALYSIS)
     p.block("text-block", span=12, title="Metric definitions",
-            options={"variant": "prose", "columns": 2, "text": DEFINITIONS})
+            options={"variant": "prose", "text": DEFINITIONS})
 
     p = r.page("Appendix: every dataset traces back to a raw table", kicker="Data lineage",
                subtitle="One file per dataset in data/datasets/; open the CSV export from any chart toolbar",
@@ -1244,10 +1257,6 @@ def build_report(a: Analysis, available: set[str]) -> Report:
                      "columns": [{"field": "dataset"}, {"field": "sql"}, {"field": "raw"},
                                  {"field": "rows"}, {"field": "python"}]})
     return r
-
-
-def a_rows(t) -> int:
-    return len(t)
 
 
 def _peer_leverage(a: Analysis) -> list[float]:

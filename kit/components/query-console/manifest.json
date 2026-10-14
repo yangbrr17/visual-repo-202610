@@ -1,0 +1,206 @@
+{
+  "id": "query-console",
+  "name": "Query Console",
+  "name_zh": "自助分析控制台",
+  "category": "controls",
+  "engine": "echarts",
+  "deps": [
+    "echarts"
+  ],
+  "needs_data": false,
+  "summary": "Client self-service analysis console: a pivot-style Builder and a validated query editor over the report's datasets, with a formatted results table, an automatic chart, CSV export, history and 'Add as metric'.",
+  "summary_zh": "客户自助分析控制台：透视表式“构建器”与带实时校验的查询编辑器，结果以格式化表格 + 自动图表呈现，支持 CSV 导出、查询历史和“保存为指标”。",
+  "description_zh": "让客户在报告内自己做分析：选择数据集，在 Builder 中按“值（聚合 × 字段）/ 分组 / 筛选 / 排序 / 前 N”拼出查询，或在 Query 中直接写 RK.query 语句（如 median(ev_ebitda_25e) by sector where region != \"Latin America\" sort 2 desc），编辑器带语法高亮、自动补全、防抖实时校验（错误信息 + 行列位置 + 波浪下划线）和 Ctrl/Cmd+Enter 运行。右侧参考面板列出字段（标题、名称、格式）、@参数与函数，点击即插入光标处。结果以按字段格式显示的可排序表格 + 自动图表（一个类别列用柱状图，年份 / 日期用折线图，单位不同则双轴，单行汇总显示为大数字）分屏呈现；结果遵循全局筛选并在筛选变化时自动重跑。行级公式可“Add as metric”写回数据集（Dataset.addComputed），其他图表随即可用。",
+  "best_for": [
+    "Letting clients answer their own follow-up questions on the comps / precedents / financials",
+    "Ad-hoc medians, averages and rankings by sector or region",
+    "Defining a new metric (e.g. EV / EBITDA 2026E) that other charts then use",
+    "Appendix 'data room' page of an interactive report"
+  ],
+  "avoid_when": [
+    "The page must tell one fixed story (use a purpose-built chart)",
+    "Printed deliverables (only the results table and chart print)",
+    "Very large datasets (> ~50k rows, the engine runs in the browser)"
+  ],
+  "channels": {},
+  "options": {
+    "datasets": {
+      "type": "array",
+      "default": null,
+      "desc": "Dataset ids offered in the picker (null = every loaded dataset)"
+    },
+    "dataset": {
+      "type": "string",
+      "default": null,
+      "desc": "Initial dataset (default: the block's dataset, else the first available)"
+    },
+    "query": {
+      "type": "string",
+      "default": null,
+      "desc": "Initial query text — opens the Query tab and runs on mount"
+    },
+    "builder": {
+      "type": "object",
+      "default": null,
+      "desc": "Initial builder state {values:[{agg, field}], rows:[fields], where, sort:{col:'v0'|'r:field', dir}, top}; null = sensible default (median of a multiple by a low-cardinality text field)"
+    },
+    "examples": {
+      "type": "array",
+      "default": [],
+      "desc": "[{label, query}] or query strings shown as clickable chips in the Query tab"
+    },
+    "tab": {
+      "type": "string",
+      "default": "builder",
+      "desc": "Initial tab: builder | query (a 'query' option without 'builder' opens the Query tab)"
+    },
+    "view": {
+      "type": "string",
+      "default": "split",
+      "desc": "Result view: split | table | chart"
+    },
+    "chart": {
+      "type": "string",
+      "default": "auto",
+      "desc": "auto | bar | line | none — auto = bar for one category column, line when it looks like a year / date"
+    },
+    "reference": {
+      "type": "boolean",
+      "default": true,
+      "desc": "Side reference panel (fields, parameters, functions, syntax); collapses to a toggle in narrow blocks"
+    },
+    "history": {
+      "type": "boolean",
+      "default": true,
+      "desc": "Remember recent queries in localStorage (silently disabled where storage is unavailable)"
+    },
+    "historySize": {
+      "type": "number",
+      "default": 20,
+      "desc": "Number of remembered queries"
+    },
+    "addMetric": {
+      "type": "boolean",
+      "default": true,
+      "desc": "Offer 'Add as metric' for row-level formula columns (Dataset.addComputed)"
+    },
+    "highlight": {
+      "type": "string|string[]",
+      "default": null,
+      "desc": "Value(s) whose result rows / bars are highlighted with accent-2 (e.g. the target company)"
+    },
+    "maxRows": {
+      "type": "number",
+      "default": 500,
+      "desc": "Rows rendered in the table (CSV exports all rows)"
+    },
+    "tools": {
+      "type": "boolean",
+      "default": false,
+      "desc": "Block toolbar (off: the console has its own CSV export)"
+    }
+  },
+  "interactions": [
+    "Builder: pick aggregation / field / group-by / filter / sort / top N — runs as you edit",
+    "Query editor: syntax highlighting, autocomplete (Tab / Enter), live validation with line / column and wavy underline, Ctrl/Cmd+Enter",
+    "Reference panel: click a field, @parameter or function to insert at the caret",
+    "Sortable result columns; chart follows the table order",
+    "Results respect global filters and re-run when filters or @parameters change",
+    "Add as metric (Dataset.addComputed) — the new field appears in every field list",
+    "CSV export, query history, example chips, dataset picker"
+  ],
+  "samples": [
+    {
+      "title": "Peer analysis — builder",
+      "data": "peers",
+      "height": 600,
+      "options": {
+        "tab": "builder",
+        "highlight": "Helios Industrial",
+        "builder": {
+          "values": [
+            {
+              "agg": "median",
+              "field": "ev_ebitda_25e"
+            },
+            {
+              "agg": "median",
+              "field": "ebitda_margin_25e"
+            }
+          ],
+          "rows": [
+            "sector"
+          ],
+          "where": "",
+          "sort": {
+            "col": "v0",
+            "dir": "desc"
+          },
+          "top": null
+        },
+        "examples": [
+          {
+            "label": "Median multiples by region",
+            "query": "median(ev_ebitda_25e) as \"EV/EBITDA 25E\", median(ev_ebitda_26e) as \"EV/EBITDA 26E\" by region from peers sort 2 desc"
+          },
+          {
+            "label": "Top 8 by EV/EBITDA 2026E",
+            "query": "company, ev / ebitda_26e as \"EV/EBITDA 2026E\" format \"0.0x\", rev_growth_25e as \"Growth 25E\" from peers sort 2 desc top 8"
+          },
+          {
+            "label": "Cash-generative peers",
+            "query": "company, net_debt_ebitda, dividend_yield from peers where net_debt_ebitda < 1.5 sort 3 desc"
+          }
+        ]
+      }
+    },
+    {
+      "title": "Ad-hoc query — EV / EBITDA 2026E ranking",
+      "data": "peers",
+      "height": 600,
+      "options": {
+        "tab": "query",
+        "highlight": "Helios Industrial",
+        "query": "company, ev / ebitda_26e as \"EV/EBITDA 2026E\" format \"0.0x\", ebitda_margin_25e as \"EBITDA margin\"\nfrom peers where region != \"Latin America\"\nsort 2 desc top 12",
+        "examples": [
+          {
+            "label": "Sector medians",
+            "query": "median(ev_ebitda_25e), median(pe_25e), count() by sector from peers"
+          },
+          {
+            "label": "Size buckets",
+            "query": "if(mkt_cap > 8000, \"Large cap\", \"Mid cap\") as \"Bucket\", company, mkt_cap from peers sort 3 desc"
+          },
+          {
+            "label": "Industrial Automation peers",
+            "query": "company, ev_ebitda_25e, ebitda_margin_25e, tsr_1y from peers where sector == \"Industrial Automation\" sort 2 desc"
+          }
+        ]
+      }
+    },
+    {
+      "title": "Financial history — revenue and margin",
+      "data": "financials",
+      "height": 560,
+      "options": {
+        "tab": "query",
+        "view": "split",
+        "query": "year, revenue, ebitda, ebitda_margin as \"EBITDA margin\" from financials",
+        "examples": [
+          {
+            "label": "Revenue CAGR 2019A–25A",
+            "query": "cagr(last(revenue), first(revenue), 6) as \"Revenue CAGR\" format \"0.0%\", avg(ebitda_margin) as \"Avg. margin\" from financials where period == \"A\""
+          },
+          {
+            "label": "FCF conversion",
+            "query": "year, fcf / ebitda as \"FCF / EBITDA\" format \"0%\", capex / revenue as \"Capex % sales\" format \"0.0%\" from financials"
+          },
+          {
+            "label": "Actuals vs plan",
+            "query": "avg(revenue_growth) as \"Avg. growth\", avg(ebitda_margin) as \"Avg. margin\" by period from financials"
+          }
+        ]
+      }
+    }
+  ]
+}
