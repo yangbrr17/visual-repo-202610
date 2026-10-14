@@ -13,7 +13,8 @@ from .data import normalize_dataset, to_json_value
 from .errors import ReportKitError
 from .template import fallback_text
 
-__all__ = ["Report", "Page", "Block", "SpecError", "SPEC_VERSION", "CONTRACT_VERSION", "PAGE_KINDS"]
+__all__ = ["Report", "Page", "Block", "SpecError", "SPEC_VERSION", "CONTRACT_VERSION", "PAGE_KINDS",
+           "default_confidentiality"]
 
 CONTRACT_VERSION = "0.1"   # "reportkit" key of data/manifest.json (architecture.md §4.2)
 SPEC_VERSION = "0.1"       # "reportkit" key of the JSON layout spec
@@ -21,6 +22,25 @@ PAGE_KINDS = ("content", "cover", "section")
 # page proportions -> printed @page size: 16:9 widescreen (PowerPoint), US Letter landscape, A4 landscape
 PAGE_SIZES = {"16:9": "13.333in 7.5in", "letter": "11in 8.5in", "a4": "297mm 210mm"}
 DEFAULT_CONFIDENTIALITY = "Strictly private & confidential"
+# default confidentiality line by language when Report(confidentiality=...) is not given (None = no line)
+CONFIDENTIALITY_BY_LANG = {"en": DEFAULT_CONFIDENTIALITY, "zh": "严格保密"}
+
+
+class _Auto:
+    """Sentinel: 'use the default for the report's locale'."""
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "<locale default>"
+
+
+AUTO = _Auto()
+
+
+def default_confidentiality(locale: str | None) -> str:
+    """The default confidentiality line for *locale* ('zh-CN' -> '严格保密'; English otherwise)."""
+    lang = (locale or "en").replace("_", "-").split("-")[0].lower()
+    return CONFIDENTIALITY_BY_LANG.get(lang, DEFAULT_CONFIDENTIALITY)
 # up / down colour convention: "us" = green up / red down; "cn" = red up / green down (CN / JP / KR / TW markets)
 UPDOWN = ("us", "cn")
 
@@ -171,7 +191,7 @@ class Report:
 
     def __init__(self, title: str, subtitle: str | None = None, client: str | None = None,
                  date: Any = None, theme: str = "navy",
-                 confidentiality: str | None = DEFAULT_CONFIDENTIALITY, locale: str = "en-US",
+                 confidentiality: Any = AUTO, locale: str = "en-US",
                  firm: str | None = None, page_size: str = "16:9", updown: str | None = None):
         if page_size not in PAGE_SIZES:
             raise ValueError(f"page_size must be one of {', '.join(PAGE_SIZES)}, got {page_size!r}")
@@ -194,6 +214,17 @@ class Report:
         self._problems: list[str] = []   # recorded at call time, reported by validate()
         self._warnings: list[str] = []
         self._dataset_args: dict[str, dict] = {}
+
+    @property
+    def confidentiality(self) -> str | None:
+        """Confidentiality line on the cover, page footers and Excel sheets; by default 'Strictly private &
+        confidential', or '严格保密' for a Chinese locale. None / '' = no line."""
+        c = self._confidentiality
+        return default_confidentiality(self.locale) if isinstance(c, _Auto) else c
+
+    @confidentiality.setter
+    def confidentiality(self, value: Any) -> None:
+        self._confidentiality = value
 
     def __repr__(self) -> str:
         return (f"Report({self.title!r}, pages={len(self.pages)}, datasets={len(self.datasets)}, "
@@ -228,7 +259,7 @@ class Report:
         return id
 
     def _auto_dataset(self, data: Any, hint: str) -> str:
-        base = slugify(hint, 32) or "data"
+        base = slugify(hint, 32, ascii_only=True) or "data"   # dataset ids are ASCII (file names, JS keys)
         did = unique_id(base, set(self.datasets))
         return self.dataset(did, data)
 

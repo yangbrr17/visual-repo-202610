@@ -62,8 +62,9 @@ p.block("kpi-tiles", data="kpis", span=5, height="auto")
 out = r.build("out/atlas")                  # -> out/atlas/index.html
 ```
 
-`Report(title, subtitle=, client=, date=, theme="navy", confidentiality="Strictly private & confidential", locale="en-US",
+`Report(title, subtitle=, client=, date=, theme="navy", confidentiality=<按语言默认>, locale="en-US",
 firm=, page_size="16:9" | "letter" | "a4", updown=None | "us" | "cn")`。
+`confidentiality` 不传时按 `locale` 取默认：英文 "Strictly private & confidential"，中文（`zh-*`）"严格保密"；`None` 表示不显示。
 
 ### 数据规范化 / Normalisation
 
@@ -84,7 +85,10 @@ Field types are inferred and merged with `fields=` overrides.
 - `r.page(title, kicker=, subtitle=, source=, notes=, id=, kind="content"|"cover"|"section", nav=, filters=True)`
 - `p.block(component, data=, title=, subtitle=, span=1..12, height=px|"50vh", options=, encode=, source=, notes=, id=)`
   - `encode` 合并进 `options["encode"]`；`data=` 也可直接传 DataFrame/records（自动注册数据集）。
-  - 页脚 Source：未显式给出时，取本页所用数据集的 `meta.source`（`source=False` 关闭）。
+  - 页脚 Source：未显式给出时，取本页所用数据集的 `meta.source`（`source=False` 关闭）。多条来源以 `"; "` 连接
+    （中文报告为「资料来源：A；B」）；文字本身已以 "Source(s):" / "资料来源：" / "来源：" 开头时原样输出。
+  - 自动 id（页面：kicker 或标题；模块：页面 id + 模块标题）：英文转为 ASCII slug；中文 / 日文等标题保留原文字符
+    （`估值：DCF 与可比公司` → `估值-dcf-与可比公司`），单文件输出的文件名同理（`远航项目.html`）；数据集 id 始终是 ASCII。
   - `options={"choices": {"y": ["revenue", "ebitda", "*computed"]}}`：在模块标题栏放一个指标 / 维度下拉框，
     客户可切换该通道绑定的字段（`*computed` = 数据集的公式字段与客户自建指标）；未写 `encode.y` 时默认第一个字段。
     A metric / dimension picker in the block head; `*computed` expands to computed + user metrics.
@@ -122,12 +126,13 @@ t.block("bar", data="comps", title="EV / EBITDA 2025E ({{comps: count()}} peers 
 ### 语言与涨跌色 / Locale & up/down colours
 
 ```python
-r_zh = Report("项目 Atlas", date="2026-10-14", locale="zh-CN", updown="cn",   # 红涨绿跌；"us" = 绿涨红跌（默认）
-              confidentiality="严格保密")                                       # 保密声明默认是英文，中文报告请显式传入
+r_zh = Report("项目 Atlas", date="2026-10-14", locale="zh-CN", updown="cn")   # 红涨绿跌；"us" = 绿涨红跌（默认）
+# 中文报告的保密声明默认为「严格保密」；需要其他措辞时传 confidentiality="机密 · 仅供董事会讨论"
 ```
 
 - `locale` → `<html lang>` 与 `<meta name="rk:locale">`：运行时界面文字（工具栏、查看数据、导出、筛选提示……）、
-  页脚 来源 / 注、封面日期（2026年10月14日）、紧凑单位（`zh-CN` 用 亿 / 万）随之切换。
+  页脚「资料来源：A；B」/「注：」、封面日期（2026年10月14日）、紧凑单位（`zh-CN` 用 亿 / 万）、顶栏主题菜单名称
+  （经典海军蓝 / 古铜象牙 / 现代石板灰 / 墨色（深色），与运行时 `theme.*` 文案一致）和默认保密声明随之切换。
 - `updown="cn"` → `<html data-rk-updown="cn">`：所有组件的正 / 负颜色互换（瀑布图、偏差条、K 线、涨跌幅着色等），换主题后仍然有效。
 - 命令行可临时覆盖：`python -m reportkit build spec.json out --locale zh-CN`。
 - 组件或页面自己的界面文字：`RK.i18n.add('zh-CN', {'myKey': '…'})` + `RK.i18n.t('myKey', 'English fallback')`
@@ -184,6 +189,11 @@ r.build("out/atlas-api", data_source="api", api="https://data.example-bank.com/a
 `build()` validates first and reports **every** problem at once. `r.check()` returns `(errors, warnings)`.
 另外检查标题模板（数据集 / 字段 / `@param`）、`options.choices` 字段、`filters` 类型，以及组件 `optionDeps`
 引用的 vendor 包（例如 `basemap: "world-50m"` 会自动打包 `geo-world-50m` 高精度底图）。
+通道检查与组件的实际读取方式一致：宽表形式不要求长表通道（`bump` 的 `rank: [prior_rank, rank]` 不需要 `x`，
+`radar` 的 `axis: [...]` 不需要 `value`）；`sources-uses` 的 `mode: "capitalization"` 不需要 `side`，`item` 可回退到
+`instrument` 字段；`network` 的节点通道（id / name / category / size）按 `options.nodesData` 数据集检查；
+`pivot-table` 的 `options.rows / cols / value` 可以是字段或行公式（如 `year(date)`），其中引用的字段同样校验。
+每个组件 manifest 里的 gallery 示例都能通过校验（`tests/py/test_locale_samples.py`）。
 
 ### 输出 / Output (architecture.md §3)
 

@@ -4,18 +4,21 @@
   "schema": {"fields": [
     {"name": "method", "type": "string", "title": "Methodology"},
     {"name": "group", "type": "string", "title": "Group"},
+    {"name": "short", "type": "string", "title": "Benchmark"},
     {"name": "low", "type": "number", "title": "Low", "format": "$#,##0.00", "unit": "USD"},
     {"name": "high", "type": "number", "title": "High", "format": "$#,##0.00", "unit": "USD"},
+    {"name": "range", "type": "string", "title": "Range (IQR)"},
+    {"name": "applied", "type": "string", "title": "Applied to"},
     {"name": "basis", "type": "string", "title": "Basis"},
     {"name": "order", "type": "number", "title": "Order", "format": "0"}
   ]},
   "data": [
-    {"method": "Trading comps — EV / EBITDA NTM", "group": "Market", "low": 28.46, "high": 49.38, "basis": "11.0x–17.5x × NTM EBITDA of $586m (peer IQR, n=9)", "order": 1},
-    {"method": "Trading comps — EV / EBITDA LTM", "group": "Market", "low": 26.86, "high": 50.67, "basis": "11.5x–19.6x × LTM EBITDA of $536m (peer IQR, n=9)", "order": 2},
-    {"method": "Trading comps — P / E NTM", "group": "Market", "low": 26.34, "high": 36.05, "basis": "18.1x–24.8x × NTM EPS of $1.45 (peer IQR, n=8, n.m. excluded)", "order": 3},
-    {"method": "Precedents — EV / EBITDA LTM", "group": "Transaction", "low": 23.57, "high": 33.76, "basis": "10.4x–13.8x × LTM EBITDA (deal IQR, n=13)", "order": 4},
-    {"method": "Premiums paid — 1-day", "group": "Transaction", "low": 31.36, "high": 33.38, "basis": "31%–39% premium to the current $23.95 (deal IQR)", "order": 5},
-    {"method": "52-week trading range", "group": "Reference", "low": 22.68, "high": 36.61, "basis": "Closing prices, last 12 months", "order": 6}
+    {"method": "Trading comps — EV / EBITDA NTM", "group": "Market", "short": "EV / EBITDA NTM", "low": 28.46, "high": 49.38, "range": "11.0x–17.5x", "applied": "NTM EBITDA $586m", "basis": "11.0x–17.5x × NTM EBITDA of $586m (peer IQR, n=9)", "order": 1},
+    {"method": "Trading comps — EV / EBITDA LTM", "group": "Market", "short": "EV / EBITDA LTM", "low": 26.86, "high": 50.67, "range": "11.5x–19.6x", "applied": "LTM EBITDA $536m", "basis": "11.5x–19.6x × LTM EBITDA of $536m (peer IQR, n=9)", "order": 2},
+    {"method": "Trading comps — P / E NTM", "group": "Market", "short": "P / E NTM", "low": 26.34, "high": 36.05, "range": "18.1x–24.8x", "applied": "NTM EPS $1.45", "basis": "18.1x–24.8x × NTM EPS of $1.45 (peer IQR, n=8, n.m. excluded)", "order": 3},
+    {"method": "Precedents — EV / EBITDA LTM", "group": "Transaction", "short": "EV / EBITDA LTM", "low": 23.57, "high": 33.76, "range": "10.4x–13.8x", "applied": "LTM EBITDA $536m", "basis": "10.4x–13.8x × LTM EBITDA (deal IQR, n=13)", "order": 4},
+    {"method": "Premiums paid — 1-day", "group": "Transaction", "short": "1-day premium", "low": 31.36, "high": 33.38, "range": "31%–39%", "applied": "Current price $23.95", "basis": "31%–39% premium to the current $23.95 (deal IQR)", "order": 5},
+    {"method": "52-week trading range", "group": "Reference", "short": "52-week range", "low": 22.68, "high": 36.61, "range": "Low – high", "applied": "Daily closes, 12 months", "basis": "Closing prices, last 12 months", "order": 6}
   ],
   "meta": {"source": "Northbridge Partners analysis; Synthetic market data (sqlite3 pipeline, random.Random(7)); prices to 13-Oct-2026", "unit": "USD"}
 }

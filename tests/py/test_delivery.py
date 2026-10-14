@@ -632,6 +632,40 @@ class SingleFileBrowserTests(unittest.TestCase):
         self.assertEqual(info["externalRefs"], [])
         self.assertTrue(any(f.startswith("Inter") for f in info["fonts"]), info["fonts"])
 
+    def test_chinese_single_file_name_and_excel_link(self):
+        """A Chinese report: the single file is named after its title (远航项目.html), opens offline, and its
+        Excel button points at the workbook written next to it."""
+        try:
+            import openpyxl  # noqa: F401
+            excel = True
+        except ImportError:  # pragma: no cover
+            excel = False
+        spec = importlib.util.spec_from_file_location("rk_build_demo_zh", ROOT / "py/examples/build_demo_zh.py")
+        demo = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(demo)
+        old = os.environ.pop("REPORTKIT_HOME", None)
+        try:
+            with tempfile.TemporaryDirectory() as tmp, warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                path = demo.build(Path(tmp) / "交付", single_file=True, excel=excel)
+                names = sorted(p.name for p in path.parent.iterdir())
+                self.assertEqual(names, ["远航项目.html", "远航项目.xlsx"] if excel else ["远航项目.html"])
+                res = subprocess.run(["node", str(ROOT / "tests/py/single_file_check.cjs"), str(path)],
+                                     capture_output=True, text=True, timeout=240)
+                self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+                info = json.loads(res.stdout.strip().splitlines()[-1])
+                if excel:
+                    from urllib.parse import unquote, urlparse
+                    self.assertEqual(len(info["downloads"]), 1, info)
+                    self.assertTrue(Path(unquote(urlparse(info["downloads"][0]).path)).is_file(), info["downloads"])
+        finally:
+            if old is not None:
+                os.environ["REPORTKIT_HOME"] = old
+        self.assertEqual(info["notRendered"], [])
+        self.assertEqual(info["errors"], [])
+        self.assertEqual(info["requests"], [])
+        self.assertGreater(info["blocks"], 15)
+
 
 if __name__ == "__main__":
     unittest.main()

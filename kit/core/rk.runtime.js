@@ -765,10 +765,28 @@
     update();
   }
 
+  /**
+   * Theme <select> labels in the report language. The builder pre-fills the options (in English); every option
+   * whose theme has an i18n name (theme.<id>, the kit's four themes or a pack that adds one) is relabelled, now and
+   * on 'i18n:changed'. Options for other custom themes keep the label they were given.
+   */
+  function labelThemeOptions(sel) {
+    [].forEach.call(sel.options, function (o) {
+      if (RK.i18n && RK.i18n.has('theme.' + o.value)) o.textContent = RK.theme.label(o.value);
+    });
+  }
+  var themeSelects = [];
+  RK.bus.on('i18n:changed', function () {
+    themeSelects.forEach(function (sel) { if (sel.isConnected !== false) labelThemeOptions(sel); });
+  });
   function wireThemeSwitch() {
     util.qsa('[data-rk-theme-switch]').forEach(function (sel) {
       if (sel.tagName === 'SELECT' && !sel.options.length) {
         RK.theme.list.forEach(function (name) { sel.appendChild(h('option', { value: name }, RK.theme.label ? RK.theme.label(name) : (RK.theme.labels[name] || name))); });
+      }
+      if (sel.tagName === 'SELECT') {
+        labelThemeOptions(sel);
+        if (themeSelects.indexOf(sel) < 0) themeSelects.push(sel);
       }
       sel.value = document.documentElement.getAttribute('data-rk-theme') || RK.theme.list[0];
       sel.addEventListener('change', function () { RK.theme.set(sel.value); });

@@ -1,4 +1,5 @@
-/* Theme: Slate modern — cooler, consulting-style palette with a teal accent. */
+/* Theme: Slate modern — cooler, consulting-style palette: slate ink, teal sequential ramp, deep gold target highlight.
+   Gold is reserved for the target (accent-2 / highlight), so the categorical series carry no gold. */
 [data-rk-theme="slate"] {
   --rk-canvas: #edf0f3;
   --rk-paper: #ffffff;
@@ -11,10 +12,10 @@
   --rk-grid: #e8ecf0;
   --rk-axis: #8d98a4;
   --rk-accent: #1f2a44;
-  --rk-accent-2: #c98a00;
+  --rk-accent-2: #a87400;     /* target highlight: 4.07:1 on paper (marks need >= 3:1) */
   --rk-accent-2-ink: #8a5e00;   /* text-safe (>= 4.5:1) variant of accent-2 for labels */
   --rk-accent-3: #3d7eaa;
-  --rk-highlight: #c98a00;
+  --rk-highlight: #a87400;
   --rk-pos: #2f7a4f;
   --rk-neg: #c0504d;
   --rk-neutral: #a8b2bd;
@@ -24,13 +25,15 @@
   --rk-map-border: #ffffff;
   --rk-map-water: #f5f7f9;
 
+  /* categorical: cat-1 brand, cat-8 grey ("Other"); cat-2..7 = the validated slate set without its gold (the target
+     colour), ordered for adjacent CVD dE 9.7 / normal 21.5 and first-3 all-pairs 9.9 / 23.1 (docs/design-system.md 3.4) */
   --rk-cat-1: #1f2a44;
-  --rk-cat-2: #c38700;
-  --rk-cat-3: #c35f92;
-  --rk-cat-4: #3e6dc8;
-  --rk-cat-5: #db6143;
-  --rk-cat-6: #7d5abc;
-  --rk-cat-7: #3e9245;
+  --rk-cat-2: #009783;
+  --rk-cat-3: #db6143;
+  --rk-cat-4: #7d5abc;
+  --rk-cat-5: #3e9245;
+  --rk-cat-6: #3e6dc8;
+  --rk-cat-7: #c35f92;
   --rk-cat-8: #8e9aaf;
 
   --rk-seq-1: #f0f6f7;

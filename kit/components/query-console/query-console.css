@@ -203,6 +203,7 @@
 .rk-qc-chart__msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .rk-qc-chart__empty { max-width: 280px; padding: 20px; text-align: center; font-size: 12px; color: var(--rk-ink-3); }
 .rk-qc-rh__note { margin-left: 4px; font-size: 11px; color: var(--rk-ink-3); white-space: nowrap; }
+.rk-qc-rh__q { display: none; order: -1; flex: 1 0 100%; margin: 0; font: 11px/1.45 var(--rk-qc-mono, monospace); color: var(--rk-ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
 .rk-qc-kpis { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px 34px; padding: 20px; }
 .rk-qc-kpi__k { font-size: var(--rk-fs-xs); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--rk-ink-3); }
 .rk-qc-kpi__v { margin-top: 2px; font-size: clamp(22px, 1.4vw + 12px, 30px); font-weight: 600; line-height: 1.1; color: var(--rk-accent); letter-spacing: -.01em; }
@@ -288,8 +289,21 @@
 /* ---------- motion off / print ---------- */
 .rk-qc.is-static *, .rk-qc.is-static *::before, .rk-qc.is-static *::after { animation: none !important; transition: none !important; }
 @media (prefers-reduced-motion: reduce) { .rk-qc *, .rk-qc-pop { animation: none !important; transition: none !important; } }
+/* print: the results (table | chart) fill the whole block — without the editor rows above them the results row would
+   otherwise shrink to the table's height and crush the chart. The same layout applies under html.rk-printing (set
+   at 'beforeprint', before the media switch), so the chart is re-laid out for paper when the runtime resizes blocks. */
+html.rk-printing .rk-qc__head, html.rk-printing .rk-qc__editor, html.rk-printing .rk-qc__ref, html.rk-printing .rk-qc__reffade,
+html.rk-printing .rk-qc-rh .rk-seg, html.rk-printing .rk-qc-rh .rk-btn, html.rk-printing .rk-qc-pop, html.rk-printing .rk-qc-ac { display: none !important; }
+html.rk-printing .rk-qc__grid { grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: minmax(0, 1fr); border: 0; }
+html.rk-printing .rk-qc-tbl tbody tr { animation: none; }
+html.rk-printing .rk-qc-chart { min-height: 180px; }
+html.rk-printing .rk-qc-rh__q { display: block; }
+html.rk-printing .rk-qc-rh__time { display: none; }
 @media print {
   .rk-qc__head, .rk-qc__editor, .rk-qc__ref, .rk-qc__reffade, .rk-qc-rh .rk-seg, .rk-qc-rh .rk-btn, .rk-qc-pop, .rk-qc-ac { display: none !important; }
-  .rk-qc__grid { grid-template-columns: minmax(0, 1fr) !important; border: 0; }
+  .rk-qc__grid { grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: minmax(0, 1fr); border: 0; }
   .rk-qc-tbl tbody tr { animation: none; }
+  .rk-qc-chart { min-height: 180px; }
+  .rk-qc-rh__q { display: block; }
+  .rk-qc-rh__time { display: none; }
 }

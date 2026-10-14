@@ -403,9 +403,57 @@
   };
   /** Compact ('auto') units per language; RK.i18n picks one (zh-CN: 亿 = 1e8, 万 = 1e4). */
   var COMPACT_UNITS = {
-    en: [[1e12, 'tn'], [1e9, 'bn'], [1e6, 'm'], [1e3, 'k']],
+    en: config.compactUnits,
     zh: [[1e8, '亿'], [1e4, '万']]
   };
+  /**
+   * Locale-dependent defaults per language (RK.format.applyLocale). zh: "n.a." / "n.m." become 不适用 / 无意义
+   * ("—" would read as an accounting zero), month and weekday names are Chinese (mmm -> 10月, mmmm -> 十月,
+   * ddd -> 周三, dddd -> 星期三) and the date presets use 年 / 月 / 日. dateCode rewrites English text-month codes
+   * ("dd mmm yyyy", "mmm yy", "d mmm" ...) into Chinese order, so a field formatted for an English report reads
+   * "2026年10月14日" rather than "14 10月 2026" in a Chinese one.
+   */
+  var LOCALES = {
+    en: {
+      config: { na: config.na, nm: config.nm, months: config.months, monthsLong: config.monthsLong, days: config.days, daysLong: config.daysLong, compactUnits: COMPACT_UNITS.en },
+      presets: { date: 'dd mmm yyyy', month: 'mmm yy' },
+      dateCode: null
+    },
+    zh: {
+      config: {
+        na: '不适用', nm: '无意义',
+        months: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+        monthsLong: ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'],
+        days: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
+        daysLong: ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'],
+        compactUnits: COMPACT_UNITS.zh
+      },
+      presets: { date: 'yyyy"年"m"月"d"日"', month: 'yy"年"m"月"' },
+      dateCode: zhDateCode
+    }
+  };
+  var DATE_TOKENS = /"[^"]*"|\\.|\[[^\]]*\]|yyyy|yy|mmmm|mmm|mm|m|dddd|ddd|dd|d|q/g;
+  /**
+   * 'dd mmm yyyy' -> 'yyyy"年"m"月"d"日"', 'mmm yy' -> 'yy"年"m"月"', 'd mmm' -> 'm"月"d"日"', 'ddd, d mmm yyyy' ->
+   * 'yyyy"年"m"月"d"日" ddd'. Only codes with a month NAME (mmm / mmmm) plus a year or day, made of date parts and
+   * separators, are rewritten; a lone 'mmm' / 'mmmm' (10月 / 十月), numeric dates ('yyyy-mm-dd', 'dd/mm/yy'), quarters
+   * and codes with literal text stay as written.
+   */
+  function zhDateCode(code) {
+    var y = null, d = false, w = null, month = false, other = false;
+    var rest = code.replace(DATE_TOKENS, function (tk) {
+      if (tk === 'yyyy' || tk === 'yy') { if (!y) y = tk; }
+      else if (tk === 'mmmm' || tk === 'mmm') month = true;
+      else if (tk === 'dd' || tk === 'd') d = true;
+      else if (tk === 'dddd' || tk === 'ddd') { if (!w) w = tk; }
+      else if (tk[0] === '\\') { if (/[^\s,.\-\/']/.test(tk.slice(1))) other = true; }   // \- \/ are separators
+      else if (tk[0] !== '[') other = true;          // m / mm, q, "literal" ([$-409] locale tags are ignored)
+      return '';
+    });
+    if (!month || (!y && !d) || other || /[^\s,.\-\/']/.test(rest)) return code;   // 'mmm' alone: just the name
+    return (y ? y + '"年"' : '') + 'm"月"' + (d ? 'd"日"' : '') + (w ? ' ' + w : '');
+  }
+  var activeLocale = LOCALES.en, appliedLocale = LOCALES.en;
 
   // Lookup tables have no prototype and are read with has(): "constructor", "toString", "__proto__" ... are never presets.
   function has(obj, key) { return obj != null && Object.prototype.hasOwnProperty.call(obj, key); }
@@ -650,7 +698,8 @@
   }
 
   function compileDate(code) {
-    var re = /"[^"]*"|\\.|\[[^\]]*\]|yyyy|yy|mmmm|mmm|mm|m|dddd|ddd|dd|d|q/g;
+    var re = DATE_TOKENS;
+    if (activeLocale.dateCode) code = activeLocale.dateCode(code);
     return function (v) {
       var d = toDate(v);
       if (!d) return String(v);
@@ -788,16 +837,30 @@
   format.presets = presets;
   format.config = config;
   format.compactUnits = COMPACT_UNITS;
+  format.locales = LOCALES;
   /**
-   * Locale-dependent settings (compact units) for an RK.i18n locale. Runs on load and on 'i18n:changed'.
-   * A page that set config.compactUnits itself keeps them (only the kit's own defaults are swapped).
+   * Locale-dependent settings for an RK.i18n locale: compact units, n.a. / n.m., month and weekday names, the
+   * 'date' / 'month' presets and the text-month date-code order (LOCALES above). Runs on load and on 'i18n:changed'.
+   * Only values still at the kit's default for the previous locale are swapped: a page that set config.na,
+   * config.compactUnits, presets.date ... itself keeps them on every switch.
    */
   format.applyLocale = function (locale) {
     var lang = String(locale || (RK.i18n && RK.i18n.locale) || 'en').split('-')[0].toLowerCase();
-    var known = Object.keys(COMPACT_UNITS).some(function (k) { return config.compactUnits === COMPACT_UNITS[k]; }) || config._defaultUnits === config.compactUnits;
-    if (!known) return;
-    config.compactUnits = has(COMPACT_UNITS, lang) ? COMPACT_UNITS[lang] : COMPACT_UNITS.en;
-    config._defaultUnits = config.compactUnits;
+    var next = has(LOCALES, lang) ? LOCALES[lang] : LOCALES.en, prev = appliedLocale;
+    Object.keys(next.config).forEach(function (k) {
+      if (config[k] === prev.config[k]) config[k] = next.config[k];
+    });
+    Object.keys(next.presets).forEach(function (k) {
+      if (presets[k] === prev.presets[k]) presets[k] = next.presets[k];
+    });
+    config._defaultUnits = config.compactUnits;    // (kept for pages that read it)
+    appliedLocale = next;
+    if (activeLocale !== next) { activeLocale = next; cache = Object.create(null); }   // compiled date codes depend on it
+  };
+  /** The date code RK.format uses for `code` in the current locale ('dd mmm yyyy' -> 'yyyy"年"m"月"d"日"' in zh). */
+  format.dateCode = function (code) {
+    code = isPreset(code) ? presets[code] : code;
+    return activeLocale.dateCode && isDateCode(code) ? activeLocale.dateCode(String(code)) : code;
   };
   format.toDate = toDate;
   format.isDateCode = isDateCode;
@@ -1523,7 +1586,7 @@
  * ReportKit data — datasets, data sources, global store (filters / params / state),
  * filtering, aggregation and the client query engine.
  *
- * Data contract (one file per dataset, see docs/data-contract.md):
+ * Data contract (one file per dataset, see docs/architecture.md §4):
  *   {
  *     "id": "comps",
  *     "title": "Trading comparables",
@@ -2755,18 +2818,29 @@
   }
 
   /* ---------------- up / down convention ---------------- */
-  var swapped = false;   // --rk-pos / --rk-neg currently set inline by applyUpdown()
-  /** Read tokens with the theme's own pos / neg, then swap them (CSS + tokens) for the 'cn' convention. */
+  var swapped = [];      // custom properties currently set inline on <html> by applyUpdown()
+  /**
+   * Read tokens with the theme's own pos / neg / div, then mirror them (CSS + tokens) for the 'cn' convention:
+   * pos <-> neg, and the diverging ramp reversed (div-1 <-> div-n), so the high / positive end of every heat scale
+   * takes the red side that pos now has and the low / negative end the theme's former "up" colour (green, teal
+   * or navy). Each theme's ramp runs from its neg hue (low) to its pos-side hue (high), so reversing it keeps the
+   * scale in step with pos / neg; components keep using t.div low -> high and need no cn branch.
+   */
   function applyUpdown() {
     var root = document.documentElement;
-    if (swapped) { root.style.removeProperty('--rk-pos'); root.style.removeProperty('--rk-neg'); swapped = false; }
+    swapped.forEach(function (p) { root.style.removeProperty(p); });
+    swapped = [];
     var t = readTokens();
     if (theme.updown() === 'cn') {
-      var pos = t.pos, neg = t.neg;
-      root.style.setProperty('--rk-pos', neg);
-      root.style.setProperty('--rk-neg', pos);
-      swapped = true;
-      t.pos = neg; t.neg = pos;
+      var pos = t.pos, neg = t.neg, div = t.div.slice().reverse();
+      function set(p, v) { root.style.setProperty(p, v); swapped.push(p); }
+      set('--rk-pos', neg);
+      set('--rk-neg', pos);
+      // the theme's --rk-div-<i> slots, read again in order (readTokens skips empty ones)
+      var cs = getComputedStyle(root), slots = [];
+      for (var i = 1; i <= 9; i++) if (cs.getPropertyValue('--rk-div-' + i).trim()) slots.push('--rk-div-' + i);
+      if (slots.length === t.div.length) slots.forEach(function (p, k) { set(p, div[k]); });
+      t.pos = neg; t.neg = pos; t.div = div;
       t.updown = 'cn';
     } else t.updown = 'us';
     return t;
@@ -2959,15 +3033,12 @@
       var locale = ctx.options.locale || (RK.i18n && RK.i18n.lang() === 'zh' ? 'ZH' : 'EN');
       var inst = global.echarts.init(ctx.el, 'rk', { renderer: renderer, locale: locale });
       var current = ctx;
-      // ECharts' roam/inside-zoom controller calls preventDefault on every wheel event before checking
-      // zoomOnMouseWheel:'ctrl', which swallows page scrolling. Keep plain wheel for the report; let
-      // Ctrl/Cmd + wheel (and trackpad pinch, which sends ctrlKey) through to ECharts.
-      function onWheel(e) { if (!e.ctrlKey && !e.metaKey) e.stopPropagation(); }
-      if (ctx.options.wheelZoom !== true) ctx.el.addEventListener('wheel', onWheel, { capture: true });
+      var guard = chart.wheelGuard(ctx.el, ctx.options);
 
       function apply(c, first) {
         current = c;
         var opt = build(c, inst) || {};
+        guard.adapt(opt);
         if (!c.motion) opt.animation = false;
         // screen readers get an auto-generated description of every chart (ECharts aria); no decal patterns
         if (opt.aria === undefined && c.options.aria !== false) opt.aria = { enabled: true, decal: { show: false } };
@@ -3006,7 +3077,7 @@
           inst.resize();
           if (hooks.rebuildOnResize) apply(current, false);   // width-dependent layouts (tick density, label widths)
         },
-        destroy: function () { ctx.el.removeEventListener('wheel', onWheel, { capture: true }); inst.dispose(); },
+        destroy: function () { guard.destroy(); inst.dispose(); },
         exportImage: function () { return exportPNG(inst, current); },
         exportSVG: function () {
           return inst.renderToSVGString ? inst.renderToSVGString() : null;
@@ -3079,11 +3150,56 @@
     return util.merge({ left: 4, right: 12, top: hasLegend ? 32 : 12, bottom: 4, containLabel: true }, extra || {});
   };
 
-  /** Standard zoom: inside (wheel/pinch) + compact slider. */
+  /**
+   * Wheel rule shared by every ECharts chart: a plain wheel scrolls the report; Ctrl + wheel, ⌘ + wheel and a
+   * trackpad pinch (which browsers send as a ctrlKey wheel) zoom.
+   *
+   * ECharts cannot do this alone: its inside-zoom / roam controller calls preventDefault on every wheel event
+   * before it checks zoomOnMouseWheel:'ctrl' (so a plain wheel over a chart would not scroll the page), and
+   * 'ctrl' only looks at ctrlKey (so ⌘ + wheel never zooms on a Mac). The guard is a capture listener on the
+   * chart host that stops plain wheels before ECharts sees them; adapt(option) then switches inside dataZooms
+   * set to 'ctrl' (the RK.chart.zoom default) to true, because only modified wheels can reach them.
+   *
+   *   var guard = RK.chart.wheelGuard(el, ctx.options);   // RK.chart() does this for its charts
+   *   inst.setOption(guard.adapt(option));  ...  guard.destroy();
+   *
+   * options.wheelZoom === true: no guard (plain wheel zooms); adapt() leaves the option alone.
+   */
+  chart.wheelGuard = function (el, options) {
+    if ((options && options.wheelZoom === true) || !el || !el.addEventListener) {
+      return { active: false, adapt: function (opt) { return opt; }, destroy: function () {} };
+    }
+    function onWheel(e) { if (!e.ctrlKey && !e.metaKey) e.stopPropagation(); }
+    el.addEventListener('wheel', onWheel, { capture: true });
+    return {
+      active: true,
+      adapt: chart.modifierZoom,
+      destroy: function () { el.removeEventListener('wheel', onWheel, { capture: true }); }
+    };
+  };
+
+  /**
+   * option.dataZoom: inside zooms with zoomOnMouseWheel 'ctrl' -> true (in place; returns the option). Only for charts
+   * behind RK.chart.wheelGuard, which already lets nothing but Ctrl / ⌘ wheels (and pinches) through.
+   */
+  chart.modifierZoom = function (opt) {
+    [opt, opt && opt.baseOption].forEach(function (o) {     // baseOption: timeline options (bubble)
+      if (!o || !o.dataZoom) return;
+      [].concat(o.dataZoom).forEach(function (dz) {
+        if (dz && dz.type === 'inside' && dz.zoomOnMouseWheel === 'ctrl') dz.zoomOnMouseWheel = true;
+      });
+    });
+    return opt;
+  };
+
+  /**
+   * Standard zoom: inside (Ctrl / ⌘ + wheel, pinch, drag to pan) + compact slider.
+   * The inside zoom asks for zoomOnMouseWheel 'ctrl'; charts made with RK.chart() (or behind RK.chart.wheelGuard) turn
+   * that into true behind their wheel guard, so ⌘ + wheel zooms too. options.wheelZoom: true zooms on a plain wheel.
+   */
   chart.zoom = function (ctx, axis, extra) {
     if (ctx.options.zoom === false) return [];
     var key = (axis || 'x') + 'AxisIndex';
-    // plain wheel scrolls the report; Ctrl/Cmd + wheel (and trackpad pinch) zooms. options.wheelZoom: true to zoom on plain wheel
     var wheel = ctx.options.wheelZoom != null ? ctx.options.wheelZoom : 'ctrl';
     var inside = { type: 'inside', filterMode: 'none', zoomOnMouseWheel: wheel, moveOnMouseWheel: false, moveOnMouseMove: true };
     inside[key] = 0;
@@ -3414,8 +3530,9 @@
       opts = opts || {};
       var t = ctx.theme, L = global.L;
       ctx.el.classList.add('rk-map');
+      var zoomButtons = opts.zoomControl != null ? opts.zoomControl : !ctx.print;   // print: no buttons
       var map = L.map(ctx.el, {
-        zoomControl: opts.zoomControl != null ? opts.zoomControl : !ctx.print,   // print: no buttons
+        zoomControl: false,          // added below with localised titles (Leaflet's own says "Zoom in" / "Zoom out")
         attributionControl: true,
         zoomSnap: 0.25,
         zoomDelta: 0.5,
@@ -3430,6 +3547,10 @@
         markerZoomAnimation: ctx.motion,
         preferCanvas: !!opts.preferCanvas
       });
+      if (zoomButtons) {
+        var tr = RK.i18n ? RK.i18n.t : function (k, f) { return f; };
+        map.zoomControl = L.control.zoom({ zoomInTitle: tr('zoomIn', 'Zoom in'), zoomOutTitle: tr('zoomOut', 'Zoom out') }).addTo(map);
+      }
       map.attributionControl.setPrefix(false);
       modifierZoom(map);
       ctx.el.style.background = t.mapWater || t.surface;
@@ -4730,10 +4851,28 @@
     update();
   }
 
+  /**
+   * Theme <select> labels in the report language. The builder pre-fills the options (in English); every option
+   * whose theme has an i18n name (theme.<id>, the kit's four themes or a pack that adds one) is relabelled, now and
+   * on 'i18n:changed'. Options for other custom themes keep the label they were given.
+   */
+  function labelThemeOptions(sel) {
+    [].forEach.call(sel.options, function (o) {
+      if (RK.i18n && RK.i18n.has('theme.' + o.value)) o.textContent = RK.theme.label(o.value);
+    });
+  }
+  var themeSelects = [];
+  RK.bus.on('i18n:changed', function () {
+    themeSelects.forEach(function (sel) { if (sel.isConnected !== false) labelThemeOptions(sel); });
+  });
   function wireThemeSwitch() {
     util.qsa('[data-rk-theme-switch]').forEach(function (sel) {
       if (sel.tagName === 'SELECT' && !sel.options.length) {
         RK.theme.list.forEach(function (name) { sel.appendChild(h('option', { value: name }, RK.theme.label ? RK.theme.label(name) : (RK.theme.labels[name] || name))); });
+      }
+      if (sel.tagName === 'SELECT') {
+        labelThemeOptions(sel);
+        if (themeSelects.indexOf(sel) < 0) themeSelects.push(sel);
       }
       sel.value = document.documentElement.getAttribute('data-rk-theme') || RK.theme.list[0];
       sel.addEventListener('change', function () { RK.theme.set(sel.value); });

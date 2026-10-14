@@ -17,7 +17,7 @@ import re
 import zipfile
 from typing import TYPE_CHECKING, Any
 
-from ._util import as_list, label
+from ._util import as_list, colon, label, list_sep, source_text
 from .data import is_iso_date
 from .errors import BuildError
 from .template import fallback_text
@@ -255,7 +255,7 @@ def workbook_bytes(report: "Report", *, build_date: str | None = None) -> bytes:
     from openpyxl.utils import get_column_letter
 
     loc = report.locale
-    sep = "：" if (loc or "").lower().startswith(("zh", "ja")) else ": "
+    sep = colon(loc)
     stamp = _stamp(build_date or report.date)
 
     wb = openpyxl.Workbook()
@@ -285,9 +285,8 @@ def workbook_bytes(report: "Report", *, build_date: str | None = None) -> bytes:
         ws.cell(row=row, column=1, value=_clean_text(str(ds.get("title") or did))).font = title_font
         row += 1
         lines: list[str] = []
-        sources = [str(s) for s in as_list(meta.get("source"))]
-        if sources:
-            lines.append(label("sources" if len(sources) > 1 else "source", loc) + sep + "; ".join(sources))
+        if as_list(meta.get("source")):
+            lines.append(source_text(meta.get("source"), loc))
         notes = [str(n) for n in as_list(meta.get("notes"))]
         if len(notes) == 1:
             lines.append(label("note", loc) + sep + notes[0])
@@ -303,7 +302,7 @@ def workbook_bytes(report: "Report", *, build_date: str | None = None) -> bytes:
             lines.append("  ·  ".join(extra))
         computed = [c for c in ds.get("computed") or [] if c.get("name") and c.get("formula")]
         if computed:
-            lines.append(label("computed", loc) + sep + "; ".join(
+            lines.append(label("computed", loc) + sep + list_sep(loc).join(
                 f"{c.get('title') or c['name']} = {c['formula']}" for c in computed))
         if report.confidentiality:
             lines.append(str(report.confidentiality))

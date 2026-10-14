@@ -3,14 +3,15 @@
  * Browser check of a single-file ReportKit report (used by tests/py/test_delivery.py).
  *   node tests/py/single_file_check.cjs /abs/path/report.html
  * Opens the file via file://, scrolls every page into view so lazy blocks render, and prints one JSON
- * line: {blocks, notRendered[], errors[], requests[] (every non-data: request besides the page itself)}.
+ * line: {blocks, notRendered[], errors[], requests[] (every non-data: request besides the page itself),
+ * downloads[] (the absolute file:// URL of each download link, e.g. the Excel workbook next to the HTML)}.
  */
 'use strict';
 let playwright;
 try { playwright = require('playwright'); } catch (e) { playwright = require(process.env.PLAYWRIGHT_PATH || '/opt/node-tools/node_modules/playwright'); }
 const { chromium } = playwright;
 const file = process.argv[2];
-const url = 'file://' + file;
+const url = require('url').pathToFileURL(file).href;   // percent-encoded like the browser's own request URL (CJK names)
 
 (async () => {
   const browser = await chromium.launch();
@@ -37,7 +38,8 @@ const url = 'file://' + file;
       blocks: blocks.length,
       notRendered: blocks.filter(b => b.state !== 'rendered').map(b => b.id + '(' + b.component + ')=' + b.state),
       externalRefs: Array.from(document.querySelectorAll('script[src],link[href]')).map(e => e.src || e.href),
-      fonts: fonts
+      fonts: fonts,
+      downloads: Array.from(document.querySelectorAll('a[data-rk-download]')).map(a => a.href)
     };
   });
   res.errors = errors;

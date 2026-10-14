@@ -14,10 +14,14 @@
 @font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 700; font-display: swap; src: url("../fonts/source-serif-4/source-serif-4-latin-700-normal.woff2") format("woff2"); }
 
 :root {
-  /* ---- typography ---- */
-  --rk-font-sans: "Inter", "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-  --rk-font-serif: "Source Serif 4", Georgia, "Times New Roman", "Songti SC", "SimSun", serif;
-  --rk-font-num: "Inter", "Helvetica Neue", Arial, sans-serif;   /* + font-variant-numeric: tabular-nums */
+  /* ---- typography ----
+     Latin faces first (Inter / Source Serif 4 ship with the kit), then the Chinese system faces that carry CJK
+     glyphs: macOS (PingFang, Hiragino, Songti), Windows (Microsoft YaHei, SimSun), Linux / Android (Noto CJK,
+     Source Han, WenQuanYi). Numbers carry 亿 / 万, so the numeric stack has CJK fallbacks too. RK.theme passes
+     these stacks to ECharts with the double quotes turned into single quotes (SVG / PNG export). */
+  --rk-font-sans: "Inter", "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif;
+  --rk-font-serif: "Source Serif 4", Georgia, "Times New Roman", "Songti SC", "STSong", "Noto Serif SC", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", serif;
+  --rk-font-num: "Inter", "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;   /* + font-variant-numeric: tabular-nums */
   --rk-fs-xs: 10px;
   --rk-fs-sm: 11px;
   --rk-fs-base: 13px;
@@ -47,3 +51,8 @@
   --rk-shadow-page: 0 1px 2px rgba(16, 24, 40, .06), 0 8px 28px rgba(16, 24, 40, .07);
   --rk-shadow-pop: 0 12px 40px rgba(16, 24, 40, .18);
 }
+
+/* Chinese reports (<html lang="zh-…">): display text that uses the serif token (page / cover / section titles, lead
+   paragraphs, quotes, big stat numbers) is set in the sans stack instead. Bold Song / SimSun is thin and uneven at
+   title sizes; Chinese decks set titles in Hei faces (PingFang / Microsoft YaHei / Noto Sans CJK). */
+:root:lang(zh) { --rk-font-serif: var(--rk-font-sans); }

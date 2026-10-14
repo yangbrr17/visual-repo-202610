@@ -959,35 +959,44 @@ def build_report(a: Analysis, available: set[str]) -> Report:
     ev_ntm, ev_ltm, pe = f["ev_ntm"], f["ev_ltm"], f["pe"]
     d_ev, d_1d = f["deal_ev_ltm"], f["deal_prem_1d"]
     eps_ntm = t["ntm_net_income"] / t["shares_out"]
+
+    def rng(q, fmt=_x) -> str:   # interquartile range as text: "11.0x–17.5x"
+        return f"{fmt(q.q1)}–{fmt(q.q3)}"
+
     valuation = [
-        {"method": "Trading comps — EV / EBITDA NTM", "group": "Market",
+        {"method": "Trading comps — EV / EBITDA NTM", "group": "Market", "short": "EV / EBITDA NTM",
          "low": per_share(ev_ntm.q1 * t["ntm_ebitda"]), "high": per_share(ev_ntm.q3 * t["ntm_ebitda"]),
-         "basis": f"{_x(ev_ntm.q1)}–{_x(ev_ntm.q3)} × NTM EBITDA of ${t['ntm_ebitda']:,.0f}m (peer IQR, n={ev_ntm.n})"},
-        {"method": "Trading comps — EV / EBITDA LTM", "group": "Market",
+         "range": rng(ev_ntm), "applied": f"NTM EBITDA ${t['ntm_ebitda']:,.0f}m",
+         "basis": f"{rng(ev_ntm)} × NTM EBITDA of ${t['ntm_ebitda']:,.0f}m (peer IQR, n={ev_ntm.n})"},
+        {"method": "Trading comps — EV / EBITDA LTM", "group": "Market", "short": "EV / EBITDA LTM",
          "low": per_share(ev_ltm.q1 * t["ltm_ebitda"]), "high": per_share(ev_ltm.q3 * t["ltm_ebitda"]),
-         "basis": f"{_x(ev_ltm.q1)}–{_x(ev_ltm.q3)} × LTM EBITDA of ${t['ltm_ebitda']:,.0f}m (peer IQR, n={ev_ltm.n})"},
-        {"method": "Trading comps — P / E NTM", "group": "Market",
+         "range": rng(ev_ltm), "applied": f"LTM EBITDA ${t['ltm_ebitda']:,.0f}m",
+         "basis": f"{rng(ev_ltm)} × LTM EBITDA of ${t['ltm_ebitda']:,.0f}m (peer IQR, n={ev_ltm.n})"},
+        {"method": "Trading comps — P / E NTM", "group": "Market", "short": "P / E NTM",
          "low": round(pe.q1 * eps_ntm, 2), "high": round(pe.q3 * eps_ntm, 2),
-         "basis": f"{_x(pe.q1)}–{_x(pe.q3)} × NTM EPS of ${eps_ntm:.2f} (peer IQR, n={pe.n}, n.m. excluded)"},
-        {"method": "Precedents — EV / EBITDA LTM", "group": "Transaction",
+         "range": rng(pe), "applied": f"NTM EPS ${eps_ntm:.2f}",
+         "basis": f"{rng(pe)} × NTM EPS of ${eps_ntm:.2f} (peer IQR, n={pe.n}, n.m. excluded)"},
+        {"method": "Precedents — EV / EBITDA LTM", "group": "Transaction", "short": "EV / EBITDA LTM",
          "low": per_share(d_ev.q1 * t["ltm_ebitda"]), "high": per_share(d_ev.q3 * t["ltm_ebitda"]),
-         "basis": f"{_x(d_ev.q1)}–{_x(d_ev.q3)} × LTM EBITDA (deal IQR, n={d_ev.n})"},
-        {"method": "Premiums paid — 1-day", "group": "Transaction",
+         "range": rng(d_ev), "applied": f"LTM EBITDA ${t['ltm_ebitda']:,.0f}m",
+         "basis": f"{rng(d_ev)} × LTM EBITDA (deal IQR, n={d_ev.n})"},
+        {"method": "Premiums paid — 1-day", "group": "Transaction", "short": "1-day premium",
          "low": round(t["price"] * (1 + d_1d.q1), 2), "high": round(t["price"] * (1 + d_1d.q3), 2),
+         "range": rng(d_1d, lambda v: _pct(v, 0)), "applied": f"Current price ${t['price']:.2f}",
          "basis": f"{_pct(d_1d.q1, 0)}–{_pct(d_1d.q3, 0)} premium to the current ${t['price']:.2f} (deal IQR)"},
-        {"method": "52-week trading range", "group": "Reference",
-         "low": t["low_52w"], "high": t["high_52w"], "basis": "Closing prices, last 12 months"},
+        {"method": "52-week trading range", "group": "Reference", "short": "52-week range",
+         "low": t["low_52w"], "high": t["high_52w"], "range": "Low – high", "applied": "Daily closes, 12 months",
+         "basis": "Closing prices, last 12 months"},
     ]
     for i, row in enumerate(valuation, 1):
         row["order"] = i
     r.dataset("valuation", valuation, title="Valuation summary: implied value per share",
               source=SRC_ANALYSIS + "; " + SRC_MARKET, unit="USD",
-              fields={"method": "Methodology", "group": "Group",
+              fields={"method": "Methodology", "group": "Group", "short": "Benchmark",
                       "low": {"title": "Low", "format": USD_PS, "unit": "USD"},
                       "high": {"title": "High", "format": USD_PS, "unit": "USD"},
+                      "range": "Range (IQR)", "applied": "Applied to",
                       "basis": "Basis", "order": {"title": "Order", "format": "0"}})
-    market_rows = [v for v in valuation if v["group"] != "Reference"]
-    lo_all, hi_all = min(v["low"] for v in market_rows), max(v["high"] for v in market_rows)
     deal_rows = [v for v in valuation if v["group"] == "Transaction"]
     lo_deal, hi_deal = min(v["low"] for v in deal_rows), max(v["high"] for v in deal_rows)
 
@@ -1083,12 +1092,24 @@ def build_report(a: Analysis, available: set[str]) -> Report:
             f"{f['n_deals']} precedents paid a median **{_pct(f['deal_prem_1d'].median, 0)} 1-day premium** "
             f"and {_x(f['deal_ev_ltm'].median)} LTM EBITDA.")},
     ]
-    p.block("text-block", span=5, title="Key takeaways",
-            options={"variant": "takeaways", "layout": "list", "items": takeaways})
-    p.block("football-field", data="valuation", span=7, height=340, title="Valuation summary",
-            subtitle="Implied value per share (USD)",
+    p.block("text-block", title="Key takeaways",
+            options={"variant": "takeaways", "layout": "grid", "columns": 4, "items": takeaways})
+
+    # valuation summary on its own page: one football field per benchmark plus the basis of each range (the
+    # tooltips carry the basis on screen; the table keeps it on paper). Clicking a bar filters the table.
+    p = r.page(f"Transaction benchmarks point to ${lo_deal:.0f}–{hi_deal:.0f} per share vs. a current "
+               f"${t['price']:.2f}", kicker="Valuation summary",
+               subtitle="Implied value per share (USD); bars span the interquartile range (IQR) of each benchmark",
+               source=[SRC_ANALYSIS, SRC_MARKET],
+               notes=f"Trading comps: {ev_ntm.n} peers (P / E: {pe.n}, n.m. excluded); precedents: {d_ev.n} deals "
+                     "with disclosed EBITDA; premiums: all deals.")
+    p.block("football-field", data="valuation", span=7, height=380, title="Implied value per share",
             encode={"label": "method", "low": "low", "high": "high", "group": "group", "note": "basis"},
             options={"refLines": [{"value": t["price"], "label": f"Current ${t['price']:.2f}"}]})
+    p.block("comps-table", data="valuation", span=5, title="Basis of each range",
+            encode={"label": "short"},
+            options={"groupBy": "group", "stats": [], "scroll": False, "sortable": False, "crossFilter": False,
+                     "columns": [{"field": "short"}, {"field": "range"}, {"field": "applied"}]})
 
     r.section("Trading analysis", subtitle="Peers, multiples, performance and capital structure")
 
@@ -1103,14 +1124,12 @@ def build_report(a: Analysis, available: set[str]) -> Report:
     p = r.page(f"{short} trades at {_x(t['ev_ntm_ebitda'])} NTM EBITDA vs. a peer median of "
                f"{_x(med['ev_ntm_ebitda'])}", kicker="Trading comparables",
                subtitle=f"Market data as of {AS_OF:%d-%b-%Y}; USD m unless otherwise stated",
-               notes=foot + ["Mean and median exclude the target."])
-    p.block("comps-table", data="comps", title="Selected listed peers",
+               notes=foot + ["Peer median excludes the target."])
+    p.block("comps-table", data="comps",
             encode={"label": "company", "highlight": "is_target"},
-            options={"groupBy": "sector", "pinTarget": "top", "stats": ["mean", "median"], "scroll": False,
+            options={"groupBy": "sector", "pinTarget": "top", "stats": ["median"], "scroll": False,
                      "dense": True, "notes": notes, "columns": [
                          {"field": "company"},
-                         {"field": "price", "title": "Price", "group": "Market data", "stats": False},
-                         {"field": "pct_52w_high", "title": "% 52w high", "group": "Market data"},
                          {"field": "mkt_cap", "title": "Mkt cap", "group": "Market data"},
                          {"field": "ev", "title": "EV", "group": "Market data"},
                          {"field": "ev_ltm_ebitda", "title": "LTM", "group": "EV / EBITDA", "heat": "seq"},
@@ -1122,7 +1141,6 @@ def build_report(a: Analysis, available: set[str]) -> Report:
                          {"field": "margin_delta_3y_bps", "title": "Δ mgn 3y", "group": "Operating"},
                          {"field": "net_leverage", "title": "ND / EBITDA", "group": "Operating"},
                          {"field": "tsr_1y", "title": "1y TSR", "group": "Trading", "heat": "div", "mid": 0},
-                         {"field": "vol_30d", "title": "30d vol.", "group": "Trading"},
                      ]})
 
     r2, n_r2 = f["r2"]
@@ -1196,7 +1214,7 @@ def build_report(a: Analysis, available: set[str]) -> Report:
     p.block("comps-table", data="deals", title="Selected precedent transactions",
             encode={"label": "target"},
             options={"labelTitle": "Target", "scroll": False, "dense": True,
-                     "sort": {"field": "announced", "dir": "desc"}, "stats": ["mean", "median", "high", "low"],
+                     "sort": {"field": "announced", "dir": "desc"}, "stats": ["mean", "median"],
                      "notes": {d: "(1)" for d in a.rows["undisclosed"]}, "columns": [
                          {"field": "target"}, {"field": "announced"}, {"field": "acquirer"},
                          {"field": "consideration"},
@@ -1221,17 +1239,25 @@ def build_report(a: Analysis, available: set[str]) -> Report:
             options={"layout": "labels", "display": "both", "centerLabel": "Deal value"})
 
     offer_ntm = (t["price"] * (1 + BASE_PREMIUM) * t["shares_out"] + adj_net_debt) / t["ntm_ebitda"]
-    p = r.page(f"A {BASE_PREMIUM:.0%} premium implies {_x(offer_ntm)} NTM EBITDA vs. {_x(med['ev_ntm_ebitda'])} "
-               f"for peers and {_x(d_ev.median)} LTM for precedents", kicker="Illustrative offer",
+    peers_ntm = f"{_x(med['ev_ntm_ebitda'])} for peers"
+    if has("param-slider"):   # live title: follows the slider (first offer row = the current price)
+        title = ("A {{@premium | 0%}} premium implies {{offer: first(offer_ev_ntm) | 0.0x}} NTM EBITDA vs. "
+                 + peers_ntm)
+    else:
+        title = f"A {BASE_PREMIUM:.0%} premium implies {_x(offer_ntm)} NTM EBITDA vs. {peers_ntm}"
+    p = r.page(title, kicker="Illustrative offer",
                subtitle=("Move the premium to update every number on this page" if has("param-slider")
-                         else f"At the base-case premium of {BASE_PREMIUM:.0%}") + "; USD",
+                         else f"At the base-case premium of {BASE_PREMIUM:.0%}")
+               + f"; precedents paid a median {_x(d_ev.median)} LTM EBITDA; USD",
                source=SRC_ANALYSIS, notes=["Offer value = offer price × diluted shares; implied EV adds net "
                                            "debt and minorities.", FICTIONAL])
     if has("param-slider"):
-        p.block("param-slider", span=4, title="Assumption", options={"params": ["premium"]})
-    p.block("bar", data="offer", span=8 if has("param-slider") else 12, height=260,
+        p.block("param-slider", data="offer", span=4, height=230, title="Assumption",
+                options={"params": ["premium"], "columns": 1,
+                         "preview": {"fields": ["reference", "offer_price", "offer_ev_ntm"], "title": "Live output"}})
+    p.block("bar", data="offer", span=8 if has("param-slider") else 12, height=230,
             title="Reference vs. implied offer price per share",
-            encode={"x": "reference", "y": ["ref_price", "offer_price"]})
+            encode={"x": "reference", "y": ["ref_price", "offer_price"]}, options={"crossFilter": False})
     p.block("comps-table", data="offer", title="Implied offer metrics",
             encode={"label": "reference"},
             options={"stats": [], "scroll": False, "sortable": False, "crossFilter": False, "columns": [

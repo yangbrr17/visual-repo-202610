@@ -21,6 +21,31 @@ __all__ = ["check", "validate", "get_kit", "DATASET_ID_RE"]
 DATASET_ID_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
 _CSS_LENGTH_RE = re.compile(r"^\d+(\.\d+)?(px|vh|vw|rem|em|%)$")
 
+# ---- how a component reads its channels (mirrors the component JS; the manifest marks the default form) ----------
+# A channel documented as "options.<name> — …" is read from that block option, not from encode (pivot-table rows /
+# cols / value); its values are field names or RK row formulas.
+_OPTION_CHANNEL_RE = re.compile(r"^\s*options\.(\w+)\b")
+_OPTION_CHANNELS = {"pivot-table": {"rows": "rows", "cols": "cols", "value": "value"}}
+# A channel documented with "(<name>Data)" binds to the secondary dataset that option names (network node channels
+# id / name / category / size -> options.nodesData); without that option the component does not read it.
+_SECONDARY_DATA_RE = re.compile(r"\((\w+Data)\)")
+_SECONDARY_CHANNELS = {"network": {"id": "nodesData", "name": "nodesData", "category": "nodesData", "size": "nodesData"}}
+
+
+def _wide(enc: dict, *channels: str) -> bool:
+    return any(isinstance(enc.get(c), (list, tuple)) for c in channels)
+
+
+# Required channels a component does not read in some configurations ("required" = required in the default form).
+_WAIVED: dict[tuple[str, str], Any] = {
+    ("bump", "x"): lambda enc, opts: _wide(enc, "rank", "value"),        # wide: one rank / value field per period
+    ("radar", "value"): lambda enc, opts: _wide(enc, "axis"),            # wide: one numeric field per axis
+    ("sources-uses", "side"): lambda enc, opts: opts.get("mode") == "capitalization",   # one list, no panels
+}
+# Field names a component falls back to when the channel is not mapped (sources-uses: pick([enc.item, 'instrument',
+# 'item'])).
+_FALLBACK_FIELDS = {("sources-uses", "item"): ("instrument", "item"), ("sources-uses", "amount"): ("amount",)}
+
 
 def get_kit(kit: Any = None) -> Kit:
     if isinstance(kit, Kit):
@@ -270,30 +295,98 @@ def _check_block(report: "Report", kit: Kit, b: "Block", where: str, errors: lis
                     else:
                         choice_fields.setdefault(ch, []).append(f)
     enc = b.encode
+    channels = manifest.get("channels") or {}
+    if not isinstance(channels, dict):
+        channels = {}
+    option_channels, secondary = _channel_bindings(b.component, manifest, channels)
+
     for ch, val in enc.items():
         refs = _encode_values(val)
+        if ch in secondary:   # bound to the dataset named by options.<secondary[ch]>, checked below
+            continue
         for ref in refs or []:
             if ref not in names:
                 errors.append(f"{where}: encode.{ch} -> field '{ref}' is not in dataset '{b.data}'"
                               f"{_suggest(ref, names) or ' (fields: ' + ', '.join(names) + ')'}")
+    for ch, opt in secondary.items():
+        sid = b.options.get(opt)
+        sds = report.datasets.get(sid) if isinstance(sid, str) else None
+        refs = _encode_values(enc.get(ch))
+        if sds is None or not refs:   # no node table: the component derives nodes from the edges
+            continue
+        snames = _field_names(sds)
+        for ref in refs:
+            if ref not in snames:
+                errors.append(f"{where}: encode.{ch} -> field '{ref}' is not in dataset '{sid}' (options.{opt})"
+                              f"{_suggest(ref, snames) or ' (fields: ' + ', '.join(snames) + ')'}")
+    for ch, opt in option_channels.items():
+        if opt in b.options:
+            _check_field_refs(b.options.get(opt), f"options.{opt}", ds, b.data, where, errors)
 
-    channels = manifest.get("channels") or {}
-    if isinstance(channels, dict):
-        for ch, spec in channels.items():
-            if not isinstance(spec, dict) or not spec.get("required"):
+    for ch, spec in channels.items():
+        if not isinstance(spec, dict) or not spec.get("required") or ch in secondary:
+            continue
+        waived = _WAIVED.get((b.component, ch))
+        if waived is not None and waived(enc, b.options):
+            continue
+        if ch in option_channels:
+            if option_channels[ch] in b.options and as_list(b.options.get(option_channels[ch])):
                 continue
+        else:
             mapped = _encode_values(enc.get(ch))
             if mapped or (enc.get(ch) is not None and mapped is None) or choice_fields.get(ch):
                 continue
-            default = spec.get("default")
-            candidates = [d for d in as_list(default) if isinstance(d, str)] if default else []
-            if candidates and all(c in names for c in candidates):
-                continue
-            if ch in names:
-                continue
-            hint = f" and its default field '{default}' is not in the dataset" if default else ""
-            errors.append(f"{where}: required channel '{ch}' is not mapped — add encode={{'{ch}': '<field>'}}"
-                          f"{hint} (dataset '{b.data}' fields: {', '.join(names)})")
+        default = spec.get("default")
+        candidates = [d for d in as_list(default) if isinstance(d, str)] if default else []
+        if candidates and all(c in names for c in candidates):
+            continue
+        if ch in names or any(f in names for f in _FALLBACK_FIELDS.get((b.component, ch), ())):
+            continue
+        hint = f" and its default field '{default}' is not in the dataset" if default else ""
+        how = (f"options={{'{option_channels[ch]}': '<field or formula>'}}" if ch in option_channels
+               else f"encode={{'{ch}': '<field>'}}")
+        errors.append(f"{where}: required channel '{ch}' is not mapped — add {how}"
+                      f"{hint} (dataset '{b.data}' fields: {', '.join(names)})")
+
+
+def _channel_bindings(component: str, manifest: dict, channels: dict) -> tuple[dict[str, str], dict[str, str]]:
+    """({channel: option read instead of encode}, {channel: option naming the secondary dataset it binds to})."""
+    opts = manifest.get("options") if isinstance(manifest.get("options"), dict) else {}
+    option_channels: dict[str, str] = dict(_OPTION_CHANNELS.get(component, {}))
+    secondary: dict[str, str] = dict(_SECONDARY_CHANNELS.get(component, {}))
+    for ch, spec in channels.items():
+        desc = str(spec.get("desc") or "") if isinstance(spec, dict) else ""
+        m = _OPTION_CHANNEL_RE.match(desc)
+        if m:
+            option_channels[ch] = m.group(1)
+            continue
+        m = _SECONDARY_DATA_RE.search(desc)
+        if m and m.group(1) in opts:
+            secondary.setdefault(ch, m.group(1))
+    return option_channels, secondary
+
+
+def _check_field_refs(value: Any, where_opt: str, ds: dict, did: str | None, where: str,
+                      errors: list[str]) -> None:
+    """Values of an option-channel: field names or RK row formulas (e.g. 'year(date)'); null / [] are allowed."""
+    names = _field_names(ds)
+    avail = {norm_name(n) for n in names}
+    avail |= {norm_name(f["title"]) for f in (ds.get("schema") or {}).get("fields", []) if f.get("title")}
+    for v in as_list(value):
+        if not isinstance(v, str):
+            errors.append(f"{where}: {where_opt} entries must be field names or formulas, got {v!r}")
+            continue
+        if v in names:
+            continue
+        try:
+            _params, refs, _funcs = formula_refs(v)
+        except ExprSyntaxError as e:
+            errors.append(f"{where}: {where_opt} -> {v!r} is neither a field of dataset '{did}' nor a valid formula ({e})")
+            continue
+        for ref in refs:
+            if norm_name(ref) not in avail:
+                errors.append(f"{where}: {where_opt} -> field '{ref}' is not in dataset '{did}'"
+                              f"{_suggest(ref, names) or ' (fields: ' + ', '.join(names) + ')'}")
 
 
 def validate(report: "Report", kit: Any = None) -> list[str]:

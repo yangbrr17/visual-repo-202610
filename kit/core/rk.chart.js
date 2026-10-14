@@ -26,15 +26,12 @@
       var locale = ctx.options.locale || (RK.i18n && RK.i18n.lang() === 'zh' ? 'ZH' : 'EN');
       var inst = global.echarts.init(ctx.el, 'rk', { renderer: renderer, locale: locale });
       var current = ctx;
-      // ECharts' roam/inside-zoom controller calls preventDefault on every wheel event before checking
-      // zoomOnMouseWheel:'ctrl', which swallows page scrolling. Keep plain wheel for the report; let
-      // Ctrl/Cmd + wheel (and trackpad pinch, which sends ctrlKey) through to ECharts.
-      function onWheel(e) { if (!e.ctrlKey && !e.metaKey) e.stopPropagation(); }
-      if (ctx.options.wheelZoom !== true) ctx.el.addEventListener('wheel', onWheel, { capture: true });
+      var guard = chart.wheelGuard(ctx.el, ctx.options);
 
       function apply(c, first) {
         current = c;
         var opt = build(c, inst) || {};
+        guard.adapt(opt);
         if (!c.motion) opt.animation = false;
         // screen readers get an auto-generated description of every chart (ECharts aria); no decal patterns
         if (opt.aria === undefined && c.options.aria !== false) opt.aria = { enabled: true, decal: { show: false } };
@@ -73,7 +70,7 @@
           inst.resize();
           if (hooks.rebuildOnResize) apply(current, false);   // width-dependent layouts (tick density, label widths)
         },
-        destroy: function () { ctx.el.removeEventListener('wheel', onWheel, { capture: true }); inst.dispose(); },
+        destroy: function () { guard.destroy(); inst.dispose(); },
         exportImage: function () { return exportPNG(inst, current); },
         exportSVG: function () {
           return inst.renderToSVGString ? inst.renderToSVGString() : null;
@@ -146,11 +143,56 @@
     return util.merge({ left: 4, right: 12, top: hasLegend ? 32 : 12, bottom: 4, containLabel: true }, extra || {});
   };
 
-  /** Standard zoom: inside (wheel/pinch) + compact slider. */
+  /**
+   * Wheel rule shared by every ECharts chart: a plain wheel scrolls the report; Ctrl + wheel, ⌘ + wheel and a
+   * trackpad pinch (which browsers send as a ctrlKey wheel) zoom.
+   *
+   * ECharts cannot do this alone: its inside-zoom / roam controller calls preventDefault on every wheel event
+   * before it checks zoomOnMouseWheel:'ctrl' (so a plain wheel over a chart would not scroll the page), and
+   * 'ctrl' only looks at ctrlKey (so ⌘ + wheel never zooms on a Mac). The guard is a capture listener on the
+   * chart host that stops plain wheels before ECharts sees them; adapt(option) then switches inside dataZooms
+   * set to 'ctrl' (the RK.chart.zoom default) to true, because only modified wheels can reach them.
+   *
+   *   var guard = RK.chart.wheelGuard(el, ctx.options);   // RK.chart() does this for its charts
+   *   inst.setOption(guard.adapt(option));  ...  guard.destroy();
+   *
+   * options.wheelZoom === true: no guard (plain wheel zooms); adapt() leaves the option alone.
+   */
+  chart.wheelGuard = function (el, options) {
+    if ((options && options.wheelZoom === true) || !el || !el.addEventListener) {
+      return { active: false, adapt: function (opt) { return opt; }, destroy: function () {} };
+    }
+    function onWheel(e) { if (!e.ctrlKey && !e.metaKey) e.stopPropagation(); }
+    el.addEventListener('wheel', onWheel, { capture: true });
+    return {
+      active: true,
+      adapt: chart.modifierZoom,
+      destroy: function () { el.removeEventListener('wheel', onWheel, { capture: true }); }
+    };
+  };
+
+  /**
+   * option.dataZoom: inside zooms with zoomOnMouseWheel 'ctrl' -> true (in place; returns the option). Only for charts
+   * behind RK.chart.wheelGuard, which already lets nothing but Ctrl / ⌘ wheels (and pinches) through.
+   */
+  chart.modifierZoom = function (opt) {
+    [opt, opt && opt.baseOption].forEach(function (o) {     // baseOption: timeline options (bubble)
+      if (!o || !o.dataZoom) return;
+      [].concat(o.dataZoom).forEach(function (dz) {
+        if (dz && dz.type === 'inside' && dz.zoomOnMouseWheel === 'ctrl') dz.zoomOnMouseWheel = true;
+      });
+    });
+    return opt;
+  };
+
+  /**
+   * Standard zoom: inside (Ctrl / ⌘ + wheel, pinch, drag to pan) + compact slider.
+   * The inside zoom asks for zoomOnMouseWheel 'ctrl'; charts made with RK.chart() (or behind RK.chart.wheelGuard) turn
+   * that into true behind their wheel guard, so ⌘ + wheel zooms too. options.wheelZoom: true zooms on a plain wheel.
+   */
   chart.zoom = function (ctx, axis, extra) {
     if (ctx.options.zoom === false) return [];
     var key = (axis || 'x') + 'AxisIndex';
-    // plain wheel scrolls the report; Ctrl/Cmd + wheel (and trackpad pinch) zooms. options.wheelZoom: true to zoom on plain wheel
     var wheel = ctx.options.wheelZoom != null ? ctx.options.wheelZoom : 'ctrl';
     var inside = { type: 'inside', filterMode: 'none', zoomOnMouseWheel: wheel, moveOnMouseWheel: false, moveOnMouseMove: true };
     inside[key] = 0;

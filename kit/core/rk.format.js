@@ -35,9 +35,57 @@
   };
   /** Compact ('auto') units per language; RK.i18n picks one (zh-CN: 亿 = 1e8, 万 = 1e4). */
   var COMPACT_UNITS = {
-    en: [[1e12, 'tn'], [1e9, 'bn'], [1e6, 'm'], [1e3, 'k']],
+    en: config.compactUnits,
     zh: [[1e8, '亿'], [1e4, '万']]
   };
+  /**
+   * Locale-dependent defaults per language (RK.format.applyLocale). zh: "n.a." / "n.m." become 不适用 / 无意义
+   * ("—" would read as an accounting zero), month and weekday names are Chinese (mmm -> 10月, mmmm -> 十月,
+   * ddd -> 周三, dddd -> 星期三) and the date presets use 年 / 月 / 日. dateCode rewrites English text-month codes
+   * ("dd mmm yyyy", "mmm yy", "d mmm" ...) into Chinese order, so a field formatted for an English report reads
+   * "2026年10月14日" rather than "14 10月 2026" in a Chinese one.
+   */
+  var LOCALES = {
+    en: {
+      config: { na: config.na, nm: config.nm, months: config.months, monthsLong: config.monthsLong, days: config.days, daysLong: config.daysLong, compactUnits: COMPACT_UNITS.en },
+      presets: { date: 'dd mmm yyyy', month: 'mmm yy' },
+      dateCode: null
+    },
+    zh: {
+      config: {
+        na: '不适用', nm: '无意义',
+        months: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+        monthsLong: ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'],
+        days: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
+        daysLong: ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'],
+        compactUnits: COMPACT_UNITS.zh
+      },
+      presets: { date: 'yyyy"年"m"月"d"日"', month: 'yy"年"m"月"' },
+      dateCode: zhDateCode
+    }
+  };
+  var DATE_TOKENS = /"[^"]*"|\\.|\[[^\]]*\]|yyyy|yy|mmmm|mmm|mm|m|dddd|ddd|dd|d|q/g;
+  /**
+   * 'dd mmm yyyy' -> 'yyyy"年"m"月"d"日"', 'mmm yy' -> 'yy"年"m"月"', 'd mmm' -> 'm"月"d"日"', 'ddd, d mmm yyyy' ->
+   * 'yyyy"年"m"月"d"日" ddd'. Only codes with a month NAME (mmm / mmmm) plus a year or day, made of date parts and
+   * separators, are rewritten; a lone 'mmm' / 'mmmm' (10月 / 十月), numeric dates ('yyyy-mm-dd', 'dd/mm/yy'), quarters
+   * and codes with literal text stay as written.
+   */
+  function zhDateCode(code) {
+    var y = null, d = false, w = null, month = false, other = false;
+    var rest = code.replace(DATE_TOKENS, function (tk) {
+      if (tk === 'yyyy' || tk === 'yy') { if (!y) y = tk; }
+      else if (tk === 'mmmm' || tk === 'mmm') month = true;
+      else if (tk === 'dd' || tk === 'd') d = true;
+      else if (tk === 'dddd' || tk === 'ddd') { if (!w) w = tk; }
+      else if (tk[0] === '\\') { if (/[^\s,.\-\/']/.test(tk.slice(1))) other = true; }   // \- \/ are separators
+      else if (tk[0] !== '[') other = true;          // m / mm, q, "literal" ([$-409] locale tags are ignored)
+      return '';
+    });
+    if (!month || (!y && !d) || other || /[^\s,.\-\/']/.test(rest)) return code;   // 'mmm' alone: just the name
+    return (y ? y + '"年"' : '') + 'm"月"' + (d ? 'd"日"' : '') + (w ? ' ' + w : '');
+  }
+  var activeLocale = LOCALES.en, appliedLocale = LOCALES.en;
 
   // Lookup tables have no prototype and are read with has(): "constructor", "toString", "__proto__" ... are never presets.
   function has(obj, key) { return obj != null && Object.prototype.hasOwnProperty.call(obj, key); }
@@ -282,7 +330,8 @@
   }
 
   function compileDate(code) {
-    var re = /"[^"]*"|\\.|\[[^\]]*\]|yyyy|yy|mmmm|mmm|mm|m|dddd|ddd|dd|d|q/g;
+    var re = DATE_TOKENS;
+    if (activeLocale.dateCode) code = activeLocale.dateCode(code);
     return function (v) {
       var d = toDate(v);
       if (!d) return String(v);
@@ -420,16 +469,30 @@
   format.presets = presets;
   format.config = config;
   format.compactUnits = COMPACT_UNITS;
+  format.locales = LOCALES;
   /**
-   * Locale-dependent settings (compact units) for an RK.i18n locale. Runs on load and on 'i18n:changed'.
-   * A page that set config.compactUnits itself keeps them (only the kit's own defaults are swapped).
+   * Locale-dependent settings for an RK.i18n locale: compact units, n.a. / n.m., month and weekday names, the
+   * 'date' / 'month' presets and the text-month date-code order (LOCALES above). Runs on load and on 'i18n:changed'.
+   * Only values still at the kit's default for the previous locale are swapped: a page that set config.na,
+   * config.compactUnits, presets.date ... itself keeps them on every switch.
    */
   format.applyLocale = function (locale) {
     var lang = String(locale || (RK.i18n && RK.i18n.locale) || 'en').split('-')[0].toLowerCase();
-    var known = Object.keys(COMPACT_UNITS).some(function (k) { return config.compactUnits === COMPACT_UNITS[k]; }) || config._defaultUnits === config.compactUnits;
-    if (!known) return;
-    config.compactUnits = has(COMPACT_UNITS, lang) ? COMPACT_UNITS[lang] : COMPACT_UNITS.en;
-    config._defaultUnits = config.compactUnits;
+    var next = has(LOCALES, lang) ? LOCALES[lang] : LOCALES.en, prev = appliedLocale;
+    Object.keys(next.config).forEach(function (k) {
+      if (config[k] === prev.config[k]) config[k] = next.config[k];
+    });
+    Object.keys(next.presets).forEach(function (k) {
+      if (presets[k] === prev.presets[k]) presets[k] = next.presets[k];
+    });
+    config._defaultUnits = config.compactUnits;    // (kept for pages that read it)
+    appliedLocale = next;
+    if (activeLocale !== next) { activeLocale = next; cache = Object.create(null); }   // compiled date codes depend on it
+  };
+  /** The date code RK.format uses for `code` in the current locale ('dd mmm yyyy' -> 'yyyy"年"m"月"d"日"' in zh). */
+  format.dateCode = function (code) {
+    code = isPreset(code) ? presets[code] : code;
+    return activeLocale.dateCode && isDateCode(code) ? activeLocale.dateCode(String(code)) : code;
   };
   format.toDate = toDate;
   format.isDateCode = isDateCode;

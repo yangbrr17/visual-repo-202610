@@ -7,11 +7,11 @@
   "deps": [
     "echarts"
   ],
-  "summary": "Compliance-safe China cartogram: the 34 provincial-level divisions as equal-size squares or hexagons on a geography-like grid, shaded by a metric — no boundaries, so no map-review (审图号) issue in client decks.",
-  "summary_zh": "合规友好的中国省级方块地图：34 个省级行政区各占一个等大的方块（或六边形），按近似地理位置排布并按指标着色；不绘制任何边界线，客户材料中无需审图号。",
-  "description_zh": "用于在客户材料中展示按省汇总的指标（收入、增速、门店数、市场份额）。每个省级行政区（含台湾、香港、澳门，共 34 个）是一个同样大小的方块（或六边形），按地理相对位置排成 7 × 8 网格：黑龙江在右上，新疆、西藏在左侧，长江沿线（西藏—四川—重庆—湖北—安徽—江苏—上海）占一整行，海南在底部，港澳在广东下方，台湾在福建东侧；70 条省际陆地边界中有 63 条保留为相邻方块。因为不画边界、不涉及比例尺和领土轮廓，图表是示意图而非需要送审的“地图”，不会因边界画法引发合规问题（可选在空白角落标注“示意图，不代表实际边界”）；同时每个省面积相等，避免新疆、西藏、内蒙古等大省在视觉上压倒东部经济大省。数据可按 6 位行政区划代码（adcode，市/县级代码自动汇总到省）、中文或英文省名（带不带“省/市/自治区”均可，含 Inner Mongolia / Xizang / Macau 等常见写法）或 ISO 3166-2:CN 字母代码连接。方块颜色表示数值：顺序色阶或以中点为中心的发散色阶（如增速相对集团平均），默认按自然断点（Jenks）分 5 档，分界值取两档之间最整的数（取整不会把省份移到别的档），头部省份自成一档，图例显示每档省份数；也可用分位数、等距分档、自定义分界或连续色阶；无数据省份用斜线填充，与最浅一档区分。方块上显示中文简称（空间不足时用一字简称）或英文名（空间不足时用 ISO 代码，长名自动换行），空间足够时第二行显示格式化数值；重点省份在方块外侧加 2px 强调色描边（中间留纸色间隔，强调色与填充色过近时改用墨色）并加粗标签。图例默认放在网格左上角的空白处（放不下时自动换行，或移到网格旁边/下方）。悬停显示全部字段、排名（多行汇总时注明合计/平均）；点击方块交叉筛选其他图表；悬停图例高亮该档省份，点击图例按档筛选；被其他图表筛掉的省份变为浅色“幽灵”方块，颜色变化平滑过渡，布局保持不变。",
+  "summary": "Boundary-free China cartogram: the 34 provincial-level divisions as equal-size squares or hexagons on a geography-like grid, shaded by a metric. It draws no administrative boundaries, so it usually avoids map-review (审图号) requirements — have legal confirm before external publication.",
+  "summary_zh": "不画边界线的中国省级方块地图：34 个省级行政区各占一个等大的方块（或六边形），按近似地理位置排布并按指标着色；瓦片示意图不含行政区划边界，通常不涉及审图号，但对外发布前请法务确认。",
+  "description_zh": "用于在客户材料中展示按省汇总的指标（收入、增速、门店数、市场份额）。每个省级行政区（含台湾、香港、澳门，共 34 个）是一个同样大小的方块（或六边形），按地理相对位置排成 7 × 8 网格：黑龙江在右上，新疆、西藏在左侧，长江沿线（西藏—四川—重庆—湖北—安徽—江苏—上海）占一整行，海南在底部，港澳在广东下方，台湾在福建东侧；70 条省际陆地边界中有 63 条保留为相邻方块。因为不画边界、不涉及比例尺和领土轮廓，图表属于瓦片示意图而非标准地图，通常不涉及审图号，也不会因边界画法出错引发问题，但对外发布前请法务确认（可选在空白角落标注“示意图，不代表实际边界”）；同时每个省面积相等，避免新疆、西藏、内蒙古等大省在视觉上压倒东部经济大省。数据可按 6 位行政区划代码（adcode，市/县级代码自动汇总到省）、中文或英文省名（带不带“省/市/自治区”均可，含 Inner Mongolia / Xizang / Macau 等常见写法）或 ISO 3166-2:CN 字母代码连接。方块颜色表示数值：顺序色阶或以中点为中心的发散色阶（如增速相对集团平均），默认按自然断点（Jenks）分 5 档，分界值取两档之间最整的数（取整不会把省份移到别的档），头部省份自成一档，图例显示每档省份数；也可用分位数、等距分档、自定义分界或连续色阶；无数据省份用斜线填充，与最浅一档区分。方块上显示中文简称（空间不足时用一字简称）或英文名（空间不足时用 ISO 代码，长名自动换行），空间足够时第二行显示格式化数值；重点省份在方块外侧加 2px 强调色描边（中间留纸色间隔，强调色与填充色过近时改用墨色）并加粗标签。图例默认放在网格左上角的空白处（放不下时自动换行，或移到网格旁边/下方）。悬停显示全部字段、排名（多行汇总时注明合计/平均）；点击方块交叉筛选其他图表；悬停图例高亮该档省份，点击图例按档筛选；被其他图表筛掉的省份变为浅色“幽灵”方块，颜色变化平滑过渡，布局保持不变。",
   "best_for": [
-    "Revenue / stores / headcount by province for China-client decks (no 审图号 needed)",
+    "Revenue / stores / headcount by province for China-client decks (no boundaries drawn; confirm 审图号 needs with legal before external publication)",
     "Growth vs. a group average by province (diverging around the average)",
     "Provincial footprint where area-based maps would over-weight Xinjiang / Tibet / Inner Mongolia",
     "Small, print-safe national overview next to a table or commentary"

@@ -56,23 +56,39 @@
           <div class="rk-block__body" style="--rk-h:150px"></div>
           <script type="application/json" data-rk-options>{"variant": "plain", "columns": 6}</script>
         </figure>
-        <figure class="rk-block" style="--rk-span:5" data-rk="text-block" id="executive-summary-key-takeaways">
+        <figure class="rk-block" style="--rk-span:12" data-rk="text-block" id="executive-summary-key-takeaways">
           <figcaption class="rk-block__head">
             <h3 class="rk-block__title">Key takeaways</h3>
           </figcaption>
           <div class="rk-block__body"></div>
-          <script type="application/json" data-rk-options>{"variant": "takeaways", "layout": "list", "items": [{"title": "Valuation gap", "text": "Kestrel trades at **9.6x NTM EBITDA** vs. a peer median of 13.1x — a 3.5x discount."}, {"title": "Fundamentals", "text": "Revenue CAGR FY22A–25A of **9.0%** (peers 7.8%); EBITDA margin +205 bps over three years (peers +29 bps)."}, {"title": "Market signals", "text": "1-year TSR of **-29.2%** vs. +1.1% for the peer median; 30-day volatility 33% vs. 32%."}, {"title": "Transaction benchmarks", "text": "14 precedents paid a median **33% 1-day premium** and 11.8x LTM EBITDA."}]}</script>
-        </figure>
-        <figure class="rk-block" style="--rk-span:7" data-rk="football-field" data-rk-data="valuation" id="executive-summary-valuation-summary">
-          <figcaption class="rk-block__head">
-            <h3 class="rk-block__title">Valuation summary</h3>
-            <p class="rk-block__subtitle">Implied value per share (USD)</p>
-          </figcaption>
-          <div class="rk-block__body" style="--rk-h:340px"></div>
-          <script type="application/json" data-rk-options>{"refLines": [{"value": 23.95, "label": "Current $23.95"}], "encode": {"label": "method", "low": "low", "high": "high", "group": "group", "note": "basis"}}</script>
+          <script type="application/json" data-rk-options>{"variant": "takeaways", "layout": "grid", "columns": 4, "items": [{"title": "Valuation gap", "text": "Kestrel trades at **9.6x NTM EBITDA** vs. a peer median of 13.1x — a 3.5x discount."}, {"title": "Fundamentals", "text": "Revenue CAGR FY22A–25A of **9.0%** (peers 7.8%); EBITDA margin +205 bps over three years (peers +29 bps)."}, {"title": "Market signals", "text": "1-year TSR of **-29.2%** vs. +1.1% for the peer median; 30-day volatility 33% vs. 32%."}, {"title": "Transaction benchmarks", "text": "14 precedents paid a median **33% 1-day premium** and 11.8x LTM EBITDA."}]}</script>
         </figure>
       </div>
       <footer class="rk-page__foot"><span class="rk-page__source">Sources: Synthetic market data (sqlite3 pipeline, random.Random(7)); prices to 13-Oct-2026; Synthetic precedent transactions 2019–2026 and pre-announcement trading<span class="rk-page__notes">Note: Illustrative only: fictional companies and synthetic data.</span></span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
+    </section>
+    <section class="rk-page" id="valuation-summary" data-rk-page="Valuation summary">
+      <header class="rk-page__head">
+        <p class="rk-page__kicker">Valuation summary</p>
+        <h2 class="rk-page__title">Transaction benchmarks point to $24–34 per share vs. a current $23.95</h2>
+        <p class="rk-page__subtitle">Implied value per share (USD); bars span the interquartile range (IQR) of each benchmark</p>
+      </header>
+      <div class="rk-page__body rk-grid">
+        <figure class="rk-block" style="--rk-span:7" data-rk="football-field" data-rk-data="valuation" id="valuation-summary-implied-value-per-share">
+          <figcaption class="rk-block__head">
+            <h3 class="rk-block__title">Implied value per share</h3>
+          </figcaption>
+          <div class="rk-block__body" style="--rk-h:380px"></div>
+          <script type="application/json" data-rk-options>{"refLines": [{"value": 23.95, "label": "Current $23.95"}], "encode": {"label": "method", "low": "low", "high": "high", "group": "group", "note": "basis"}}</script>
+        </figure>
+        <figure class="rk-block" style="--rk-span:5" data-rk="comps-table" data-rk-data="valuation" id="valuation-summary-basis-of-each-range">
+          <figcaption class="rk-block__head">
+            <h3 class="rk-block__title">Basis of each range</h3>
+          </figcaption>
+          <div class="rk-block__body"></div>
+          <script type="application/json" data-rk-options>{"groupBy": "group", "stats": [], "scroll": false, "sortable": false, "crossFilter": false, "columns": [{"field": "short"}, {"field": "range"}, {"field": "applied"}], "encode": {"label": "short"}}</script>
+        </figure>
+      </div>
+      <footer class="rk-page__foot"><span class="rk-page__source">Sources: Northbridge Partners analysis; Synthetic market data (sqlite3 pipeline, random.Random(7)); prices to 13-Oct-2026<span class="rk-page__notes">Note: Trading comps: 9 peers (P / E: 8, n.m. excluded); precedents: 13 deals with disclosed EBITDA; premiums: all deals.</span></span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
     </section>
     <section class="rk-page rk-page--section" id="trading-analysis" data-rk-page="Trading analysis">
       <div class="rk-section" data-rk-reveal>
@@ -88,15 +104,12 @@
         <p class="rk-page__subtitle">Market data as of 13-Oct-2026; USD m unless otherwise stated</p>
       </header>
       <div class="rk-page__body rk-grid">
-        <figure class="rk-block" style="--rk-span:12" data-rk="comps-table" data-rk-data="comps" id="trading-comparables-selected-listed-peers">
-          <figcaption class="rk-block__head">
-            <h3 class="rk-block__title">Selected listed peers</h3>
-          </figcaption>
+        <figure class="rk-block" style="--rk-span:12" data-rk="comps-table" data-rk-data="comps" id="trading-comparables-comps-table">
           <div class="rk-block__body"></div>
-          <script type="application/json" data-rk-options>{"groupBy": "sector", "pinTarget": "top", "stats": ["mean", "median"], "scroll": false, "dense": true, "notes": {"Cardwell Software": "(1)", "Vedrix Robotics": "(2)"}, "columns": [{"field": "company"}, {"field": "price", "title": "Price", "group": "Market data", "stats": false}, {"field": "pct_52w_high", "title": "% 52w high", "group": "Market data"}, {"field": "mkt_cap", "title": "Mkt cap", "group": "Market data"}, {"field": "ev", "title": "EV", "group": "Market data"}, {"field": "ev_ltm_ebitda", "title": "LTM", "group": "EV / EBITDA", "heat": "seq"}, {"field": "ev_ntm_ebitda", "title": "NTM", "group": "EV / EBITDA", "heat": "seq"}, {"field": "ev_ntm_revenue", "title": "NTM", "group": "EV / Revenue"}, {"field": "pe_ntm", "title": "NTM", "group": "P / E", "nm": [0, 60.0]}, {"field": "rev_cagr_3y", "title": "Rev. CAGR 3y", "group": "Operating", "heat": "div"}, {"field": "ebitda_margin_ltm", "title": "EBITDA mgn LTM", "group": "Operating"}, {"field": "margin_delta_3y_bps", "title": "Δ mgn 3y", "group": "Operating"}, {"field": "net_leverage", "title": "ND / EBITDA", "group": "Operating"}, {"field": "tsr_1y", "title": "1y TSR", "group": "Trading", "heat": "div", "mid": 0}, {"field": "vol_30d", "title": "30d vol.", "group": "Trading"}], "encode": {"label": "company", "highlight": "is_target"}}</script>
+          <script type="application/json" data-rk-options>{"groupBy": "sector", "pinTarget": "top", "stats": ["median"], "scroll": false, "dense": true, "notes": {"Cardwell Software": "(1)", "Vedrix Robotics": "(2)"}, "columns": [{"field": "company"}, {"field": "mkt_cap", "title": "Mkt cap", "group": "Market data"}, {"field": "ev", "title": "EV", "group": "Market data"}, {"field": "ev_ltm_ebitda", "title": "LTM", "group": "EV / EBITDA", "heat": "seq"}, {"field": "ev_ntm_ebitda", "title": "NTM", "group": "EV / EBITDA", "heat": "seq"}, {"field": "ev_ntm_revenue", "title": "NTM", "group": "EV / Revenue"}, {"field": "pe_ntm", "title": "NTM", "group": "P / E", "nm": [0, 60.0]}, {"field": "rev_cagr_3y", "title": "Rev. CAGR 3y", "group": "Operating", "heat": "div"}, {"field": "ebitda_margin_ltm", "title": "EBITDA mgn LTM", "group": "Operating"}, {"field": "margin_delta_3y_bps", "title": "Δ mgn 3y", "group": "Operating"}, {"field": "net_leverage", "title": "ND / EBITDA", "group": "Operating"}, {"field": "tsr_1y", "title": "1y TSR", "group": "Trading", "heat": "div", "mid": 0}], "encode": {"label": "company", "highlight": "is_target"}}</script>
         </figure>
       </div>
-      <footer class="rk-page__foot"><span class="rk-page__source">Source: Synthetic market data (sqlite3 pipeline, random.Random(7)); prices to 13-Oct-2026; Synthetic company financials FY21A–FY27E<span class="rk-page__notes">Notes: (1) Listed in 2023; no FY22A financials, so CAGR and margin change are n.a. (2) P / E n.m. (≤ 0x or &gt; 60x). (3) Mean and median exclude the target.</span></span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
+      <footer class="rk-page__foot"><span class="rk-page__source">Source: Synthetic market data (sqlite3 pipeline, random.Random(7)); prices to 13-Oct-2026; Synthetic company financials FY21A–FY27E<span class="rk-page__notes">Notes: (1) Listed in 2023; no FY22A financials, so CAGR and margin change are n.a. (2) P / E n.m. (≤ 0x or &gt; 60x). (3) Peer median excludes the target.</span></span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
     </section>
     <section class="rk-page" id="multiples" data-rk-page="Multiples">
       <header class="rk-page__head">
@@ -218,7 +231,7 @@
             <h3 class="rk-block__title">Selected precedent transactions</h3>
           </figcaption>
           <div class="rk-block__body"></div>
-          <script type="application/json" data-rk-options>{"labelTitle": "Target", "scroll": false, "dense": true, "sort": {"field": "announced", "dir": "desc"}, "stats": ["mean", "median", "high", "low"], "notes": {"Jessop Automation": "(1)"}, "columns": [{"field": "target"}, {"field": "announced"}, {"field": "acquirer"}, {"field": "consideration"}, {"field": "deal_ev", "title": "Deal EV"}, {"field": "ev_ltm_revenue", "title": "EV / Rev. LTM"}, {"field": "ev_ltm_ebitda", "title": "EV / EBITDA LTM", "heat": "seq"}, {"field": "premium_1d", "title": "Premium 1-day", "heat": "seq"}, {"field": "premium_30d_vwap", "title": "Premium 30d VWAP"}], "encode": {"label": "target"}}</script>
+          <script type="application/json" data-rk-options>{"labelTitle": "Target", "scroll": false, "dense": true, "sort": {"field": "announced", "dir": "desc"}, "stats": ["mean", "median"], "notes": {"Jessop Automation": "(1)"}, "columns": [{"field": "target"}, {"field": "announced"}, {"field": "acquirer"}, {"field": "consideration"}, {"field": "deal_ev", "title": "Deal EV"}, {"field": "ev_ltm_revenue", "title": "EV / Rev. LTM"}, {"field": "ev_ltm_ebitda", "title": "EV / EBITDA LTM", "heat": "seq"}, {"field": "premium_1d", "title": "Premium 1-day", "heat": "seq"}, {"field": "premium_30d_vwap", "title": "Premium 30d VWAP"}], "encode": {"label": "target"}}</script>
         </figure>
       </div>
       <footer class="rk-page__foot"><span class="rk-page__source">Source: Synthetic precedent transactions 2019–2026 and pre-announcement trading<span class="rk-page__notes">Note: (1) EBITDA not disclosed: Jessop Automation.</span></span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
@@ -251,23 +264,23 @@
     <section class="rk-page" id="illustrative-offer" data-rk-page="Illustrative offer">
       <header class="rk-page__head">
         <p class="rk-page__kicker">Illustrative offer</p>
-        <h2 class="rk-page__title">A 30% premium implies 11.8x NTM EBITDA vs. 13.1x for peers and 11.8x LTM for precedents</h2>
-        <p class="rk-page__subtitle">Move the premium to update every number on this page; USD</p>
+        <h2 class="rk-page__title" data-rk-template="A {{@premium | 0%}} premium implies {{offer: first(offer_ev_ntm) | 0.0x}} NTM EBITDA vs. 13.1x for peers">A … premium implies … NTM EBITDA vs. 13.1x for peers</h2>
+        <p class="rk-page__subtitle">Move the premium to update every number on this page; precedents paid a median 11.8x LTM EBITDA; USD</p>
       </header>
       <div class="rk-page__body rk-grid">
-        <figure class="rk-block" style="--rk-span:4" data-rk="param-slider" id="illustrative-offer-assumption">
+        <figure class="rk-block" style="--rk-span:4" data-rk="param-slider" data-rk-data="offer" id="illustrative-offer-assumption">
           <figcaption class="rk-block__head">
             <h3 class="rk-block__title">Assumption</h3>
           </figcaption>
-          <div class="rk-block__body"></div>
-          <script type="application/json" data-rk-options>{"params": ["premium"]}</script>
+          <div class="rk-block__body" style="--rk-h:230px"></div>
+          <script type="application/json" data-rk-options>{"params": ["premium"], "columns": 1, "preview": {"fields": ["reference", "offer_price", "offer_ev_ntm"], "title": "Live output"}}</script>
         </figure>
         <figure class="rk-block" style="--rk-span:8" data-rk="bar" data-rk-data="offer" id="illustrative-offer-reference-vs-implied-offer">
           <figcaption class="rk-block__head">
             <h3 class="rk-block__title">Reference vs. implied offer price per share</h3>
           </figcaption>
-          <div class="rk-block__body" style="--rk-h:260px"></div>
-          <script type="application/json" data-rk-options>{"encode": {"x": "reference", "y": ["ref_price", "offer_price"]}}</script>
+          <div class="rk-block__body" style="--rk-h:230px"></div>
+          <script type="application/json" data-rk-options>{"crossFilter": false, "encode": {"x": "reference", "y": ["ref_price", "offer_price"]}}</script>
         </figure>
         <figure class="rk-block" style="--rk-span:12" data-rk="comps-table" data-rk-data="offer" id="illustrative-offer-implied-offer-metrics">
           <figcaption class="rk-block__head">

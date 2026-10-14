@@ -1,6 +1,10 @@
 /*!
  * RK component: kpi-tiles — headline metrics with count-up, delta pill and sparkline.
  * One row of the dataset = one tile. Pure DOM + inline SVG (no chart engine).
+ *
+ * Delta colour: by favourability (the good field: a falling leverage ratio is green) in the default convention;
+ * by direction in the Chinese convention (<html data-rk-updown="cn">, 红涨绿跌: every rise red, every fall green),
+ * where a green ▲ would read wrong whatever the metric.
  */
 (function () {
   'use strict';
@@ -78,6 +82,7 @@
       function build(c) {
         current = c;
         var o = c.options, enc = c.enc, t = c.theme, next = {};
+        var cn = (t && t.updown ? t.updown : RK.theme.updown && RK.theme.updown()) === 'cn';
         grid.className = 'rk-kpi rk-kpi--' + o.variant;
         grid.textContent = '';
         c.rows.forEach(function (r, i) {
@@ -89,7 +94,9 @@
           var deltaEl = null;
           if (delta != null && isFinite(delta)) {
             var positive = delta > 0, favourable = good === 'down' ? delta < 0 : delta > 0;
-            deltaEl = h('span.rk-kpi__delta', { class: delta === 0 ? 'is-flat' : (favourable ? 'is-good' : 'is-bad') },
+            // cn: --rk-pos is red and --rk-neg green (RK.theme swaps them), so rises take pos and falls neg
+            var tone = delta === 0 ? 'is-flat' : cn ? (positive ? 'is-up' : 'is-down') : (favourable ? 'is-good' : 'is-bad');
+            deltaEl = h('span.rk-kpi__delta', { class: tone },
               h('span.rk-kpi__arrow', { 'aria-hidden': 'true' }, delta === 0 ? '■' : (positive ? '▲' : '▼')),
               RK.format(delta, dfmt));
           }

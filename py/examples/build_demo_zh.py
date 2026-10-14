@@ -8,7 +8,7 @@
 故事（全部为虚构的示例数据）：A+H 上市的工业自动化公司「华辰智能」（总部江苏苏州）拟以企业价值 12.0 亿欧元
 （按 7.80 折合约 93.6 亿元人民币）收购德国精密驱动企业「凯斯勒驱动技术」100% 股权，北桥资本担任买方财务顾问。
 报告为中国客户而做：Report(locale="zh-CN", updown="cn")——界面文字为简体中文，紧凑数字使用万 / 亿，红涨绿跌；
-版式遵循国内投行材料惯例（「单位：人民币亿元」副标题、来源 / 注、机密字样）。
+版式遵循国内投行材料惯例（「单位：人民币亿元」副标题、资料来源 / 注、机密字样；多条来源以「；」连接）。
 
 交互：顶栏按「上市地 / 细分领域」筛选可比公司；可比公司页标题、估值页副标题、假设分析页标题与国内布局页右图副标题
 是 {{…}} 实时模板；省级方块图与可比公司散点图带指标切换（choices）；敏感性表点击单元格切换 DCF 基准（@wacc / @tgr）；
@@ -17,7 +17,8 @@
 检查：node tests/e2e/demo.cjs --dir examples/demo-zh-cn [--pdf]（--pdf 写出 examples/demo-zh-cn.pdf）。
 
 所有标题中的数字都由下面的数据计算得出（或由运行时的 {{…}} 标题模板实时计算），因此「结论」与图表一致。
-中国省级数据使用 china-tilemap（等大方块示意图，不绘制边界，客户材料无需审图号），不使用中国多边形地图。
+中国省级数据使用 china-tilemap（等大方块示意图，不绘制边界），不使用中国多边形地图：瓦片示意图不含行政区划边界，
+通常不涉及审图号，但对外发布前请法务确认。
 
 页面预算：屏幕上一页为 16:9（1440 px 宽窗口、含左侧目录时约 1135 × 638 px），打印为 1280 × 720 px。
 一行图表约有 400 px 绘图高度。中文标题字号 27 px，一行约容纳 36 个汉字。
@@ -55,11 +56,6 @@ DEMO = "示例数据：文中公司、机构与数据均为虚构，仅用于演
 def cjk_len(text: str) -> float:
     """标题宽度（以汉字为 1）：拉丁字母、数字约占半个汉字宽。"""
     return sum(1.0 if ord(c) > 0x2E80 else 0.55 for c in text)
-
-
-def src(*items: str) -> str:
-    """多条来源用中文分号连接（一条字符串，页脚显示为「来源：A；B」）。"""
-    return "；".join(items)
 
 
 def plot_h(title: str, *, block_sub: bool = False, block_head: bool = True, page_sub: bool = True,
@@ -556,7 +552,7 @@ def build(out: Path, **build_kw) -> Path:
 
     t = f"以{EV}亿元收购凯斯勒：补齐高端运动控制，2027E每股收益增厚{a[0]:.1%}"
     p = r.page(t, kicker="执行摘要", id="summary", nav="执行摘要",
-               subtitle="单位：人民币；市场数据截至2026年10月9日", source=src(SRC_MKT, SRC_NB), notes=DEMO)
+               subtitle="单位：人民币；市场数据截至2026年10月9日", source=[SRC_MKT, SRC_NB], notes=DEMO)
     p.block("kpi-tiles", data="kpis", height=128, options={"variant": "boxed", "columns": 6, "sparkline": False})
     p.block("text-block", height=172, options={
         "variant": "takeaways", "columns": 4,

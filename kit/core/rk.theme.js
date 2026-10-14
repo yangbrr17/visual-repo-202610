@@ -184,18 +184,29 @@
   }
 
   /* ---------------- up / down convention ---------------- */
-  var swapped = false;   // --rk-pos / --rk-neg currently set inline by applyUpdown()
-  /** Read tokens with the theme's own pos / neg, then swap them (CSS + tokens) for the 'cn' convention. */
+  var swapped = [];      // custom properties currently set inline on <html> by applyUpdown()
+  /**
+   * Read tokens with the theme's own pos / neg / div, then mirror them (CSS + tokens) for the 'cn' convention:
+   * pos <-> neg, and the diverging ramp reversed (div-1 <-> div-n), so the high / positive end of every heat scale
+   * takes the red side that pos now has and the low / negative end the theme's former "up" colour (green, teal
+   * or navy). Each theme's ramp runs from its neg hue (low) to its pos-side hue (high), so reversing it keeps the
+   * scale in step with pos / neg; components keep using t.div low -> high and need no cn branch.
+   */
   function applyUpdown() {
     var root = document.documentElement;
-    if (swapped) { root.style.removeProperty('--rk-pos'); root.style.removeProperty('--rk-neg'); swapped = false; }
+    swapped.forEach(function (p) { root.style.removeProperty(p); });
+    swapped = [];
     var t = readTokens();
     if (theme.updown() === 'cn') {
-      var pos = t.pos, neg = t.neg;
-      root.style.setProperty('--rk-pos', neg);
-      root.style.setProperty('--rk-neg', pos);
-      swapped = true;
-      t.pos = neg; t.neg = pos;
+      var pos = t.pos, neg = t.neg, div = t.div.slice().reverse();
+      function set(p, v) { root.style.setProperty(p, v); swapped.push(p); }
+      set('--rk-pos', neg);
+      set('--rk-neg', pos);
+      // the theme's --rk-div-<i> slots, read again in order (readTokens skips empty ones)
+      var cs = getComputedStyle(root), slots = [];
+      for (var i = 1; i <= 9; i++) if (cs.getPropertyValue('--rk-div-' + i).trim()) slots.push('--rk-div-' + i);
+      if (slots.length === t.div.length) slots.forEach(function (p, k) { set(p, div[k]); });
+      t.pos = neg; t.neg = pos; t.div = div;
       t.updown = 'cn';
     } else t.updown = 'us';
     return t;

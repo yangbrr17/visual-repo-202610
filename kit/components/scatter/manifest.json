@@ -20,7 +20,7 @@
   },
   "options": {
     "labels": {"type": "boolean|string", "default": "auto", "desc": "Point labels: true | false | 'auto' (on up to 40 points); each label takes the first free spot around its point (never over another label or point), labels that fit nowhere are hidden"},
-    "regression": {"type": "boolean", "default": false, "desc": "Ordinary least-squares fit across peers (target excluded) with R² label"},
+    "regression": {"type": "boolean", "default": false, "desc": "Ordinary least-squares fit across peers (target excluded) with R² label (in the legend, or in a free plot corner when legend is false)"},
     "equation": {"type": "boolean", "default": false, "desc": "Also print the fitted equation y = bx + a"},
     "quadrants": {"type": "string|object", "default": null, "desc": "null | 'median' | 'mean' | {x, y, label} — dashed quadrant lines (peer statistics exclude the target)"},
     "quadrantLabels": {"type": "string[]", "default": null, "desc": "Corner captions [top-left, top-right, bottom-left, bottom-right]"},
@@ -35,7 +35,7 @@
     "brush": {"type": "boolean", "default": true, "desc": "Box-select tool that cross-filters the label field"},
     "zoom": {"type": "boolean", "default": true, "desc": "Box zoom, Ctrl + wheel zoom, drag to pan and the hover toolbar; false = static chart"},
     "wheelZoom": {"type": "boolean", "default": null, "desc": "true = a plain mouse wheel zooms; default: Ctrl/Cmd + wheel or a trackpad pinch zooms, so the wheel keeps scrolling the report"},
-    "legend": {"type": "boolean", "default": true, "desc": "Category legend (top-left; wraps onto extra rows, never pages)"}
+    "legend": {"type": "boolean", "default": true, "desc": "Category legend (top-left; wraps onto extra rows, never pages). false: the regression caption (R²) moves to a free inner corner of the plot, clear of points and labels"}
   },
   "interactions": ["Hover tooltip with both metrics (+ extra fields)", "Click a point to cross-filter (toggle)", "Box-select points to cross-filter", "Box-zoom and reset buttons; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)", "Legend toggles categories", "Animated transitions when filters change", "PNG / CSV export"],
   "samples": [

@@ -15,5 +15,5 @@
   {"price":52.0,"label":"Final proposal","kind":"offer","date":"2026-10-06"},
   {"price":55.0,"label":null,"kind":"level","date":null}
  ],
- "meta":{"source":"Project Atlas analysis (synthetic); Helios Industrial management plan","unit":"USD per share","notes":["Reference prices: unaffected $42.50 (09-Oct-2026 close), 30-day VWAP $41.10, 52-week high $47.90.","kind: current = current share price; proposal = indicative proposal received; offer = final proposal; level = illustrative.","Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."],"asOf":"2026-10-10"}
+ "meta":{"source":"Project Atlas analysis (synthetic); Helios Industrial management plan","unit":"USD per share","notes":["Reference prices (from price_ohlc): unaffected $42.50 (09-Oct-2026 close), 30-day VWAP $42.53 (30 trading days to 09-Oct-2026), 52-week closing high $47.14.","kind: current = current share price; proposal = indicative proposal received; offer = final proposal; level = illustrative.","Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."],"asOf":"2026-10-10"}
 }

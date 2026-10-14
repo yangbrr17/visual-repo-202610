@@ -2,7 +2,7 @@
  * ReportKit data — datasets, data sources, global store (filters / params / state),
  * filtering, aggregation and the client query engine.
  *
- * Data contract (one file per dataset, see docs/data-contract.md):
+ * Data contract (one file per dataset, see docs/architecture.md §4):
  *   {
  *     "id": "comps",
  *     "title": "Trading comparables",

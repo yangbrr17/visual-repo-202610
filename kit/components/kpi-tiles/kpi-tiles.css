@@ -12,8 +12,9 @@
 .rk-kpi__period { text-wrap: balance; min-width: 0; }
 .rk-kpi__nw { white-space: nowrap; }
 .rk-kpi__delta { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 3px; font-weight: 600; font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; }
-.rk-kpi__delta.is-good { color: var(--rk-pos); background: color-mix(in srgb, var(--rk-pos) 12%, transparent); }
-.rk-kpi__delta.is-bad { color: var(--rk-neg); background: color-mix(in srgb, var(--rk-neg) 12%, transparent); }
+/* is-good / is-bad: favourability (default); is-up / is-down: direction (data-rk-updown="cn", pos = red there) */
+.rk-kpi__delta.is-good, .rk-kpi__delta.is-up { color: var(--rk-pos); background: color-mix(in srgb, var(--rk-pos) 12%, transparent); }
+.rk-kpi__delta.is-bad, .rk-kpi__delta.is-down { color: var(--rk-neg); background: color-mix(in srgb, var(--rk-neg) 12%, transparent); }
 .rk-kpi__delta.is-flat { color: var(--rk-ink-3); background: var(--rk-surface); }
 .rk-kpi__arrow { font-size: 8px; }
 .rk-kpi__spark { position: relative; height: 30px; margin-top: 4px; clip-path: inset(-4px 100% -4px -4px); animation: rk-kpi-draw 1.1s var(--rk-ease) calc(var(--rk-i, 0) * 90ms + 150ms) forwards; }

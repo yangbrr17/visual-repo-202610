@@ -1571,6 +1571,15 @@ class _Gen:
                          unit="USD per share", notes=[f"Current share price ${PRICE:.2f} (09-Oct-2026).",
                                                       "Ranges derived from peers (core = Industrial Automation + Motion & Power Control), precedents, sensitivity_dcf and sensitivity_lbo."]))
 
+    def reference_prices(self) -> tuple[float, float]:
+        """(30-day VWAP, 52-week closing high) of HLX on REF_DAY, read off the price_ohlc rows: VWAP = sum(close x
+        volume) / sum(volume) over the 30 trading days to REF_DAY; the high uses the same closing-price window as the
+        peers 52-week columns and the football field's 52-week range."""
+        ohlc = self.ohlc[:self.ref + 1]
+        win = ohlc[-30:]
+        vwap = sum(r["close"] * r["volume"] for r in win) / sum(r["volume"] for r in win)
+        return rnd(vwap, 2), max(r["close"] for r in ohlc[self.i1y:])
+
     # ------------------------------------------------- ib-valuation: sum-of-the-parts, offer price levels (AVP)
     def ib_valuation(self):
         """sotp: segments on FY26E (segment EBITDA + corporate costs = group EBITDA); offer_prices: AVP column levels."""
@@ -1613,14 +1622,15 @@ class _Gen:
             f"and other adjustments ${-OTHER_ADJ:,.0f}m = equity ${eq[0]:,.0f}m–${eq[1]:,.0f}m, "
             f"${eq[0] / SHARES:.2f}–${eq[1] / SHARES:.2f} per share on {SHARES:.1f}m diluted shares."]))
         # --- offer price levels for the analysis at various prices (AVP): current price, proposals received, levels
-        vwap_30d, high_52w = 41.10, 47.90
+        vwap_30d, high_52w = self.reference_prices()
         levels = [(PRICE, "Current", "current", iso(REF_DAY)), (45.00, None, "level", None),
                   (47.00, "Initial proposal", "proposal", "2026-08-12"), (49.50, "Revised proposal", "proposal", "2026-09-15"),
                   (52.00, "Final proposal", "offer", "2026-10-06"), (55.00, None, "level", None)]
         self.add(make_ds("offer_prices", "Offer price levels for the analysis at various prices", [
             N("price", "Price per share", F_PX, "USD"), S("label", "Label"), S("kind", "Kind"), D("date", "Received")],
             [dict(price=p, label=lb, kind=k, date=d) for p, lb, k, d in levels], source=SRC_ANALYSIS, unit="USD per share", notes=[
-                f"Reference prices: unaffected ${PRICE:.2f} (09-Oct-2026 close), 30-day VWAP ${vwap_30d:.2f}, 52-week high ${high_52w:.2f}.",
+                f"Reference prices (from price_ohlc): unaffected ${PRICE:.2f} (09-Oct-2026 close), 30-day VWAP ${vwap_30d:.2f} "
+                f"(30 trading days to 09-Oct-2026), 52-week closing high ${high_52w:.2f}.",
                 "kind: current = current share price; proposal = indicative proposal received; offer = final proposal; level = illustrative."]))
 
     def ebitda_bridge(self):
@@ -2034,6 +2044,15 @@ def check_consistency(ds: dict) -> list[str]:
     chk([r["price"] for r in op] == sorted(r["price"] for r in op), "offer_prices: not ascending")
     chk(sum(r["kind"] == "current" for r in op) == 1 and sum(r["kind"] == "offer" for r in op) == 1, "offer_prices: one current, one offer")
     chk(next(r["price"] for r in op if r["kind"] == "current") == PRICE, "offer_prices: current != PRICE")
+    # the reference prices quoted in the offer_prices notes are the ones price_ohlc gives (closing basis)
+    to_ref = [r for r in ohlc if r["date"] <= iso(REF_DAY)]
+    vw = sum(r["close"] * r["volume"] for r in to_ref[-30:]) / sum(r["volume"] for r in to_ref[-30:])
+    hi52 = max(r["close"] for r in to_ref if r["date"] >= iso(ONE_YEAR_AGO))
+    op_notes = " ".join(ds["offer_prices"]["meta"].get("notes") or [])
+    chk(f"30-day VWAP ${vw:.2f}" in op_notes, f"offer_prices notes: 30-day VWAP should be ${vw:.2f} (price_ohlc)")
+    chk(f"52-week closing high ${hi52:.2f}" in op_notes, f"offer_prices notes: 52-week high should be ${hi52:.2f} (price_ohlc)")
+    hlx = next(p for p in rows("peers") if p["is_target"])
+    chk(hlx["price_52w_high"] == hi52, f"peers HLX price_52w_high {hlx['price_52w_high']} != price_ohlc closing high {hi52}")
     for k in rows("kpis"):
         chk(len(k["spark"]) == 12 and k["good"] in ("up", "down"), f"kpis {k['id']}: spark/good")
     return errs

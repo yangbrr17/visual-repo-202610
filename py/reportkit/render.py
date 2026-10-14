@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any
 
-from ._util import as_list, esc, human_date, json_for_script, label
+from ._util import as_list, esc, human_date, json_for_script, label, notes_text, source_text
 from .template import fallback_text, has_template
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -48,37 +48,12 @@ def _span(s: Any) -> int:
         return 12
 
 
-def _sep(locale: str) -> str:
-    return "：" if (locale or "").lower().startswith(("zh", "ja")) else ": "
-
-
-def _source_text(src: Any, locale: str) -> str:
-    items = [str(s) for s in as_list(src)]
-    if not items:
-        return ""
-    text = "; ".join(items)
-    if re.match(r"^\s*(sources?\b|来源)", text, re.I):
-        return text
-    return label("sources" if len(items) > 1 else "source", locale) + _sep(locale) + text
-
-
-def _notes_text(notes: Any, locale: str) -> str:
-    items = [str(n) for n in as_list(notes)]
-    if not items:
-        return ""
-    if len(items) == 1:
-        if re.match(r"^\s*(notes?\b|注)", items[0], re.I):
-            return items[0]
-        return label("note", locale) + _sep(locale) + items[0]
-    return label("notes", locale) + _sep(locale) + " ".join(f"({i}) {n}" for i, n in enumerate(items, 1))
-
-
 def _block_foot(source: Any, notes: Any, locale: str) -> str:
     out = []
-    s = _source_text(source, locale)
+    s = source_text(source, locale)
     if s:
         out.append(f'<p class="rk-block__source">{esc(s)}</p>')
-    n = _notes_text(notes, locale)
+    n = notes_text(notes, locale)
     if n:
         out.append(f'<p class="rk-block__notes">{esc(n)}</p>')
     return "".join(out)
@@ -165,8 +140,8 @@ def _page_source(report: "Report", page: "Page") -> Any:
 
 
 def _page_foot(report: "Report", page: "Page", ind: str) -> list[str]:
-    src = esc(_source_text(_page_source(report, page), report.locale))
-    notes = _notes_text(page.notes, report.locale)
+    src = esc(source_text(_page_source(report, page), report.locale))
+    notes = notes_text(page.notes, report.locale)
     if notes:
         src += f'<span class="rk-page__notes">{esc(notes)}</span>'
     spans = f'<span class="rk-page__source">{src}</span>'
@@ -306,7 +281,7 @@ def render_index(report: "Report", plan: "BuildPlan", *, data_source: str = "bun
     L.append("      </select>")
     if excel_href:
         L.append(f'      <a class="rk-btn" href="{esc(excel_href)}" download data-rk-download="excel" '
-                 f'style="text-decoration:none" title="{esc(label("excel_title", loc))}">{esc(label("excel", loc))}</a>')
+                 f'title="{esc(label("excel_title", loc))}">{esc(label("excel", loc))}</a>')
     L.append(f'      <button type="button" class="rk-btn" data-rk-print>{esc(label("print", loc))}</button>')
     L.append("    </div>")
     L.append("  </header>")

@@ -183,8 +183,9 @@
       opts = opts || {};
       var t = ctx.theme, L = global.L;
       ctx.el.classList.add('rk-map');
+      var zoomButtons = opts.zoomControl != null ? opts.zoomControl : !ctx.print;   // print: no buttons
       var map = L.map(ctx.el, {
-        zoomControl: opts.zoomControl != null ? opts.zoomControl : !ctx.print,   // print: no buttons
+        zoomControl: false,          // added below with localised titles (Leaflet's own says "Zoom in" / "Zoom out")
         attributionControl: true,
         zoomSnap: 0.25,
         zoomDelta: 0.5,
@@ -199,6 +200,10 @@
         markerZoomAnimation: ctx.motion,
         preferCanvas: !!opts.preferCanvas
       });
+      if (zoomButtons) {
+        var tr = RK.i18n ? RK.i18n.t : function (k, f) { return f; };
+        map.zoomControl = L.control.zoom({ zoomInTitle: tr('zoomIn', 'Zoom in'), zoomOutTitle: tr('zoomOut', 'Zoom out') }).addTo(map);
+      }
       map.attributionControl.setPrefix(false);
       modifierZoom(map);
       ctx.el.style.background = t.mapWater || t.surface;

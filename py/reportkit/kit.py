@@ -9,13 +9,17 @@ from typing import Any
 
 from .errors import KitNotFoundError
 
-__all__ = ["Kit", "CATEGORIES", "THEME_LABELS", "COMPONENT_ID_RE"]
+__all__ = ["Kit", "CATEGORIES", "THEME_LABELS", "THEME_LABELS_BY_LANG", "COMPONENT_ID_RE"]
 
 CATEGORIES = ("layout", "controls", "valuation", "trend", "comparison", "composition", "bridge",
               "distribution", "flow", "geo", "table", "timeline")
 
-# Fallback labels for the theme <select> (build.json may override with "themeLabels").
+# Labels for the theme <select>, by language — the same strings as the runtime's i18n packs ('theme.<id>' in
+# kit/core/rk.core.js), so the builder-written menu and the runtime agree. build.json may override them with
+# "themeLabels": {"navy": "…"} (all languages) or {"zh": {"navy": "…"}, "en": {…}} (per language).
 THEME_LABELS = {"navy": "Navy classic", "bronze": "Bronze & ivory", "slate": "Slate modern", "ink": "Ink (dark)"}
+THEME_LABELS_BY_LANG = {"en": THEME_LABELS,
+                        "zh": {"navy": "经典海军蓝", "bronze": "古铜象牙", "slate": "现代石板灰", "ink": "墨色（深色）"}}
 
 COMPONENT_ID_RE = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
 
@@ -114,9 +118,18 @@ class Kit:
     def default_theme(self) -> str:
         return self.build.get("defaultTheme") or (self.build.get("themes") or ["navy"])[0]
 
-    def theme_label(self, theme: str) -> str:
-        labels = self.build.get("themeLabels") or {}
-        return labels.get(theme) or THEME_LABELS.get(theme) or theme.replace("-", " ").capitalize()
+    def theme_label(self, theme: str, locale: str | None = None) -> str:
+        """Display name of *theme* for *locale* ('zh-CN' -> '经典海军蓝'); English when the language has none."""
+        lang = (locale or "en").replace("_", "-").split("-")[0].lower()
+        custom = self.build.get("themeLabels") or {}
+        per_lang = custom.get(lang) if isinstance(custom.get(lang), dict) else {}
+        flat = {k: v for k, v in custom.items() if isinstance(v, str)}
+        # custom for this language > custom flat (English) > built-in for this language > custom flat > English
+        order = [per_lang, flat] if lang == "en" else [per_lang, THEME_LABELS_BY_LANG.get(lang, {}), flat]
+        for table in (*order, THEME_LABELS):
+            if table.get(theme):
+                return str(table[theme])
+        return theme.replace("-", " ").capitalize()
 
     @property
     def version(self) -> str:

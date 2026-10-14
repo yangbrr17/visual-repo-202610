@@ -1,8 +1,8 @@
 /*!
- * RK component: china-tilemap — compliance-safe tile-grid cartogram of China's 34 provincial-level
+ * RK component: china-tilemap — boundary-free tile-grid cartogram of China's 34 provincial-level
  * divisions. Every division is one equal-size square (or hexagon) placed on a grid that keeps the
- * relative geography; no boundary lines are drawn, so the chart is not a "map" in the sense of the
- * PRC map-review rules (no 审图号 needed in client decks) and never mis-draws a border.
+ * relative geography; no administrative boundaries are drawn, so the tile cartogram usually avoids the PRC
+ * map-review (审图号) requirements and never mis-draws a border — have legal confirm before external publication.
  *
  * Rows join by adcode (6-digit string; city / county codes roll up to their province), by province
  * name (English or 中文, with or without 省 / 市 / 自治区 suffixes) or by ISO 3166-2:CN letters.

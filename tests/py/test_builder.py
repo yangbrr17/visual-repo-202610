@@ -690,8 +690,11 @@ class TestBuild(KitTestCase):
         html = r.html()
         self.assertIn('lang="zh-CN"', html)
         self.assertIn("2026年10月14日", html)
-        self.assertIn("来源：公司公告", html)
-        self.assertIn('id="page-2"', html)  # non-ASCII titles fall back to page-N ids
+        self.assertIn("资料来源：公司公告", html)
+        self.assertNotIn("来源：资料来源", html)
+        self.assertIn('id="标题"', html)  # Chinese titles keep their characters in auto ids (not page-N)
+        self.assertIn('<option value="navy" selected>经典海军蓝</option>', html)
+        self.assertIn('<p class="rk-cover__conf">严格保密</p>', html)
 
 
 # ---------------------------------------------------------------------------------------------

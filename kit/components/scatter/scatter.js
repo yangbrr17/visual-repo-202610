@@ -1,6 +1,6 @@
 /*!
  * RK component: scatter — labelled two-metric scatter (e.g. EV/EBITDA vs. growth) with optional
- * OLS regression line + R² (in the legend), quadrant lines (medians / means / fixed values) with corner
+ * OLS regression line + R² (in the legend, or in a free inner corner when legend: false), quadrant lines (medians / means / fixed values) with corner
  * labels, point labels placed clear of every other label and point, target highlight, colour by
  * category, click / box-select cross-filter and box zoom. Peer statistics (medians, regression)
  * exclude the target.
@@ -19,7 +19,7 @@
   if (RK.i18n && typeof RK.i18n.add === 'function') {
     RK.i18n.add('zh-CN', {
       'scatter.tools': '图表工具', 'scatter.boxSelect': '框选数据点（交叉筛选）', 'scatter.boxZoom': '框选缩放', 'scatter.resetZoomSel': '重置缩放和选择',
-      'scatter.target': '目标公司', 'scatter.peers': '可比公司', 'scatter.linearFit': '线性拟合'
+      'scatter.target': '目标公司', 'scatter.peers': '可比公司', 'scatter.linearFit': '线性拟合', 'scatter.sep': '，'
     });
   }
 
@@ -93,7 +93,7 @@
    */
   function layoutLabels(inst) {
     var L = inst.__rkLabels;
-    if (!L || !L.specs.length || inst.isDisposed()) return;
+    if (!L || (!L.specs.length && !L.fit) || inst.isDisposed()) return;
     var rect = gridRect(inst), legendSel = {};
     try { legendSel = (inst.getOption().legend || [])[0].selected || {}; } catch (e) { legendSel = {}; }
     var on = function (name) { return legendSel[name] !== false; };
@@ -137,6 +137,39 @@
       }
       return true;
     }
+    // fixed captions inside the plot: quadrant corner labels and the y median label at the right end of its line
+    (L.corners || []).forEach(function (c, i) {
+      if (!c) return;
+      var right = i % 2 === 1, bottom = i >= 2;
+      placed.push({ x: right ? rect.x + rect.width - 6 - c.w : rect.x + 6, y: bottom ? rect.y + rect.height - 6 - c.h : rect.y + 6, w: c.w, h: c.h });
+    });
+    if (L.yRefLabel) {
+      var yl = toPx({ x: 0, y: L.yRefLabel.y })[1];
+      placed.push({ x: rect.x + rect.width - L.yRefLabel.w - 2, y: yl - L.yRefLabel.h - 3, w: L.yRefLabel.w, h: L.yRefLabel.h });
+    }
+    // legend: false — the fit caption ("Linear fit, R² = 0.62") goes to a free inner corner, clear of every point,
+    // label and line (corners away from the line first), before the point labels are placed around it
+    var fitPos = null;
+    if (L.fit) {
+      var F = L.fit, pad = 6, up = F.slope >= 0;
+      var corner = {
+        tl: [rect.x + pad, rect.y + pad], tr: [rect.x + rect.width - pad - F.w, rect.y + pad],
+        bl: [rect.x + pad, rect.y + rect.height - pad - F.h], br: [rect.x + rect.width - pad - F.w, rect.y + rect.height - pad - F.h]
+      };
+      var order = up ? ['tl', 'br', 'tr', 'bl'] : ['tr', 'bl', 'tl', 'br'];
+      // each corner, then one row further in (below a quadrant caption / above an axis-side cluster)
+      var cands0 = [];
+      order.forEach(function (k) { cands0.push(corner[k]); });
+      order.forEach(function (k) { var c = corner[k]; cands0.push([c[0], c[1] + (k[0] === 't' ? 1 : -1) * (F.h + 4)]); });
+      for (var pass0 = 0; pass0 < 2 && !fitPos; pass0++) {
+        for (var c0 = 0; c0 < cands0.length; c0++) {
+          var fb = { x: cands0[c0][0], y: cands0[c0][1], w: F.w, h: F.h };
+          if (free(fb, null) && (pass0 || !crosses(fb))) { fitPos = fb; break; }
+        }
+      }
+      if (!fitPos) fitPos = { x: corner[order[0]][0], y: corner[order[0]][1], w: F.w, h: F.h };
+      placed.push(fitPos);
+    }
     var specs = L.specs.map(function (sp) { var q = toPx(sp); return util.merge({}, sp, { px: q[0], py: q[1] }); });
     // targets first, then isolated points (they rarely block), then crowded ones
     specs.forEach(function (sp) {
@@ -173,7 +206,14 @@
         })
       };
     });
-    inst.setOption({ series: upd });
+    var opt = { series: upd };
+    if (fitPos) {
+      opt.graphic = [{
+        id: 'rk-fit-label', type: 'text', silent: true, z: 8, x: fitPos.x, y: fitPos.y,
+        style: { text: L.fit.text, fill: L.fit.color, font: L.fit.font, textVerticalAlign: 'top', textBorderColor: L.fit.paper, textBorderWidth: 3 }
+      }];
+    }
+    inst.setOption(opt);
   }
 
   /* ---------------- chart toolbar (select / zoom / reset), HTML so it can hide on hover-out --------------- */
@@ -377,7 +417,8 @@
     if (fit) {
       var fx = util.extent(xs), pad = (fx[1] - fx[0]) * 0.04;
       var x0 = Math.max(xe.min, fx[0] - pad), x1 = Math.min(xe.max, fx[1] + pad);
-      fitName = (o.equation ? 'y = ' + coef(fit.b) + 'x ' + (fit.a < 0 ? '− ' : '+ ') + coef(Math.abs(fit.a)) + ', ' : tr('scatter.linearFit', 'Linear fit') + ', ') + 'R² = ' + RK.format(fit.r2, '0.00');
+      fitName = (o.equation ? 'y = ' + coef(fit.b) + 'x ' + (fit.a < 0 ? '− ' : '+ ') + coef(Math.abs(fit.a)) : tr('scatter.linearFit', 'Linear fit')) +
+        tr('scatter.sep', ', ') + 'R² = ' + RK.format(fit.r2, '0.00');
       refSegs.push({ x0: x0, y0: fit.a + fit.b * x0, x1: x1, y1: fit.a + fit.b * x1 });
     }
     series.unshift({
@@ -387,16 +428,28 @@
       markArea: areas.length ? { silent: true, data: areas } : undefined
     });
 
-    // regression: a 2-point line series so the fit (and its R²) sits in the legend, never on top of labels
+    // regression: a 2-point line series so the fit (and its R²) sits in the legend, never on top of labels;
+    // without a legend, layoutLabels() writes the caption in a free inner corner of the plot
     var legendOn = o.legend !== false;
     if (fit) {
       var fitColor = t.accent3 || t.ink2;
       series.splice(1, 0, {
         id: 'fit', name: fitName, type: 'line', silent: true, z: 1, symbol: 'none', tooltip: { show: false },
         lineStyle: { color: fitColor, width: 1.25, type: 'solid' }, itemStyle: { color: fitColor },
-        endLabel: { show: !legendOn, formatter: function () { return fitName; }, color: fitColor, fontSize: 10.5, fontWeight: 600, distance: 4, textBorderColor: t.paper, textBorderWidth: 2.5, align: 'right', offset: [0, -10] },
         data: [[x0, fit.a + fit.b * x0], [x1, fit.a + fit.b * x1]]
       });
+      if (!legendOn) {
+        var fitFont = '600 10.5px ' + t.fontSans;
+        inst.__rkLabels.fit = { text: fitName, color: fitColor, paper: t.paper, font: fitFont, w: C.measure(fitName, fitFont) + 2, h: 14, slope: fit.b };
+      }
+    }
+    // captions the point labels must keep clear of
+    if (q && util.isNum(q.x) && util.isNum(q.y)) {
+      inst.__rkLabels.corners = (o.quadrantLabels || []).slice(0, 4).map(function (txt) { return txt ? { w: C.measure(String(txt), '600 10px ' + t.fontSans) + 2, h: 13 } : null; });
+    }
+    if (q && util.isNum(q.y)) {
+      var yTxt = (q.label ? q.label + ' ' : '') + RK.format(q.y, yFmt);
+      inst.__rkLabels.yRefLabel = { y: q.y, w: C.measure(yTxt, 'italic 10.5px ' + t.fontSans) + 4, h: 13 };
     }
 
     inst.__rk = { ctx: ctx, points: points, selField: selField };

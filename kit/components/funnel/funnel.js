@@ -87,17 +87,35 @@
       cols.forEach(function (c) {
         c.w = Math.ceil(Math.max(measure(String(c.title).toUpperCase(), headFont) + 6, Math.max.apply(null, c.text.map(function (s) { return measure(s, numFont); }))) + 22);
       });
-      var colsW = cols.reduce(function (s, c) { return s + c.w; }, 0);
-      var headH = cols.length ? 24 : 4;
 
       // value labels: one placement rule for the whole chart — inside every bar when all of them fit,
       // otherwise outside every bar (with room reserved right of the widest bar)
       var W0 = ctx.el.clientWidth || 600, valFont = '600 ' + numFont;
       var tws = vals.map(function (v) { return measure(RK.format(v, fmt), valFont); });
-      var plot0 = Math.max(40, W0 - (labW + 18) - (colsW + (center ? 8 : 40)));
-      var allInside = vals.every(function (v, i) { return !util.isNum(v) || v / max * plot0 > tws[i] + 14; });
-      var outRoom = allInside || o.labels === false ? 0 : Math.max.apply(null, tws.concat([0])) + 10;
-      var gridRight = colsW + (center ? 8 : 40) + (outRoom ? (center ? outRoom * 2 : Math.max(0, outRoom - 32)) : 0);
+      /** Layout for a set of right-hand columns: column width, label placement, grid right edge and bar track width. */
+      function fit(cs, tight) {
+        var cw = cs.reduce(function (s, c) { return s + c.w; }, 0);
+        var plot0 = Math.max(40, W0 - (labW + 18) - (cw + (center ? 8 : 40)));
+        var inside = vals.every(function (v, i) { return !util.isNum(v) || v / max * plot0 > tws[i] + 14; });
+        var room = inside || o.labels === false ? 0 : Math.max.apply(null, tws.concat([0])) + 10;
+        // a centred funnel normally sits mid-way between the names and the columns (room on both sides);
+        // tight: only the widest bar's label needs room, on its right
+        var right = cw + (center ? 8 : 40) + (room ? (center ? room * (tight ? 1 : 2) : Math.max(0, room - 32)) : 0);
+        return { cols: cs, colsW: cw, allInside: inside, gridRight: right, track: W0 - (labW + 18) - right };
+      }
+      // narrow blocks (e.g. ~420px with a secondary and a "% of top" column): the bar track keeps a minimum width.
+      // Stage names give way first (truncated, full name in the tooltip) and outside labels reserve room on one
+      // side only; then the "% of top" column goes, then the secondary column (both stay in the tooltip).
+      var minTrack = Math.max(90, Math.min(160, W0 * 0.3));
+      var L = fit(cols);
+      if (L.track < minTrack) {
+        labW = Math.min(labW, Math.max(64, Math.floor(W0 * 0.3)));
+        L = fit(cols, true);
+        while (L.track < minTrack && L.cols.length) L = fit(L.cols.slice(0, -1), true);
+      }
+      cols = L.cols;
+      var colsW = L.colsW, allInside = L.allInside, gridRight = L.gridRight;
+      var headH = cols.length ? 24 : 4;
 
       function renderItem(params, api) {
         var i = params.dataIndex, v = vals[i];
@@ -188,7 +206,8 @@
           });
           xr += c.w;
         });
-        graphic.push({ type: 'text', id: 'hv', left: labW + 18, top: 4, silent: true, style: { text: titled(enc.value).toUpperCase(), font: headFont, fill: t.ink3 } });
+        // the value header stays clear of the column headers (truncated with an ellipsis when the block is narrow)
+        graphic.push({ type: 'text', id: 'hv', left: labW + 18, top: 4, silent: true, style: { text: titled(enc.value).toUpperCase(), font: headFont, fill: t.ink3, width: Math.max(30, W0 - colsW - (labW + 18) - 10), overflow: 'truncate' } });
         graphic.push({ type: 'rect', id: 'hr', left: 0, top: headH - 4, silent: true, shape: { width: 4000, height: 1 }, style: { fill: t.rule } });
       }
 

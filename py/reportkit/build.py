@@ -85,7 +85,7 @@ def plan(report: "Report", kit: Any = None, *, build_date: Any = None) -> BuildP
         p.vendor_css += [_href("assets/vendor", pkg["id"], f) for f in Kit.vendor_files(pkg, ".css")]
         p.vendor_js += [_href("assets/vendor", pkg["id"], f) for f in Kit.vendor_files(pkg, ".js")]
     p.component_js = [_href("assets/js/components", f"{c}.js") for c in used]
-    p.themes = [(t, kit.theme_label(t)) for t in kit.themes]
+    p.themes = [(t, kit.theme_label(t, report.locale)) for t in kit.themes]
     return p
 
 

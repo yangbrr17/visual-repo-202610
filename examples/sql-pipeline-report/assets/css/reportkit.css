@@ -17,10 +17,14 @@
 @font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 700; font-display: swap; src: url("../fonts/source-serif-4/source-serif-4-latin-700-normal.woff2") format("woff2"); }
 
 :root {
-  /* ---- typography ---- */
-  --rk-font-sans: "Inter", "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-  --rk-font-serif: "Source Serif 4", Georgia, "Times New Roman", "Songti SC", "SimSun", serif;
-  --rk-font-num: "Inter", "Helvetica Neue", Arial, sans-serif;   /* + font-variant-numeric: tabular-nums */
+  /* ---- typography ----
+     Latin faces first (Inter / Source Serif 4 ship with the kit), then the Chinese system faces that carry CJK
+     glyphs: macOS (PingFang, Hiragino, Songti), Windows (Microsoft YaHei, SimSun), Linux / Android (Noto CJK,
+     Source Han, WenQuanYi). Numbers carry 亿 / 万, so the numeric stack has CJK fallbacks too. RK.theme passes
+     these stacks to ECharts with the double quotes turned into single quotes (SVG / PNG export). */
+  --rk-font-sans: "Inter", "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif;
+  --rk-font-serif: "Source Serif 4", Georgia, "Times New Roman", "Songti SC", "STSong", "Noto Serif SC", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", serif;
+  --rk-font-num: "Inter", "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;   /* + font-variant-numeric: tabular-nums */
   --rk-fs-xs: 10px;
   --rk-fs-sm: 11px;
   --rk-fs-base: 13px;
@@ -50,6 +54,11 @@
   --rk-shadow-page: 0 1px 2px rgba(16, 24, 40, .06), 0 8px 28px rgba(16, 24, 40, .07);
   --rk-shadow-pop: 0 12px 40px rgba(16, 24, 40, .18);
 }
+
+/* Chinese reports (<html lang="zh-…">): display text that uses the serif token (page / cover / section titles, lead
+   paragraphs, quotes, big stat numbers) is set in the sans stack instead. Bold Song / SimSun is thin and uneven at
+   title sizes; Chinese decks set titles in Hei faces (PingFang / Microsoft YaHei / Noto Sans CJK). */
+:root:lang(zh) { --rk-font-serif: var(--rk-font-sans); }
 
 /* ==== kit/styles/themes/navy.css ==== */
 /* Theme: Navy classic — the default bulge-bracket pitchbook look.
@@ -176,7 +185,8 @@
 }
 
 /* ==== kit/styles/themes/slate.css ==== */
-/* Theme: Slate modern — cooler, consulting-style palette with a teal accent. */
+/* Theme: Slate modern — cooler, consulting-style palette: slate ink, teal sequential ramp, deep gold target highlight.
+   Gold is reserved for the target (accent-2 / highlight), so the categorical series carry no gold. */
 [data-rk-theme="slate"] {
   --rk-canvas: #edf0f3;
   --rk-paper: #ffffff;
@@ -189,10 +199,10 @@
   --rk-grid: #e8ecf0;
   --rk-axis: #8d98a4;
   --rk-accent: #1f2a44;
-  --rk-accent-2: #c98a00;
+  --rk-accent-2: #a87400;     /* target highlight: 4.07:1 on paper (marks need >= 3:1) */
   --rk-accent-2-ink: #8a5e00;   /* text-safe (>= 4.5:1) variant of accent-2 for labels */
   --rk-accent-3: #3d7eaa;
-  --rk-highlight: #c98a00;
+  --rk-highlight: #a87400;
   --rk-pos: #2f7a4f;
   --rk-neg: #c0504d;
   --rk-neutral: #a8b2bd;
@@ -202,13 +212,15 @@
   --rk-map-border: #ffffff;
   --rk-map-water: #f5f7f9;
 
+  /* categorical: cat-1 brand, cat-8 grey ("Other"); cat-2..7 = the validated slate set without its gold (the target
+     colour), ordered for adjacent CVD dE 9.7 / normal 21.5 and first-3 all-pairs 9.9 / 23.1 (docs/design-system.md 3.4) */
   --rk-cat-1: #1f2a44;
-  --rk-cat-2: #c38700;
-  --rk-cat-3: #c35f92;
-  --rk-cat-4: #3e6dc8;
-  --rk-cat-5: #db6143;
-  --rk-cat-6: #7d5abc;
-  --rk-cat-7: #3e9245;
+  --rk-cat-2: #009783;
+  --rk-cat-3: #db6143;
+  --rk-cat-4: #7d5abc;
+  --rk-cat-5: #3e9245;
+  --rk-cat-6: #3e6dc8;
+  --rk-cat-7: #c35f92;
   --rk-cat-8: #8e9aaf;
 
   --rk-seq-1: #f0f6f7;
@@ -1137,8 +1149,9 @@ html.rk-printing {
 .rk-kpi__period { text-wrap: balance; min-width: 0; }
 .rk-kpi__nw { white-space: nowrap; }
 .rk-kpi__delta { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 3px; font-weight: 600; font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; }
-.rk-kpi__delta.is-good { color: var(--rk-pos); background: color-mix(in srgb, var(--rk-pos) 12%, transparent); }
-.rk-kpi__delta.is-bad { color: var(--rk-neg); background: color-mix(in srgb, var(--rk-neg) 12%, transparent); }
+/* is-good / is-bad: favourability (default); is-up / is-down: direction (data-rk-updown="cn", pos = red there) */
+.rk-kpi__delta.is-good, .rk-kpi__delta.is-up { color: var(--rk-pos); background: color-mix(in srgb, var(--rk-pos) 12%, transparent); }
+.rk-kpi__delta.is-bad, .rk-kpi__delta.is-down { color: var(--rk-neg); background: color-mix(in srgb, var(--rk-neg) 12%, transparent); }
 .rk-kpi__delta.is-flat { color: var(--rk-ink-3); background: var(--rk-surface); }
 .rk-kpi__arrow { font-size: 8px; }
 .rk-kpi__spark { position: relative; height: 30px; margin-top: 4px; clip-path: inset(-4px 100% -4px -4px); animation: rk-kpi-draw 1.1s var(--rk-ease) calc(var(--rk-i, 0) * 90ms + 150ms) forwards; }
@@ -1171,7 +1184,6 @@ html.rk-printing {
 .rk-ps__value {
   height: 26px; padding: 0 4px; border: 1px solid transparent; border-radius: var(--rk-radius);
   background: none; cursor: text;
-  margin-right: -5px;                    /* figures end flush with the track / max label */
   font-size: var(--rk-fs-lg); font-weight: 600; color: var(--rk-ink); letter-spacing: -.01em;
   transition: border-color var(--rk-dur-fast), background var(--rk-dur-fast), color var(--rk-dur-fast);
 }
@@ -1183,14 +1195,19 @@ html.rk-printing {
 .rk-ps__reset {
   display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0;
   border: 0; border-radius: var(--rk-radius); background: none; color: var(--rk-ink-3); cursor: pointer;
-  opacity: 0; visibility: hidden; transform: rotate(-60deg);
-  transition: opacity var(--rk-dur-fast), transform 320ms var(--rk-ease), color var(--rk-dur-fast), visibility 0s linear var(--rk-dur-fast);
+  opacity: 0; visibility: hidden;
+  transition: opacity var(--rk-dur-fast), color var(--rk-dur-fast), visibility 0s linear var(--rk-dur-fast);
 }
-.rk-ps__reset svg { width: 13px; height: 13px; }
+/* the icon (not the 22px button) turns in: a rotated button's box would overflow a 24px top-bar row */
+.rk-ps__reset svg { width: 13px; height: 13px; transform: rotate(-60deg); transition: transform 320ms var(--rk-ease); }
 .rk-ps__reset:hover { color: var(--rk-accent); background: var(--rk-surface); }
-.rk-ps__item.is-changed .rk-ps__reset { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+.rk-ps__item.is-changed .rk-ps__reset { opacity: 1; visibility: visible; transition-delay: 0s; }
+.rk-ps__item.is-changed .rk-ps__reset svg { transform: none; }
 
+/* the value button's padding + border (5px) insets its figures: the track and max label end flush with them
+   (a negative margin on the button would overflow the block body by 5px and trigger print-fit) */
 .rk-ps__track { position: relative; height: 20px; display: flex; align-items: center; }
+.rk-ps--stacked .rk-ps__track, .rk-ps--stacked .rk-ps__minmax { margin-right: 5px; }
 .rk-ps__range { position: relative; z-index: 1; margin: 0; cursor: pointer; background: linear-gradient(90deg, var(--rk-accent) var(--rk-fill, 50%), var(--rk-grid) var(--rk-fill, 50%)); }
 .rk-ps__range:focus-visible { outline: none; }
 .rk-ps__range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px color-mix(in srgb, var(--rk-accent-3) 25%, transparent); }
@@ -1235,8 +1252,8 @@ html.rk-printing {
 .rk-ps--compact .rk-ps__value { font-size: var(--rk-fs-md); height: 24px; }
 .rk-ps--compact .rk-ps__delta { display: none; }
 
-.rk-ps.is-static .rk-ps__reset, .rk-ps.is-static .rk-ps__range::-webkit-slider-thumb { transition: none; }
-@media (prefers-reduced-motion: reduce) { .rk-ps__reset { transition: none; } .rk-ps__preview.is-flash td.is-live, .rk-ps__preview.is-flash .rk-ps__sval { animation: none; } }
+.rk-ps.is-static .rk-ps__reset, .rk-ps.is-static .rk-ps__reset svg, .rk-ps.is-static .rk-ps__range::-webkit-slider-thumb { transition: none; }
+@media (prefers-reduced-motion: reduce) { .rk-ps__reset, .rk-ps__reset svg { transition: none; } .rk-ps__preview.is-flash td.is-live, .rk-ps__preview.is-flash .rk-ps__sval { animation: none; } }
 /* print: an assumptions read-out (label · value · change), no slider controls */
 @media print { .rk-ps__reset, .rk-ps__base, .rk-ps__track, .rk-ps__minmax { display: none; } .rk-ps__value { border-color: transparent; } }
 /* change not meaningful (relative change from a zero / negative base): neutral, never red / green */

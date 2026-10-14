@@ -8,7 +8,6 @@
 .rk-ps__value {
   height: 26px; padding: 0 4px; border: 1px solid transparent; border-radius: var(--rk-radius);
   background: none; cursor: text;
-  margin-right: -5px;                    /* figures end flush with the track / max label */
   font-size: var(--rk-fs-lg); font-weight: 600; color: var(--rk-ink); letter-spacing: -.01em;
   transition: border-color var(--rk-dur-fast), background var(--rk-dur-fast), color var(--rk-dur-fast);
 }
@@ -20,14 +19,19 @@
 .rk-ps__reset {
   display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0;
   border: 0; border-radius: var(--rk-radius); background: none; color: var(--rk-ink-3); cursor: pointer;
-  opacity: 0; visibility: hidden; transform: rotate(-60deg);
-  transition: opacity var(--rk-dur-fast), transform 320ms var(--rk-ease), color var(--rk-dur-fast), visibility 0s linear var(--rk-dur-fast);
+  opacity: 0; visibility: hidden;
+  transition: opacity var(--rk-dur-fast), color var(--rk-dur-fast), visibility 0s linear var(--rk-dur-fast);
 }
-.rk-ps__reset svg { width: 13px; height: 13px; }
+/* the icon (not the 22px button) turns in: a rotated button's box would overflow a 24px top-bar row */
+.rk-ps__reset svg { width: 13px; height: 13px; transform: rotate(-60deg); transition: transform 320ms var(--rk-ease); }
 .rk-ps__reset:hover { color: var(--rk-accent); background: var(--rk-surface); }
-.rk-ps__item.is-changed .rk-ps__reset { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+.rk-ps__item.is-changed .rk-ps__reset { opacity: 1; visibility: visible; transition-delay: 0s; }
+.rk-ps__item.is-changed .rk-ps__reset svg { transform: none; }
 
+/* the value button's padding + border (5px) insets its figures: the track and max label end flush with them
+   (a negative margin on the button would overflow the block body by 5px and trigger print-fit) */
 .rk-ps__track { position: relative; height: 20px; display: flex; align-items: center; }
+.rk-ps--stacked .rk-ps__track, .rk-ps--stacked .rk-ps__minmax { margin-right: 5px; }
 .rk-ps__range { position: relative; z-index: 1; margin: 0; cursor: pointer; background: linear-gradient(90deg, var(--rk-accent) var(--rk-fill, 50%), var(--rk-grid) var(--rk-fill, 50%)); }
 .rk-ps__range:focus-visible { outline: none; }
 .rk-ps__range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px color-mix(in srgb, var(--rk-accent-3) 25%, transparent); }
@@ -72,8 +76,8 @@
 .rk-ps--compact .rk-ps__value { font-size: var(--rk-fs-md); height: 24px; }
 .rk-ps--compact .rk-ps__delta { display: none; }
 
-.rk-ps.is-static .rk-ps__reset, .rk-ps.is-static .rk-ps__range::-webkit-slider-thumb { transition: none; }
-@media (prefers-reduced-motion: reduce) { .rk-ps__reset { transition: none; } .rk-ps__preview.is-flash td.is-live, .rk-ps__preview.is-flash .rk-ps__sval { animation: none; } }
+.rk-ps.is-static .rk-ps__reset, .rk-ps.is-static .rk-ps__reset svg, .rk-ps.is-static .rk-ps__range::-webkit-slider-thumb { transition: none; }
+@media (prefers-reduced-motion: reduce) { .rk-ps__reset, .rk-ps__reset svg { transition: none; } .rk-ps__preview.is-flash td.is-live, .rk-ps__preview.is-flash .rk-ps__sval { animation: none; } }
 /* print: an assumptions read-out (label · value · change), no slider controls */
 @media print { .rk-ps__reset, .rk-ps__base, .rk-ps__track, .rk-ps__minmax { display: none; } .rk-ps__value { border-color: transparent; } }
 /* change not meaningful (relative change from a zero / negative base): neutral, never red / green */

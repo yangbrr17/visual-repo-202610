@@ -7,7 +7,7 @@
   "deps": [],
   "summary": "Headline numbers with count-up animation, favourable/unfavourable delta and a sparkline.",
   "summary_zh": "关键指标数字卡片：数字滚动动画、同比/环比变化（自动判断好坏方向）与迷你趋势线。",
-  "description_zh": "用于执行摘要页或每个章节开头，突出 4–6 个核心数字（营收、EBITDA 利润率、EV/EBITDA、净杠杆、股东回报等）。每行数据是一张卡片，可以单独为每张卡片设置格式码；good 字段决定涨跌哪个方向是“好”（如杠杆率下降是好）。spark 字段是数字数组，绘制迷你趋势线。",
+  "description_zh": "用于执行摘要页或每个章节开头，突出 4–6 个核心数字（营收、EBITDA 利润率、EV/EBITDA、净杠杆、股东回报等）。每行数据是一张卡片，可以单独为每张卡片设置格式码；good 字段决定涨跌哪个方向是“好”（如杠杆率下降是好），默认按好坏着色；红涨绿跌模式（updown=\"cn\"）下按方向着色：上升一律为红色，下降一律为绿色。spark 字段是数字数组，绘制迷你趋势线。",
   "best_for": ["Executive summary headline metrics", "Section openers", "Dashboard header"],
   "avoid_when": ["More than ~8 tiles (use a table)"],
   "channels": {
@@ -18,7 +18,7 @@
     "deltaFormat": {"type": "string", "required": false, "desc": "Per-row delta format code field", "default": "delta_format"},
     "period": {"type": "string", "required": false, "desc": "Comparison label, e.g. 'vs. FY24'", "default": "period"},
     "spark": {"type": "number[]", "required": false, "desc": "Array of values for the sparkline", "default": "spark"},
-    "good": {"type": "string", "required": false, "desc": "'up' or 'down' — which direction is favourable", "default": "good"}
+    "good": {"type": "string", "required": false, "desc": "'up' or 'down' — which direction is favourable (colours the delta; in the cn up/down convention deltas are coloured by direction: rise red, fall green)", "default": "good"}
   },
   "options": {
     "columns": {"type": "number", "default": null, "desc": "Fixed number of columns; null = balanced automatic count (as many as fit at ~160px, rows evened out: 6 tiles -> 6 x 1 wide, 3 x 2 at ~760px, 2 x 3 on phones)"},

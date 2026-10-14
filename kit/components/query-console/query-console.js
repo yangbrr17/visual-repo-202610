@@ -24,14 +24,15 @@
   var HKEY = 'rk:query-console:history';
   var MAC = typeof navigator !== 'undefined' && /Mac|iP(hone|ad|od)/.test(navigator.platform || navigator.userAgent);
 
-  var AGGS = [
-    { id: 'none', label: 'Value', sub: 'No aggregation — one row per record' },
-    { id: 'sum', label: 'Sum' }, { id: 'avg', label: 'Average' }, { id: 'median', label: 'Median' },
-    { id: 'min', label: 'Min' }, { id: 'max', label: 'Max' }, { id: 'count', label: 'Count' },
-    { id: 'countd', label: 'Distinct count' }, { id: 'stdev', label: 'Std. dev.' }
-  ];
-  var AGG_LABEL = { average: 'Average', mean: 'Average', stddev: 'Std. dev.', first: 'First', last: 'Last', pctl: 'Percentile', percentile: 'Percentile', wavg: 'Weighted avg.' };
-  AGGS.forEach(function (a) { AGG_LABEL[a.id] = a.label; });
+  // builder aggregations (in picker order); labels via aggLabel() so they follow the report language
+  var AGGS = ['none', 'sum', 'avg', 'median', 'min', 'max', 'count', 'countd', 'stdev'];
+  // English names of every aggregate (aliases share one translation key, AGG_KEY)
+  var AGG_LABEL = {
+    none: 'Value', sum: 'Sum', avg: 'Average', median: 'Median', min: 'Min', max: 'Max', count: 'Count', countd: 'Distinct count',
+    stdev: 'Std. dev.', average: 'Average', mean: 'Average', stddev: 'Std. dev.', first: 'First', last: 'Last', pctl: 'Percentile',
+    percentile: 'Percentile', wavg: 'Weighted avg.'
+  };
+  var AGG_KEY = { average: 'avg', mean: 'avg', stddev: 'stdev', percentile: 'pctl' };
 
   var FN_DOC = {
     sum: 'sum(x) — total', avg: 'avg(x) — mean', average: 'average(x) — mean', mean: 'mean(x) — mean', median: 'median(x)',
@@ -50,14 +51,6 @@
   var CLAUSE_KW = { select: 1, show: 1, from: 1, by: 1, group: 1, order: 1, where: 1, sort: 1, top: 1, limit: 1, as: 1, format: 1, asc: 1, desc: 1 };
   var LOGIC_KW = { and: 1, or: 1, not: 1, in: 1, true: 1, false: 1, null: 1 };
   var AC_KEYWORDS = ['from', 'by', 'where', 'sort', 'top', 'as', 'format', 'desc', 'asc', 'and', 'or', 'not', 'in'];
-  var SYNTAX = [
-    ['items', 'expr [as "Label"] [format "0.0x"], …'],
-    ['from', 'from peers'],
-    ['by', 'by sector, region'],
-    ['where', 'where region == "Europe" and mkt_cap > 5000'],
-    ['sort', 'sort 2 desc  ·  sort "Label" asc'],
-    ['top', 'top 10']
-  ];
 
   var ICONS = {
     play: '<path d="M7 5.5v13l11-6.5z" fill="currentColor" stroke="none"/>',
@@ -119,9 +112,80 @@
       'queryConsole.clearHistory': '清除历史记录',
       'queryConsole.split': '分栏',
       'queryConsole.table': '表格',
-      'queryConsole.chart': '图表'
+      'queryConsole.chart': '图表',
+      // aggregations ("{agg} {field}" reads "{field}{agg}" in Chinese: EV/EBITDA 2026E中位数)
+      'queryConsole.agg.none': '原值', 'queryConsole.agg.sum': '合计', 'queryConsole.agg.avg': '平均值', 'queryConsole.agg.median': '中位数',
+      'queryConsole.agg.min': '最小值', 'queryConsole.agg.max': '最大值', 'queryConsole.agg.count': '计数', 'queryConsole.agg.countd': '不重复计数',
+      'queryConsole.agg.stdev': '标准差', 'queryConsole.agg.first': '首个值', 'queryConsole.agg.last': '末个值', 'queryConsole.agg.pctl': '百分位数',
+      'queryConsole.agg.wavg': '加权平均值', 'queryConsole.aggOf': '{field}{agg}', 'queryConsole.noAgg': '不汇总 — 每条记录一行',
+      // head, pickers, builder
+      'queryConsole.mode': '控制台模式', 'queryConsole.history': '查询历史', 'queryConsole.chooseDs': '选择数据集',
+      'queryConsole.chooseDsStart': '请先选择数据集。', 'queryConsole.options': '选项', 'queryConsole.searchPh': '搜索…',
+      'queryConsole.noMatches': '无匹配项', 'queryConsole.datasets': '数据集', 'queryConsole.searchDs': '搜索数据集…',
+      'queryConsole.searchFields': '搜索字段…', 'queryConsole.numbers': '数值', 'queryConsole.textDates': '文本与日期',
+      'queryConsole.aggregation': '汇总方式', 'queryConsole.of': '·', 'queryConsole.removeValue': '移除数值',
+      'queryConsole.addValue': '添加数值', 'queryConsole.removeX': '移除{name}', 'queryConsole.filterExpr': '筛选表达式',
+      'queryConsole.eg': '例如：{example}', 'queryConsole.aggInWhere': '行筛选中不能使用聚合函数', 'queryConsole.validFilter': '筛选表达式有效',
+      'queryConsole.noSort': '不排序', 'queryConsole.sortBy': '排序依据', 'queryConsole.highLow': '从高到低', 'queryConsole.lowHigh': '从低到高',
+      'queryConsole.topN': '前 N 行', 'queryConsole.editAsQuery': '以查询语句编辑',
+      // status line
+      'queryConsole.idle': '输入查询语句、点选示例，或使用参考面板 →', 'queryConsole.lnCol': '第 {line} 行，第 {col} 列',
+      'queryConsole.nRows': '{n} 行', 'queryConsole.nRows.one': '{n} 行', 'queryConsole.nCols': '{n} 列', 'queryConsole.nCols.one': '{n} 列',
+      'queryConsole.valid': '有效 — {rows} × {cols}{by}', 'queryConsole.groupedBy': ' · 按 {list} 分组', 'queryConsole.summaryRow': ' · 汇总',
+      'queryConsole.toRun': '按 {key} + Enter 运行', 'queryConsole.builderIdle': '构建器会自动生成查询语句 — 修改后结果即时更新',
+      'queryConsole.builderOk': '{rows} — 结果随编辑即时更新', 'queryConsole.runSaves': '点击“运行”保存到历史记录',
+      'queryConsole.ran': '已运行 — {rows}，用时 {ms} 毫秒',
+      'queryConsole.unknownDs': '未知数据集“{id}” — 可用数据集：{list}',
+      'queryConsole.whereAgg': 'where 用于筛选行 — 其中不能使用 sum()、median() 等聚合函数',
+      'queryConsole.unknownField': '未知字段“{name}”', 'queryConsole.didYouMean': ' — 是否指 {list}？', 'queryConsole.seeFields': ' — 请查看字段列表',
+      'queryConsole.keyword': '关键字', 'queryConsole.items': '输出列', 'queryConsole.label': '标签',
+      // history
+      'queryConsole.histEmpty': '运行过的查询会显示在这里。', 'queryConsole.nRecent': '最近 {n} 条查询', 'queryConsole.nRecent.one': '最近 {n} 条查询',
+      'queryConsole.justNow': '刚刚', 'queryConsole.minAgo': '{n} 分钟前', 'queryConsole.hAgo': '{n} 小时前', 'queryConsole.dAgo': '{n} 天前',
+      // results
+      'queryConsole.rowsUnit': '行', 'queryConsole.rowsUnit.one': '行', 'queryConsole.ms': '{n} 毫秒',
+      'queryConsole.respects': '结果已应用报告筛选：{list}', 'queryConsole.nFilters': '{n} 个全局筛选', 'queryConsole.nFilters.one': '{n} 个全局筛选',
+      'queryConsole.resultView': '结果视图', 'queryConsole.csvTitle': '将全部结果行下载为 CSV',
+      'queryConsole.noRows': '没有匹配的行 — 请检查 where 条件或报告筛选。', 'queryConsole.showingFirst': '显示前 {max} 行，共 {n} 行 — CSV 导出全部行。',
+      'queryConsole.nothingToChart': '没有可绘制的数据', 'queryConsole.noNumeric': '没有可绘制的数值列',
+      'queryConsole.addLabel': '添加一个标签列（例如 {name}）即可绘制这些数值', 'queryConsole.estimate': '预测',
+      'queryConsole.notCharted': '{n} 列未绘制（单位不同）', 'queryConsole.notCharted.one': '{n} 列未绘制（单位不同）',
+      'queryConsole.preview': '预览：{list}',
+      // function reference (descriptions after the signature)
+      'queryConsole.fn.sum': 'sum(x) — 合计', 'queryConsole.fn.avg': 'avg(x) — 平均值', 'queryConsole.fn.average': 'average(x) — 平均值',
+      'queryConsole.fn.mean': 'mean(x) — 平均值', 'queryConsole.fn.median': 'median(x) — 中位数',
+      'queryConsole.fn.min': 'min(x) — 最小值（或逐行 min(a, b)）', 'queryConsole.fn.max': 'max(x) — 最大值（或逐行 max(a, b)）',
+      'queryConsole.fn.count': 'count() 行数，count(x) 非空值个数', 'queryConsole.fn.countd': 'countd(x) — 不重复值个数',
+      'queryConsole.fn.stdev': 'stdev(x) — 样本标准差', 'queryConsole.fn.stddev': 'stddev(x) — 样本标准差',
+      'queryConsole.fn.first': 'first(x) — 第一个非空值', 'queryConsole.fn.last': 'last(x) — 最后一个非空值',
+      'queryConsole.fn.pctl': 'pctl(x, 0.75) — 百分位数', 'queryConsole.fn.percentile': 'percentile(x, 0.25) — 百分位数',
+      'queryConsole.fn.wavg': 'wavg(x, weight) — 加权平均值', 'queryConsole.fn.abs': 'abs(x) — 绝对值', 'queryConsole.fn.round': 'round(x, 1) — 四舍五入',
+      'queryConsole.fn.floor': 'floor(x) — 向下取整', 'queryConsole.fn.ceil': 'ceil(x) — 向上取整', 'queryConsole.fn.sqrt': 'sqrt(x) — 平方根',
+      'queryConsole.fn.pow': 'pow(x, y) — 乘方', 'queryConsole.fn.exp': 'exp(x) — e 的 x 次方', 'queryConsole.fn.ln': 'ln(x) — 自然对数',
+      'queryConsole.fn.log': 'log(x [, base]) — 对数', 'queryConsole.fn.log10': 'log10(x) — 以 10 为底的对数', 'queryConsole.fn.sign': 'sign(x) — 正负号',
+      'queryConsole.fn.clamp': 'clamp(x, lo, hi) — 限定在区间内', 'queryConsole.fn.div': 'div(a, b) — 安全除法（除数为零时为空）',
+      'queryConsole.fn.pct_change': 'pct_change(new, old) — 增长率', 'queryConsole.fn.cagr': 'cagr(end, start, years) — 复合年增长率',
+      'queryConsole.fn.coalesce': 'coalesce(a, b, …) — 第一个非空值', 'queryConsole.fn.isnull': 'isnull(x) — 是否为空',
+      'queryConsole.fn.between': 'between(x, lo, hi) — 是否在区间内', 'queryConsole.fn.number': 'number(x) — 转为数字',
+      'queryConsole.fn.text': 'text(x, "0.0x") — 格式化为文本', 'queryConsole.fn.len': 'len(s) — 文本长度', 'queryConsole.fn.lower': 'lower(s) — 转为小写',
+      'queryConsole.fn.upper': 'upper(s) — 转为大写', 'queryConsole.fn.concat': 'concat(a, b, …) — 连接文本',
+      'queryConsole.fn.contains': 'contains(s, "sub") — 是否包含', 'queryConsole.fn.startswith': 'startswith(s, "p") — 是否以 p 开头',
+      'queryConsole.fn.endswith': 'endswith(s, "p") — 是否以 p 结尾', 'queryConsole.fn.year': 'year(date) — 年份', 'queryConsole.fn.month': 'month(date) — 月份',
+      'queryConsole.fn.quarter': 'quarter(date) — 季度', 'queryConsole.fn.if': 'if(condition, then, else) — 条件取值'
     });
   }
+  /** Aggregation name in the report language ('median' -> "Median" / 中位数); null for anything else. */
+  function aggLabel(id) {
+    id = String(id || '').toLowerCase();
+    if (!Object.prototype.hasOwnProperty.call(AGG_LABEL, id)) return null;
+    return tr('queryConsole.agg.' + (AGG_KEY[id] || id), AGG_LABEL[id]);
+  }
+  /** Aggregate column title: "Median EV/EBITDA 2025E" (zh: "EV/EBITDA 2025E中位数"). */
+  function aggTitle(id, fieldTitle) { return tr('queryConsole.aggOf', '{agg} {field}', { agg: aggLabel(id) || id, field: fieldTitle }); }
+  /** Function reference line ("median(x) — …") in the report language. */
+  function fnDoc(name) { return Object.prototype.hasOwnProperty.call(FN_DOC, name) ? tr('queryConsole.fn.' + name, FN_DOC[name]) : ''; }
+  /** "{n} rows" / "1 row" (keys key and key.one) with the count formatted. */
+  function countText(key, n, one, many) { return tr(n === 1 ? key + '.one' : key, n === 1 ? one : many, { n: RK.format(n, '#,##0') }); }
 
   function norm(s) { return String(s).toLowerCase().replace(/[\s_]+/g, ' ').trim(); }
   function quoteName(n) {
@@ -169,7 +233,8 @@
   function fmtKind(f) { f = String(RK.format.presets[f] || f || ''); return /%/.test(f) ? 'pct' : /x"?\s*$/.test(f) ? 'mult' : 'num'; }
   function relTime(t) {
     var s = Math.max(0, (Date.now() - t) / 1000);
-    return s < 60 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : s < 86400 ? Math.round(s / 3600) + ' h ago' : Math.round(s / 86400) + ' d ago';
+    return s < 60 ? tr('queryConsole.justNow', 'just now') : s < 3600 ? tr('queryConsole.minAgo', '{n} min ago', { n: Math.round(s / 60) })
+      : s < 86400 ? tr('queryConsole.hAgo', '{n} h ago', { n: Math.round(s / 3600) }) : tr('queryConsole.dAgo', '{n} d ago', { n: Math.round(s / 86400) });
   }
   /**
    * History store, scoped to this report: every file:// page shares one storage origin in Chromium, so an
@@ -229,17 +294,97 @@
     var m = /^Unknown field "([^"]+)"/.exec(msg || '');
     if (m && ds) {
       var s = suggest(m[1], ds);
-      return 'Unknown field "' + m[1] + '"' + (s.length ? ' — did you mean ' + s.join(', ') + '?' : ' — see the field list');
+      return tr('queryConsole.unknownField', 'Unknown field "{name}"', { name: m[1] }) +
+        (s.length ? tr('queryConsole.didYouMean', ' — did you mean {list}?', { list: s.join(tr('listSep', ', ')) }) : tr('queryConsole.seeFields', ' — see the field list'));
     }
     return msg;
   }
+  /**
+   * Example snippets built from a dataset's own fields (editor / filter placeholders, syntax reference), so no report
+   * shows another report's fields (a Chinese deck never reads region == "Europe"): {query, where, by, from}.
+   */
+  function hints(ds) {
+    var out = {
+      from: 'from peers', by: 'by sector, region', where: 'region == "Europe" and mkt_cap > 5000',
+      query: 'median(ev_ebitda_25e) by sector where region != "Latin America" sort 2 desc'
+    };
+    if (!ds) return out;
+    out.from = 'from ' + quoteName(ds.id);
+    var nums = ds.fields.filter(function (f) { return f.type === 'number' && !/^(lat|lon|lng|latitude|longitude|year|fiscal_year|order|rank|id)$/i.test(f.name); });
+    var strs = ds.fields.filter(function (f) { return f.type === 'string'; });
+    var dims = strs.filter(function (f) { var n = ds.distinct(f.name).length; return n > 1 && n <= 12 && n < ds.rows.length; });
+    if (!dims.length) dims = strs.slice(0, 1);
+    var num = nums.filter(function (f) { return fmtKind(f.format) === 'mult'; })[0] || nums[0];
+    // a size measure for the example filter: the money field with the largest typical value (market cap, EV, revenue)
+    function mid(f) { var v = ds.rows.map(function (r) { return r[f.name]; }).filter(isNum).sort(function (a, b) { return a - b; }); return v.length ? v[Math.floor(v.length / 2)] : null; }
+    var money = nums.filter(function (f) { return f !== num && /\$|€|£|¥|元/.test(f.format || '') && isNum(mid(f)); })
+      .sort(function (a, b) { return Math.abs(mid(b)) - Math.abs(mid(a)); });
+    var size = money[0] || nums.filter(function (f) { return f !== num; })[0] || num;
+    var d1 = dims[0], d2 = dims[1] || dims[0];
+    var val = null;
+    if (d2) { var r0 = ds.rows.filter(function (r) { return r[d2.name] != null && r[d2.name] !== ''; })[0]; val = r0 ? String(r0[d2.name]) : null; }
+    var cond = d2 && val != null ? quoteName(d2.name) + ' == "' + val.replace(/["\\]/g, '\\$&') + '"' : null;
+    var thr = size && isNum(mid(size)) ? +(+mid(size)).toPrecision(1) : null;
+    var cmp = size && thr != null && isFinite(thr) ? quoteName(size.name) + ' > ' + String(thr) : null;
+    out.where = [cond, cmp].filter(Boolean).join(' and ') || out.where;
+    out.by = d1 ? 'by ' + quoteName(d1.name) + (d2 && d2 !== d1 ? ', ' + quoteName(d2.name) : '') : out.by;
+    var item = num ? 'median(' + quoteName(num.name) + ')' : 'count()';
+    out.query = item + (d1 ? ' by ' + quoteName(d1.name) : '') + (d2 && d2 !== d1 && val != null ? ' where ' + quoteName(d2.name) + ' != "' + val.replace(/["\\]/g, '\\$&') + '"' : '') + (d1 ? ' sort 2 desc' : '');
+    return out;
+  }
+  /** Syntax reference rows (clause, example) for a dataset. */
+  function syntaxRows(ds) {
+    var hn = hints(ds), lab = tr('queryConsole.label', 'Label');
+    return [
+      [tr('queryConsole.items', 'items'), 'expr [as "' + lab + '"] [format "0.0x"], …'],
+      ['from', hn.from],
+      ['by', hn.by],
+      ['where', 'where ' + hn.where],
+      ['sort', 'sort 2 desc  ·  sort "' + lab + '" asc'],
+      ['top', 'top 10']
+    ];
+  }
+  /**
+   * The aggregation word every title shares, as [prefix, suffix] of the aggTitle template ("Median " + "" in English,
+   * "" + "中位数" in Chinese), or null.
+   */
+  function sharedAgg(titles) {
+    var tpl = tr('queryConsole.aggOf', '{agg} {field}'), ids = Object.keys(AGG_LABEL);
+    for (var i = 0; i < ids.length; i++) {
+      var parts = tpl.replace('{agg}', aggLabel(ids[i])).split('{field}');
+      if (parts.length !== 2) return null;
+      var ok = titles.every(function (x) {
+        return x.length > parts[0].length + parts[1].length && x.indexOf(parts[0]) === 0 && x.slice(x.length - parts[1].length) === parts[1];
+      });
+      if (ok) return parts;
+    }
+    return null;
+  }
+  /**
+   * The report's wheel rule for the result chart (RK.chart.wheelGuard when the core has it): a plain wheel scrolls the
+   * page, Ctrl / ⌘ + wheel or a pinch zooms long line charts; options.wheelZoom: true zooms on a plain wheel.
+   */
+  function wheelGuard(el, options) {
+    if (RK.chart && typeof RK.chart.wheelGuard === 'function') return RK.chart.wheelGuard(el, options);
+    if (options && options.wheelZoom === true) return { adapt: function (opt) { return opt; }, destroy: function () {} };
+    function onWheel(e) { if (!e.ctrlKey && !e.metaKey) e.stopPropagation(); }
+    el.addEventListener('wheel', onWheel, { capture: true });
+    return {
+      adapt: function (opt) {
+        [].concat(opt.dataZoom || []).forEach(function (dz) { if (dz && dz.type === 'inside' && dz.zoomOnMouseWheel === 'ctrl') dz.zoomOnMouseWheel = true; });
+        return opt;
+      },
+      destroy: function () { el.removeEventListener('wheel', onWheel, { capture: true }); }
+    };
+  }
+
   /** "avg(ebitda_margin_25e)" -> "Average EBITDA margin 2025E" for unlabeled aggregate columns. */
   function prettyTitle(col, ds) {
     var m = /^\s*(\w+)\(\s*`?([^`()]*?)`?\s*\)\s*$/.exec(col.title || '');
     if (!m || !AGG_LABEL[m[1].toLowerCase()]) return col.title;
     var f = m[2] && ds.field(m[2]);
-    if (!m[2]) return AGG_LABEL[m[1].toLowerCase()];
-    return AGG_LABEL[m[1].toLowerCase()] + ' ' + (f ? f.title : m[2]);
+    if (!m[2]) return aggLabel(m[1]);
+    return aggTitle(m[1], f ? f.title : m[2]);
   }
 
   /* ------------------------------------------------------------------ *
@@ -288,9 +433,9 @@
   function picker(anchor, items, opts) {
     var q = '', act = 0, rows = [];
     var listId = RK.util.uid('rk-qc-pk');
-    var list = h('div.rk-qc-pk__list', { id: listId, role: 'listbox', tabindex: '-1', 'aria-label': opts.label || 'Options', on: { keydown: onKey } });
+    var list = h('div.rk-qc-pk__list', { id: listId, role: 'listbox', tabindex: '-1', 'aria-label': opts.label || tr('queryConsole.options', 'Options'), on: { keydown: onKey } });
     var search = items.length > 10 ? h('input.rk-qc-pk__q', {
-      type: 'text', placeholder: opts.placeholder || 'Search…', role: 'combobox', 'aria-expanded': 'true', 'aria-controls': listId, autocomplete: 'off', spellcheck: 'false',
+      type: 'text', placeholder: opts.placeholder || tr('queryConsole.searchPh', 'Search…'), role: 'combobox', 'aria-expanded': 'true', 'aria-controls': listId, autocomplete: 'off', spellcheck: 'false',
       on: { input: function () { q = search.value; act = 0; render(); }, keydown: onKey }
     }) : null;
     function render() {
@@ -309,7 +454,7 @@
         list.appendChild(el);
         rows.push(rec);
       });
-      if (!rows.length) list.appendChild(h('div.rk-qc-pk__empty', 'No matches'));
+      if (!rows.length) list.appendChild(h('div.rk-qc-pk__empty', tr('queryConsole.noMatches', 'No matches')));
       act = Math.max(0, Math.min(act, rows.length - 1));
       paint(false);
     }
@@ -410,7 +555,7 @@
     if (!ds) {
       var fp = clausePos(text, 'from');
       var at = fp >= 0 ? text.indexOf(spec.from, fp) : 0;
-      return { error: 'Unknown dataset "' + (spec.from || dsId) + '" — available: ' + RK.data.ids().join(', '), pos: at, end: at + String(spec.from || '').length };
+      return { error: tr('queryConsole.unknownDs', 'Unknown dataset "{id}" — available: {list}', { id: spec.from || dsId, list: RK.data.ids().join(', ') }), pos: at, end: at + String(spec.from || '').length };
     }
     var cursor = 0, i, chk, at2;
     for (i = 0; i < spec.select.length; i++) {
@@ -437,7 +582,7 @@
         var pw = Math.max(0, wp) + Math.max(0, chk.pos);
         return { error: friendlyError(chk.error, ds), pos: pw, end: chk.pos >= spec.where.length ? pw : tokenEnd(text, pw) };
       }
-      if (chk.aggregate) return { error: '"where" filters rows — aggregates such as sum() or median() are not allowed there', pos: wp, end: wp + spec.where.length };
+      if (chk.aggregate) return { error: tr('queryConsole.whereAgg', '"where" filters rows — aggregates such as sum() or median() are not allowed there'), pos: wp, end: wp + spec.where.length };
     }
     try {
       var res = RK.query(text, { dataset: dsId, exclude: self });
@@ -493,14 +638,14 @@
         if (!st.text && st.builder) st.text = genQuery(st.builder, ds0);
       }
 
-      var alive = true, pops = [], chart = null, chartKey = null, ro = null, result = null, ac = null;
+      var alive = true, pops = [], chart = null, chartKey = null, ro = null, result = null, ac = null, wheel = null;
       var lastEditor = null, valTimer = null, autoTimer = null, err = null;
       function track(p) { pops.push(p); return p; }
 
       /* ---------------- skeleton ---------------- */
       ctx.el.classList.add('rk-qc-host');
       var root = h('div.rk-qc', { class: (ctx.motion ? '' : 'is-static') + (o.reference ? ' has-ref' : '') });
-      var tabsEl = h('div.rk-qc-tabs', { role: 'tablist', 'aria-label': 'Console mode' });
+      var tabsEl = h('div.rk-qc-tabs', { role: 'tablist', 'aria-label': tr('queryConsole.mode', 'Console mode') });
       var tabBtn = {};
       [['builder', tr('builder', 'Builder')], ['query', tr('query', 'Query')]].forEach(function (p) {
         tabBtn[p[0]] = h('button.rk-qc-tab', {
@@ -511,8 +656,8 @@
       });
       var dsName = h('span.rk-qc-ds__v'), dsRows = h('span.rk-qc-ds__n.rk-num');
       var dsBtn = h('button.rk-qc-ds', { type: 'button', 'aria-haspopup': 'listbox', on: { click: openDatasets } },
-        h('span.rk-qc-ds__k', 'Dataset'), dsName, dsRows, h('span.rk-qc-caret', { html: icon('caret', 12) }));
-      var histBtn = o.history ? h('button.rk-iconbtn.rk-qc-hbtn', { type: 'button', title: 'Query history', 'aria-label': 'Query history', html: icon('history', 15), on: { click: openHistory } }) : null;
+        h('span.rk-qc-ds__k', tr('dataset', 'Dataset')), dsName, dsRows, h('span.rk-qc-caret', { html: icon('caret', 12) }));
+      var histBtn = o.history ? h('button.rk-iconbtn.rk-qc-hbtn', { type: 'button', title: tr('queryConsole.history', 'Query history'), 'aria-label': tr('queryConsole.history', 'Query history'), html: icon('history', 15), on: { click: openHistory } }) : null;
       var refBtn = o.reference ? h('button.rk-iconbtn.rk-qc-refbtn', { type: 'button', title: tr('queryConsole.refTitle', 'Fields & functions'), 'aria-label': tr('queryConsole.refTitle', 'Fields & functions'), 'aria-expanded': 'false', html: icon('book', 15), on: { click: function () { setRef(!st.refOpen); } } }) : null;
       var runBtn = h('button.rk-btn.rk-btn--primary.rk-qc-run', { type: 'button', on: { click: runCurrent } },
         h('span', { html: icon('play', 12) }), tr('run', 'Run'), h('kbd.rk-qc-kbd', MAC ? '⌘↵' : 'Ctrl ↵'));
@@ -521,8 +666,7 @@
       // query pane
       var mirror = h('div.rk-qc-ed__mirror', { 'aria-hidden': 'true' });
       var ta = h('textarea.rk-qc-ed__input', {
-        spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off', 'aria-label': 'Query', rows: '3',
-        placeholder: 'e.g. median(ev_ebitda_25e) by sector where region != "Latin America" sort 2 desc'
+        spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off', 'aria-label': tr('query', 'Query'), rows: '3'
       });
       var ed = h('div.rk-qc-ed', mirror, ta);
       var exEl = h('div.rk-qc-ex');
@@ -551,16 +695,18 @@
       /* ---------------- dataset ---------------- */
       function paintDataset() {
         var ds = DS();
-        dsName.textContent = ds ? ds.title : 'Choose a dataset';
-        dsRows.textContent = ds ? RK.format(ds.rows.length, '#,##0') + ' rows' : '';
+        dsName.textContent = ds ? ds.title : tr('queryConsole.chooseDs', 'Choose a dataset');
+        dsRows.textContent = ds ? countText('queryConsole.nRows', ds.rows.length, '{n} row', '{n} rows') : '';
         dsBtn.title = ds ? ds.id : '';
+        // the example in the empty editor uses this dataset's own fields
+        ta.placeholder = tr('queryConsole.eg', 'e.g. {example}', { example: hints(ds).query });
       }
       function openDatasets() {
         track(picker(dsBtn, available().map(function (id) {
           var d = RK.data.get(id);
-          return { value: id, label: d.title, sub: id + ' · ' + d.rows.length + ' rows' };
+          return { value: id, label: d.title, sub: id + ' · ' + countText('queryConsole.nRows', d.rows.length, '{n} row', '{n} rows') };
         }), {
-          value: st.ds, label: 'Datasets', placeholder: 'Search datasets…', minWidth: 300,
+          value: st.ds, label: tr('queryConsole.datasets', 'Datasets'), placeholder: tr('queryConsole.searchDs', 'Search datasets…'), minWidth: 300,
           onPick: function (id) {
             if (id === st.ds) return;
             st.ds = id;
@@ -606,7 +752,7 @@
           var f = ds.field(v.field);
           if (!f) return;
           if (v.agg === 'none') items.push(quoteName(f.name));
-          else items.push(v.agg + '(' + quoteName(f.name) + ') as "' + (AGG_LABEL[v.agg] + ' ' + f.title).replace(/"/g, "'") + '"');
+          else items.push(v.agg + '(' + quoteName(f.name) + ') as "' + aggTitle(v.agg, f.title).replace(/"/g, "'") + '"');
         });
         if (!items.length) items = ['*'];
         var s = items.join(', ') + ' from ' + dsId;
@@ -631,7 +777,7 @@
         b.rows.forEach(function (r) { var f = ds.field(r); if (f) out.push({ value: 'r:' + r, label: f.title }); });
         b.values.forEach(function (v, i) {
           var f = ds.field(v.field);
-          if (f) out.push({ value: 'v' + i, label: v.agg === 'none' ? f.title : AGG_LABEL[v.agg] + ' ' + f.title });
+          if (f) out.push({ value: 'v' + i, label: v.agg === 'none' ? f.title : aggTitle(v.agg, f.title) });
         });
         return out;
       }
@@ -644,7 +790,7 @@
           return pa - pb;
         });
         return list.map(function (f) {
-          return { value: f.name, label: f.title, sub: f.name + (f.format ? ' · ' + f.format : ''), tag: (f.computed ? 'ƒ ' : '') + typeTag(f.type), group: f.type === 'number' ? 'Numbers' : 'Text & dates' };
+          return { value: f.name, label: f.title, sub: f.name + (f.format ? ' · ' + f.format : ''), tag: (f.computed ? 'ƒ ' : '') + typeTag(f.type), group: f.type === 'number' ? tr('queryConsole.numbers', 'Numbers') : tr('queryConsole.textDates', 'Text & dates') };
         });
       }
       function bChanged() { st.text = genQuery(st.builder, st.ds); paintBuilder(); autoRun(); }
@@ -652,41 +798,42 @@
       function paintBuilder() {
         var b = st.builder, ds = DS();
         builderPane.innerHTML = '';
-        if (!ds || !b) { builderPane.appendChild(h('p.rk-muted', 'Choose a dataset to start.')); return; }
+        if (!ds || !b) { builderPane.appendChild(h('p.rk-muted', tr('queryConsole.chooseDsStart', 'Choose a dataset to start.'))); return; }
+        var hint = hints(ds);
         // values
         var vals = h('div.rk-qc-b__items');
         b.values.forEach(function (v, i) {
           var f = ds.field(v.field);
-          var aggBtn = h('button.rk-qc-pill__agg', { type: 'button', title: 'Aggregation', on: { click: function () {
+          var aggBtn = h('button.rk-qc-pill__agg', { type: 'button', title: tr('queryConsole.aggregation', 'Aggregation'), on: { click: function () {
             var numeric = f && f.type === 'number';
-            track(picker(aggBtn, AGGS.filter(function (a) { return numeric || a.id === 'none' || a.id === 'count' || a.id === 'countd'; })
-              .map(function (a) { return { value: a.id, label: a.label, sub: a.sub }; }), {
-              value: v.agg, label: 'Aggregation', minWidth: 200,
+            track(picker(aggBtn, AGGS.filter(function (a) { return numeric || a === 'none' || a === 'count' || a === 'countd'; })
+              .map(function (a) { return { value: a, label: aggLabel(a), sub: a === 'none' ? tr('queryConsole.noAgg', 'No aggregation — one row per record') : null }; }), {
+              value: v.agg, label: tr('queryConsole.aggregation', 'Aggregation'), minWidth: 200,
               onPick: function (id) { v.agg = id; bChanged(); }
             }));
-          } } }, AGG_LABEL[v.agg] || v.agg);
-          var fBtn = h('button.rk-qc-pill__f', { type: 'button', title: 'Field', on: { click: function () {
-            track(picker(fBtn, fieldItems('number'), { value: v.field, label: 'Fields', placeholder: 'Search fields…', minWidth: 300, onPick: function (name) {
+          } } }, aggLabel(v.agg) || v.agg);
+          var fBtn = h('button.rk-qc-pill__f', { type: 'button', title: tr('field', 'Field'), on: { click: function () {
+            track(picker(fBtn, fieldItems('number'), { value: v.field, label: tr('queryConsole.fields', 'Fields'), placeholder: tr('queryConsole.searchFields', 'Search fields…'), minWidth: 300, onPick: function (name) {
               v.field = name;
               var nf = ds.field(name);
               if (nf && nf.type !== 'number' && ['none', 'count', 'countd'].indexOf(v.agg) < 0) v.agg = 'countd';
               bChanged();
             } }));
           } } }, f ? f.title : v.field);
-          var rm = h('button.rk-qc-pill__x', { type: 'button', 'aria-label': 'Remove value', html: icon('x', 11), on: { click: function () {
+          var rm = h('button.rk-qc-pill__x', { type: 'button', 'aria-label': tr('queryConsole.removeValue', 'Remove value'), html: icon('x', 11), on: { click: function () {
             b.values.splice(i, 1);
             if (b.sort.col && b.sort.col[0] === 'v') b.sort.col = null;
             bChanged();
           } } });
-          vals.appendChild(h('span.rk-qc-pill', aggBtn, h('span.rk-qc-pill__of', 'of'), fBtn, rm));
+          vals.appendChild(h('span.rk-qc-pill', aggBtn, h('span.rk-qc-pill__of', tr('queryConsole.of', 'of')), fBtn, rm));
         });
         var addV = h('button.rk-qc-add', { type: 'button', on: { click: function () {
-          track(picker(addV, fieldItems('number'), { label: 'Fields', placeholder: 'Search fields…', minWidth: 300, onPick: function (name) {
+          track(picker(addV, fieldItems('number'), { label: tr('queryConsole.fields', 'Fields'), placeholder: tr('queryConsole.searchFields', 'Search fields…'), minWidth: 300, onPick: function (name) {
             var nf = ds.field(name);
             b.values.push({ agg: nf && nf.type === 'number' ? (b.rows.length && aggregated(b) ? 'median' : (aggregated(b) ? 'median' : 'none')) : 'countd', field: name });
             bChanged();
           } }));
-        } } }, h('span', { html: icon('plus', 12) }), 'Add value');
+        } } }, h('span', { html: icon('plus', 12) }), tr('queryConsole.addValue', 'Add value'));
         vals.appendChild(addV);
 
         // rows (group by / label columns)
@@ -694,20 +841,20 @@
         b.rows.forEach(function (r, i) {
           var f = ds.field(r);
           rws.appendChild(h('span.rk-qc-pill.rk-qc-pill--dim', h('span.rk-qc-pill__f.is-static', f ? f.title : r),
-            h('button.rk-qc-pill__x', { type: 'button', 'aria-label': 'Remove ' + (f ? f.title : r), html: icon('x', 11), on: { click: function () {
+            h('button.rk-qc-pill__x', { type: 'button', 'aria-label': tr('queryConsole.removeX', 'Remove {name}', { name: f ? f.title : r }), html: icon('x', 11), on: { click: function () {
               b.rows.splice(i, 1);
               if (b.sort.col === 'r:' + r) b.sort.col = null;
               bChanged();
             } } })));
         });
         var addR = h('button.rk-qc-add', { type: 'button', on: { click: function () {
-          track(picker(addR, fieldItems('dim').filter(function (it) { return b.rows.indexOf(it.value) < 0; }), { label: 'Fields', placeholder: 'Search fields…', minWidth: 300, onPick: function (name) { b.rows.push(name); bChanged(); } }));
+          track(picker(addR, fieldItems('dim').filter(function (it) { return b.rows.indexOf(it.value) < 0; }), { label: tr('queryConsole.fields', 'Fields'), placeholder: tr('queryConsole.searchFields', 'Search fields…'), minWidth: 300, onPick: function (name) { b.rows.push(name); bChanged(); } }));
         } } }, h('span', { html: icon('plus', 12) }), aggregated(b) ? tr('queryConsole.groupBy', 'Group by') : tr('queryConsole.addColumn', 'Add column'));
 
         // filter
         var where = h('input.rk-input.rk-qc-b__where', {
-          type: 'text', value: b.where || '', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Filter expression',
-          placeholder: 'e.g. region == "Europe" and mkt_cap > 5000',
+          type: 'text', value: b.where || '', spellcheck: 'false', autocomplete: 'off', 'aria-label': tr('queryConsole.filterExpr', 'Filter expression'),
+          placeholder: tr('queryConsole.eg', 'e.g. {example}', { example: hint.where }),
           on: {
             input: function () { b.where = where.value; checkWhere(); clearTimeout(autoTimer); autoTimer = setTimeout(function () { if (!whereBad) { st.text = genQuery(b, st.ds); paintGen(); runText(st.text, { silent: true }); } }, 380); },
             focus: function () { lastEditor = where; },
@@ -719,12 +866,12 @@
         function checkWhere() {
           var v = where.value.trim();
           var c = v ? RK.expr.check(v, { fields: ds.fields }) : { ok: true };
-          if (c.ok && c.aggregate) c = { ok: false, error: 'Aggregates are not allowed in a row filter' };
+          if (c.ok && c.aggregate) c = { ok: false, error: tr('queryConsole.aggInWhere', 'Aggregates are not allowed in a row filter') };
           whereBad = !c.ok;
           where.classList.toggle('is-bad', whereBad);
           whereMark.innerHTML = v ? icon(c.ok ? 'check' : 'warn', 13) : '';
           whereMark.className = 'rk-qc-b__mark ' + (v ? (c.ok ? 'is-ok' : 'is-bad') : '');
-          whereMark.title = c.ok ? 'Valid filter' : friendlyError(c.error, ds);
+          whereMark.title = c.ok ? tr('queryConsole.validFilter', 'Valid filter') : friendlyError(c.error, ds);
           if (!c.ok) setStatus('error', friendlyError(c.error, ds));
         }
 
@@ -732,19 +879,19 @@
         var cols = outputColumns(b);
         var cur = cols.filter(function (c) { return c.value === b.sort.col; })[0];
         var sortBtn = h('button.rk-qc-sel', { type: 'button', on: { click: function () {
-          track(picker(sortBtn, [{ value: null, label: 'No sorting' }].concat(cols), { value: b.sort.col, label: 'Sort by', minWidth: 220, onPick: function (v) { b.sort.col = v; bChanged(); } }));
-        } } }, h('span', cur ? cur.label : 'No sorting'), h('span.rk-qc-caret', { html: icon('caret', 12) }));
-        var dirSeg = h('div.rk-seg.rk-qc-seg', [['desc', 'High → low'], ['asc', 'Low → high']].map(function (d) {
+          track(picker(sortBtn, [{ value: null, label: tr('queryConsole.noSort', 'No sorting') }].concat(cols), { value: b.sort.col, label: tr('queryConsole.sortBy', 'Sort by'), minWidth: 220, onPick: function (v) { b.sort.col = v; bChanged(); } }));
+        } } }, h('span', cur ? cur.label : tr('queryConsole.noSort', 'No sorting')), h('span.rk-qc-caret', { html: icon('caret', 12) }));
+        var dirSeg = h('div.rk-seg.rk-qc-seg', [['desc', tr('queryConsole.highLow', 'High → low')], ['asc', tr('queryConsole.lowHigh', 'Low → high')]].map(function (d) {
           return h('button', { type: 'button', class: b.sort.dir === d[0] ? 'is-on' : null, 'aria-pressed': b.sort.dir === d[0] ? 'true' : 'false', disabled: !b.sort.col, on: { click: function () { b.sort.dir = d[0]; bChanged(); } } }, d[1]);
         }));
         var top = h('input.rk-input.rk-qc-b__top.rk-num', {
-          type: 'number', min: '1', step: '1', value: b.top || '', placeholder: 'All', 'aria-label': 'Top N rows',
+          type: 'number', min: '1', step: '1', value: b.top || '', placeholder: tr('all', 'All'), 'aria-label': tr('queryConsole.topN', 'Top N rows'),
           on: { change: function () { var n = parseInt(top.value, 10); b.top = n > 0 ? n : null; bChanged(); } }
         });
 
         var gen = h('code.rk-qc-gen');
         function paintGen() { gen.innerHTML = highlight(st.text || genQuery(b, st.ds), ds, null, -1); }
-        var editAs = h('button.rk-qc-link', { type: 'button', on: { click: function () { st.text = genQuery(b, st.ds); ta.value = st.text; setTab('query'); ta.focus(); } } }, 'Edit as query', h('span', { html: icon('arrow', 12) }));
+        var editAs = h('button.rk-qc-link', { type: 'button', on: { click: function () { st.text = genQuery(b, st.ds); ta.value = st.text; setTab('query'); ta.focus(); } } }, tr('queryConsole.editAsQuery', 'Edit as query'), h('span', { html: icon('arrow', 12) }));
 
         function row(label, body, hint) {
           return h('div.rk-qc-b__row', h('div.rk-qc-b__k', label, hint ? h('span.rk-qc-b__hint', hint) : null), h('div.rk-qc-b__v', body));
@@ -785,15 +932,17 @@
       function runValidation() {
         if (!alive) return;
         var v = validate(ta.value, st.ds, ctx.id);
-        if (v.empty) { err = null; setStatus('idle', 'Type a query, pick an example or use the reference panel →'); }
+        if (v.empty) { err = null; setStatus('idle', tr('queryConsole.idle', 'Type a query, pick an example or use the reference panel →')); }
         else if (v.error) {
           err = v.pos >= 0 ? { pos: v.pos, end: v.end } : null;
           var lc = v.pos >= 0 ? lineCol(ta.value, v.pos) : null;
-          setStatus('error', v.error, lc ? 'Ln ' + lc.line + ', Col ' + lc.col : null);
+          setStatus('error', v.error, lc ? tr('queryConsole.lnCol', 'Ln {line}, Col {col}', { line: lc.line, col: lc.col }) : null);
         } else {
           err = null;
-          var r = v.res, by = v.spec.by.length ? ' · grouped by ' + v.spec.by.join(', ') : (r.aggregate ? ' · summary' : '');
-          setStatus('ok', 'Valid — ' + r.rows.length + ' row' + (r.rows.length === 1 ? '' : 's') + ' × ' + r.columns.length + ' column' + (r.columns.length === 1 ? '' : 's') + by, (MAC ? '⌘' : 'Ctrl') + ' + Enter to run');
+          var r = v.res, by = v.spec.by.length ? tr('queryConsole.groupedBy', ' · grouped by {list}', { list: v.spec.by.join(', ') }) : (r.aggregate ? tr('queryConsole.summaryRow', ' · summary') : '');
+          setStatus('ok', tr('queryConsole.valid', 'Valid — {rows} × {cols}{by}', {
+            rows: countText('queryConsole.nRows', r.rows.length, '{n} row', '{n} rows'), cols: countText('queryConsole.nCols', r.columns.length, '{n} column', '{n} columns'), by: by
+          }), tr('queryConsole.toRun', '{key} + Enter to run', { key: MAC ? '⌘' : 'Ctrl' }));
         }
         paintMirror();
       }
@@ -840,9 +989,9 @@
         } else {
           if (ds) ds.fields.forEach(function (f) { cands.push({ ins: quoteName(f.name), label: f.name, sub: f.title, kind: f.type === 'number' ? '#' : typeTag(f.type), title: f.title }); });
           RK.expr.functions.aggregate.concat(RK.expr.functions.scalar).forEach(function (fn) {
-            if (!cands.some(function (c) { return c.label === fn + '()'; })) cands.push({ ins: fn + '(', label: fn + '()', sub: FN_DOC[fn] || '', kind: 'ƒ' });
+            if (!cands.some(function (c) { return c.label === fn + '()'; })) cands.push({ ins: fn + '(', label: fn + '()', sub: fnDoc(fn), kind: 'ƒ' });
           });
-          AC_KEYWORDS.forEach(function (k) { cands.push({ ins: k + ' ', label: k, sub: 'keyword', kind: 'kw' }); });
+          AC_KEYWORDS.forEach(function (k) { cands.push({ ins: k + ' ', label: k, sub: tr('queryConsole.keyword', 'keyword'), kind: 'kw' }); });
         }
         var starts = [], contains = [];
         cands.forEach(function (c) {
@@ -942,17 +1091,17 @@
           refEl.appendChild(h('section.rk-qc-ref__sec', h('h4', tr('queryConsole.parameters', 'Parameters')), pl));
         }
         [[tr('queryConsole.aggFns', 'Aggregate functions'), RK.expr.functions.aggregate], [tr('queryConsole.rowFns', 'Row functions'), RK.expr.functions.scalar]].forEach(function (grp) {
-          var names = grp[1].filter(function (n) { return match(n + ' ' + (FN_DOC[n] || '')); });
+          var names = grp[1].filter(function (n) { return match(n + ' ' + fnDoc(n)); });
           if (!names.length) return;
           var gl = h('div.rk-qc-ref__fns');
           names.forEach(function (n) {
-            gl.appendChild(h('button.rk-qc-fn', { type: 'button', title: FN_DOC[n] || n + '()', on: { click: function () { insert(n + '('); } } }, n));
+            gl.appendChild(h('button.rk-qc-fn', { type: 'button', title: fnDoc(n) || n + '()', on: { click: function () { insert(n + '('); } } }, n));
           });
           refEl.appendChild(h('section.rk-qc-ref__sec', h('h4', grp[0]), gl));
         });
         if (!t0) {
           var sl = h('dl.rk-qc-ref__syntax');
-          SYNTAX.forEach(function (s) { sl.appendChild(h('dt', s[0])); sl.appendChild(h('dd', s[1])); });
+          syntaxRows(ds).forEach(function (s) { sl.appendChild(h('dt', s[0])); sl.appendChild(h('dd', s[1])); });
           refEl.appendChild(h('section.rk-qc-ref__sec', h('h4', tr('queryConsole.syntax', 'Syntax')), sl));
         }
         if (keepFocus) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
@@ -1042,7 +1191,7 @@
       function openHistory() {
         var list = loadHistory();
         var body = h('div.rk-qc-hist');
-        if (!list.length) body.appendChild(h('p.rk-qc-hist__empty', 'Queries you run appear here.'));
+        if (!list.length) body.appendChild(h('p.rk-qc-hist__empty', tr('queryConsole.histEmpty', 'Queries you run appear here.')));
         list.forEach(function (x) {
           body.appendChild(h('button.rk-qc-hist__item', { type: 'button', on: { click: function () {
             p.close();
@@ -1053,7 +1202,7 @@
             runCurrent();
           } } }, h('code.rk-qc-hist__q', { html: highlight(x.q, RK.data.get(x.ds), null, -1) }), h('span.rk-qc-hist__meta', (x.ds || '') + ' · ' + relTime(x.t))));
         });
-        var foot = h('div.rk-qc-hist__foot', h('span', list.length + ' recent quer' + (list.length === 1 ? 'y' : 'ies')),
+        var foot = h('div.rk-qc-hist__foot', h('span', countText('queryConsole.nRecent', list.length, '{n} recent query', '{n} recent queries')),
           list.length ? h('button.rk-qc-link', { type: 'button', on: { click: function () { saveHistory([]); p.close(); } } }, tr('queryConsole.clearHistory', 'Clear history')) : null);
         var p = track(popover(histBtn, h('div', body, foot), { minWidth: 380, align: 'right', cls: 'rk-qc-pop--hist' }));
       }
@@ -1071,7 +1220,7 @@
         queryPane.hidden = tab !== 'query';
         closeAc();
         if (tab === 'query') { autosize(); paintMirror(); runValidation(); }
-        else setStatus('idle', 'Builder writes the query for you — results update as you change it');
+        else setStatus('idle', tr('queryConsole.builderIdle', 'Builder writes the query for you — results update as you change it'));
       }
 
       /* ---------------- running ---------------- */
@@ -1100,8 +1249,9 @@
         if (!opts.keepSort) st.tsort = null;
         st.last = { text: text, ds: res.dataset };
         if (!opts.silent) pushHistory(text, res.dataset);
-        if (!opts.rerun && st.tab === 'builder') setStatus('ok', res.rows.length + ' row' + (res.rows.length === 1 ? '' : 's') + ' — results update as you edit', 'Run saves to history');
-        if (!opts.rerun && st.tab === 'query' && !opts.silent) setStatus('ok', 'Ran — ' + res.rows.length + ' row' + (res.rows.length === 1 ? '' : 's') + ' in ' + res.ms.toFixed(1) + ' ms');
+        var nrows = countText('queryConsole.nRows', res.rows.length, '{n} row', '{n} rows');
+        if (!opts.rerun && st.tab === 'builder') setStatus('ok', tr('queryConsole.builderOk', '{rows} — results update as you edit', { rows: nrows }), tr('queryConsole.runSaves', 'Run saves to history'));
+        if (!opts.rerun && st.tab === 'query' && !opts.silent) setStatus('ok', tr('queryConsole.ran', 'Ran — {rows} in {ms} ms', { rows: nrows, ms: RK.format(res.ms, '0.0') }));
         result = res;
         paintResults(opts.rerun);
         if (!opts.silent && !opts.rerun) {
@@ -1154,13 +1304,15 @@
         resHead.innerHTML = '';
         var nf = activeFilters();
         resHead.appendChild(h('div.rk-qc-rh__meta',
-          h('strong.rk-num', RK.format(result.rows.length, '#,##0')), ' row' + (result.rows.length === 1 ? '' : 's'),
-          h('span.rk-qc-dot', '·'), result.columns.length + ' col' + (result.columns.length === 1 ? '' : 's'),
-          h('span.rk-qc-dot', '·'), h('span.rk-num', (result.ms || 0).toFixed(1) + ' ms'),
-          nf.length ? h('span.rk-qc-badge', { title: 'Results respect the report filters: ' + nf.join(', ') }, h('span', { html: icon('filter', 11) }), nf.length + ' global filter' + (nf.length > 1 ? 's' : '')) : null,
+          h('strong.rk-num', RK.format(result.rows.length, '#,##0')), ' ' + tr(result.rows.length === 1 ? 'queryConsole.rowsUnit.one' : 'queryConsole.rowsUnit', result.rows.length === 1 ? 'row' : 'rows'),
+          h('span.rk-qc-dot', '·'), countText('queryConsole.nCols', result.columns.length, '{n} col', '{n} cols'),
+          h('span.rk-qc-dot.rk-qc-rh__time', '·'), h('span.rk-num.rk-qc-rh__time', tr('queryConsole.ms', '{n} ms', { n: RK.format(result.ms || 0, '0.0') })),
+          nf.length ? h('span.rk-qc-badge', { title: tr('queryConsole.respects', 'Results respect the report filters: {list}', { list: nf.join(', ') }) }, h('span', { html: icon('filter', 11) }), countText('queryConsole.nFilters', nf.length, '{n} global filter', '{n} global filters')) : null,
           h('span.rk-qc-rh__note')));
         resHead.appendChild(h('span.rk-qc__spacer'));
-        var viewSeg = h('div.rk-seg.rk-qc-seg', { role: 'group', 'aria-label': 'Result view' }, [['split', tr('queryConsole.split', 'Split')], ['table', tr('queryConsole.table', 'Table')], ['chart', tr('queryConsole.chart', 'Chart')]].map(function (v) {
+        // on paper the editor is hidden: the query that produced these results is printed above them instead
+        if (st.last && st.last.text) resHead.appendChild(h('code.rk-qc-rh__q', { html: highlight(st.last.text, ds, null, -1) }));
+        var viewSeg = h('div.rk-seg.rk-qc-seg', { role: 'group', 'aria-label': tr('queryConsole.resultView', 'Result view') }, [['split', tr('queryConsole.split', 'Split')], ['table', tr('queryConsole.table', 'Table')], ['chart', tr('queryConsole.chart', 'Chart')]].map(function (v) {
           return h('button', { type: 'button', class: st.view === v[0] ? 'is-on' : null, 'aria-pressed': st.view === v[0] ? 'true' : 'false', on: { click: function () { st.view = v[0]; paintResults(true); } } }, v[1]);
         }));
         resHead.appendChild(viewSeg);
@@ -1170,7 +1322,7 @@
             h('span', { html: icon('metric', 13) }), tr('addAsMetric', 'Add as metric'));
           resHead.appendChild(addBtn);
         }
-        resHead.appendChild(h('button.rk-btn.rk-qc-csv', { type: 'button', title: 'Download all result rows as CSV', on: { click: exportCSV } }, h('span', { html: icon('download', 13) }), 'CSV'));
+        resHead.appendChild(h('button.rk-btn.rk-qc-csv', { type: 'button', title: tr('queryConsole.csvTitle', 'Download all result rows as CSV'), on: { click: exportCSV } }, h('span', { html: icon('download', 13) }), 'CSV'));
 
         resBody.className = 'rk-qc-rb is-' + st.view;
         paintTable(rows);
@@ -1200,9 +1352,9 @@
           }));
         }));
         tableWrap.innerHTML = '';
-        if (!rows.length) { tableWrap.appendChild(h('div.rk-qc-empty', 'No rows match — check the "where" clause or the report filters.')); return; }
+        if (!rows.length) { tableWrap.appendChild(h('div.rk-qc-empty', tr('queryConsole.noRows', 'No rows match — check the "where" clause or the report filters.'))); return; }
         tableWrap.appendChild(h('table.rk-table.rk-qc-tbl', thead, tbody));
-        if (rows.length > max) tableWrap.appendChild(h('p.rk-qc-more', 'Showing first ' + max + ' of ' + rows.length + ' rows — CSV exports all.'));
+        if (rows.length > max) tableWrap.appendChild(h('p.rk-qc-more', tr('queryConsole.showingFirst', 'Showing first {max} of {n} rows — CSV exports all.', { max: RK.format(max, '#,##0'), n: RK.format(rows.length, '#,##0') })));
         snapTable();
       }
       /**
@@ -1256,11 +1408,11 @@
         chartWrap.classList.remove('has-msg', 'has-kpi');
         panelMode = false;
         st.chartNote = '';
-        if (!rows.length || !meas.length) return chartMessage(!rows.length ? 'Nothing to chart' : 'No numeric column to chart');
+        if (!rows.length || !meas.length) return chartMessage(!rows.length ? tr('queryConsole.nothingToChart', 'Nothing to chart') : tr('queryConsole.noNumeric', 'No numeric column to chart'));
         if (!dims.length) {
           if (rows.length === 1) return chartKpi(rows[0], meas);
           var lab = dimFields(DS())[0];
-          return chartMessage('Add a label column (e.g. ' + (lab ? lab.name : 'company') + ') to chart these values');
+          return chartMessage(tr('queryConsole.addLabel', 'Add a label column (e.g. {name}) to chart these values', { name: lab ? lab.name : 'company' }));
         }
         var x = dims[0];
         var sdim = dims.length > 1 && meas.length === 1 ? dims[1] : null;
@@ -1271,7 +1423,7 @@
         var kind = o.chart === 'bar' || o.chart === 'line' ? o.chart : (timeLike && !combo ? 'line' : 'bar');
         if (timeLike && !st.tsort) cats.sort(function (a, b) { return String(a).localeCompare(String(b)); });
         // braces in data would start ECharts rich-text runs in axis / point labels
-        var catLabels = cats.map(function (c) { return c == null ? 'n.a.' : RK.chart.richSafe(RK.format(c, x.format)); });
+        var catLabels = cats.map(function (c) { return c == null ? RK.format(null) : RK.chart.richSafe(RK.format(c, x.format)); });
         var labelLen = Math.max.apply(null, catLabels.map(function (c) { return c.length; }));
         var horiz = kind === 'bar' && !timeLike && (cats.length > 7 || labelLen > 11);
         function byCat(list, field) {
@@ -1300,9 +1452,9 @@
           var panels = meas.slice(0, 3);
           dropped = meas.length - panels.length;
           // "Median EV/EBITDA 2025E" + "Median EBITDA margin" -> drop the shared aggregation word in panel titles
-          var first = panels.map(function (p) { return String(p.title).split(' ')[0]; });
-          var strip = panels.length > 1 && first.every(function (w) { return w === first[0]; }) && AGG_LABEL[first[0].toLowerCase()] != null;
-          function panelTitle(p) { return strip ? String(p.title).slice(first[0].length + 1) : p.title; }
+          // (zh: the shared 中位数 suffix of "EV/EBITDA 2025E中位数")
+          var shared = panels.length > 1 ? sharedAgg(panels.map(function (p) { return String(p.title); })) : null;
+          function panelTitle(p) { var s2 = String(p.title); return shared ? s2.slice(shared[0].length, s2.length - shared[1].length) : p.title; }
           var W = chartHost.clientWidth || 420;
           var labelW = Math.min(170, Math.max(70, labelLen * 6.3 + 14));
           var valPad = cats.length <= 24 ? 40 : 10, gap = 14, MINW = 60;
@@ -1426,7 +1578,7 @@
                 return RK.chart.tip(catLabels[i], ps.map(function (p) {
                   var col = sdim ? meas[0] : (plotted[p.seriesIndex] || plotted[0]).col;
                   return { color: p.color, label: p.seriesName, value: RK.format(valueOf(p.value), col.format) };
-                }), isEstimate(cats[i]) ? 'Estimate' : null);
+                }), isEstimate(cats[i]) ? tr('queryConsole.estimate', 'Estimate') : null);
               }
             },
             xAxis: horiz ? valAxis[0] : catAxis,
@@ -1489,7 +1641,7 @@
                   var i = ps[0].dataIndex;
                   return RK.chart.tip(catLabels[i], plotted.map(function (p, k) {
                     return { color: pal[k % pal.length], label: p.col.title, value: RK.format(byCat(rows, p.col.name)[i], p.col.format) };
-                  }), isEstimate(cats[i]) ? 'Estimate' : null);
+                  }), isEstimate(cats[i]) ? tr('queryConsole.estimate', 'Estimate') : null);
                 }
               },
               xAxis: [
@@ -1506,8 +1658,11 @@
           }
         }
         var key = (opt.grid.length || 1) + '|' + horiz + '|' + kind + '|' + (opt.yAxis.length || 1) + '|' + opt.series.length;
+        // ECharts' own strings (aria descriptions) follow the report language, like RK.chart()
+        if (opt.aria === undefined && o.aria !== false) opt.aria = { enabled: true, decal: { show: false } };
         if (!chart) {
-          chart = window.echarts.init(chartHost, 'rk', { renderer: 'svg' });
+          chart = window.echarts.init(chartHost, 'rk', { renderer: 'svg', locale: RK.i18n && RK.i18n.lang && RK.i18n.lang() === 'zh' ? 'ZH' : 'EN' });
+          wheel = wheelGuard(chartHost, o);
           ro = 'ResizeObserver' in window ? new ResizeObserver(RK.util.rafThrottle(function () {
             if (!chart) return;
             if (panelMode && lastRows) paintChart(lastRows, true); else chart.resize();
@@ -1515,10 +1670,11 @@
           if (ro) ro.observe(chartHost);
         }
         chart.resize();
+        wheel.adapt(opt);
         if (key !== chartKey) chart.setOption(opt, { notMerge: true });
         else chart.setOption(opt, { replaceMerge: ['series', 'xAxis', 'yAxis', 'legend', 'dataZoom', 'grid', 'title'] });
         chartKey = key;
-        if (dropped) st.chartNote = dropped + ' column' + (dropped > 1 ? 's' : '') + ' not charted (other units)';
+        if (dropped) st.chartNote = countText('queryConsole.notCharted', dropped, '{n} column not charted (other units)', '{n} columns not charted (other units)');
         var note = resHead.querySelector('.rk-qc-rh__note');
         if (note) note.textContent = st.chartNote ? '· ' + st.chartNote : '';
       }
@@ -1577,7 +1733,7 @@
             var c = RK.expr.compile(chosen.expr, { fields: ds.fields });
             vals = ds.rows.slice(0, 4).map(function (r) { return RK.format(c.eval(r, { params: RK.store.params() }), fmtIn.value || 'auto'); });
           } catch (e) { vals = []; }
-          preview.textContent = vals.length ? 'Preview: ' + vals.join('  ·  ') + '  …' : '';
+          preview.textContent = vals.length ? tr('queryConsole.preview', 'Preview: {list}', { list: vals.join('  ·  ') + '  …' }) : '';
         }
         fmtIn.addEventListener('input', paintPreview);
         var choice = cands.length > 1 ? h('div.rk-qc-am__choice', cands.map(function (it, i) {
@@ -1647,7 +1803,14 @@
           // re-run when a global filter touches the dataset, or a parameter used by the query / its fields changes
           if ((ds && RK.data.affected(ds, changes)) || (params && /@/.test(st.last.text))) runText(st.last.text, { silent: true, rerun: true, keepSort: true });
         },
-        resize: function () { if (chart) chart.resize(); snapTable(); refEdge(); },
+        // the chart layout depends on its size (panel widths, stacked-combo heights, label thinning): repaint it, e.g. when
+        // print lays the results out over the whole block
+        resize: function () {
+          var plain = chartWrap.classList.contains('has-msg') || chartWrap.classList.contains('has-kpi');
+          if (chart && result && lastRows && !plain && st.view !== 'table' && o.chart !== 'none') paintChart(lastRows, true);
+          else if (chart) chart.resize();
+          snapTable(); refEdge();
+        },
         exportImage: function () {
           if (!chart || st.view === 'table') return null;
           return chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: t.paper });
@@ -1659,6 +1822,7 @@
           closeAc();
           pops.forEach(function (p) { p.close(); });
           if (ro) ro.disconnect();
+          if (wheel) wheel.destroy();
           if (chart) { chart.dispose(); chart = null; }
           root.remove();
         }

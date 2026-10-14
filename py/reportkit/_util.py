@@ -10,6 +10,7 @@ from typing import Any, Iterable
 
 __all__ = [
     "esc", "attr", "slugify", "unique_id", "dumps", "json_for_script", "iso_date", "human_date", "as_list", "label",
+    "colon", "list_sep", "source_text", "notes_text",
 ]
 
 
@@ -24,13 +25,48 @@ attr = esc
 _SLUG_STRIP = re.compile(r"[^a-z0-9]+")
 
 
-def slugify(text: Any, max_len: int = 48) -> str:
-    """ASCII slug for ids/anchors: 'Implied value — $4.2bn' -> 'implied-value-4-2bn'."""
-    s = unicodedata.normalize("NFKD", str(text or "")).encode("ascii", "ignore").decode("ascii").lower()
+def _slug_char(ch: str) -> str:
+    """One character of a Unicode-aware slug: ASCII letters / digits as is; accented Latin letters folded to
+    ASCII ('é' -> 'e'); other letters and digits (CJK, kana, Cyrillic ...) kept; anything else a separator."""
+    if ch.isascii():
+        return ch if ch.isalnum() else "-"
+    folded = "".join(c for c in unicodedata.normalize("NFKD", ch) if not unicodedata.combining(c))
+    if folded and folded.isascii():
+        return "".join(c if c.isalnum() else "-" for c in folded.lower())
+    return ch if ch.isalnum() else "-"
+
+
+def _non_latin(ch: str) -> bool:
+    """A letter / digit of a script other than Latin or Greek (CJK, kana, Hangul, Cyrillic ...), which the
+    ASCII slug would drop."""
+    if ch.isascii() or not ch.isalnum():
+        return False
+    return any(not c.isascii() and c.isalnum() and not unicodedata.name(c, "").startswith(("LATIN", "GREEK"))
+               for c in unicodedata.normalize("NFKD", ch))
+
+
+def slugify(text: Any, max_len: int = 48, *, ascii_only: bool = False) -> str:
+    """Slug for ids / anchors / file names: 'Implied value — $4.2bn' -> 'implied-value-4-2bn'.
+
+    Text in another script keeps its letters ('估值：DCF 与可比公司' -> '估值-dcf-与可比公司'), so Chinese titles give
+    meaningful page ids and file names; Latin text (with Greek symbols such as Δ) gives exactly the ASCII slug
+    (accents folded, other symbols dropped). ascii_only=True always returns the ASCII slug (e.g. dataset ids)."""
+    raw = str(text or "")
+    s = unicodedata.normalize("NFKD", raw).encode("ascii", "ignore").decode("ascii").lower()
     s = _SLUG_STRIP.sub("-", s).strip("-")
-    if len(s) > max_len:
-        s = s[:max_len].rsplit("-", 1)[0] if "-" in s[:max_len] else s[:max_len]
-    return s.strip("-")
+    if not ascii_only and any(_non_latin(ch) for ch in raw):
+        s = re.sub(r"-{2,}", "-", "".join(_slug_char(ch) for ch in unicodedata.normalize("NFKC", raw).lower()))
+        s = s.strip("-")
+    # max_len counts display columns: a wide (CJK) character counts 2, so Chinese slugs stay as compact as English
+    cut, width = 0, 0
+    for cut, ch in enumerate(s):
+        width += 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
+        if width > max_len:
+            break
+    else:
+        return s
+    head = s[:cut]
+    return (head.rsplit("-", 1)[0] if "-" in head else head).strip("-")
 
 
 def unique_id(base: str, used: set[str]) -> str:
@@ -120,7 +156,7 @@ _LABELS = {
            "filters": "Filters", "excel": "Excel", "excel_title": "Download every dataset as an Excel workbook",
            "unit": "Unit", "as_of": "As of", "computed": "Calculated live in the report (not in this sheet)",
            "fields": "fields"},
-    "zh": {"source": "来源", "sources": "来源", "note": "注", "notes": "注",
+    "zh": {"source": "资料来源", "sources": "资料来源", "note": "注", "notes": "注",
            "print": "打印 / PDF", "theme": "配色主题", "contents": "目录", "filters": "筛选",
            "excel": "Excel 数据", "excel_title": "下载全部数据集（Excel 工作簿）",
            "unit": "单位", "as_of": "数据截至", "computed": "报告中实时计算的字段（本表未包含）", "fields": "字段"},
@@ -130,3 +166,45 @@ _LABELS = {
 def label(key: str, locale: str = "en-US") -> str:
     lang = (locale or "en").split("-")[0].lower()
     return _LABELS.get(lang, _LABELS["en"]).get(key, _LABELS["en"][key])
+
+
+def _cjk(locale: str | None) -> bool:
+    return (locale or "").lower().startswith(("zh", "ja"))
+
+
+def colon(locale: str | None) -> str:
+    """Label separator: ': ' / full-width '：' (zh, ja)."""
+    return "：" if _cjk(locale) else ": "
+
+
+def list_sep(locale: str | None) -> str:
+    """Separator between several sources: '; ' / full-width '；' (zh, ja)."""
+    return "；" if _cjk(locale) else "; "
+
+
+# text that already carries its own label is printed as is: "Sources: …", "资料来源：…", "来源：…" / "Note: …", "注：…"
+_SOURCE_PREFIX = re.compile(r"^\s*(sources?\b|(资料)?来源)", re.I)
+_NOTES_PREFIX = re.compile(r"^\s*(notes?\b|注释?\s*[:：(（\d])", re.I)
+
+
+def source_text(src: Any, locale: str = "en-US") -> str:
+    """'Source: FactSet' / 'Sources: A; B' / '资料来源：万得；公司公告' — one line for a block / page footer."""
+    items = [str(s) for s in as_list(src)]
+    if not items:
+        return ""
+    text = list_sep(locale).join(items)
+    if _SOURCE_PREFIX.match(text):
+        return text
+    return label("sources" if len(items) > 1 else "source", locale) + colon(locale) + text
+
+
+def notes_text(notes: Any, locale: str = "en-US") -> str:
+    """'Note: …' / 'Notes: (1) … (2) …' / '注：…'."""
+    items = [str(n) for n in as_list(notes)]
+    if not items:
+        return ""
+    if len(items) == 1:
+        if _NOTES_PREFIX.match(items[0]):
+            return items[0]
+        return label("note", locale) + colon(locale) + items[0]
+    return label("notes", locale) + colon(locale) + " ".join(f"({i}) {n}" for i, n in enumerate(items, 1))

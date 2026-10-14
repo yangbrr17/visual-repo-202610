@@ -67,12 +67,13 @@
   /**
    * ECharts' inside-zoom controller consumes every wheel event over the plot (preventDefault) even with
    * zoomOnMouseWheel 'ctrl', which would block page scrolling. Installed on the ECharts viewport
-   * (disposed with the chart): plain wheels bypass it, so the page scrolls and only Ctrl + wheel / pinch
-   * reaches the time zoom; options.wheelZoom: true opts out.
+   * (disposed with the chart): plain wheels bypass it, so the page scrolls and only Ctrl + wheel, ⌘ + wheel or a
+   * pinch reaches the time zoom (same rule as RK.chart.wheelGuard, which also lets ECharts zoom on ⌘);
+   * options.wheelZoom: true opts out.
    */
   function passWheel(inst, ctx) {
     var root = inst.getZr().painter.getViewportRoot();
-    function onWheel(e) { if (!e.ctrlKey && ctx.options.wheelZoom !== true) e.stopPropagation(); }
+    function onWheel(e) { if (!e.ctrlKey && !e.metaKey && ctx.options.wheelZoom !== true) e.stopPropagation(); }
     root.addEventListener('wheel', onWheel, true);
     root.addEventListener('mousewheel', onWheel, true);
   }
