@@ -1,0 +1,190 @@
+{
+  "id": "sankey",
+  "name": "Sankey Diagram",
+  "name_zh": "桑基图",
+  "category": "flow",
+  "engine": "echarts",
+  "deps": [
+    "echarts"
+  ],
+  "summary": "Flow widths proportional to value across stages — P&L walk from segment revenue to net income, revenue by segment to region, sources & uses.",
+  "summary_zh": "按数值比例绘制各阶段之间的流量宽度：从分部收入到净利润的损益流向、分部→地区收入、资金来源与用途。",
+  "description_zh": "每行数据是一条连线（source → target，value 为流量），节点总量、所在阶段（列）和标签位置由组件自动推导。最典型的用法是损益表桑基图：左侧为各业务分部收入，汇入总收入后逐级分流为毛利 / 销货成本、EBITDA / 运营费用、EBIT / 折旧摊销，直至净利润；成本节点（costNodes）以负向色显示，percentOf 可在标签上标注占收入的比例（即利润率）。线宽读数量、节点高度读总量；悬停高亮相邻流向，点击节点保持聚焦并交叉筛选。适合 3–6 个阶段、不超过约 30 个节点的结构化流向。",
+  "best_for": [
+    "P&L walk: segment revenue → revenue → gross profit → EBITDA → net income",
+    "Revenue by segment → region / customer group",
+    "Sources & uses of funds",
+    "Customer or volume migration between stages"
+  ],
+  "avoid_when": [
+    "Flows with cycles (A → B → A)",
+    "More than ~30 nodes or 6+ stages — aggregate first",
+    "Exact comparison of many similar values (use a bar or waterfall)"
+  ],
+  "channels": {
+    "source": {
+      "type": "string",
+      "required": true,
+      "desc": "Link origin node",
+      "default": "source"
+    },
+    "target": {
+      "type": "string",
+      "required": true,
+      "desc": "Link destination node",
+      "default": "target"
+    },
+    "value": {
+      "type": "number",
+      "required": true,
+      "desc": "Flow size (duplicate source → target rows are summed)",
+      "default": "value"
+    }
+  },
+  "options": {
+    "orient": {
+      "type": "string",
+      "default": "horizontal",
+      "desc": "horizontal | vertical"
+    },
+    "nodeAlign": {
+      "type": "string",
+      "default": "left",
+      "desc": "Column placement of sinks: left (P&L — costs branch off where they occur) | right | justify (all sinks in the last column)"
+    },
+    "nodeOrder": {
+      "type": "string",
+      "default": "data",
+      "desc": "data: keep row order within a column (cost nodes placed below profit lines) | auto: ECharts relaxation to minimise crossings"
+    },
+    "colorBy": {
+      "type": "string",
+      "default": "stage",
+      "desc": "stage: ordinal ramp by column (dark → light) | node: categorical colour per node"
+    },
+    "nodeColors": {
+      "type": "object",
+      "default": {},
+      "desc": "{nodeName: colour} — a theme token ('accent2', 'neg', 'cat3' …) or CSS colour"
+    },
+    "costNodes": {
+      "type": "string[]",
+      "default": [],
+      "desc": "Node names drawn as costs / leakage in the theme's negative colour"
+    },
+    "highlight": {
+      "type": "string|string[]",
+      "default": null,
+      "desc": "Node name(s) drawn in accent2 (e.g. 'Net income')"
+    },
+    "linkColor": {
+      "type": "string",
+      "default": "source",
+      "desc": "Link colour: source | target | gradient | neutral"
+    },
+    "linkOpacity": {
+      "type": "number",
+      "default": 0.3,
+      "desc": "Resting link opacity (hover / selection raise it)"
+    },
+    "nodeWidth": {
+      "type": "number",
+      "default": 12,
+      "desc": "Node bar thickness in px"
+    },
+    "nodeGap": {
+      "type": "number",
+      "default": 14,
+      "desc": "Gap between nodes in a column in px"
+    },
+    "labels": {
+      "type": "boolean",
+      "default": true,
+      "desc": "Show node labels (first column outside-left, others to the right with a paper halo)"
+    },
+    "labelValues": {
+      "type": "boolean",
+      "default": true,
+      "desc": "Formatted node total under each name"
+    },
+    "percentOf": {
+      "type": "string",
+      "default": null,
+      "desc": "null | 'max' | node name — append '% of' that node to labels (e.g. margins vs. 'Revenue')"
+    },
+    "focus": {
+      "type": "string",
+      "default": "adjacency",
+      "desc": "Hover emphasis: adjacency | trajectory | none"
+    },
+    "draggable": {
+      "type": "boolean",
+      "default": false,
+      "desc": "Allow dragging nodes"
+    },
+    "format": {
+      "type": "string",
+      "default": null,
+      "desc": "Value format; defaults to the value field's format"
+    },
+    "crossFilter": {
+      "type": "boolean",
+      "default": true,
+      "desc": "Click a node to select it (keeps its links in focus and filters other blocks)"
+    },
+    "filterScope": {
+      "type": "string",
+      "default": "dataset",
+      "desc": "dataset: the selection only filters blocks bound to the same dataset (field names like 'source' are generic) | global"
+    }
+  },
+  "interactions": [
+    "Hover a node or link: adjacency emphasis + tooltip with inflow / outflow / % shares",
+    "Click a node to keep its flows in focus and cross-filter (click again to clear)",
+    "Animated re-layout when filters change",
+    "PNG / CSV export"
+  ],
+  "samples": [
+    {
+      "title": "FY25A P&L flow — segment revenue to net income (USD m)",
+      "data": "pnl_flow",
+      "height": 420,
+      "options": {
+        "encode": {
+          "source": "source",
+          "target": "target",
+          "value": "value"
+        },
+        "costNodes": [
+          "Cost of goods sold",
+          "Operating expenses",
+          "D&A",
+          "Net interest",
+          "Income tax"
+        ],
+        "highlight": "Net income",
+        "linkColor": "target",
+        "percentOf": "Revenue",
+        "format": "$#,##0"
+      }
+    },
+    {
+      "title": "Revenue build to gross profit — categorical nodes, links by source",
+      "data": "pnl_flow",
+      "height": 340,
+      "span": 8,
+      "options": {
+        "where": "target in [\"Revenue\", \"Gross profit\", \"Cost of goods sold\"]",
+        "colorBy": "node",
+        "linkColor": "source",
+        "linkOpacity": 0.4,
+        "nodeAlign": "justify",
+        "nodeOrder": "auto",
+        "costNodes": [
+          "Cost of goods sold"
+        ],
+        "format": "$#,##0"
+      }
+    }
+  ]
+}

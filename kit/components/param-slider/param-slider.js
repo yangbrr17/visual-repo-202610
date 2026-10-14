@@ -94,6 +94,10 @@
       var compact = o.compact || !!ctx.block.closest('.rk-topbar');
       var defs = resolveParams(o.params);
       ctx.el.classList.add('is-auto');
+      // parameters that only exist in the options (not in the report manifest) start at their base value
+      var undef = {};
+      defs.forEach(function (d) { if (RK.store.param(d.name) === undefined) undef[d.name] = d.base; });
+      RK.store.defineParams(undef);
 
       // computed fields that depend on the parameters (idempotent: re-render keeps them)
       var computedNames = [];

@@ -1,0 +1,44 @@
+{
+  "id": "lollipop",
+  "name": "Lollipop Ranking",
+  "name_zh": "棒棒糖排名图",
+  "category": "comparison",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Ranked stems and dots — a lighter alternative to bars for many categories, with target highlight, median line and an optional second value.",
+  "summary_zh": "细杆加圆点的排名图：类别较多时比柱状图更清爽，支持高亮目标公司、中位数参考线以及第二个数值点（如 2025E 对比 2026E）。",
+  "description_zh": "每行一个类别（通常是同业公司），细杆从 0 画到数值、末端圆点标出数值，按大小排序后一眼看出目标公司在同业中的位置。目标公司（is_target 或 highlight）用 accent-2 色圆点、加粗标签和浅色底纹突出；虚线为同业中位数（默认不含目标公司）。设置 encode.value2 后会在同一行再画一个空心点并用浅色带连接，适合展示两期倍数（EV/EBITDA 2025E→2026E）的变化；encode.group 可按行业/地区着色。",
+  "best_for": ["Peer ranking by valuation multiple (10–30 companies)", "Target vs. peer median positioning", "Two-period comparison per company (2025E vs 2026E)", "Scores or growth rates where bars would feel heavy"],
+  "avoid_when": ["Fewer than ~5 categories (use bar)", "Part-to-whole data (use stacked bar / treemap)", "Values whose length from zero is not meaningful (use dumbbell / dot plot)"],
+  "channels": {
+    "label": {"type": "string", "required": true, "desc": "Category (company)", "default": "company"},
+    "value": {"type": "number", "required": true, "desc": "Primary value (stem + filled dot); used for sorting", "default": "value"},
+    "value2": {"type": "number", "required": false, "desc": "Second value drawn as a hollow dot joined to the first (e.g. next-year multiple)"},
+    "highlight": {"type": "boolean", "required": false, "desc": "Boolean field marking the target row(s)", "default": "is_target"},
+    "group": {"type": "string", "required": false, "desc": "Colour dots by group (sector / region) with a legend"}
+  },
+  "options": {
+    "orientation": {"type": "string", "default": "horizontal", "desc": "horizontal (ranking list) | vertical"},
+    "sort": {"type": "string", "default": "desc", "desc": "'desc' | 'asc' | null (keep data order)"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Label value(s) to emphasise in addition to the highlight channel"},
+    "highlightBand": {"type": "boolean", "default": true, "desc": "Tinted row band behind highlighted categories"},
+    "refLine": {"type": "string|number", "default": "median", "desc": "'median' | 'mean' | a number | null"},
+    "refExcludeHighlight": {"type": "boolean", "default": true, "desc": "Compute the median / mean without the highlighted (target) rows"},
+    "refLabel": {"type": "string", "default": null, "desc": "Reference line label; default 'Median' / 'Mean'"},
+    "refLines": {"type": "array", "default": [], "desc": "Extra [{value, label, color}] reference lines"},
+    "labels": {"type": "boolean", "default": true, "desc": "Value labels beyond the outer dot (both values when value2 is set)"},
+    "dotSize": {"type": "number", "default": 9, "desc": "Dot diameter in px"},
+    "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field's format"},
+    "legend": {"type": "boolean", "default": true, "desc": "Legend (shown for value2 / group)"},
+    "zoom": {"type": "boolean", "default": false, "desc": "Scroll / zoom along the category axis for long lists"}
+  },
+  "interactions": ["Hover tooltip with premium / (discount) to the median and period change", "Click a dot to cross-filter", "Legend toggles groups", "Optional category zoom for long lists", "PNG / CSV export"],
+  "samples": [
+    {"title": "EV / EBITDA 2025E — trading peers", "data": "peers", "height": 440, "span": 6,
+     "options": {"encode": {"label": "company", "value": "ev_ebitda_25e"}, "refLabel": "Peer median"}},
+    {"title": "EV / EBITDA 2025E vs. 2026E", "data": "peers", "height": 440, "span": 6,
+     "options": {"encode": {"label": "company", "value": "ev_ebitda_25e", "value2": "ev_ebitda_26e"}, "refLine": null}},
+    {"title": "EBITDA margin 2025E by sub-sector", "data": "peers", "height": 340,
+     "options": {"encode": {"label": "ticker", "value": "ebitda_margin_25e", "group": "sector"}, "orientation": "vertical", "refLine": "mean", "refLabel": "Peer mean"}}
+  ]
+}

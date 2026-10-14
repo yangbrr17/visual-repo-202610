@@ -1,0 +1,44 @@
+{
+  "id": "combo",
+  "name": "Combo: Bars + Line",
+  "name_zh": "柱线组合图（双轴）",
+  "category": "trend",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Columns with a line on a secondary axis — e.g. revenue bars with the EBITDA margin line in % — with hatched estimate years and CAGR brackets.",
+  "summary_zh": "柱状 + 折线双轴组合图：如收入柱 + EBITDA 利润率折线（右轴 %），预测年份斜线填充，可加 CAGR 箭头标注。",
+  "description_zh": "投行财务概览页最常用的图：柱子表示规模（收入、EBITDA、FCF，可分组或堆叠），折线表示比率（利润率、增速）并使用右侧百分比轴。默认 band 布局把折线放在柱子上方的独立区域，数值标签互不遮挡；预测年份（period = E 或 x 以 E 结尾）自动以浅色斜线填充并加“Projected”底色区分。cagr 可在首尾柱之间画出括号箭头并标注复合增长率，'split' 同时标注历史与预测两段。适合 5–12 个年度/季度的时间序列。",
+  "best_for": ["Revenue (bars) + EBITDA margin (line) financial summary", "Historical vs. projected growth with CAGR call-outs", "Quarterly actual vs. consensus with margin overlay", "Any magnitude + ratio pair over 5–12 periods"],
+  "avoid_when": ["More than ~16 periods (use a line chart with zoom)", "Two magnitudes in the same unit (use grouped bars)", "Ratios that need their own precise scale reading (use separate charts)"],
+  "channels": {
+    "x": {"type": "string", "required": true, "desc": "Period / category axis (year, quarter)", "default": "year"},
+    "bars": {"type": "string|string[]", "required": true, "desc": "Bar field(s): array = one bar series per field (wide); single field + series = long format", "default": ["revenue"]},
+    "series": {"type": "string", "required": false, "desc": "Long-format bar series field (one bar series per distinct value; rows are summed)"},
+    "line": {"type": "string|string[]", "required": false, "desc": "Line field(s) on the secondary axis (duplicate rows per x are averaged)", "default": ["ebitda_margin"]},
+    "period": {"type": "string", "required": false, "desc": "Actual / estimate flag (values starting with E, F, P or B mark estimates) used by forecastFrom 'auto'", "default": "period"}
+  },
+  "options": {
+    "layout": {"type": "string", "default": "band", "desc": "band = line in its own band above the bars (no label collisions) | overlay = classic dual axes with aligned ticks"},
+    "barStack": {"type": "boolean", "default": false, "desc": "Stack the bar series (totals labelled on top)"},
+    "labels": {"type": "boolean|string", "default": "auto", "desc": "Value labels: true | false | 'auto' (on when bars are wide enough) | 'bars' | 'line'"},
+    "format": {"type": "string", "default": null, "desc": "Bar value format; defaults to the first bar field's format"},
+    "lineFormat": {"type": "string", "default": null, "desc": "Line value format; defaults to the first line field's format (else 0.0%)"},
+    "lineAxisFormat": {"type": "string", "default": null, "desc": "Right-axis tick format; defaults to lineFormat with redundant decimals trimmed"},
+    "forecastFrom": {"type": "string|null", "default": "auto", "desc": "x value where estimates start; 'auto' = period field or x ending in E/F/B; null = no estimate styling"},
+    "forecastLabel": {"type": "string", "default": "Projected", "desc": "Caption above the estimate band ('' hides it)"},
+    "cagr": {"type": "boolean|string|object|array", "default": false, "desc": "true = first→last bar; 'split' = actuals and estimates separately; {from, to, label, field} or an array of them"},
+    "cagrFormat": {"type": "string", "default": "0.0%", "desc": "Format of the CAGR figure"},
+    "legend": {"type": "boolean", "default": true, "desc": "Top-left legend (shown when there is more than one series)"},
+    "zoom": {"type": "boolean", "default": false, "desc": "Enable dataZoom on the period axis (wheel + slider)"}
+  },
+  "interactions": ["Axis tooltip with every bar and line value (estimate periods flagged)", "Click a bar to cross-filter on the period", "Legend toggle", "Animated transitions on filter changes", "Optional zoom", "PNG / CSV export"],
+  "samples": [
+    {"title": "Revenue and EBITDA margin, 2019A–2028E", "data": "financials", "height": 340,
+     "options": {"encode": {"x": "year", "bars": ["revenue"], "line": ["ebitda_margin"]}, "format": "$#,##0", "cagr": "split"}},
+    {"title": "EBITDA and unlevered FCF vs. margin", "data": "financials", "height": 320,
+     "options": {"encode": {"x": "year", "bars": ["ebitda", "fcf"], "line": ["ebitda_margin"]}, "format": "$#,##0",
+                 "cagr": {"from": "2025A", "to": "2028E", "field": "ebitda", "label": "EBITDA CAGR '25A–'28E"}}},
+    {"title": "Quarterly revenue vs. consensus, EBITDA margin", "data": "quarterly", "height": 320,
+     "options": {"encode": {"x": "quarter", "bars": ["revenue", "consensus_revenue"], "line": ["ebitda_margin"]}, "format": "$#,##0", "layout": "overlay", "labels": "line"}}
+  ]
+}

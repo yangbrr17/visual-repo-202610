@@ -55,7 +55,9 @@
     // colours: stable rank in the unfiltered data, so slices keep their colour while filtering
     var t = ctx.theme;
     var hl = o.highlight == null ? [] : [].concat(o.highlight).map(String);
-    var pal = t.cat.filter(function (c) { return !hl.length || c.toLowerCase() !== String(t.accent2).toLowerCase(); });
+    // with a highlight, drop palette colours that read like the accent so the target stands alone
+    var pal = t.cat.filter(function (c) { return !hl.length || !near(c, t.accent2); });
+    if (!pal.length) pal = t.cat;
     var rank = collect(ctx.allRows).sort(bySize).map(function (d) { return d.name; });
     items.forEach(function (d, i) {
       var r = rank.indexOf(d.name);
@@ -68,6 +70,11 @@
     var fmt = o.format || ctx.fmtOf(enc.value) || 'auto';
     var display = o.display === 'auto' ? (/%/.test(RK.format.presets[fmt] || fmt) ? 'value' : 'both') : o.display;
     return { items: items, total: total, fmt: fmt, pctFmt: o.pctFormat || '0.0%', display: display };
+  }
+
+  function near(a, b) {
+    var x = RK.theme.parseColor(a), y = RK.theme.parseColor(b);
+    return Math.sqrt(Math.pow(x[0] - y[0], 2) + Math.pow(x[1] - y[1], 2) + Math.pow(x[2] - y[2], 2)) < 64;
   }
 
   function dimmed(ctx, d) {
@@ -106,7 +113,7 @@
       L.table.y = Math.max(2, (H - th) / 2);
     } else {
       var room = o.layout === 'labels' ? Math.min(150, W * 0.22) : 6;
-      L.R = Math.max(40, Math.min(H / 2 - (o.layout === 'labels' ? 22 : 6), W / 2 - room, 190));
+      L.R = Math.max(40, Math.min(H / 2 - (o.layout === 'labels' ? 32 : 6), W / 2 - room, 190));
       L.cx = W / 2; L.cy = H / 2;
     }
     L.r0 = L.R * Math.max(0, Math.min(0.9, o.innerRadius || 0));

@@ -40,6 +40,18 @@
     var a = Math.abs(v);
     return RK.format(v, a >= 100 ? '#,##0' : a >= 10 ? '0.0' : a >= 1 ? '0.00' : '0.000');
   }
+  /** Category palette that skips colours too close to accent2, which is reserved for the target. */
+  function catPalette(values, t) {
+    var a = RK.theme.parseColor(t.accent2);
+    var pool = t.cat.filter(function (c) {
+      var b = RK.theme.parseColor(c);
+      return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2)) > 90;
+    });
+    if (!pool.length) pool = t.cat;
+    var map = {};
+    values.forEach(function (v, i) { map[v] = pool[i % pool.length]; });
+    return function (v) { return map[v] || t.neutral; };
+  }
   /** Rough rendered width (px) of an axis label — used to space the rotated y-axis name. */
   function textW(s, px) { return String(s).length * (px || 11) * 0.58; }
 
@@ -117,7 +129,7 @@
     var showLabels = !!labelF && (o.labels === 'auto' ? rows.length <= 40 : !!o.labels);
     // stable colours: category order from the unfiltered data so filtering never re-colours points
     var groups = colorF ? util.unique(ctx.allRows.map(function (r) { return r[colorF]; }).filter(function (v) { return v != null; })) : [];
-    var palette = RK.theme.categorical(groups);
+    var palette = catPalette(groups, t);
     var sel = selField ? ctx.selected(selField) : [];
     var peers = rows.filter(function (r) { return !isTarget(r); });
     var targets = rows.filter(isTarget);
@@ -137,7 +149,9 @@
     var ye = niceExtent(ys.concat(q && util.isNum(q.y) ? [q.y] : []), 0.08, 5);
     var points = [];
 
-    /* ---- point series: one per category (legend toggles), target(s) on top ---- */
+    /* ---- point series: one per category (legend toggles), target(s) on top ----
+     * Labels live in a transparent companion series with the same name (so the legend toggles both)
+     * drawn above every point: a later point can never cover an earlier label. */
     function item(r, color, target) {
       var key = selField ? r[selField] : null;
       var dim = sel.length && sel.indexOf(key) < 0;
@@ -146,40 +160,50 @@
         value: [r[enc.x], r[enc.y]],
         name: labelF ? String(r[labelF] == null ? '' : r[labelF]) : '',
         row: r,
-        itemStyle: { color: dim ? RK.theme.alpha(color, 0.22) : color, borderColor: target ? t.paper : RK.theme.alpha(t.paper, 0.9) },
-        label: dim ? { color: RK.theme.alpha(target ? t.ink : t.ink2, 0.35) } : undefined
+        dim: dim,
+        itemStyle: { color: dim ? RK.theme.alpha(color, 0.22) : color, borderColor: target ? t.paper : RK.theme.alpha(t.paper, 0.9) }
       };
     }
     var size = o.symbolSize;
-    var labelCfg = {
-      show: showLabels, position: 'right', distance: 4, fontSize: 10.5, fontFamily: t.fontSans, color: t.ink2,
-      formatter: function (p) { return p.name; }
-    };
-    var seriesBase = {
-      type: 'scatter', symbol: 'circle', symbolSize: size,
-      itemStyle: { borderWidth: 0.8, opacity: 1 },
-      label: labelCfg,
-      labelLayout: { hideOverlap: true, moveOverlap: 'shiftY' },
-      emphasis: { scale: 1.35, focus: 'none', label: { show: !!labelF, color: t.ink, fontWeight: 600 } },
-      animationDelay: function (i) { return i * 14; }
-    };
-    var series = [];
+    var layers = [];
     if (colorF) {
       groups.forEach(function (g) {
         var list = peers.filter(function (r) { return r[colorF] === g; });
-        if (!list.length) return;
-        series.push(util.merge({}, seriesBase, { id: 'g-' + g, name: String(g), itemStyle: { color: palette(g) }, data: list.map(function (r) { return item(r, palette(g)); }) }));
+        if (list.length) layers.push({ id: 'g-' + g, name: String(g), color: palette(g), rows: list });
       });
     } else if (peers.length) {
-      series.push(util.merge({}, seriesBase, { id: 'peers', name: o.peerLabel, itemStyle: { color: t.cat[0] }, data: peers.map(function (r) { return item(r, t.cat[0]); }) }));
+      layers.push({ id: 'peers', name: o.peerLabel, color: catPalette([0], t)(0), rows: peers });
     }
     targets.forEach(function (r, i) {
-      series.push(util.merge({}, seriesBase, {
-        id: 'target-' + i, name: String(r[nameF] == null ? 'Target' : r[nameF]), z: 5, symbolSize: size + 5,
-        itemStyle: { borderWidth: 1.5, color: t.accent2 },
-        label: { show: !!labelF, fontWeight: 700, color: t.ink, fontSize: 11 },
-        data: [item(r, t.accent2, true)]
-      }));
+      layers.push({ id: 'target-' + i, name: String(r[nameF] == null ? 'Target' : r[nameF]), color: t.accent2, rows: [r], target: true });
+    });
+    var series = [];
+    layers.forEach(function (L) {
+      var sz = L.target ? size + 5 : size;
+      var data = L.rows.map(function (r) { return item(r, L.color, L.target); });
+      series.push({
+        id: L.id, name: L.name, type: 'scatter', symbol: 'circle', symbolSize: sz, z: L.target ? 4 : 2,
+        itemStyle: { color: L.color, borderWidth: L.target ? 1.5 : 0.8 },
+        emphasis: { scale: 1.35, focus: 'none' },
+        animationDelay: function (i) { return i * 14; },
+        data: data
+      });
+      if (!showLabels) return;
+      series.push({
+        id: L.id + ':lab', name: L.name, type: 'scatter', symbol: 'circle', symbolSize: sz, z: 6, silent: true,
+        tooltip: { show: false }, itemStyle: { color: 'transparent', borderWidth: 0 }, emphasis: { disabled: true },
+        label: {
+          show: true, position: 'right', distance: 4, fontFamily: t.fontSans,
+          fontSize: L.target ? 11 : 10.5, fontWeight: L.target ? 700 : 400, color: L.target ? t.ink : t.ink2,
+          textBorderColor: t.paper, textBorderWidth: 2.5,
+          formatter: function (p) { return p.name; }
+        },
+        labelLayout: { hideOverlap: true, moveOverlap: 'shiftY' },
+        animationDelay: function (i) { return 200 + i * 14; },
+        data: data.map(function (d) {
+          return { value: d.value, name: d.name, label: d.dim ? { color: RK.theme.alpha(L.target ? t.ink : t.ink2, 0.35) } : undefined };
+        })
+      });
     });
 
     /* ---- reference layer: zero lines, quadrant lines + labels, regression ---- */
@@ -204,16 +228,11 @@
         qa(ql[3], q.x, xe.max, ye.min, q.y, 'insideBottomRight');
       }
     }
+    var fitName = null;
     if (fit) {
       var fx = util.extent(xs), pad = (fx[1] - fx[0]) * 0.04;
       var x0 = Math.max(xe.min, fx[0] - pad), x1 = Math.min(xe.max, fx[1] + pad);
-      var txt = 'R² = ' + RK.format(fit.r2, '0.00');
-      if (o.equation) txt = 'y = ' + coef(fit.b) + 'x ' + (fit.a < 0 ? '− ' : '+ ') + coef(Math.abs(fit.a)) + '   ' + txt;
-      lines.push([
-        { coord: [x0, fit.a + fit.b * x0], lineStyle: { color: t.accent3 || t.ink2, type: 'solid', width: 1.25, opacity: 0.9 },
-          label: { show: true, position: 'insideEndTop', formatter: txt, color: t.accent3 || t.ink2, fontSize: 10.5, fontWeight: 600, distance: 4 } },
-        { coord: [x1, fit.a + fit.b * x1] }
-      ]);
+      fitName = (o.equation ? 'y = ' + coef(fit.b) + 'x ' + (fit.a < 0 ? '− ' : '+ ') + coef(Math.abs(fit.a)) + ', ' : 'Linear fit, ') + 'R² = ' + RK.format(fit.r2, '0.00');
     }
     series.unshift({
       id: 'ref', type: 'scatter', data: [], silent: true, tooltip: { show: false }, z: 1,
@@ -221,12 +240,25 @@
       markArea: areas.length ? { silent: true, data: areas } : undefined
     });
 
+    // regression: a 2-point line series so the fit (and its R²) sits in the legend, never on top of labels
+    var legendOn = o.legend !== false;
+    if (fit) {
+      var fitColor = t.accent3 || t.ink2;
+      series.splice(1, 0, {
+        id: 'fit', name: fitName, type: 'line', silent: true, z: 1, symbol: 'none', tooltip: { show: false },
+        lineStyle: { color: fitColor, width: 1.25, type: 'solid' }, itemStyle: { color: fitColor },
+        endLabel: { show: !legendOn, formatter: fitName, color: fitColor, fontSize: 10.5, fontWeight: 600, distance: 4, textBorderColor: t.paper, textBorderWidth: 2.5, align: 'right', offset: [0, -10] },
+        data: [[x0, fit.a + fit.b * x0], [x1, fit.a + fit.b * x1]]
+      });
+    }
+
     inst.__rk = { ctx: ctx, points: points, selField: selField };
     inst.__rkCanBrush = !!selField && o.brush !== false;
 
     var yLabW = Math.max(textW(RK.format(ye.min, yFmt)), textW(RK.format(ye.max, yFmt)));
-    var legendNames = series.filter(function (s) { return s.id !== 'ref'; }).map(function (s) { return s.name; });
-    var showLegend = o.legend !== false && (groups.length > 1 || targets.length > 0) && legendNames.length > 1;
+    var legendNames = layers.map(function (L) { return L.name; });
+    if (fit) legendNames.push({ name: fitName, icon: 'path://M0 4.2h18v1.6H0z', itemWidth: 16, itemHeight: 9 });
+    var showLegend = legendOn && legendNames.length > 1;
     var interactive = !ctx.print && o.zoom !== false;
 
     return {
@@ -261,6 +293,7 @@
         axisLabel: { formatter: C.axisFmt(yFmt) },
         splitLine: { show: true, lineStyle: { color: t.grid } }
       },
+      toolbox: { show: false },  // the brush is driven from the HTML toolbar
       dataZoom: interactive ? [
         { type: 'inside', xAxisIndex: 0, filterMode: 'none', zoomOnMouseWheel: 'ctrl', moveOnMouseMove: true, moveOnMouseWheel: false },
         { type: 'inside', yAxisIndex: 0, filterMode: 'none', zoomOnMouseWheel: 'ctrl', moveOnMouseMove: true, moveOnMouseWheel: false }

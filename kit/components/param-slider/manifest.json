@@ -1,0 +1,49 @@
+{
+  "id": "param-slider",
+  "name": "Parameter Sliders (What-if)",
+  "name_zh": "参数滑块（假设分析）",
+  "category": "controls",
+  "engine": "dom",
+  "deps": [],
+  "needs_data": false,
+  "summary": "What-if sliders bound to report parameters (@wacc, @tgr …); every computed field using them recalculates and the charts update live.",
+  "summary_zh": "绑定报告参数（@wacc、@tgr 等）的假设分析滑块：拖动后所有引用该参数的计算字段实时重算，图表同步更新。",
+  "description_zh": "用于 DCF / LBO / 情景分析页面，让客户自己调整 WACC、永续增长率、退出倍数等假设。每个滑块显示格式化的当前值、相对基准值的变化（百分比参数以 bps 表示）、轨道上的基准刻度和一键还原；点击数值可直接输入精确值。参数默认取报告 manifest.params，可在 options.params 中覆盖标签、范围、步长与格式。options.computed 可向绑定数据集添加引用 @参数 的公式字段，options.preview 则在滑块下方渲染一个实时读数表（当前值及相对基准假设的变化），便于在单个区块中演示参数驱动的计算。",
+  "best_for": ["DCF WACC / terminal growth what-if", "LBO exit multiple and leverage assumptions", "Sticky top-bar assumptions in an interactive model", "Live readout of formula fields driven by parameters"],
+  "avoid_when": ["The audience needs a fixed, printed answer (use a sensitivity table)", "More than ~6 parameters at once (split by page)"],
+  "channels": {},
+  "options": {
+    "params": {"type": "array", "default": null, "desc": "[{name, label, min, max, step, format, default}] or ['wacc', ...]; merged with RK.data.manifest.params; null = every report parameter. Missing ranges are inferred from the base value"},
+    "compact": {"type": "boolean", "default": false, "desc": "Single-row label · track · value layout (automatic inside .rk-topbar)"},
+    "columns": {"type": "number", "default": null, "desc": "Slider columns in the stacked layout (null = auto-fit, min 220px each)"},
+    "showRange": {"type": "boolean", "default": true, "desc": "Formatted min / max under each track"},
+    "showDelta": {"type": "boolean", "default": true, "desc": "Change vs. base value next to the value (bps for % formats)"},
+    "computed": {"type": "array", "default": [], "desc": "[{name, formula, title, format}] computed fields added to the bound dataset (formulas may use @params)"},
+    "preview": {"type": "boolean|object", "default": false, "desc": "true or {fields, where, title, total} — live readout table of the bound dataset; live cells show % change vs. base parameters; total = true | [fields]"},
+    "tools": {"type": "boolean", "default": false, "desc": "Block toolbar (off for controls)"}
+  },
+  "interactions": ["Drag or arrow keys (native range input, aria-valuetext formatted)", "Click the value to type an exact number (9.25%, 9.25 or 0.0925)", "Reset to base per slider", "Store writes throttled while dragging; every computed field using the parameter recalculates", "Preview cells flash and show % change vs. base"],
+  "samples": [
+    {"title": "DCF assumptions — live readout (USD m)", "data": "financials", "height": 300, "span": 8,
+     "options": {
+       "params": [
+         {"name": "wacc", "label": "WACC", "min": 0.07, "max": 0.11, "step": 0.0025, "format": "0.00%"},
+         {"name": "tgr", "label": "Terminal growth", "min": 0.01, "max": 0.035, "step": 0.0025, "format": "0.00%"}
+       ],
+       "computed": [
+         {"name": "discount_factor", "title": "Discount factor", "formula": "1 / (1 + @wacc) ^ (fiscal_year - 2025.5)", "format": "0.000"},
+         {"name": "pv_fcf", "title": "PV of FCF", "formula": "fcf / (1 + @wacc) ^ (fiscal_year - 2025.5)", "format": "$#,##0.0"},
+         {"name": "implied_value", "title": "Perpetuity value FCF / (WACC – g)", "formula": "fcf / (@wacc - @tgr)", "format": "$#,##0"}
+       ],
+       "preview": {"where": "period == \"E\"", "fields": ["year", "fcf", "discount_factor", "pv_fcf", "implied_value"], "total": ["fcf", "pv_fcf"]}
+     }},
+    {"title": "Report parameters — compact (top-bar style)", "data": null, "height": 60, "span": 8,
+     "options": {"compact": true}},
+    {"title": "LBO exit assumption", "data": "financials", "height": 240, "span": 6,
+     "options": {
+       "params": [{"name": "exit_multiple", "label": "Exit EV / EBITDA", "default": 9.0, "min": 7.0, "max": 12.0, "step": 0.25, "format": "0.00x"}],
+       "computed": [{"name": "exit_ev", "title": "Implied exit EV", "formula": "ebitda * @exit_multiple", "format": "$#,##0"}],
+       "preview": {"where": "period == \"E\"", "fields": ["year", "ebitda", "exit_ev"]}
+     }}
+  ]
+}

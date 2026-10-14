@@ -1,0 +1,50 @@
+{
+  "id": "line",
+  "name": "Line / Area Chart",
+  "name_zh": "折线图 / 面积图",
+  "category": "trend",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Multi-series trends over time or categories — rebased performance, highlighted target, direct end labels, dashed estimates, event pins and zoom.",
+  "summary_zh": "多系列时间趋势：股价相对表现（重设基数为 100）、目标公司高亮、线端直接标注、预测期虚线、事件编号标注与缩放。",
+  "description_zh": "展示一个或多个指标随时间（日期字段自动使用时间轴）或类别（年度、期限）的变化。支持宽表（encode.y 为字段数组，每个字段一条线）与长表（y + series 字段）。rebase 可把每条线重设为首个有效值 = 100，用于股价相对表现；highlight 用 accent2 加粗目标公司，其余系列弱化；线端标签直接给出系列名与最新值并自动避让；“2026E”等预测年份自动转为虚线并加浅色“Projected”底纹；eventsData 绑定事件数据集后在线上显示编号图钉，悬停查看详情。时间序列默认开启缩放，纵轴随可见窗口自动重算。",
+  "best_for": ["Relative share price performance vs. peers and indices (rebased to 100)", "Trading multiple history (NTM EV/EBITDA vs. peer median)", "Financial projections with actual vs. estimate styling", "Yield curves and other category-axis curves"],
+  "avoid_when": ["More than ~8 series (use small multiples or highlight one)", "Few discrete periods where magnitudes matter (use bar)", "Composition of a total over time with many parts (use stacked bar)"],
+  "channels": {
+    "x": {"type": "date|string|number", "required": true, "desc": "X field: date (time axis), category (year, tenor) or number (value axis)", "default": "date"},
+    "y": {"type": "number|number[]", "required": true, "desc": "Value field, or an array of fields for wide data (one line per field)", "default": "value"},
+    "series": {"type": "string", "required": false, "desc": "Long-format series field (one line per distinct value)"}
+  },
+  "options": {
+    "area": {"type": "boolean|string", "default": false, "desc": "false | true (light fill under each line, zero-based axis) | 'stacked'"},
+    "rebase": {"type": "number", "default": null, "desc": "Rebase each series to its first non-null value = this number (e.g. 100); tooltip adds % change"},
+    "endLabels": {"type": "boolean|string", "default": true, "desc": "Collision-free labels at the line ends: true (value tag + name) | 'value' | 'name' | false"},
+    "smooth": {"type": "boolean", "default": false, "desc": "Smoothed (monotone) lines"},
+    "highlight": {"type": "string", "default": null, "desc": "Series name drawn thicker in accent2 (the target); other series are muted"},
+    "labels": {"type": "boolean|string", "default": "auto", "desc": "Point value labels: true | false | 'auto' (category axis, <= 12 points, <= 3 series)"},
+    "labelFormat": {"type": "string", "default": null, "desc": "Format of point labels (defaults to format)"},
+    "symbols": {"type": "boolean|string", "default": "auto", "desc": "Point markers: true | false | 'auto' (category axis with <= 24 points)"},
+    "forecastFrom": {"type": "string", "default": "auto", "desc": "First estimate x value: line becomes dashed and a 'Projected' band is shaded. 'auto' detects labels like 2026E; null disables"},
+    "forecastLabel": {"type": "string", "default": "Projected", "desc": "Label of the estimates band (empty string hides it)"},
+    "eventsData": {"type": "string", "default": null, "desc": "Dataset id of events (date, label, kind, detail) drawn as numbered pins"},
+    "eventsEncode": {"type": "object", "default": {"date": "date", "label": "label", "kind": "kind", "detail": "detail"}, "desc": "Field mapping of the events dataset"},
+    "eventsSeries": {"type": "string", "default": null, "desc": "Series the pins sit on (default: highlight, else the first series)"},
+    "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] horizontal reference lines"},
+    "zoom": {"type": "boolean|string", "default": "auto", "desc": "'auto' (on for time axes with > 12 points) | true | false — wheel / pinch + slider; value axis re-fits to the window"},
+    "xType": {"type": "string", "default": "auto", "desc": "'auto' | 'time' | 'category' | 'value'"},
+    "xFormat": {"type": "string", "default": null, "desc": "X format for tooltip titles (dates default to the field format)"},
+    "format": {"type": "string", "default": null, "desc": "Value format; defaults to the y field format ('#,##0.0' when rebased)"},
+    "yMin": {"type": "string|number", "default": "auto", "desc": "'auto' (zero for areas, otherwise fit the data) | 'dataMin' | number"},
+    "legend": {"type": "boolean", "default": true, "desc": "Legend top-left (shown when there is more than one series)"}
+  },
+  "interactions": ["Axis tooltip with all series (and % change when rebased)", "Hover near a pin to read the event", "Wheel / pinch / slider zoom with automatic y re-fit", "Legend toggle re-fits the axis", "Click a line to cross-filter (long data)", "End labels follow zoom and filters", "PNG / CSV export"],
+  "samples": [
+    {"title": "Share price performance, rebased to 100", "data": "price_perf", "height": 380,
+     "options": {"encode": {"x": "date", "y": "value", "series": "series"}, "rebase": 100, "highlight": "Helios Industrial",
+                 "eventsData": "price_events"}},
+    {"title": "Revenue and EBITDA, 2019A–2028E (USD m)", "data": "financials", "height": 320, "span": 7,
+     "options": {"encode": {"x": "year", "y": ["revenue", "ebitda"]}, "format": "$#,##0", "endLabels": "name"}},
+    {"title": "USD sovereign yield curve", "data": "yield_curve", "height": 320, "span": 5,
+     "options": {"encode": {"x": "tenor", "y": ["current", "one_month_ago", "one_year_ago"]}, "highlight": "Current", "endLabels": "value", "labels": false}}
+  ]
+}
