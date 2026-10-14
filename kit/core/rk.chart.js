@@ -24,6 +24,11 @@
       var renderer = ctx.options.renderer || (ctx.print ? 'svg' : 'svg');
       var inst = global.echarts.init(ctx.el, 'rk', { renderer: renderer, locale: ctx.options.locale || 'EN' });
       var current = ctx;
+      // ECharts' roam/inside-zoom controller calls preventDefault on every wheel event before checking
+      // zoomOnMouseWheel:'ctrl', which swallows page scrolling. Keep plain wheel for the report; let
+      // Ctrl/Cmd + wheel (and trackpad pinch, which sends ctrlKey) through to ECharts.
+      function onWheel(e) { if (!e.ctrlKey && !e.metaKey) e.stopPropagation(); }
+      if (ctx.options.wheelZoom !== true) ctx.el.addEventListener('wheel', onWheel, { capture: true });
 
       function apply(c, first) {
         current = c;
@@ -64,7 +69,7 @@
           inst.resize();
           if (hooks.rebuildOnResize) apply(current, false);   // width-dependent layouts (tick density, label widths)
         },
-        destroy: function () { inst.dispose(); },
+        destroy: function () { ctx.el.removeEventListener('wheel', onWheel, { capture: true }); inst.dispose(); },
         exportImage: function () { return exportPNG(inst, current); },
         exportSVG: function () {
           return inst.renderToSVGString ? inst.renderToSVGString() : null;
