@@ -24,6 +24,19 @@
     return +RK.util.clamp(n, d.min, d.max).toFixed(Math.min(12, decimalsOf(d.step) + 2));
   }
 
+  // the same parameter reads the same everywhere (stacked panel, top bar, other reports)
+  var KNOWN = {
+    wacc: 'WACC', tgr: 'Terminal growth', g: 'Terminal growth', terminal_growth: 'Terminal growth', exit_multiple: 'Exit multiple',
+    entry_multiple: 'Entry multiple', tax_rate: 'Tax rate', ke: 'Cost of equity', kd: 'Cost of debt', erp: 'Equity risk premium',
+    beta: 'Beta', rf: 'Risk-free rate', leverage: 'Leverage', synergies: 'Synergies', premium: 'Offer premium', offer_price: 'Offer price'
+  };
+  function labelOf(name) {
+    var k = String(name).toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(KNOWN, k)) return KNOWN[k];
+    var s = String(name).replace(/[_\-]+/g, ' ').trim();
+    return s.length <= 4 ? s.toUpperCase() : s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
   /** Merge option entries with manifest params and infer what is missing. */
   function resolveParams(list) {
     var man = (RK.data.manifest && RK.data.manifest.params) || {};
@@ -35,7 +48,7 @@
       var d = RK.util.merge({}, m, p);
       var cur = RK.store.param(d.name);
       d.base = isNum(d.default) ? d.default : isNum(d.value) ? d.value : isNum(cur) ? cur : 0;
-      d.label = d.label || d.title || d.name;
+      d.label = String(d.label || d.title || labelOf(d.name));
       var rate = d.base !== 0 && Math.abs(d.base) < 1;
       var span = rate ? Math.max(Math.abs(d.base) * 0.5, 0.01) : Math.max(Math.abs(d.base) * 0.5, 1);
       if (!isNum(d.step)) {
@@ -137,7 +150,7 @@
         var row = h('div.rk-ps__item',
           h('div.rk-ps__head',
             h('label.rk-ps__label', { for: d.id }, d.label),
-            h('span.rk-ps__readout', o.showDelta ? delta : null, valueBtn, reset)),
+            h('span.rk-ps__readout', o.showDelta ? delta : null, reset, valueBtn)),
           track, range);
         grid.appendChild(row);
 
@@ -202,42 +215,71 @@
         var strField = ds.fields.filter(function (f) { return f.type === 'string' || f.type === 'date'; })[0];
         var fields = (p.fields || [strField && strField.name].concat(computedNames)).filter(function (n) { return n && ds.has(n); });
         var totals = p.total === true ? fields.filter(function (n) { return ds.field(n).type === 'number'; }) : (p.total || []);
-        var compiled = {};
-        fields.forEach(function (n) {
-          var f = ds.field(n);
-          if (f.formula) {
-            try { compiled[n] = RK.expr.compile(f.formula, { fields: ds.fields }); } catch (e) { /* invalid formula: shown as n.a. */ }
-          }
-        });
         var wrap = h('div.rk-ps__preview');
-        if (p.title) wrap.appendChild(h('div.rk-ps__ptitle', p.title));
+        if (p.title) wrap.appendChild(h('div.rk-ps__ptitle', String(p.title)));
         var table = h('table.rk-table.rk-ps__table');
         wrap.appendChild(table);
+        // headline outputs under the table, e.g. PV of terminal value and enterprise value
+        var summary = (p.summary || []).filter(function (it) { return it && (it.field || it.expr); });
+        var sumEl = summary.length ? h('div.rk-ps__summary') : null;
+        if (sumEl) wrap.appendChild(sumEl);
+        var sumExpr = {};
+        summary.forEach(function (it, i) {
+          if (!it.expr) return;
+          var names = summary.slice(0, i).map(function (x, j) { return { name: x.name || 's' + j, type: 'number' }; });
+          try { sumExpr[i] = RK.expr.compile(it.expr, { fields: names }); } catch (e) { console.warn('[RK] param-slider summary', it.expr, e.message); }
+        });
+        /** Summary values for a set of rows: field aggregates, then formulas over the earlier items. */
+        function summarise(data, env) {
+          var vals = {}, out = [];
+          summary.forEach(function (it, i) {
+            var v = null;
+            if (it.field) {
+              var fn = RK.expr.agg[it.agg || 'sum'] || RK.expr.agg.sum;
+              v = fn(data.map(function (r) { return r[it.field]; }).filter(isNum));
+            } else if (sumExpr[i]) {
+              try { v = sumExpr[i].eval(vals, env); } catch (e) { v = null; }
+            }
+            vals[it.name || 's' + i] = v;
+            out.push(v);
+          });
+          return out;
+        }
 
         function baseParams() {
           var out = RK.util.merge({}, RK.store.params());
           defs.forEach(function (d) { out[d.name] = d.base; });
           return out;
         }
+        /** Base-case row: the dataset's computed fields re-evaluated in order with the base params (chains included). */
+        function baseRow(r, env) {
+          var b = RK.util.merge({}, r);
+          ds.computed.forEach(function (c) { try { b[c.def.name] = c.compiled.eval(b, env); } catch (e) { b[c.def.name] = null; } });
+          return b;
+        }
         function draw() {
           var data = RK.data.view(ds, p.where ? { where: p.where } : null);
           var env = { params: baseParams() };
+          var live = {};   // computed fields driven by a @param directly or through another computed field
+          ds.computed.forEach(function (c) { live[c.def.name] = c.compiled.params.length > 0 || c.compiled.fields.some(function (f) { return live[f]; }); });
+          // one key output column carries the weight; the other computed columns read as plain ink figures
+          var key = p.key || fields.filter(function (n) { return live[n]; }).slice(-1)[0];
           var thead = h('thead', h('tr', fields.map(function (n) {
             var f = ds.field(n);
-            return h('th', { class: f.type === 'number' ? 'is-num' : null }, f.title || n);
+            return h('th', { class: (f.type === 'number' ? 'is-num' : '') + (n === key ? ' is-key' : '') }, String(f.title || n));
           })));
           var tbody = h('tbody', data.map(function (r) {
+            var base = null;
             return h('tr', fields.map(function (n) {
               var f = ds.field(n), v = r[n];
               var td = h('td', { class: f.type === 'number' ? 'is-num' : null }, RK.format(v, f.format));
-              var c = compiled[n];
-              if (c && c.params.length) {
+              if (n === key) td.classList.add('is-key');
+              if (live[n]) {
                 td.classList.add('is-live');
-                var b;
-                try { b = c.eval(r, env); } catch (e) { b = null; }
+                var b = (base || (base = baseRow(r, env)))[n];
                 if (isNum(v) && isNum(b) && b !== 0 && Math.abs(v / b - 1) > 1e-9) {
                   var chg = v / b - 1;
-                  td.appendChild(h('span.rk-ps__chg', { class: chg > 0 ? 'is-up' : 'is-down' }, RK.format(chg, '+0.0%;-0.0%')));
+                  td.appendChild(h('span.rk-ps__chg', { class: chg > 0 ? 'is-up' : 'is-down' }, RK.format(chg, '+0.0%;(0.0%)')));
                 }
               }
               return td;
@@ -256,6 +298,20 @@
           table.appendChild(thead);
           table.appendChild(tbody);
           if (tfoot) table.appendChild(tfoot);
+          if (sumEl) {
+            var now = summarise(data, { params: RK.store.params() });
+            var then = summarise(data.map(function (r) { return baseRow(r, env); }), env);
+            sumEl.innerHTML = '';
+            summary.forEach(function (it, i) {
+              var v = now[i], b = then[i];
+              var fmt = it.format || (it.field && ds.field(it.field) && ds.field(it.field).format) || '$#,##0';
+              var chg = isNum(v) && isNum(b) && b !== 0 && Math.abs(v / b - 1) > 1e-9 ? v / b - 1 : null;
+              sumEl.appendChild(h('div.rk-ps__sitem', { class: it.key ? 'is-key' : null },
+                h('span.rk-ps__slabel', String(it.label || it.name || '')),
+                h('span.rk-ps__sval.rk-num', RK.format(v, fmt),
+                  chg != null ? h('span.rk-ps__chg', { class: chg > 0 ? 'is-up' : 'is-down' }, RK.format(chg, '+0.0%;(0.0%)')) : null)));
+            });
+          }
           if (ctx.motion) {
             wrap.classList.remove('is-flash');
             void wrap.offsetWidth;

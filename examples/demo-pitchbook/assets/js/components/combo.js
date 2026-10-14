@@ -23,6 +23,8 @@
       lineAxisFormat: null,        // right-axis tick format (defaults to lineFormat, trimmed when ticks are whole)
       forecastFrom: 'auto',        // x value where estimates start | 'auto' (period field "E…" or x ending in E/F/B) | null
       forecastLabel: 'Projected',  // caption over the estimate band ('' = none)
+      lineColor: 'auto',           // first line: 'auto' (ink-2 in band layout, a palette colour clear of the bars in overlay) | token | colour
+      axisTitles: 'auto',          // value-axis titles with units: 'auto' (overlay layout) | true | false
       cagr: false,                 // false | true (first -> last) | 'split' (actuals + estimates) | {from, to, label, field} | [...]
       cagrFormat: '0.0%',
       legend: true,
@@ -38,11 +40,13 @@
       var bfmt = o.format || ctx.fmtOf(bars.length ? bars[0].field : null) || 'auto';
       var lfmt = o.lineFormat || ctx.fmtOf(lines.length ? lines[0].field : null) || '0.0%';
       var band = o.layout !== 'overlay';
-      // primary line in accent2; bars and further lines from the palette, kept clear of it
-      var pal = RK.theme.palette({ n: bars.length + lines.length });
+      // accent2 is reserved for a highlighted target: the primary line is ink-2 (band) or a palette colour clear of
+      // the bars (overlay, where it crosses them); lineColor: 'accent2' opts in explicitly
+      var pal = RK.theme.palette({ n: bars.length + lines.length + 1 });
       var ord = o.barStack && bars.length > 1 && bars.length <= t.ord.length;   // stacked bars: parts of a whole
       var barColor = function (i) { return bars.length === 1 ? t.accent : ord ? t.ord[i] : pal[i]; };
-      var lineColor = function (i) { return i === 0 ? t.accent2 : i === 1 ? t.ink3 : pal[bars.length + i - 2]; };
+      var line0 = o.lineColor && o.lineColor !== 'auto' ? RK.theme.resolve(o.lineColor) : band ? t.ink2 : farthest(bars.map(function (b, i) { return barColor(i); }), t);
+      var lineColor = function (i) { return i === 0 ? line0 : pal[bars.length + i - (band ? 1 : 0)]; };
 
       // per-category bar tops (stack totals or tallest bar) — used for scales, labels and CAGR legs
       var pos = [], neg = [], tops = [];
@@ -64,7 +68,9 @@
       // labels: 'auto' = on when the bars are wide enough to carry them
       var groups = o.barStack ? 1 : Math.max(1, bars.length);
       var barPx = (inst.getWidth() - 110) / Math.max(1, n) * 0.62 / groups;
-      var autoBars = barPx >= 34 && n <= 16, autoLine = n <= 16;
+      // line labels need their own width per category (narrow blocks: the axis carries the values instead)
+      var lineLabW = C.measure(RK.format(0.888, o.lineFormat || ctx.fmtOf(lines.length ? lines[0].field : null) || '0.0%'), '600 10.5px ' + t.fontNum);
+      var autoBars = barPx >= 34 && n <= 16, autoLine = n <= 16 && (inst.getWidth() - 110) / Math.max(1, n) >= lineLabW + 6;
       var showBarLabels = o.labels === true || o.labels === 'bars' || (o.labels === 'auto' && autoBars);
       var showLineLabels = o.labels === true || o.labels === 'line' || (o.labels === 'auto' && autoLine);
       var labelPad = showBarLabels ? 18 : 6;
@@ -76,6 +82,10 @@
       /* ---------------- value axes ---------------- */
       var hasLegend = o.legend !== false && bars.length + lines.length > 1;
       var gridTop = hasLegend ? 40 : (fi >= 0 && o.forecastLabel ? 24 : 12);
+      // dual axes need their titles and units (classic overlay layout; the band layout labels the line itself)
+      var titled = o.axisTitles === true || (o.axisTitles === 'auto' && !band);
+      var leftTitle = titled ? axisTitle(ctx, bars) : '', rightTitle = titled && lines.length ? axisTitle(ctx, lines) : '';
+      if (leftTitle || rightTitle) gridTop += 18;
       var plotH = Math.max(120, inst.getHeight() - gridTop - (o.zoom && !ctx.print ? 56 : 26));
       var lineLo = 0.72, lineHi = 0.92;
       var yLeft, yRight = null, lAxisFmt = o.lineAxisFormat || lfmt;
@@ -111,9 +121,10 @@
           for (var lv = Math.floor(lmin / lstep) * lstep; lv <= Math.ceil(lmax / lstep) * lstep + 1e-9; lv += lstep) {
             if (lv >= A && lv <= B) lticks.push(+lv.toPrecision(12));
           }
+          // the band carries its own value labels: a second, gridless axis beside them only floats (no labels then)
           yRight = {
             type: 'value', position: 'right', min: A, max: B, splitLine: { show: false },
-            axisLabel: { customValues: lticks, formatter: C.tickFmt(lAxisFmt, o.lineAxisFormat ? null : lstep) },
+            axisLabel: { show: !showLineLabels, customValues: lticks, formatter: C.tickFmt(lAxisFmt, o.lineAxisFormat ? null : lstep) },
             axisTick: { show: false, customValues: lticks }
           };
         }
@@ -126,7 +137,8 @@
         var k = Math.max(1, Math.round((omax - omin) / ostep));
         yLeft = { type: 'value', min: omin, max: omax, interval: ostep, axisLabel: { formatter: C.tickFmt(bfmt, ostep) } };
         if (hasLine) {
-          var al = alignScale(lmin, lmax, k);
+          // ratios (margins, growth) start at zero like the bars: a 17-20% axis would exaggerate a 2pt move
+          var al = alignScale(lmin >= 0 ? 0 : lmin, lmax, k);
           yRight = { type: 'value', position: 'right', min: al.min, max: al.max, interval: al.step, splitLine: { show: false },
             axisLabel: { formatter: C.tickFmt(lAxisFmt, o.lineAxisFormat ? null : al.step) } };
         }
@@ -148,7 +160,7 @@
         series.push({
           id: 'b-' + bi, name: b.name, type: 'bar', yAxisIndex: 0,
           stack: o.barStack ? 'bars' : null,
-          barGap: '14%', barCategoryGap: groups > 1 ? '30%' : '36%',
+          barGap: '14%', barCategoryGap: groups > 1 ? '30%' : '36%', barMaxWidth: 64,   // wide blocks get proper columns
           z: 2,
           itemStyle: { color: base },          // series colour also drives the legend icon
           label: showBarLabels ? C.label(ctx, bfmt, o.barStack ? {
@@ -170,7 +182,7 @@
       // stack totals sit on an invisible zero-height series, as in the bar component
       if (o.barStack && bars.length > 1 && showBarLabels) {
         series.push({
-          id: 'b-total', name: 'Total', type: 'bar', stack: 'bars', silent: true, yAxisIndex: 0,
+          id: 'b-total', name: 'Total', type: 'bar', stack: 'bars', silent: true, yAxisIndex: 0, barMaxWidth: 64,
           itemStyle: { color: 'transparent' }, tooltip: { show: false },
           label: { show: true, position: 'insideBottom', distance: 4, color: t.ink, fontWeight: 600, fontSize: 10.5, fontFamily: t.fontNum,
             formatter: function (p) { return RK.format(pos[p.dataIndex], bfmt); } },
@@ -186,6 +198,7 @@
           lineStyle: { width: 2, color: col },
           itemStyle: { color: col, borderColor: t.paper, borderWidth: 1 },
           emphasis: { focus: 'none', scale: 1.3 },
+          labelLayout: { hideOverlap: true },          // crowded (narrow) blocks drop colliding labels rather than stack them
           label: showLineLabels ? { show: true, position: 'top', distance: 6, color: labCol, fontSize: 10.5, fontWeight: 600, fontFamily: t.fontNum,
             // overlay: the line crosses the bars, so its labels sit on small paper chips
             backgroundColor: band ? null : RK.theme.alpha(t.paper, 0.92), padding: band ? 0 : [1, 3], borderRadius: 2,
@@ -223,7 +236,7 @@
             var x0 = Math.max(cs.x, x);
             var kids = [{ type: 'rect', shape: { x: x0, y: cs.y, width: right - x0, height: cs.height }, style: { fill: RK.theme.alpha(t.ink, t.dark ? 0.05 : 0.028) } }];
             if (x > cs.x + 1) kids.push({ type: 'line', shape: { x1: x, y1: cs.y - 6, x2: x, y2: cs.y + cs.height }, style: { stroke: t.axis, lineWidth: 1, lineDash: [3, 3] } });
-            if (caption) kids.push({ type: 'text', x: x0 + 6, y: cs.y - 3, style: { text: caption, fill: t.ink3, font: '600 9.5px ' + t.fontSans, align: 'left', verticalAlign: 'bottom' } });
+            if (caption) kids.push({ type: 'text', x: x0 + 6, y: cs.y - 3, style: { text: caption, fill: t.ink3, font: '600 10px ' + t.fontSans, align: 'left', verticalAlign: 'bottom' } });
             return { type: 'group', children: kids };
           }
         });
@@ -238,6 +251,9 @@
           s.end = o.barStack ? pos : s.values;
           s.rate = cagrRate(s.values[s.from], s.values[s.to], periodsBetween(cats[s.from], cats[s.to], s.to - s.from));
           s.text = (s.label || (cagrs.length > 1 ? shortX(cats[s.from]) + '–' + shortX(cats[s.to]) + ' CAGR' : 'CAGR')) + ': ' + RK.format(s.rate, o.cagrFormat);
+          s.pillW = C.measure(s.text, '600 10.5px ' + t.fontNum) + 20;
+          s.shortText = 'CAGR ' + RK.format(s.rate, o.cagrFormat);          // for brackets narrower than their caption
+          s.shortW = C.measure(s.shortText, '600 10.5px ' + t.fontNum) + 20;
           for (var k = s.from; k <= s.to; k++) level = Math.max(level, tops[k]);
           s.padL = cagrs.some(function (x) { return x !== s && x.to === s.from; }) ? 5 : 0;
           s.padR = cagrs.some(function (x) { return x !== s && x.from === s.to; }) ? 5 : 0;
@@ -260,14 +276,16 @@
             var y1 = api.coord([s.from, Math.max(0, s.end[s.from] || 0)])[1] - labelPad - 2;
             var y2 = api.coord([s.to, Math.max(0, s.end[s.to] || 0)])[1] - labelPad - 1;
             var accent = t.dark ? t.ink : t.accent;
+            var short = s.pillW > Math.abs(x2 - x1) + 40, pw = short ? s.shortW : s.pillW;
             var fade = { style: { opacity: 0 } };
             return {
               type: 'group',
               children: [
                 { type: 'polyline', shape: { points: [[x1, y1], [x1, yTop], [x2, yTop], [x2, y2 - 5]] }, style: { stroke: ink, lineWidth: 1, fill: null }, enterFrom: fade },
                 { type: 'polygon', shape: { points: [[x2 - 3.5, y2 - 6], [x2 + 3.5, y2 - 6], [x2, y2]] }, style: { fill: ink }, enterFrom: fade },
-                { type: 'text', x: (x1 + x2) / 2, y: yTop, enterFrom: fade,
-                  style: { text: s.text, align: 'center', verticalAlign: 'middle', fill: accent, font: '600 10.5px ' + t.fontNum,
+                // the pill stays inside the plot even when the bracket is narrower than its text
+                { type: 'text', x: U.clamp((x1 + x2) / 2, params.coordSys.x + pw / 2, params.coordSys.x + params.coordSys.width - pw / 2), y: yTop, enterFrom: fade,
+                  style: { text: short ? s.shortText : s.text, align: 'center', verticalAlign: 'middle', fill: accent, font: '600 10.5px ' + t.fontNum,
                     backgroundColor: t.paper, borderColor: accent, borderWidth: 1, borderRadius: 10, padding: [3, 9] } }
               ]
             };
@@ -302,6 +320,13 @@
         },
         xAxis: { type: 'category', data: cats, axisLabel: { interval: 0, hideOverlap: true } },
         yAxis: yAxes,
+        graphic: [leftTitle, rightTitle].map(function (txt, i) {
+          if (!txt) return null;
+          var g = { type: 'text', id: 'axis-title-' + i, top: gridTop - 24, silent: true,
+            style: { text: txt, fill: t.ink3, font: '11px ' + t.fontSans } };
+          g[i ? 'right' : 'left'] = 0;
+          return g;
+        }).filter(Boolean),
         dataZoom: o.zoom ? C.zoom(ctx, 'x') : [],
         series: series
       };
@@ -378,6 +403,38 @@
     return [].concat(c).filter(U.isObj).map(function (s) {
       return { from: at(s.from, 0), to: at(s.to, n - 1), label: s.label, field: s.field };
     }).filter(function (s) { return s.from >= 0 && s.to > s.from; });
+  }
+
+  /** Overlay line colour: the palette colour (not red / green, not the target accent) most distinct from the bars it crosses. */
+  function farthest(barCols, t) {
+    var best = null, bd = -1;
+    RK.theme.palette({ exclude: [t.accent2, t.pos, t.neg, t.ref] }).forEach(function (c) {      // base colours only, no tints
+      if (changeHue(c)) return;                     // red / green read as change, not as a metric
+      var d = Math.min.apply(null, barCols.map(function (b) { return RK.theme.distance(c, b); }).concat([999]));
+      if (d > bd) { bd = d; best = c; }
+    });
+    return best || t.ink2;
+  }
+
+  /** Saturated reds and greens (hue 330-20 or 85-165 degrees). */
+  function changeHue(c) {
+    var p = RK.theme.parseColor(c), r = p[0] / 255, g = p[1] / 255, b = p[2] / 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    if (d < 0.15) return false;                     // greys
+    var h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    h = (h * 60 + 360) % 360;
+    return h >= 330 || h <= 20 || (h >= 85 && h <= 165);
+  }
+
+  /** "Revenue (USD m)" for one series, the shared unit ("USD m", "%") for several. */
+  function axisTitle(ctx, list) {
+    if (!list.length) return '';
+    var f = ctx.field(list[0].field) || {};
+    var unitOf = function (g) { return g.unit || (/%/.test(String(RK.format.presets[g.format] || g.format || '')) ? '%' : ''); };
+    var unit = unitOf(f);
+    if (!list.every(function (x) { return unitOf(ctx.field(x.field) || {}) === unit; })) unit = '';
+    var name = list.length === 1 ? String(list[0].name) : '';
+    return name && unit ? name + ' (' + unit + ')' : name || unit;
   }
 
   function seriesIndex(bars, key) {

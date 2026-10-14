@@ -12,6 +12,39 @@
   var SEARCH_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5"/></svg>';
 
   function truthy(v) { return v === true || v === 1 || v === 'true' || v === 'Y' || v === 'yes'; }
+
+  /** Accounting negatives (house rule): '$#,##0' -> '$#,##0;($#,##0)'; an explicit '-' section -> parentheses. */
+  function acct(code) {
+    var c = code && (RK.format.presets[code] || code);
+    if (typeof c !== 'string' || !/[0#?]/.test(c.replace(/"[^"]*"/g, '')) || RK.format.isDateCode(c)) return code;
+    var s = [], cur = '', q = false;
+    for (var i = 0; i < c.length; i++) {
+      var ch = c[i];
+      if (ch === '"') q = !q;
+      if (ch === ';' && !q) { s.push(cur); cur = ''; } else cur += ch;
+    }
+    s.push(cur);
+    if (s.length === 1) return c + ';(' + c.replace(/^\+/, '') + ')';
+    if (/^-/.test(s[1])) s[1] = '(' + s[1].slice(1) + ')';
+    return s.join(';');
+  }
+
+  /**
+   * Header / group titles and cell tooltips as DOM text nodes: Tabulator writes string titles and string
+   * tooltips with innerHTML, so data-derived text (schema titles, company names) must never reach it as a string.
+   */
+  function textTitle(title) {
+    return function () { var el = document.createElement('span'); el.textContent = title == null ? '' : String(title); return el; };
+  }
+  function textTip(fmt) {
+    return function (e, cell) {
+      var v = cell.getValue();
+      if (v == null || v === '') return '';
+      var el = document.createElement('div');
+      el.textContent = RK.format(v, fmt);
+      return el;
+    };
+  }
   // generic field names (link tables, bridges...) cross-filter only this dataset (house rule: scoped selections)
   var GENERIC = /^(type|kind|source|target|step|stage|metric|status|name|label|key|id|category|group|series)$/i;
 
@@ -62,6 +95,7 @@
       c.title = c.title != null ? c.title : ctx.title(c.field);
       c.format = c.format || f.format || (c.type === 'number' ? '#,##0.##' : c.type === 'date' ? 'dd mmm yyyy' : null);
       c.num = c.type === 'number';
+      if (c.num && !c.sign) c.format = acct(c.format);   // negatives in parentheses; signed change columns keep '+' / '-'
       return c;
     });
   }
@@ -79,7 +113,8 @@
     var defs = specs.map(function (c, i) {
       var fmt = c.format;
       var d = {
-        title: c.title,
+        title: c.title,              // raw text: only read by Tabulator itself (never rendered: titleFormatter below)
+        titleFormatter: textTitle(c.title),
         field: c.field,
         hozAlign: c.align || (c.num ? 'right' : 'left'),
         headerHozAlign: c.align || (c.num ? 'right' : 'left'),
@@ -95,10 +130,10 @@
         headerSortStartingDir: c.num ? 'desc' : 'asc',
         cssClass: c.num ? 'is-num' : null,
         resizable: true,
-        minWidth: c.minWidth || (c.num ? 64 : 90)
+        minWidth: c.minWidth || (c.num ? 76 : 90)
       };
       if (c.width) d.width = c.width;
-      if (!c.num && c.type !== 'boolean') d.tooltip = true;
+      if (!c.num && c.type !== 'boolean') d.tooltip = textTip(fmt);
       if (o.headerFilters !== false && c.headerFilter !== false) {
         d.headerFilter = 'input';
         d.headerFilterPlaceholder = 'Filter';
@@ -112,7 +147,7 @@
     var out = [];
     for (var i = 0; i < specs.length; i++) {
       if (!specs[i].group) { out.push(defs[i]); continue; }
-      var g = { title: specs[i].group, headerHozAlign: 'center', columns: [] };
+      var g = { title: specs[i].group, titleFormatter: textTitle(specs[i].group), headerHozAlign: 'center', columns: [] };
       while (i < specs.length && specs[i].group === g.title) { g.columns.push(defs[i]); i++; }
       i--;
       out.push(g);
@@ -158,8 +193,9 @@
         bar.appendChild(dl);
       }
       var holder = h('div.rk-dgrid__table', { class: o.pagination ? 'is-paged' : null });
+      var frame = h('div.rk-dgrid__frame', { class: o.pagination ? 'is-paged' : null }, holder);   // carries the scroll-edge fade
       root.appendChild(bar);
-      root.appendChild(holder);
+      root.appendChild(frame);
       ctx.el.appendChild(root);
 
       function marks() { return cur.options.highlight == null ? [] : [].concat(cur.options.highlight); }
@@ -203,6 +239,31 @@
       }
       var table = new window.Tabulator(holder, config);
 
+      /* ---------------- horizontal scroll cue + whole-row viewport ---------------- */
+      var tholder = null;
+      function edges() {
+        if (!tholder) return;
+        var more = tholder.scrollWidth - tholder.clientWidth - tholder.scrollLeft > 1;
+        frame.classList.toggle('is-more-r', more);
+        frame.classList.toggle('is-scrolled-x', tholder.scrollLeft > 1);
+        var foot = holder.querySelector('.tabulator-footer');
+        frame.style.setProperty('--rk-dgrid-foot', (foot ? foot.offsetHeight : 0) + 'px');
+      }
+      /** Virtual-scroll grids: header + a whole number of rows, so the last visible row is never sliced. */
+      function fitRows() {
+        if (!built || cur.options.pagination || !tholder) return;
+        var row = tholder.querySelector('.tabulator-row');
+        var avail = tableHeight();
+        if (!row) { table.setHeight(avail); return; }
+        var rowH = row.offsetHeight, el = table.element;
+        var chrome = el.offsetHeight - tholder.clientHeight;      // header + horizontal scrollbar + borders
+        var content = tholder.scrollHeight;
+        if (content <= avail - chrome) { if (el.offsetHeight !== Math.ceil(chrome + content)) table.setHeight(Math.ceil(chrome + content)); return; }
+        var n = Math.max(3, Math.floor((avail - chrome) / rowH));
+        var want = Math.min(avail, chrome + n * rowH);
+        if (Math.abs(el.offsetHeight - want) > 0.5) table.setHeight(want);
+      }
+
       function setCount() {
         if (!built) return;
         var shown = table.getDataCount('active'), total = cur.rows.length;
@@ -215,11 +276,16 @@
 
       table.on('tableBuilt', function () {
         built = true;
+        tholder = holder.querySelector('.tabulator-tableholder');
+        if (tholder) tholder.addEventListener('scroll', edges, { passive: true });
         if (cur.motion) root.classList.add('is-in');
+        fitRows();
+        edges();
         setCount();
         if (pending) { var p = pending; pending = null; apply(p); }
       });
-      table.on('dataFiltered', function () { setTimeout(setCount, 0); });
+      table.on('dataFiltered', function () { setTimeout(function () { setCount(); edges(); }, 0); });
+      table.on('renderComplete', function () { edges(); });
       table.on('rowClick', function (e, row) {
         if (cur.options.crossFilter === false) return;
         cur.select(key, row.getData()[key], GENERIC.test(key) && !cur.options.crossFilterScope ? { scope: 'dataset' } : null);
@@ -246,10 +312,16 @@
       }, 160);
       if (search) search.addEventListener('input', onSearch);
 
+      /**
+       * CSV of the filtered rows in the current sort order, through RK.Dataset.toCSV (quotes values and
+       * neutralises spreadsheet formulas: a text cell starting with = + - @ is written as text).
+       */
       function onDownload() {
         if (!built) return;
         var name = (cur.dataset.id || 'data') + '.csv';
-        table.download('csv', name, { bom: true }, 'active');
+        var fields = specs.map(function (c) { return { name: c.field, title: c.title == null ? c.field : String(c.title), type: c.type }; });
+        var csv = RK.Dataset.prototype.toCSV.call(cur.dataset, table.getData('active'), fields);
+        util.download(name, csv, 'text/csv;charset=utf-8');
       }
       if (dl) dl.addEventListener('click', onDownload);
 
@@ -257,7 +329,7 @@
       function apply(c) {
         cur = c;
         if (!built) { pending = c; return; }
-        table.replaceData(rowsCopy(c)).then(function () { restyle(); setCount(); });
+        table.replaceData(rowsCopy(c)).then(function () { restyle(); setCount(); fitRows(); edges(); });
       }
 
       return {
@@ -266,8 +338,11 @@
           if (!built) return;
           if (!cur.options.pagination) table.setHeight(tableHeight());
           table.redraw();
+          fitRows();
+          edges();
         },
         destroy: function () {
+          if (tholder) tholder.removeEventListener('scroll', edges);
           if (search) search.removeEventListener('input', onSearch);
           if (dl) dl.removeEventListener('click', onDownload);
           if (cur.options.searchFilters) RK.store.clearFilter(cur.id + ':search');

@@ -100,7 +100,9 @@
       if (t === '.') el.classList.add(v); else el.id = v;
     });
     var kids = Array.prototype.slice.call(arguments, 2);
-    if (props && (typeof props !== 'object' || props.nodeType || Array.isArray(props))) { kids.unshift(props); props = null; }
+    // second argument is a props bag only when it is a plain object; data values must be passed as children
+    // (dataset cells are normalised to scalars by RK.Dataset, so a data cell can never become props)
+    if (props && (typeof props !== 'object' || props.nodeType || Array.isArray(props) || Object.getPrototypeOf(props) !== Object.prototype)) { kids.unshift(props); props = null; }
     if (props) {
       for (var k in props) {
         var v = props[k];
@@ -161,6 +163,14 @@
       g.push(rows[i]);
     }
     return map;
+  };
+
+  /** Balanced grid columns: as many as fit at minW, with rows evened out (6 -> 3x2 rather than 4+2). */
+  util.balancedCols = function (n, width, minW) {
+    if (!n) return 1;
+    var fit = Math.max(1, Math.min(n, Math.floor(width / (minW || 160))));
+    var rows = Math.ceil(n / fit);
+    return Math.ceil(n / rows);
   };
 
   util.unique = function (arr) {
@@ -622,6 +632,16 @@
     return compile(spec)(v);
   }
 
+  /** '#,##0.0' -> '#,##0.0;(#,##0.0)': accounting negatives in parentheses (pitchbook tables). */
+  format.parens = function (spec) {
+    var code = presets[spec] || spec || '#,##0';
+    return String(code).indexOf(';') >= 0 ? code : code + ';(' + code + ')';
+  };
+  /** '0.0%' -> '+0.0%;(0.0%);0.0%': signed changes, negatives in parentheses. */
+  format.signed = function (spec) {
+    var code = presets[spec] || spec || '#,##0.0';
+    return String(code).indexOf(';') >= 0 ? code : '+' + code + ';(' + code + ');' + code;
+  };
   format.compile = compile;
   format.compact = compact;
   format.round = round;
@@ -1419,6 +1439,18 @@
         return o;
       });
     }
+    // Cells must be scalars (or arrays, e.g. sparklines). Object cells (dict / JSONB columns) are turned into JSON
+    // text so they can never be mistaken for DOM props / markup by components.
+    for (var ri = 0; ri < data.length; ri++) {
+      var rec = data[ri];
+      for (var ck in rec) {
+        if (Object.prototype.hasOwnProperty.call(rec, ck)) {
+          var cv = rec[ck];
+          if (cv !== null && typeof cv === 'object' && !Array.isArray(cv)) rec[ck] = JSON.stringify(cv);
+          else if (Array.isArray(cv)) rec[ck] = cv.map(function (x) { return x !== null && typeof x === 'object' ? JSON.stringify(x) : x; });
+        }
+      }
+    }
     this.rows = data;
     if (!fields) {
       var names = data.length ? Object.keys(data[0]) : [];
@@ -1533,7 +1565,9 @@
     function esc(v) {
       if (v == null) return '';
       var s = String(v);
-      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      // spreadsheet formula injection: =HYPERLINK(...), +cmd, -cmd, @SUM... are executed by Excel on open
+      if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s) && !/^-?\d/.test(s)) s = "'" + s;
+      return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     }
     var lines = [fields.map(function (f) { return esc(f.title || f.name); }).join(',')];
     rows.forEach(function (r) { lines.push(fields.map(function (f) { return esc(get(r, f.name)); }).join(',')); });
@@ -2144,7 +2178,7 @@
 
   var TOKEN_NAMES = [
     'font-sans', 'font-serif', 'font-num', 'paper', 'canvas', 'surface', 'surface-2',
-    'ink', 'ink-2', 'ink-3', 'rule', 'grid', 'axis', 'accent', 'accent-2', 'accent-3',
+    'ink', 'ink-2', 'ink-3', 'rule', 'grid', 'axis', 'accent', 'accent-2', 'accent-2-ink', 'accent-3',
     'highlight', 'pos', 'neg', 'neutral', 'tooltip-bg', 'tooltip-ink', 'map-land', 'map-border', 'map-water'
   ];
 
@@ -2229,6 +2263,7 @@
     t.axis = t.axis || t.ink3;
     t.accent = t.accent || t.cat[0];
     t.accent2 = t.accent2 || t.cat[3] || t.cat[1];
+    t.accent2Ink = t.accent2Ink || t.accent2;   // use for TEXT in the highlight colour (contrast >= 4.5:1)
     t.pos = t.pos || '#2f7d6d';
     t.neg = t.neg || '#a3485a';
     t.neutral = t.neutral || '#9ca3af';
@@ -2294,7 +2329,8 @@
       bar: { barMaxWidth: 36, itemStyle: { borderRadius: 0 } },
       scatter: { symbolSize: 8 },
       candlestick: { itemStyle: { color: t.pos, color0: t.neg, borderColor: t.pos, borderColor0: t.neg } },
-      markLine: { lineStyle: { color: t.ink3, type: 'dashed' }, label: { color: t.ink2, fontSize: 11 }, symbol: ['none', 'none'] },
+      // precision: ECharts rounds markLine values to the axis precision by default, which misplaces medians
+      markLine: { precision: 10, lineStyle: { color: t.ink3, type: 'dashed' }, label: { color: t.ink2, fontSize: 11 }, symbol: ['none', 'none'] },
       dataZoom: {
         borderColor: t.rule, backgroundColor: 'transparent', fillerColor: alpha(t.accent, 0.08),
         handleStyle: { color: t.paper, borderColor: t.accent }, moveHandleStyle: { color: alpha(t.accent, 0.35) },
@@ -2374,7 +2410,10 @@
     /** Readable label colour on top of a data fill, correct in light and dark themes. */
     textOn: function (fill) {
       var t = theme.tokens();
-      return onColor(fill, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#ffffff');
+      var c = onColor(fill, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#ffffff');
+      if (contrast(fill, c) >= 4.5) return c;
+      // neither theme colour is legible enough on this fill: fall back to pure black / white
+      return contrast(fill, '#000000') >= contrast(fill, '#ffffff') ? '#000000' : '#ffffff';
     },
 
     /**
@@ -2725,6 +2764,14 @@
       var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
       return RK.format(v, ok ? trimmed : code);
     };
+  };
+
+  /**
+   * Make a data string safe inside an ECharts rich-text template ('{n|' + name + '}'): braces in data would
+   * otherwise start / end style runs. Replaces them with look-alike full-width characters.
+   */
+  chart.richSafe = function (s) {
+    return s == null ? '' : String(s).replace(/\{/g, '\uFF5B').replace(/\}/g, '\uFF5D');
   };
 
   RK.chart = chart;
@@ -4017,6 +4064,12 @@
         var def = RK.components[el.getAttribute('data-rk')];
         mount(el, { lazy: def ? def.lazy !== false : true });
       });
+      // labels are measured with canvas text metrics: once web fonts arrive, re-lay out what was drawn before
+      if (document.fonts && document.fonts.status !== 'loaded' && document.fonts.ready) {
+        document.fonts.ready.then(function () {
+          blocks.forEach(function (b) { if (b.state === 'rendered') { b.resize(); if (b.def && b.def.relayoutOnFonts !== false) b.refresh(); } });
+        });
+      }
       RK.bus.emit('report:ready', RK);
       return RK;
     });

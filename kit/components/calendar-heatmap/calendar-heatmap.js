@@ -360,8 +360,7 @@
 
   /** "0.0%" -> "0.0%;(0.0%)": negatives in brackets (a format with its own sections is kept). */
   function negParens(code) {
-    code = String(RK.format.presets[code] || code);
-    return code.indexOf(';') >= 0 || code === 'auto' ? code : code + ';(' + code + ')';
+    return code === 'auto' ? code : RK.format.parens(code);
   }
   /** "0.0%" -> "+0.0%;(0.0%);0.0%": red / green summary figures always carry a sign. */
   function signedParens(code) {

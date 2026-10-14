@@ -9,26 +9,35 @@
   var C = RK.chart, util = RK.util;
 
   /* ---------- helpers ---------- */
-  var measure = null;
-  function textWidth(s, font) {
-    if (!measure) measure = document.createElement('canvas').getContext('2d');
-    measure.font = font;
-    return measure.measureText(String(s)).width;
-  }
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
-  /**
-   * Categorical palette for peers: drops colours too close to accent-2 (reserved for the target)
-   * and near-duplicates of a colour already kept, so adjacent series stay distinguishable.
-   */
-  function paletteFor(t) {
-    function dist(x, y) {
-      var a = RK.theme.parseColor(x), b = RK.theme.parseColor(y);
-      return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
-    }
-    var base = t.cat.filter(function (c) { return dist(c, t.accent2) > 64; });
-    var pal = [];
-    base.forEach(function (c) { if (pal.every(function (k) { return dist(c, k) > 48; })) pal.push(c); });
-    return pal.length >= 3 ? pal : (base.length ? base : t.cat);
+
+  /** Axis tick format: the value format with no more decimals than the tick step needs (10x not 10.0x). */
+  function tickFmt(fmt, step) {
+    var code = RK.format.presets[fmt] || fmt;
+    if (typeof code !== 'string' || !step || !/[0#]/.test(code) || RK.format.isDateCode(code)) return fmt;
+    var sec = code.split(';')[0].replace(/"[^"]*"/g, ''), scale = Math.pow(1000, ((sec.match(/[0#](,+)[^0#]*$/) || [])[1] || '').length);
+    var v = Math.abs(step) * (/%/.test(sec) ? 100 : 1) / scale, dec = 0;
+    while (dec < 4 && Math.abs(Math.round(v * Math.pow(10, dec)) - v * Math.pow(10, dec)) > 1e-6) dec++;
+    return code.replace(/([0#])\.([0#]+)/g, function (m, a, d) { var n = Math.min(dec, d.length); return a + (n ? '.' + d.slice(0, n) : ''); });
+  }
+
+  /** Value text with a true minus sign. */
+  function num(v, f) { return RK.format(v, f).replace(/^-/, '\u2212'); }
+  /** Largest 1 / 2 / 2.5 / 5 x 10^k at or below v (size-key values). */
+  function niceBelow(v) {
+    if (!(v > 0)) return 0;
+    var mag = Math.pow(10, Math.floor(Math.log10(v))), n = v / mag;
+    return (n >= 5 ? 5 : n >= 2.5 ? 2.5 : n >= 2 ? 2 : 1) * mag;
+  }
+  /** Rows a wrapping (type 'plain') ECharts legend needs within `avail` px — mirrors ECharts' box layout. */
+  function legendRows(names, avail, font) {
+    var rows = 1, x = 0;
+    names.forEach(function (n) {
+      var w = 15 + C.measure(n, font);
+      if (x > 0 && x + w > avail) { rows++; x = 0; }
+      x += w + 14;
+    });
+    return rows;
   }
 
   /** Summary stats of a numeric array (sorted copy, quartiles by linear interpolation). */
@@ -86,13 +95,15 @@
       refLines: [],               // [{value, label, color}] e.g. offer premium, sector average
       colorBy: 'single',          // 'single' | 'group' | <field name> (categorical + legend)
       symbolSize: 10,             // dot diameter (px)
-      sizeRange: [6, 24],         // diameter range when encode.size is set (sqrt / area scale)
+      sizeRange: [7, 24],         // diameter range when encode.size is set (sqrt scale); >= 7px so the smallest dot never reads as a speck
+      sizeLegend: true,           // size key (nested-circle scale, top right) when encode.size is set
       sortGroups: null,           // null (data order) | 'desc' | 'asc' (by median) | 'alpha'
       format: null,               // value format; defaults to the value field format
       zoom: false,                // dataZoom along the value axis
+      wheelZoom: null,            // zoom: null = Ctrl/Cmd + wheel or pinch (plain wheel scrolls the report) | true = plain wheel
       legend: true                // legend (only shown when colorBy is a field)
     },
-    render: C(function (ctx) {
+    render: C(function (ctx, inst) {
       var o = ctx.options, t = ctx.theme, enc = ctx.enc;
       var horiz = o.orientation !== 'vertical';
       var fmt = o.format || ctx.fmtOf(enc.value) || 'auto';
@@ -123,24 +134,24 @@
       var hl = o.highlight == null ? [] : [].concat(o.highlight);
       var isHL = function (r) { return (enc.target && r[enc.target] === true) || hl.some(function (h) { return same(h, r[lf]); }); };
 
-      // colours (accent-2 is reserved for the target, so it is skipped in categorical palettes)
-      var pal = paletteFor(t);
-      var peerColor = t.accent3 || t.cat[1];
+      // colours: categorical palettes skip accent-2 (reserved for the target); one peer colour across the kit
+      var peerColor = t.peer || t.accent;
       var colorField = o.colorBy && o.colorBy !== 'single' && o.colorBy !== 'group' && ctx.dataset && ctx.dataset.has(o.colorBy) ? o.colorBy : null;
       // colour order from the unfiltered rows so colours stay put while cross-filters change
       var cats = colorField ? util.unique(ctx.allRows.map(function (r) { return r[colorField]; })) : [];
       var groupOrder = util.unique(ctx.allRows.map(groupOf));
+      var pal = RK.theme.palette({ n: Math.max(cats.length, groupOrder.length) });
       var colorOf = function (r) {
-        if (colorField) return pal[cats.indexOf(r[colorField]) % pal.length];
-        if (o.colorBy === 'group') return pal[groupOrder.indexOf(groupOf(r)) % pal.length];
+        if (colorField) return pal[cats.indexOf(r[colorField])];
+        if (o.colorBy === 'group') return pal[groupOrder.indexOf(groupOf(r))];
         return peerColor;
       };
 
       // dot radius: fixed, or sqrt-scaled by encode.size
       var sizeExt = enc.size ? util.extent(rows.map(function (r) { return r[enc.size]; })) : null;
-      var radiusOf = function (r) {
+      var radiusOf = function (r, val) {
         if (!sizeExt) return (o.symbolSize || 10) / 2;
-        var v = r[enc.size], lo = Math.sqrt(Math.max(0, sizeExt[0])), hi = Math.sqrt(Math.max(0, sizeExt[1]));
+        var v = r ? r[enc.size] : val, lo = Math.sqrt(Math.max(0, sizeExt[0])), hi = Math.sqrt(Math.max(0, sizeExt[1]));
         if (!util.isNum(v)) return o.sizeRange[0] / 2;
         var tt = hi > lo ? (Math.sqrt(Math.max(0, v)) - lo) / (hi - lo) : 0.5;
         return (o.sizeRange[0] + tt * (o.sizeRange[1] - o.sizeRange[0])) / 2;
@@ -170,6 +181,12 @@
       var span = (ext[1] - ext[0]) || Math.abs(ext[1]) || 1;
       var step = util.niceStep(span * 1.1, horiz ? 6 : 5);
       var axMin = Math.floor((ext[0] - span * 0.05) / step) * step, axMax = Math.ceil((ext[1] + span * 0.05) / step) * step;
+
+      // reference lines: zero line, overall median (statistic: ink-3 dashed 1px), user lines (--rk-ref dashed 1.2px)
+      var lines = [];
+      if (axMin < 0 && axMax > 0) lines.push({ v: 0, label: '', color: t.axis, type: 'solid', width: 1 });
+      if (o.overall && overall) lines.push({ v: overall.median, label: 'Overall median ' + num(overall.median, fmt), color: t.ink3, type: [4, 3], width: 1 });
+      (o.refLines || []).forEach(function (r) { lines.push({ v: r.value, label: r.label || num(r.value, fmt), color: r.color || t.ref, type: r.type || [4, 3], width: 1.2, ref: true }); });
 
       /* ---------- swarm layout (pixel space, cached per coordinate system state) ---------- */
       var L = { key: null, pos: [] };
@@ -206,45 +223,69 @@
         });
         // bands / median ticks hug the widest swarm (same thickness for every group), box-plot style
         L.half = Math.min(half, Math.max(12, widest + 7));
-        placeLabels(cs);
+        // obstacles for the labels: median ticks and the reference / overall-median lines ([x1, y1, x2, y2])
+        var segs = [], hb = L.half + 2;
+        if (o.median) groups.forEach(function (g) {
+          var pm = api.coord(horiz ? [gStats[g].median, gIndex[g]] : [gIndex[g], gStats[g].median]);
+          segs.push(horiz ? [pm[0], pm[1] - hb, pm[0], pm[1] + hb] : [pm[0] - hb, pm[1], pm[0] + hb, pm[1]]);
+        });
+        lines.forEach(function (l) {
+          var q = api.coord(horiz ? [l.v, 0] : [0, l.v]);
+          segs.push(horiz ? [q[0], cs.y, q[0], cs.y + cs.height] : [cs.x, q[1], cs.x + cs.width, q[1]]);
+        });
+        placeLabels(cs, segs);
         return L;
       }
 
-      // direct labels: try above / below / right / left; never collide with a label already placed
-      function placeLabels(cs) {
+      /**
+       * Direct labels: candidate spots around the dot (centred above / below, beside, then above / below shifted so
+       * the label ends at the dot). A spot must stay inside the plot (never over the group names) and must not hit a
+       * label already placed; among those, the one crossing the fewest median ticks / reference lines, then covering
+       * the fewest dots, wins (ties keep the preference order).
+       */
+      function placeLabels(cs, segs) {
         var boxes = [];
         var cand = rows.map(function (r, i) { return { r: r, i: i, pri: labelPri(r) }; })
           .filter(function (c) { return c.pri >= 0; })
           .sort(function (a, b) { return a.pri - b.pri || b.r[vf] - a.r[vf]; });
+        var lo = horiz ? [cs.x - 1, cs.y - 6] : [cs.x + 2, cs.y - 10], hi = horiz ? [cs.x + cs.width + 16, cs.y + cs.height + 4] : [cs.x + cs.width + 6, cs.y + cs.height - 1];
         cand.forEach(function (c) {
           var p = L.pos[c.i], strong = c.pri === 0;
           var font = (strong ? '600 ' : '') + '11px ' + t.fontSans;
-          var w = textWidth(c.r[lf], font) + 2, h = 13, gap = p.r + 3;
-          var opts = horiz
-            ? [['top', 0, -gap, 'center', 'bottom'], ['bottom', 0, gap, 'center', 'top'], ['right', gap + 1, 0, 'left', 'middle'], ['left', -gap - 1, 0, 'right', 'middle']]
-            : [['right', gap + 1, 0, 'left', 'middle'], ['left', -gap - 1, 0, 'right', 'middle'], ['top', 0, -gap, 'center', 'bottom'], ['bottom', 0, gap, 'center', 'top']];
-          if (horiz && p.o > 0.5) opts = [opts[1], opts[0], opts[2], opts[3]];   // dot sits low → label below
-          if (!horiz && p.o < -0.5) opts = [opts[1], opts[0], opts[2], opts[3]]; // dot sits left → label left
-          // first position (in preference order) with no label collision and the fewest dots covered
-          var chosen = null, best = Infinity;
+          var w = C.measure(c.r[lf], font) + 2, h = 13, gap = p.r + 3, sh = Math.min(6, p.r + 2);
+          var above = ['top', 0, -gap, 'center', 'bottom'], below = ['bottom', 0, gap, 'center', 'top'];
+          var right = ['right', gap + 1, 0, 'left', 'middle'], left = ['left', -gap - 1, 0, 'right', 'middle'];
+          var aboveL = ['tl', sh, -gap, 'right', 'bottom'], aboveR = ['tr', -sh, -gap, 'left', 'bottom'];
+          var belowL = ['bl', sh, gap, 'right', 'top'], belowR = ['br', -sh, gap, 'left', 'top'];
+          var opts = horiz ? [above, below, right, left, aboveL, aboveR, belowL, belowR] : [right, left, above, below, aboveL, aboveR, belowL, belowR];
+          if (horiz && p.o > 0.5) opts = [below, above, right, left, belowL, belowR, aboveL, aboveR];   // dot sits low → label below
+          if (!horiz && p.o < -0.5) opts = [left, right, above, below, aboveL, aboveR, belowL, belowR]; // dot sits left → label left
+          var chosen = null, best = Infinity, fallback = null, fbScore = Infinity;
           for (var k = 0; k < opts.length; k++) {
             var op = opts[k], x = p.x + op[1], y = p.y + op[2];
             var bx = op[3] === 'center' ? x - w / 2 : op[3] === 'right' ? x - w : x;
             var by = op[4] === 'middle' ? y - h / 2 : op[4] === 'bottom' ? y - h : y;
             var box = [bx, by, bx + w, by + h];
-            if (box[0] < cs.x - 40 || box[2] > cs.x + cs.width + 40 || box[1] < cs.y - 12 || box[3] > cs.y + cs.height + 12) continue;
-            var hit = boxes.some(function (b) { return box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1]; });
-            if (hit) continue;
+            if (box[0] < lo[0] || box[2] > hi[0] || box[1] < lo[1] || box[3] > hi[1]) continue;
+            var lines = 0;
+            segs.forEach(function (sg) {
+              if (sg[0] === sg[2] ? (sg[0] > box[0] - 3 && sg[0] < box[2] + 3 && sg[1] < box[3] && sg[3] > box[1])
+                : (sg[1] > box[1] - 3 && sg[1] < box[3] + 3 && sg[0] < box[2] && sg[2] > box[0])) lines++;
+            });
             var cover = 0;
             L.pos.forEach(function (q) {
               if (!q || q === p) return;
               var nx = Math.max(box[0], Math.min(q.x, box[2])), ny = Math.max(box[1], Math.min(q.y, box[3]));
               if ((nx - q.x) * (nx - q.x) + (ny - q.y) * (ny - q.y) < q.r * q.r) cover++;
             });
-            if (cover < best) { best = cover; chosen = { dx: op[1], dy: op[2], align: op[3], va: op[4], box: box }; }
-            if (!cover) break;
+            var score = lines * 100 + cover;
+            var spot = { dx: op[1], dy: op[2], align: op[3], va: op[4], box: box };
+            if (score < fbScore) { fbScore = score; fallback = spot; }
+            if (boxes.some(function (b) { return box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1]; })) continue;
+            if (score < best) { best = score; chosen = spot; }
+            if (!score) break;
           }
-          if (!chosen && strong) chosen = { dx: opts[0][1], dy: opts[0][2], align: opts[0][3], va: opts[0][4] };
+          if (!chosen && strong) chosen = fallback || { dx: opts[0][1], dy: opts[0][2], align: opts[0][3], va: opts[0][4] };
           if (chosen) { if (chosen.box) boxes.push(chosen.box); L.labels[c.i] = { dx: chosen.dx, dy: chosen.dy, align: chosen.align, va: chosen.va, font: font, strong: strong }; }
         });
       }
@@ -299,9 +340,12 @@
       } : null;
 
       // one points series per colour category (so the legend can toggle them); layout is shared
-      var present = colorField ? cats.filter(function (c) { return rows.some(function (r) { return r[colorField] === c; }); }) : [];
-      var buckets = colorField ? present.map(function (c) { return { name: String(c), color: pal[cats.indexOf(c) % pal.length], test: function (r) { return r[colorField] === c; } }; })
+      // with a colour legend the target gets its own accent-2 entry (and series), like scatter
+      var present = colorField ? cats.filter(function (c) { return rows.some(function (r) { return r[colorField] === c && !isHL(r); }); }) : [];
+      var hlNames = colorField ? util.unique(rows.filter(isHL).map(function (r) { return String(r[lf]); })) : [];
+      var buckets = colorField ? present.map(function (c) { return { name: String(c), color: pal[cats.indexOf(c)], test: function (r) { return r[colorField] === c && !isHL(r); } }; })
         : [{ name: ctx.title(vf), test: function () { return true; } }];
+      if (hlNames.length) buckets.push({ name: hlNames.join(' / '), color: t.accent2, test: isHL });
       var pointSeries = buckets.map(function (b, bi) {
         var idx = [];
         rows.forEach(function (r, i) { if (b.test(r)) idx.push(i); });
@@ -333,7 +377,7 @@
               kids.push({
                 type: 'text', silent: true, x: lab.dx, y: lab.dy,
                 style: {
-                  text: String(r[lf]), font: lab.font, fill: dim ? RK.theme.alpha(t.ink, 0.35) : (lab.strong ? t.ink : t.ink2),
+                  text: C.richSafe(r[lf]), font: lab.font, fill: dim ? RK.theme.alpha(t.ink, 0.35) : (lab.strong ? t.ink : t.ink2),
                   align: lab.align, verticalAlign: lab.va, stroke: t.paper, lineWidth: 3, lineJoin: 'round'
                 },
                 enterFrom: { style: { opacity: 0 } }
@@ -348,19 +392,16 @@
         };
       });
 
-      // reference lines: overall median, zero line, user lines
-      var lines = [];
-      if (axMin < 0 && axMax > 0) lines.push({ v: 0, label: '', color: t.axis, type: 'solid', width: 1 });
-      if (o.overall && overall) lines.push({ v: overall.median, label: 'Overall median ' + RK.format(overall.median, fmt), color: t.ink3, type: 'dashed', width: 1 });
-      (o.refLines || []).forEach(function (r) { lines.push({ v: r.value, label: r.label || RK.format(r.value, fmt), color: r.color || t.accent2, type: r.type || 'dashed', width: 1.5 }); });
       var hasLineLabels = lines.some(function (l) { return l.label; });
       if (lines.length) {
         bandSeries.markLine = {
-          silent: true, symbol: ['none', 'none'], animation: false,
+          // precision 10: lines sit at the exact value; z 2 keeps them under the dots and their (haloed) labels
+          silent: true, symbol: ['none', 'none'], animation: false, precision: 10, z: 2,
           data: lines.map(function (l) {
+            var text = C.richSafe(l.label);
             var d = { lineStyle: { color: l.color, type: l.type, width: l.width },
-              label: { show: !!l.label, formatter: l.label, color: l.color === t.axis ? t.ink3 : l.color, fontSize: 10.5, fontWeight: 600,
-                position: horiz ? 'end' : 'insideEndTop', distance: 4 } };
+              label: { show: !!l.label, formatter: function () { return text; }, color: l.ref ? l.color : t.ink2, fontSize: 10.5,
+                fontStyle: 'italic', fontWeight: l.ref ? 600 : 400, position: horiz ? 'end' : 'insideEndTop', distance: 4 } };
             d[horiz ? 'xAxis' : 'yAxis'] = l.v;
             return d;
           })
@@ -374,7 +415,7 @@
           var g = axisGroups[i], s = gStats[g];
           if (!s) return '';
           var sub = 'n = ' + s.n + (gMissing[g] ? ' (+' + gMissing[g] + ' n.a.)' : '') + (o.median ? '  ·  Med. ' + RK.format(s.median, fmt) : '');
-          return '{n|' + String(g).replace(/[{}|]/g, '') + '}\n{s|' + sub + '}';
+          return '{n|' + C.richSafe(g) + '}\n{s|' + C.richSafe(sub) + '}';
         },
         rich: {
           n: { color: t.ink, fontSize: 11.5, fontWeight: 600, lineHeight: 16, fontFamily: t.fontSans, align: horiz ? 'right' : 'center' },
@@ -391,16 +432,43 @@
         type: 'value', min: axMin, max: axMax, interval: step,
         axisLine: { show: !horiz, lineStyle: { color: t.axis } },
         splitLine: { show: true, lineStyle: { color: t.grid } },
-        axisLabel: { formatter: C.axisFmt(fmt), hideOverlap: true }
+        axisLabel: { formatter: function (v) { return num(v, tickFmt(fmt, step)); }, hideOverlap: true }
       };
 
+      /* ---------- size key (top right): circles at nice values on the same sqrt scale as the dots ---------- */
+      var W = (inst && inst.getWidth()) || ctx.el.clientWidth || 800, graphic = [], keyW = 0, keyH = 0;
+      if (sizeExt && o.sizeLegend !== false && sizeExt[1] > 0) {
+        var sFmt = ctx.fmtOf(enc.size) || 'auto';
+        var keyVals = util.unique([niceBelow(sizeExt[1]), niceBelow(sizeExt[1] / 4), niceBelow(sizeExt[1] / 16)])
+          .filter(function (v) { return v >= sizeExt[0]; }).sort(function (a, b) { return a - b; });
+        if (keyVals.length) {
+          var kf = C.tickFmt(sFmt, keyVals), keyFont = '10px ' + t.fontNum, titleFont = '600 10px ' + t.fontSans;
+          var sTitle = ctx.title(enc.size), x = C.measure(sTitle, titleFont) + 8, dMax = 2 * radiusOf(null, keyVals[keyVals.length - 1]);
+          keyH = Math.max(14, dMax);
+          var kids = [{ type: 'text', x: 0, y: keyH / 2, style: { text: C.richSafe(sTitle), fill: t.ink3, font: titleFont, verticalAlign: 'middle' } }];
+          keyVals.forEach(function (v) {
+            var r = radiusOf(null, v);
+            kids.push({ type: 'circle', shape: { cx: x + r, cy: keyH / 2, r: r }, style: { fill: 'none', stroke: t.ink3, lineWidth: 0.8 } });
+            x += 2 * r + 4;
+            var lab = C.richSafe(kf(v));
+            kids.push({ type: 'text', x: x, y: keyH / 2, style: { text: lab, fill: t.ink2, font: keyFont, verticalAlign: 'middle' } });
+            x += C.measure(lab, keyFont) + 10;
+          });
+          keyW = x;
+          graphic.push({ type: 'group', id: 'rk-size', right: 4, top: 0, silent: true, children: kids });
+        }
+      }
+
       var showLegend = !!colorField && o.legend !== false;
-      var top = (showLegend ? 30 : 6) + (hasLineLabels ? 18 : 0);
+      var legendNames = buckets.map(function (b) { return b.name; });
+      var lRows = showLegend ? legendRows(legendNames, W - (keyW ? keyW + 24 : 0), '11px ' + t.fontSans) : 0;
+      var top = Math.max(showLegend ? 25 * lRows + 5 : 6, keyH ? keyH + 10 : 0) + (hasLineLabels ? 18 : 0);
       var series = [bandSeries].concat(pointSeries);
       if (medianSeries) series.push(medianSeries);
 
       return {
-        legend: C.legend(ctx, { show: showLegend, data: buckets.map(function (b) { return b.name; }), icon: 'circle', itemWidth: 9, itemHeight: 9 }),
+        legend: C.legend(ctx, { show: showLegend, type: 'plain', data: legendNames, width: W - (keyW ? keyW + 24 : 0) }),   // wraps clear of the size key
+        graphic: graphic,
         grid: { left: 4, right: horiz ? 18 : 8, top: top, bottom: o.zoom ? 34 : 6, containLabel: true },
         tooltip: {
           trigger: 'item', confine: true,
@@ -439,6 +507,8 @@
         series: series
       };
     }, {
+      rebuildOnResize: true,      // legend rows and the size key are laid out in px
+      // generic column names (e.g. a deal's 'target') stay within this dataset: ctx.select scopes them (RK.data.isGenericField)
       select: function (p, ctx) {
         if (p.seriesId === 'band') return ctx.enc.group ? { field: ctx.enc.group, value: String(p.name) } : null;
         if (/^pts-/.test(p.seriesId)) return { field: ctx.enc.label, value: String(p.name).split('\u0001')[0] };

@@ -19,6 +19,8 @@
   STATS.average = STATS.mean; STATS.max = STATS.high; STATS.min = STATS.low;
 
   function truthy(v) { return v === true || v === 1 || v === 'true' || v === 'Y' || v === 'yes'; }
+  // generic field names (link tables, bridges...) cross-filter only this dataset (house rule: scoped selections)
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|status|name|label|key|id|category|group|series)$/i;
 
   /** Value outside the column's meaningful range (e.g. P/E < 0x or > 50x) -> "n.m.". */
   function isNM(c, v) {
@@ -32,6 +34,73 @@
     var out = [];
     rows.forEach(function (r) { var v = r[c.field]; if (util.isNum(v) && !isNM(c, v)) out.push(v); });
     return out;
+  }
+
+  /** Format sections of a code (split on ';' outside quotes). */
+  function sections(code) {
+    var out = [], cur = '', q = false;
+    for (var i = 0; i < code.length; i++) {
+      var ch = code[i];
+      if (ch === '"') q = !q;
+      if (ch === ';' && !q) { out.push(cur); cur = ''; } else cur += ch;
+    }
+    out.push(cur);
+    return out;
+  }
+  function numericCode(code) {
+    var c = code && (RK.format.presets[code] || code);
+    return typeof c === 'string' && /[0#?]/.test(c.replace(/"[^"]*"/g, '')) && !RK.format.isDateCode(c) ? c : null;
+  }
+  /** Accounting negatives (house rule): '$#,##0' -> '$#,##0;($#,##0)'; an explicit '-' section -> parentheses. */
+  function acct(code) {
+    var c = numericCode(code);
+    if (!c) return code;
+    var s = sections(c);
+    if (s.length === 1) return c + ';(' + c.replace(/^\+/, '') + ')';
+    if (/^-/.test(s[1])) s[1] = '(' + s[1].slice(1) + ')';
+    return s.join(';');
+  }
+  /** Signed change format: '+0.0%;(0.0%);0.0%' from a value format. */
+  function signed(code) {
+    var c = numericCode(code);
+    if (!c) return code;
+    var f = sections(c)[0].replace(/^\+/, '');
+    return '+' + f + ';(' + f + ');' + f;
+  }
+
+  /** Readable text on a heat fill: the fill is nudged (away from the text colour) until contrast >= 4.5:1. */
+  function readable(bg, t) {
+    var T = RK.theme, dk = t.dark ? t.paper : t.ink, lt = t.dark ? t.ink : '#ffffff';
+    for (var i = 0; i < 14; i++) {
+      var cd = T.contrast(bg, dk), cl = T.contrast(bg, lt);
+      if (Math.max(cd, cl) >= 4.5) return { bg: bg, fg: cd >= cl ? dk : lt };
+      bg = T.mix(bg, cd >= cl ? lt : dk, 0.06);
+    }
+    return { bg: bg, fg: T.contrast(bg, dk) >= T.contrast(bg, lt) ? dk : lt };
+  }
+  /**
+   * Heat scale on the theme ramp clamped to its inner stops (seq-2..seq-6 / div-2..div-6 at intensity 0.5):
+   * the top bin stays chromatic (no mixing toward paper / grey) and the text keeps 4.5:1.
+   */
+  function heatScale(t, kind, domain, mid, intensity, reverse) {
+    var all = (kind === 'div' ? t.div : t.seq).slice(), k = util.isNum(intensity) ? intensity : 0.5, stops;
+    if (kind === 'div') {
+      var c = Math.floor((all.length - 1) / 2), r = Math.max(1, Math.min(c, Math.round(k * 4)));
+      stops = all.slice(c - r, c + r + 1);
+    } else {
+      stops = all.slice(1, Math.max(3, Math.min(all.length, Math.round(k * 10) + 1)));
+    }
+    if (reverse) stops.reverse();
+    var sc = kind === 'div' ? RK.theme.diverging(domain, mid, stops) : RK.theme.sequential(domain, stops);
+    return function (v) { return util.isNum(v) ? readable(sc(v), t) : null; };
+  }
+
+  /** Header text split into two balanced lines (at most two lines, never one word per line). */
+  function balancedHalves(text) {
+    var s = String(text == null ? '' : text), best = -1, mid = s.length / 2;
+    if (s.length <= 12) return [s];
+    for (var i = 0; i < s.length; i++) if (s[i] === ' ' && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
+    return best < 0 ? [s] : [s.slice(0, best), s.slice(best + 1)];
   }
 
   /** options.columns -> normalised column specs; the label column is prepended unless listed. */
@@ -56,6 +125,8 @@
       }
       if (c.title == null) c.title = c.isLabel && o.labelTitle != null ? o.labelTitle : (c.expr && !ctx.field(c.field) ? c.field : ctx.title(c.field));
       c.format = c.format || f.format || (c.num ? '#,##0.0' : null);
+      // negatives in parentheses; signed (change) columns carry an explicit '+'
+      if (c.type === 'number') c.format = c.sign ? signed(c.format) : acct(c.format);
       c.align = c.align || (c.num ? 'right' : 'left');
       if (c.isLabel && c.width == null) c.width = o.labelWidth;
       return c;
@@ -91,19 +162,9 @@
     if (!c.heat || !c.num) return null;
     var vals = numbersOf(rows, c);
     if (vals.length < 2) return null;
-    var t = ctx.theme, ext = util.extent(vals);
-    var stops = (c.heat === 'div' ? t.div : t.seq).slice();
-    if (c.reverse) stops.reverse();
-    var scale = c.heat === 'div'
-      ? RK.theme.diverging(ext, c.mid != null ? c.mid : RK.expr.agg.median(vals), stops)
-      : RK.theme.sequential(ext, stops);
-    var k = ctx.options.heatIntensity;
-    var dark = t.dark ? t.paper : t.ink, light = t.dark ? t.ink : t.paper;
-    return function (v) {
-      if (!util.isNum(v) || isNM(c, v)) return null;
-      var fill = RK.theme.mix(t.paper, scale(v), k);
-      return { bg: fill, fg: RK.theme.onColor(fill, dark, light) };
-    };
+    var ext = util.extent(vals), kind = c.heat === 'div' ? 'div' : 'seq';
+    var scale = heatScale(ctx.theme, kind, ext, c.mid != null ? c.mid : RK.expr.agg.median(vals), ctx.options.heatIntensity, c.reverse);
+    return function (v) { return !util.isNum(v) || isNM(c, v) ? null : scale(v); };
   }
 
   function sortRows(rows, sort, cols) {
@@ -179,9 +240,10 @@
       labelTitle: null,
       labelWidth: null,
       notes: {},                  // {"<label value>": "(1)"} footnote markers after row labels
+      footnotes: {},              // {"(1)": "Pending completion"} note text, written to the block footer
       sort: null,                 // {field, dir: 'asc' | 'desc'} initial sort (within sections)
       sortable: true,
-      heatIntensity: 0.5,         // 0..1 strength of heat tints
+      heatIntensity: 0.5,         // 0..1 span of the theme ramp used by heat columns (0.5 = seq-2..seq-6)
       scroll: true,               // true: fixed block height, sticky header; false: grow to content
       dense: false,
       stagger: true,
@@ -196,9 +258,48 @@
       // overall statistics live in <tfoot>, which stays pinned to the bottom while the body scrolls
       var thead = h('thead'), tbody = h('tbody'), tfoot = h('tfoot');
       var table = h('table.rk-table', thead, tbody, tfoot);
-      var root = h('div.rk-comps', { class: (ctx.options.dense ? 'rk-comps--dense ' : '') + (auto ? 'is-auto' : '') },
-        h('div.rk-comps__scroll', table));
+      var scroller = h('div.rk-comps__scroll', table);
+      var root = h('div.rk-comps', { class: (ctx.options.dense ? 'rk-comps--dense ' : '') + (auto ? 'is-auto' : '') }, scroller);
       ctx.el.appendChild(root);
+
+      /* ---------------- horizontal scroll cue: edge fade + sticky-column shadow ---------------- */
+      function edges() {
+        var more = scroller.scrollWidth - scroller.clientWidth - scroller.scrollLeft > 1;
+        root.classList.toggle('is-more-r', more);
+        root.classList.toggle('is-scrolled-x', scroller.scrollLeft > 1);
+      }
+      scroller.addEventListener('scroll', edges, { passive: true });
+
+      /* ---------------- whole-row scroll window: no row is cut by the sticky statistics footer ---------------- */
+      function snap() {
+        scroller.style.height = '';
+        if (auto) return;
+        var avail = scroller.clientHeight, foot = tfoot.offsetHeight;
+        if (table.offsetHeight <= avail + 1) return;
+        var limit = avail - foot, best = 0, rows = tbody.children;
+        for (var i = 0; i < rows.length; i++) {
+          var b = rows[i].offsetTop + rows[i].offsetHeight;
+          if (b > limit + 0.5) break;
+          // never end the window on a section header (it would sit alone above the footer)
+          if (!rows[i].classList.contains('is-section')) best = b;
+        }
+        if (best > 0) scroller.style.height = (best + foot + (scroller.offsetHeight - scroller.clientHeight)) + 'px';
+      }
+
+      /* ---------------- footnote text in the block footer ---------------- */
+      var notesEl = null, madeFoot = null;
+      function drawNotes() {
+        var fn = cur.options.footnotes || {};
+        var keys = Object.keys(fn).filter(function (k) { return fn[k] != null && fn[k] !== ''; });
+        if (!keys.length) { if (notesEl) notesEl.remove(); notesEl = null; return; }
+        if (!notesEl) {
+          notesEl = h('p.rk-comps__notes');
+          var blk = cur.block, foot = blk && blk !== cur.el ? blk.querySelector(':scope > .rk-block__foot') : null;
+          if (!foot && blk && blk !== cur.el && blk.classList.contains('rk-block')) foot = madeFoot = blk.appendChild(h('footer.rk-block__foot'));
+          if (foot) foot.insertBefore(notesEl, foot.firstChild); else root.appendChild(notesEl);
+        }
+        notesEl.textContent = keys.map(function (k) { return k + ' ' + String(fn[k]); }).join('   ');
+      }
 
       /* ---------------- header ---------------- */
       function drawHead(cols) {
@@ -216,8 +317,8 @@
             scope: 'col',
             'aria-sort': on ? (sort.dir === 'asc' ? 'ascending' : 'descending') : null,
             style: util.merge(c.width ? { width: typeof c.width === 'number' ? c.width + 'px' : c.width } : {}, { 'text-align': c.align }),
-            dataset: sortable ? { field: c.field } : null
-          }, c.align === 'right' ? ind : null, c.title,
+            dataset: util.merge(sortable ? { field: c.field } : {}, { title: String(c.title == null ? '' : c.title) })
+          }, c.align === 'right' ? ind : null, String(c.title == null ? '' : c.title),
             c.note ? h('sup.rk-comps__fn', c.note) : null,
             c.align !== 'right' ? ind : null);
           return th;
@@ -241,6 +342,21 @@
         thead.appendChild(bottom);
       }
 
+      /**
+       * Header cells wrap to at most two balanced lines: the cell's min-width is the wider half of the
+       * title (plus the inline sort glyph), so narrow layouts scroll sideways instead of stacking words.
+       */
+      function fitHead() {
+        Array.prototype.forEach.call(thead.querySelectorAll('th[data-title]'), function (th) {
+          var cs = getComputedStyle(th);
+          var font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+          var halves = balancedHalves(th.dataset.title);
+          var w = Math.max.apply(null, halves.map(function (x) { return RK.chart.measure(x, font); }));
+          var pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+          th.style.minWidth = Math.ceil(w + pad + (th.classList.contains('is-sortable') ? 13 : 0) + 1) + 'px';
+        });
+      }
+
       /* ---------------- body ---------------- */
       function drawBody(cols, animate) {
         var c0 = cur, o = c0.options, enc = c0.enc;
@@ -249,23 +365,29 @@
         var heats = {};
         cols.forEach(function (c) { heats[c.field] = heatOf(c0, c, rows); });
         var sel = c0.selected(enc.label);
-        var before = animate ? positions() : null;
         var clickable = o.crossFilter !== false;
-        tbody.innerHTML = '';
-        tfoot.innerHTML = '';
         root.classList.toggle('has-sel', sel.length > 0);
+        if (animate) RK.motion.flip([tbody, tfoot], paint); else paint();
 
-        seq.forEach(function (s, idx) {
+        function paint() {
+          tbody.innerHTML = '';
+          tfoot.innerHTML = '';
+          seq.forEach(row);
+        }
+        function row(s, idx) {
           var tr;
           if (s.kind === 'section') {
-            tr = h('tr.is-section', h('td', { colspan: cols.length }, h('span.rk-comps__sec', s.label)));
+            tr = h('tr.is-section', h('td', { colspan: cols.length }, h('span.rk-comps__sec', String(s.label))));
           } else if (s.kind === 'stat') {
             // the statistic label spans the leading text columns (date / target / acquirer ...)
             var lead = 0;
             while (lead < cols.length && !(cols[lead].num && cols[lead].stats !== false && !cols[lead].isLabel)) lead++;
             lead = Math.max(1, lead);
             tr = h('tr.is-stat', { class: (s.sub ? 'is-substat ' : '') + (s.first ? 'is-stat-first' : '') },
-              h('td.rk-comps__label', { colspan: lead > 1 ? lead : null, class: lead === 1 ? 'is-sticky' : null }, s.label),
+              // the label sits in the sticky first column (an empty cell spans the rest of the lead) so it stays
+              // in view when the table scrolls sideways
+              h('td.rk-comps__label.is-sticky', s.label),
+              lead > 1 ? h('td', { colspan: lead > 2 ? lead - 1 : null }) : null,
               cols.slice(lead).map(function (c) {
                 if (!c.num || c.stats === false) return h('td', { class: c.num ? 'is-num' : null });
                 var vals = numbersOf(s.rows, c);
@@ -288,12 +410,14 @@
               }
               var heat = heats[c.field] && heats[c.field](v);
               var cls = [c.num ? 'is-num' : '', c.sticky ? 'is-sticky' : ''];
-              if (c.sign && util.isNum(v) && !isNM(c, v)) cls.push(v < 0 ? 'is-neg' : v > 0 ? 'is-pos' : '');
+              // change columns: text stays ink ('+4.5%' / '(4.9%)'); only the small arrow carries the colour
+              var arrow = c.sign && util.isNum(v) && !isNM(c, v) && v !== 0
+                ? h('span.rk-comps__chg', { class: v > 0 ? 'is-up' : 'is-down', 'aria-hidden': 'true' }, v > 0 ? '▲' : '▼') : null;
               if (heat) cls.push('is-heat');
               return h('td', {
                 class: cls.join(' '),
                 style: util.merge({ 'text-align': c.align }, heat ? { 'background-color': heat.bg, color: heat.fg } : {})
-              }, cellText(c, v));
+              }, arrow, cellText(c, v));
             }));
             tr._rkValue = label;
           }
@@ -303,37 +427,18 @@
             tr.style.setProperty('--rk-i', Math.min(idx, 40));
           }
           (s.foot ? tfoot : tbody).appendChild(tr);
-        });
-        if (before) flip(before);
+        }
       }
-
-      /* FLIP: rows that survive a re-order glide from their old position; new rows fade in */
       function bodyRows() { return Array.prototype.slice.call(tbody.children).concat(Array.prototype.slice.call(tfoot.children)); }
-      function positions() {
-        var m = new Map();
-        bodyRows().forEach(function (tr) { m.set(tr.dataset.key, tr.getBoundingClientRect().top); });
-        return m;
-      }
-      function flip(before) {
-        var moved = [];
-        bodyRows().forEach(function (tr) {
-          var y0 = before.get(tr.dataset.key);
-          if (y0 == null) { tr.classList.add('is-enter'); return; }
-          var dy = y0 - tr.getBoundingClientRect().top;
-          if (Math.abs(dy) < 0.5) return;
-          tr.style.transition = 'none';
-          tr.style.transform = 'translateY(' + dy + 'px)';
-          moved.push(tr);
-        });
-        if (!moved.length) return;
-        void table.offsetHeight; // commit the inverted positions before releasing them
-        moved.forEach(function (tr) { tr.style.transition = ''; tr.style.transform = ''; });
-      }
 
       function draw(animate) {
         var cols = columnsOf(cur);
         drawHead(cols);
+        fitHead();
         drawBody(cols, animate && cur.motion);
+        drawNotes();
+        snap();
+        edges();
         first = false;
       }
 
@@ -351,7 +456,8 @@
       }
       function pick(tr) {
         if (!tr || cur.options.crossFilter === false || !tr.classList.contains('is-data')) return;
-        cur.select(cur.enc.label, tr._rkValue);
+        var f = cur.enc.label;
+        cur.select(f, tr._rkValue, GENERIC.test(f) && !cur.options.crossFilterScope ? { scope: 'dataset' } : null);
       }
       function onBodyClick(e) { pick(e.target.closest('tr')); }
       var bodies = [tbody, tfoot];
@@ -382,6 +488,9 @@
       }
 
       draw(false);
+      // web fonts change header widths and row heights: measure again once they are in
+      var alive = true;
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (alive) { fitHead(); snap(); edges(); } });
 
       return {
         update: function (c) {
@@ -389,7 +498,12 @@
           cur = c;
           if (selOnly) restyle(); else draw(true);
         },
+        resize: function () { snap(); edges(); },
         destroy: function () {
+          alive = false;
+          scroller.removeEventListener('scroll', edges);
+          if (notesEl) notesEl.remove();
+          if (madeFoot) madeFoot.remove();
           thead.removeEventListener('click', onHeadClick);
           bodies.forEach(function (b) { b.removeEventListener('click', onBodyClick); b.removeEventListener('keydown', onKey); });
           root.remove();

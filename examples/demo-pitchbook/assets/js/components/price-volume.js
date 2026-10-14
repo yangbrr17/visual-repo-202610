@@ -19,7 +19,7 @@
       area: true,              // light fill under the price line
       ma: [50, 200],           // simple moving averages in trading days; [] = none
       vwap: false,             // false | true (20-day) | number of days — rolling VWAP line
-      range52w: 'lines',       // 'lines' | 'band' | false — 52-week high / low (high / low fields, else close)
+      range52w: 'lines',       // 'lines' (neutral dotted reference lines) | 'band' | false — 52-week high / low (high / low fields, else close)
       lastPrice: true,         // current price tag on the right axis + dotted guide
       refLines: [],            // [{value, label, color}] e.g. offer price, unaffected price (default colour: theme ref)
       eventsData: null,        // dataset id with events {date, label, kind, detail} -> numbered pins
@@ -225,9 +225,11 @@
     var step = util.niceStep((ext[1] - ext[0]) || Math.abs(ext[1]) * 0.1 || 1, util.clamp(Math.round(gh / 50), 3, 7));
     var p = { min: rnd(Math.floor(ext[0] / step + 1e-9) * step), max: rnd(Math.ceil(ext[1] / step - 1e-9) * step), interval: step };
     if (p.min === p.max) p.max = rnd(p.max + step);
+    // the volume pane is short: one labelled tick (its top) keeps it from reading as part of the price axis
     var vmax = vv.length ? Math.max.apply(null, vv) : 1;
-    var vstep = util.niceStep(vmax || 1, util.clamp(Math.round((state.volH || 60) / 34), 1, 3));
-    var v = { max: rnd(Math.ceil(vmax / vstep) * vstep) || 1, interval: vstep };
+    var vstep = util.niceStep(vmax || 1, 3);
+    var vtop = rnd(Math.ceil((vmax || 1) / vstep) * vstep) || 1;
+    var v = { max: vtop, interval: vtop };
     return { p: p, v: v, first: first };
   }
   function rnd(v) { return Math.round(v * 1e10) / 1e10; }
@@ -253,7 +255,7 @@
     var hasLegend = o.legend !== false;
     var H = inst.getHeight();
     var hasSelector = o.rangeSelector && !ctx.print && useZoom && m.n >= 30;
-    var top = hasLegend || hasSelector ? 34 : 14, gap = 16, xLab = 22, bottom = slider ? 32 : 4;
+    var top = hasLegend || hasSelector ? 34 : 14, gap = 18, xLab = 22, bottom = slider ? 32 : 4;
     var avail = Math.max(120, H - top - gap - xLab - bottom);
     var hasVol = m.vol.length > 0;
     var volH = state.volH = hasVol ? Math.max(36, Math.round(avail * util.clamp(o.volumeShare || 0.24, 0.1, 0.5))) : 0;
@@ -272,8 +274,9 @@
     var tk = state.ticks = dateTicks(windowOf(m, state.zoom), state.plotW);
 
     var priceColor = t.accent;
-    // MA / VWAP overlays stay clear of the price line, the accent2 highlight, the 52-week (pos / neg) and reference lines
-    var pal = RK.theme.palette({ exclude: [priceColor, t.accent2, t.pos, t.neg, t.ref], minDistance: 110, n: m.mas.length + 1 });
+    // MA / VWAP overlays stay clear of the price line, the accent2 highlight, up / down colours, the neutral
+    // 52-week lines and reference lines
+    var pal = overlayPalette([priceColor, t.accent2, t.pos, t.neg, t.ref, t.ink3], m.mas.length + 1, t);
     var series = [];
     var sel = state.legendSel;
 
@@ -297,7 +300,8 @@
     }
     var marks = markSeries(ctx, m, priceColor);
     if (marks) series.push(marks);
-    if (pins.length) series.push(pinSeries(ctx, m, pins));
+    if (pins.length) series.push(pinSeries(ctx, m, pins, state));
+    if (m.r52 && o.range52w && o.range52w !== 'band') series.push(rangeLabelSeries(ctx, m, pins, state));
     if (hasVol) {
       series.push({
         id: 'volume', name: ctx.title(ctx.enc.volume) || 'Volume', type: 'bar', xAxisIndex: 1, yAxisIndex: 1,
@@ -342,8 +346,9 @@
         util.merge({}, xBase, { id: 'xv', gridIndex: 1, show: hasVol, axisLabel: tickLabel(tk) })
       ],
       yAxis: [
+        // the price axis' lowest label would sit on top of the volume label: drop it when there is a volume pane
         { id: 'yp', gridIndex: 0, type: 'value', min: ax.p.min, max: ax.p.max, interval: ax.p.interval,
-          axisLabel: { formatter: pAxisFmt }, axisPointer: { label: { formatter: function (p) { return RK.format(p.value, fmt); } } } },
+          axisLabel: { formatter: pAxisFmt, showMinLabel: !hasVol }, axisPointer: { label: { formatter: function (p) { return RK.format(p.value, fmt); } } } },
         { id: 'yv', gridIndex: 1, type: 'value', min: 0, max: ax.v.max, interval: ax.v.interval, show: hasVol,
           splitLine: { show: true, lineStyle: { color: t.grid } },
           axisLabel: { formatter: function (v) { return v === 0 ? '' : RK.format(v, 'auto'); } },
@@ -369,26 +374,28 @@
     var o = ctx.options, t = ctx.theme, fmt = m.fmt;
     var chip = RK.theme.alpha(t.paper, 0.85);       // label background: legible where it crosses the line
     var lines = [], area = null;
+    // label text always comes from a function: "{a}", "{b}", "{c}" in data are never template-substituted
     (o.refLines || []).forEach(function (r) {
       var col = RK.theme.resolve(r.color) || t.ref;          // token names ('pos', 'accent2') or literal colours
       lines.push({ yAxis: r.value, lineStyle: { color: col, type: r.type || 'dashed', width: 1.25 },
-        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: col, fontWeight: 600, fontSize: 10.5, backgroundColor: chip, padding: [1, 4], borderRadius: 2 } });
+        label: { formatter: textFn(r.label != null && r.label !== '' ? r.label : RK.format(r.value, fmt)), position: 'insideStartTop', color: col, fontWeight: 600, fontSize: 10.5, backgroundColor: chip, padding: [1, 4], borderRadius: 2 } });
     });
     if (m.r52 && o.range52w === 'band') {
       area = { silent: true, itemStyle: { color: RK.theme.alpha(t.accent3 || t.accent, t.dark ? 0.12 : 0.07) },
         label: { show: true, position: 'insideTopLeft', color: t.ink3, fontSize: 10.5,
-          formatter: '52-week range ' + RK.format(m.r52.low, fmt) + ' – ' + RK.format(m.r52.high, fmt) },
+          formatter: textFn('52-week range ' + RK.format(m.r52.low, fmt) + ' – ' + RK.format(m.r52.high, fmt)) },
         data: [[{ xAxis: m.r52.from, yAxis: m.r52.low }, { xAxis: m.r52.to, yAxis: m.r52.high }]] };
     } else if (m.r52 && o.range52w) {
-      lines.push({ yAxis: m.r52.high, lineStyle: { color: t.pos, type: [4, 3], width: 1 },
-        label: { formatter: '52-wk high ' + RK.format(m.r52.high, fmt), position: 'insideStartTop', color: t.pos, fontSize: 10.5, backgroundColor: chip, padding: [1, 4], borderRadius: 2 } });
-      lines.push({ yAxis: m.r52.low, lineStyle: { color: t.neg, type: [4, 3], width: 1 },
-        label: { formatter: '52-wk low ' + RK.format(m.r52.low, fmt), position: 'insideStartBottom', color: t.neg, fontSize: 10.5, backgroundColor: chip, padding: [1, 4], borderRadius: 2 } });
+      // 52-week high / low are context, not change and not a reference price: neutral ink-3 dotted lines
+      // (red stays with reference lines, red / green with up / down moves)
+      // (their labels: rangeLabelSeries, placed clear of the event pins)
+      lines.push({ yAxis: m.r52.high, lineStyle: { color: t.ink3, type: [2, 3], width: 1 }, label: { show: false } });
+      lines.push({ yAxis: m.r52.low, lineStyle: { color: t.ink3, type: [2, 3], width: 1 }, label: { show: false } });
     }
     if (o.lastPrice) {
       var last = m.close[m.n - 1];
       lines.push({ yAxis: last, lineStyle: { color: priceColor, type: [1.5, 2.5], width: 1, opacity: 0.8 },
-        label: { formatter: RK.format(last, fmt), position: 'end', distance: 4, backgroundColor: priceColor,
+        label: { formatter: textFn(RK.format(last, fmt)), position: 'end', distance: 4, backgroundColor: priceColor,
           color: RK.theme.textOn(priceColor), padding: [3, 4, 2, 4], borderRadius: 2, fontWeight: 600, fontSize: 10.5, fontFamily: t.fontNum } });
     }
     if (!lines.length && !area) return null;
@@ -399,39 +406,166 @@
     };
   }
 
-  /** Numbered pins on stems; staggered vertically when they would touch. */
-  function pinSeries(ctx, m, pins) {
-    var t = ctx.theme, pinColor = t.ink2, txt = RK.theme.textOn(pinColor), R = 8;
+  /**
+   * Overlay (MA / VWAP) colours: theme palette minus the excluded colours and minus saturated reds and
+   * greens, which the house reserves for change; tints / shades of the survivors when more are needed.
+   */
+  function overlayPalette(exclude, n, t) {
+    // well clear of the excluded colours first; relax the distance before falling back to tints of one hue
+    function changeHue(c) {
+      var p = RK.theme.parseColor(c), r = p[0] / 255, g = p[1] / 255, b = p[2] / 255;
+      var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+      if (d < 0.15) return false;
+      var h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      h = (h * 60 + 360) % 360;
+      return h >= 330 || h <= 20 || (h >= 85 && h <= 165);
+    }
+    var base = [];
+    [110, 80, 60].forEach(function (dist) {
+      if (base.length >= n) return;
+      RK.theme.palette({ exclude: exclude, minDistance: dist }).forEach(function (c) {
+        if (base.indexOf(c) < 0 && !changeHue(c)) base.push(c);
+      });
+    });
+    if (!base.length) base = [t.ink2];
+    var out = base.slice(0, n);
+    for (var k = 0; out.length < n; k++) {
+      var src = base[k % base.length], round = Math.floor(k / base.length) + 1;
+      out.push(round % 2 ? RK.theme.mix(src, t.paper, 0.4) : RK.theme.mix(src, t.ink, 0.3));
+    }
+    return out;
+  }
+
+  function textFn(s) { s = String(s); return function () { return s; }; }
+
+  var PIN_R = 8.5;
+
+  /** Pin geometry in pixels: anchor point and circle centre (above every visible line near the pin). */
+  function pinLayout(api, cs, m, pins, state) {
+    var R = PIN_R;
+    var pos = pins.map(function (p) { return api.coord([m.xv[p.i], p.y]); });
+    var overlays = [m.close].concat(m.mas.filter(function (s) { return shown(state, s.name); }).map(function (s) { return s.values; }),
+      m.vwap && shown(state, m.vwap.name) ? [m.vwap.values] : []);
+    var lv = [];
+    return pos.map(function (pt, k) {
+      var used = {};
+      for (var j = 0; j < k; j++) if (Math.abs(pos[j][0] - pt[0]) < 2 * R + 3) used[lv[j]] = 1;
+      var l = 0;
+      while (used[l]) l++;
+      lv.push(l);
+      var rg = localRange(api, m, overlays, pins[k].i, pt, R + 3);
+      var stem = 14 + l * (2 * R + 4);
+      var up = rg[0] - stem - R >= cs.y - 2;
+      var inPlot = pt[0] >= cs.x - 1 && pt[0] <= cs.x + cs.width + 1;
+      return { x: pt[0], y: pt[1], cy: up ? rg[0] - stem : rg[1] + stem, up: up, show: inPlot };
+    });
+  }
+
+  /** Numbered pins on stems, above every visible line near them; staggered vertically when they would touch. */
+  function pinSeries(ctx, m, pins, state) {
+    var t = ctx.theme, pinColor = t.ink2, txt = RK.theme.textOn(pinColor), R = PIN_R;
     return {
-      id: 'events', type: 'custom', name: '__events', xAxisIndex: 0, yAxisIndex: 0, z: 6, clip: true, tooltip: { show: false },
+      // not clipped: a pin on the last trading day may reach into the right margin rather than be cut in half
+      id: 'events', type: 'custom', name: '__events', xAxisIndex: 0, yAxisIndex: 0, z: 6, clip: false, tooltip: { show: false },
       encode: { x: 0, y: 1 },
       data: pins.map(function (p) { return [m.xv[p.i], p.y, p.n]; }),
       renderItem: function (params, api) {
-        var c = params.context, cs = params.coordSys;
-        if (!c.pos) {
-          c.pos = pins.map(function (p) { return api.coord([m.xv[p.i], p.y]); });
-          c.lv = [];
-          c.pos.forEach(function (pt, k) {
-            var used = {};
-            for (var j = 0; j < k; j++) if (Math.abs(c.pos[j][0] - pt[0]) < 2 * R + 3) used[c.lv[j]] = 1;
-            var l = 0;
-            while (used[l]) l++;
-            c.lv.push(l);
-          });
-        }
-        var k = params.dataIndex, pt = c.pos[k];
-        if (!pt || pt[0] < cs.x - 1 || pt[0] > cs.x + cs.width + 1) return null;
-        var stem = 14 + c.lv[k] * (2 * R + 4);
-        var up = pt[1] - stem - R >= cs.y - 2;
-        var cy = up ? pt[1] - stem : pt[1] + stem;
+        var c = params.context;
+        if (!c.lay) c.lay = pinLayout(api, params.coordSys, m, pins, state);
+        var g = c.lay[params.dataIndex];
+        if (!g || !g.show) return null;
         return { type: 'group', children: [
-          { type: 'line', shape: { x1: pt[0], y1: pt[1], x2: pt[0], y2: cy + (up ? R : -R) }, style: { stroke: pinColor, lineWidth: 1, opacity: 0.7 } },
-          { type: 'circle', shape: { cx: pt[0], cy: pt[1], r: 2.5 }, style: { fill: pinColor, stroke: t.paper, lineWidth: 1 } },
-          { type: 'circle', shape: { cx: pt[0], cy: cy, r: R }, style: { fill: pinColor, stroke: t.paper, lineWidth: 1.25 } },
-          { type: 'text', x: pt[0], y: cy, style: { text: String(api.value(2)), fill: txt, font: '600 10px ' + t.fontNum, align: 'center', verticalAlign: 'middle' } }
+          { type: 'line', shape: { x1: g.x, y1: g.y, x2: g.x, y2: g.cy + (g.up ? R : -R) }, style: { stroke: pinColor, lineWidth: 1, opacity: 0.7 } },
+          { type: 'circle', shape: { cx: g.x, cy: g.y, r: 2.5 }, style: { fill: pinColor, stroke: t.paper, lineWidth: 1 } },
+          { type: 'circle', shape: { cx: g.x, cy: g.cy, r: R }, style: { fill: pinColor, stroke: t.paper, lineWidth: 1.25 } },
+          { type: 'text', x: g.x, y: g.cy, style: { text: String(api.value(2)), fill: txt, font: '600 11px ' + t.fontNum, align: 'center', verticalAlign: 'middle' } }
         ] };
       }
     };
+  }
+
+  /**
+   * 52-week high / low labels: drawn here rather than as markLine labels so they can step aside from the
+   * event pins, reference-line labels and the lines themselves (searched along their line, preferred end first).
+   */
+  function rangeLabelSeries(ctx, m, pins, state) {
+    var o = ctx.options, t = ctx.theme, fmt = m.fmt, font = '10.5px ' + t.fontNum;
+    var chip = RK.theme.alpha(t.paper, 0.85);
+    var items = [
+      { v: m.r52.high, text: '52-wk high ' + RK.format(m.r52.high, fmt), sides: [-1, 1], fromLeft: true },
+      { v: m.r52.low, text: '52-wk low ' + RK.format(m.r52.low, fmt), sides: [1, -1], fromLeft: false }
+    ];
+    function hit(r, b) { return r.x < b.x + b.w && b.x < r.x + r.w && r.y < b.y + b.h && b.y < r.y + r.h; }
+    return {
+      id: 'r52-labels', type: 'custom', name: '__r52', xAxisIndex: 0, yAxisIndex: 0, z: 5, clip: false, silent: true, tooltip: { show: false },
+      encode: { x: 0, y: 1 },
+      data: items.map(function (it) { return [m.r52.to, it.v]; }),
+      renderItem: function (params, api) {
+        var c = params.context, cs = params.coordSys;
+        if (!c.obst) {
+          c.obst = [];
+          if (pins.length) pinLayout(api, cs, m, pins, state).forEach(function (g) {
+            if (g.show) c.obst.push({ x: g.x - PIN_R - 2, y: g.cy - PIN_R - 2, w: 2 * PIN_R + 4, h: 2 * PIN_R + 4 });
+          });
+          (o.refLines || []).forEach(function (r) {
+            if (!util.isNum(r.value)) return;
+            var y = api.coord([m.r52.to, r.value])[1];
+            var w = C.measure(r.label != null && r.label !== '' ? String(r.label) : RK.format(r.value, fmt), '600 ' + font) + 12;
+            c.obst.push({ x: cs.x, y: y - 17, w: w, h: 16 });
+          });
+          // visible line vertices inside the plot
+          c.pts = [];
+          [m.close].concat(m.mas.filter(function (s) { return shown(state, s.name); }).map(function (s) { return s.values; }))
+            .forEach(function (arr) {
+              for (var i = 0; i < m.n; i++) {
+                if (arr[i] == null) continue;
+                var q = api.coord([m.xv[i], arr[i]]);
+                if (q[0] >= cs.x && q[0] <= cs.x + cs.width) c.pts.push(q);
+              }
+            });
+        }
+        var it = items[params.dataIndex];
+        var ly = api.coord([m.r52.to, it.v])[1];
+        if (!(ly >= cs.y - 0.5 && ly <= cs.y + cs.height + 0.5)) return null;
+        var w = C.measure(it.text, font) + 8, h = 15;
+        var x0 = cs.x + 4, x1 = cs.x + cs.width - 4 - w;
+        var first = null, nearPins = null, best = null;
+        it.sides.some(function (side) {
+          var y = side < 0 ? ly - 2 - h : ly + 2;
+          if (y < cs.y - 1 || y + h > cs.y + cs.height + 1) return false;
+          for (var k = 0; x0 + k * 12 <= x1 + 11; k++) {
+            var x = Math.min(x1, it.fromLeft ? x0 + k * 12 : x1 - k * 12);
+            var r = { x: x, y: y, w: w, h: h };
+            if (!first) first = r;
+            if (c.obst.some(function (b) { return hit(r, b); })) continue;
+            if (!nearPins) nearPins = r;
+            if (!c.pts.some(function (q) { return q[0] >= r.x - 2 && q[0] <= r.x + r.w + 2 && q[1] >= r.y - 1 && q[1] <= r.y + r.h + 1; })) { best = r; return true; }
+          }
+          return false;
+        });
+        best = best || nearPins || first;
+        if (!best) return null;
+        return { type: 'text', x: best.x, y: best.y + h / 2,
+          style: { text: it.text, fill: t.ink3, font: font, align: 'left', verticalAlign: 'middle', backgroundColor: chip, padding: [1, 4], borderRadius: 2 } };
+      }
+    };
+  }
+
+  /** [top, bottom] pixel y of the lines within `reach` px of a pin's x (the pin stands clear of all of them). */
+  function localRange(api, m, lines, i, pt, reach) {
+    var top = pt[1], bot = pt[1];
+    [-1, 1].forEach(function (dir) {
+      for (var j = dir < 0 ? i : i + 1; j >= 0 && j < m.n; j += dir) {
+        if (Math.abs(api.coord([m.xv[j], 0])[0] - pt[0]) > reach) break;
+        lines.forEach(function (arr) {
+          if (arr[j] == null) return;
+          var y = api.coord([m.xv[j], arr[j]])[1];
+          if (y < top) top = y;
+          if (y > bot) bot = y;
+        });
+      }
+    });
+    return [top, bot];
   }
 
   /* ------------------------------------------------------------------ *

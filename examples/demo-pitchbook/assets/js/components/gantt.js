@@ -82,7 +82,7 @@
       sort: 'start',            // 'start' (groups and tasks by start date) | 'data' (dataset order)
       groupOrder: null,         // explicit workstream order, e.g. ["Process management", "Legal"]
       palette: 'categorical',   // categorical | sequential (ordered phases in shades of the accent)
-      milestoneLabel: 'date',   // date | label | none — text right of each diamond
+      milestoneLabel: 'date',   // date | label (name, only when the row labels are hidden — else the date) | none
       milestoneName: 'Milestone',
       barLabel: null,           // field shown right of each bar (e.g. 'owner'), 'duration', or null
       endInclusive: true,       // end date is the last working day (bar runs to end of that day)
@@ -150,13 +150,19 @@
       /* ---------- colours ---------- */
       // colours are keyed on the phases of all rows, so they do not shift when filters remove a phase
       var phases = RK.util.unique(tasks.map(function (k) { return k.phase; }).filter(function (p) { return p != null; }));
-      var allPhases = enc.phase ? RK.util.unique(ctx.allRows.map(function (r) { return r[enc.phase] == null ? null : String(r[enc.phase]); }).filter(function (p) { return p != null; })) : [];
+      // (the block's own 'where' still applies: a timetable restricted to some phases spreads its shades over those)
+      var baseRows = ctx.allRows;
+      if (o.where && ctx.dataset) {
+        try { var wc = RK.expr.compile(o.where, { fields: ctx.dataset.fields }); baseRows = baseRows.filter(function (r) { return wc.eval(r, { params: RK.store.params() }); }); } catch (e) { baseRows = ctx.rows; }
+      }
+      var allPhases = enc.phase ? RK.util.unique(baseRows.map(function (r) { return r[enc.phase] == null ? null : String(r[enc.phase]); }).filter(function (p) { return p != null; })) : [];
+      phases.forEach(function (p) { if (allPhases.indexOf(p) < 0) allPhases.push(p); });
       phases.sort(function (a, b) { return allPhases.indexOf(a) - allPhases.indexOf(b); });
       var phaseColor;
       if (o.palette === 'sequential') {
-        var seqStops = t.seq.slice(Math.min(2, t.seq.length - 2));
-        var sq = RK.theme.sequential([0, Math.max(1, allPhases.length - 1)], seqStops);
-        phaseColor = function (p) { return sq(allPhases.indexOf(p)); };
+        // ordered phases: the theme's ordinal ramp (validated steps), early phases light -> late phases dark
+        var ordRamp = RK.theme.ramp(t.ord.slice().reverse());
+        phaseColor = function (p) { return ordRamp(allPhases.length > 1 ? allPhases.indexOf(p) / (allPhases.length - 1) : 1); };
       } else {
         var cat = RK.theme.categoricalSafe(allPhases);   // extended with tints instead of repeating
         phaseColor = function (p) { return p == null ? t.accent : cat(p); };
@@ -177,7 +183,7 @@
         if (ext[0] - lo < 2 * DAY) lo = addDays(lo, -7);
       }
       var W = inst.getWidth() || ctx.el.clientWidth || 800;
-      var fontLab = '11px ' + t.fontSans, fontHead = '600 11.5px ' + t.fontSans;
+      var fontLab = '11px ' + t.fontSans, fontHead = '600 11px ' + t.fontSans;
       var labW = o.labelWidth === 'auto' || o.labelWidth == null
         ? Math.ceil(Math.max(90, Math.min(W * 0.38, Math.max.apply(null, rowsY.map(function (r) { return r.header ? C.measure(r.text, fontHead) : C.measure(r.text, fontLab) + 12; }).concat([0])))))
         : +o.labelWidth;
@@ -211,12 +217,13 @@
         }];
         var lab = o.barLabel === 'duration' ? durText(k, true) : (o.barLabel && k.row[o.barLabel] != null ? String(k.row[o.barLabel]) : null);
         if (lab) {
-          var tw = C.measure(lab, '10.5px ' + t.fontSans), right = cs.x + cs.width;
+          var tw = C.measure(lab, '11px ' + t.fontSans), right = cs.x + cs.width;
           var after = shape.x + shape.width + 5;
           var x = after + tw <= right ? after : shape.x - 5;
           if (x >= cs.x && (x === after || x - tw >= cs.x)) {
             kids.push({ type: 'text', x: x, y: p0[1], silent: true,
-              style: { text: lab, fill: t.ink3, font: '10.5px ' + t.fontSans, align: x === after ? 'left' : 'right', verticalAlign: 'middle', opacity: selField && fill !== phaseColor(k.phase) ? 0.4 : 1 },
+              // paper halo: the today line and gridlines stop at the text
+              style: { text: lab, fill: t.ink3, font: '11px ' + t.fontSans, align: x === after ? 'left' : 'right', verticalAlign: 'middle', stroke: t.paper, lineWidth: 3, opacity: selField && fill !== phaseColor(k.phase) ? 0.4 : 1 },
               enterFrom: animate ? { style: { opacity: 0 } } : undefined,
               enterAnimation: animate ? { delay: 520 + k.y * 22, duration: 400 } : undefined });
           }
@@ -237,10 +244,13 @@
           enterFrom: animate ? { scaleX: 0, scaleY: 0 } : undefined,
           enterAnimation: animate ? { delay: 520 + k.y * 22, duration: 420, easing: 'backOut' } : undefined
         }];
-        var text = o.milestoneLabel === 'label' ? k.label : o.milestoneLabel === 'date' ? RK.format(new Date(k.s), 'd mmm') : null;
+        // 'label' would repeat the row label right beside it (every milestone has its own labelled row): the
+        // name is only drawn when the row label column is hidden (labelWidth 0), otherwise the date
+        var named = o.milestoneLabel === 'label' && labW <= 0;
+        var text = named ? k.label : (o.milestoneLabel === 'date' || o.milestoneLabel === 'label') ? RK.format(new Date(k.s), 'd mmm') : null;
         if (text && p[0] + r + 4 < cs.x + cs.width) {
           kids.push({ type: 'text', x: p[0] + r + 4, y: p[1], silent: true,
-            style: { text: text, fill: fill === t.ink ? t.ink2 : fill, font: (o.milestoneLabel === 'date' ? '600 ' : '500 ') + '10.5px ' + t.fontSans, verticalAlign: 'middle' },
+            style: { text: text, fill: fill === t.ink ? t.ink2 : fill, font: (named ? '500 ' : '600 ') + '11px ' + t.fontSans, verticalAlign: 'middle', stroke: t.paper, lineWidth: 3 },
             enterFrom: animate ? { style: { opacity: 0 } } : undefined,
             enterAnimation: animate ? { delay: 640 + k.y * 22, duration: 400 } : undefined });
         }
@@ -286,13 +296,9 @@
           kids.push({ type: 'line', silent: true, shape: { x1: x0, y1: yTop + (p.tier ? 5 : 3), x2: x0, y2: p.tier ? cs.y - 3 : cs.y - TIER }, style: { stroke: p.tier ? t.grid : t.rule, lineWidth: 1 } });
           if (p.grid) kids.push({ type: 'line', silent: true, shape: { x1: x0, y1: cs.y, x2: x0, y2: cs.y + cs.height }, style: { stroke: t.grid, lineWidth: 1 } });
         }
-        var font = p.tier ? '10px ' + t.fontNum : '600 10.5px ' + t.fontSans;
+        // (the today caret sits below the lower tier's text, so no label is ever dropped or pushed for it)
+        var font = p.tier ? '11px ' + t.fontNum : '600 11px ' + t.fontSans;
         var tw = p.text ? C.measure(p.text, font) : 0, tx = (cx0 + cx1) / 2;
-        if (p.tier && todayTs != null) {
-          // keep lower-tier text clear of the today marker on the header edge
-          var xt = api.coord([todayTs, 0])[0];
-          if (Math.abs(xt - tx) < tw / 2 + 6) tx = xt + 6 + tw / 2 + 2 <= cx1 ? xt + 6 + tw / 2 : xt - 6 - tw / 2;
-        }
         if (p.text && tw + 6 <= cx1 - cx0 && tx - tw / 2 >= cx0 - 1 && tx + tw / 2 <= cx1 + 1) {
           kids.push({ type: 'text', silent: true, x: tx, y: yTop + TIER / 2 + 1,
             style: { text: p.text, fill: p.tier ? t.ink3 : t.ink2, font: font, align: 'center', verticalAlign: 'middle' } });
@@ -312,11 +318,11 @@
       function renderToday(params, api) {
         var cs = params.coordSys, x = api.coord([todayTs, 0])[0];
         if (x < cs.x || x > cs.x + cs.width) return null;
-        var label = o.todayLabel + ' ' + RK.format(new Date(todayTs), 'd mmm'), font = '600 10.5px ' + t.fontSans;
+        var label = o.todayLabel + ' ' + RK.format(new Date(todayTs), 'd mmm'), font = '600 11px ' + t.fontSans;
         var half = C.measure(label, font) / 2, lx = Math.max(cs.x + half, Math.min(cs.x + cs.width + 12 - half, x));   // keep the label inside the chart
         return { type: 'group', children: [
           { type: 'line', silent: true, shape: { x1: x, y1: cs.y, x2: x, y2: cs.y + cs.height + 3 }, style: { stroke: t.ref, lineWidth: 1.25, lineDash: [4, 3] } },
-          { type: 'polygon', silent: true, shape: { points: [[x - 3.5, cs.y - 3], [x + 3.5, cs.y - 3], [x, cs.y + 1.5]] }, style: { fill: t.ref } },
+          { type: 'polygon', silent: true, shape: { points: [[x - 3.5, cs.y - 2], [x + 3.5, cs.y - 2], [x, cs.y + 2.5]] }, style: { fill: t.ref } },
           { type: 'text', silent: true, x: lx, y: cs.y + cs.height + 5,
             style: { text: label, fill: t.ref, font: font, align: 'center', verticalAlign: 'top' } }
         ] };
@@ -333,7 +339,8 @@
           series.push({ id: 'past', type: 'custom', silent: true, z: 0, renderItem: renderPast, tooltip: { show: false },
             encode: { x: 0, y: 1 }, data: [[todayTs, 0]], animation: false });
         }
-        series.push({ id: 'today', type: 'custom', silent: true, z: 6, renderItem: renderToday, tooltip: { show: false },
+        // under the bars / milestones (z 3-4): their labels carry a paper halo, so the line never cuts through text
+        series.push({ id: 'today', type: 'custom', silent: true, z: 2, renderItem: renderToday, tooltip: { show: false },
           encode: { x: 0, y: 1 }, data: [[todayTs, 0]], animation: false });
       }
       phases.concat(tasks.some(function (k) { return !k.ms && k.phase == null; }) ? [null] : []).forEach(function (ph, pi) {
@@ -391,12 +398,12 @@
           formatter: function (key) {
             var r = rowIndex[key];
             if (!r) return key;
-            var txt = String(r.text).replace(/[{}|]/g, '');
+            var txt = C.richSafe(r.text);   // braces in data would open / close rich-text runs
             if (r.header) return '{g|' + txt + '}';
             return '{' + (r.task && r.task.ms ? 'm' : 't') + '|' + txt + '}';
           },
           rich: {
-            g: { fontFamily: t.fontSans, fontSize: 11.5, fontWeight: 600, color: t.ink },
+            g: { fontFamily: t.fontSans, fontSize: 11, fontWeight: 600, color: t.ink },
             t: { fontFamily: t.fontSans, fontSize: 11, color: t.ink2, padding: [0, 0, 0, headers ? 12 : 0] },
             m: { fontFamily: t.fontSans, fontSize: 11, color: t.ink, padding: [0, 0, 0, headers ? 12 : 0] }
           }

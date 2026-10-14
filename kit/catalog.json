@@ -370,7 +370,7 @@
     "columns": {
      "type": "number",
      "default": null,
-     "desc": "Fixed number of columns (auto-fit when null)"
+     "desc": "Fixed number of columns; null = balanced automatic count (as many as fit at ~160px, rows evened out: 6 tiles -> 6 x 1 wide, 3 x 2 at ~760px, 2 x 3 on phones)"
     },
     "countUp": {
      "type": "boolean",
@@ -482,12 +482,12 @@
     "text": {
      "type": "string",
      "default": null,
-     "desc": "Body text in the safe markdown subset (**bold**, *italic*, '- ' bullets, '1. ' numbered, line breaks, blank line = paragraph); used by prose, callout and quote. Supports {{placeholders}}"
+     "desc": "Body text in the safe markdown subset (**bold**, *italic*, `code`, '- ' bullets, '1. ' numbered, line breaks, blank line = paragraph); used by prose, callout and quote. Supports {{placeholders}} (filled as text, never as HTML)"
     },
     "html": {
      "type": "string",
      "default": null,
-     "desc": "Trusted author HTML instead of text (scripts, event handlers and javascript: URLs are stripped); placeholders are filled"
+     "desc": "Author HTML instead of text, passed through an allowlist sanitiser: basic text, list, heading (h1–h6), table, a[href] and img tags only; href limited to http(s), mailto, #fragment or relative URLs (checked after removing the whitespace browsers ignore); img src limited to relative paths or inline data:image (no remote fetches); style limited to text-align / font / colour properties without url(); svg, math, forms, media and embedded documents are dropped. {{placeholders}} are filled in text only (never in attributes)"
     },
     "items": {
      "type": "array",
@@ -527,7 +527,7 @@
     "columns": {
      "type": "number",
      "default": null,
-     "desc": "prose: number of text columns (> 1); takeaways / stats: fixed grid columns (auto-fit when null)"
+     "desc": "prose: number of text columns (> 1); takeaways / stats: fixed grid columns. null = balanced automatic count (as many as fit, rows evened out: 4 -> 2 x 2, 5 -> 3 + 2, 6 -> 3 x 2 at ~760px), dividers only between items of a row"
     },
     "layout": {
      "type": "string",
@@ -890,7 +890,7 @@
     "params": {
      "type": "array",
      "default": null,
-     "desc": "[{name, label, min, max, step, format, default}] or ['wacc', ...]; merged with RK.data.manifest.params; null = every report parameter. Missing ranges are inferred from the base value"
+     "desc": "[{name, label, min, max, step, format, default}] or ['wacc', ...]; merged with RK.data.manifest.params; null = every report parameter. Missing ranges are inferred from the base value; labels default to the param title, then a standard name (wacc -> WACC, tgr -> Terminal growth)"
     },
     "compact": {
      "type": "boolean",
@@ -920,7 +920,7 @@
     "preview": {
      "type": "boolean|object",
      "default": false,
-     "desc": "true or {fields, where, title, total} — live readout table of the bound dataset; live cells show % change vs. base parameters; total = true | [fields]"
+     "desc": "true or {fields, where, title, total, key, summary} — live readout table of the bound dataset; live cells show % change vs. base parameters; total = true | [fields]; key = the output column set in bold (default: last computed column); summary = [{name, label, field + agg | expr over earlier names, format, key}] headline outputs under the table (e.g. PV of terminal value, enterprise value)"
     },
     "tools": {
      "type": "boolean",
@@ -974,9 +974,9 @@
         "format": "$#,##0.0"
        },
        {
-        "name": "implied_value",
-        "title": "Perpetuity value FCF / (WACC – g)",
-        "formula": "fcf / (@wacc - @tgr)",
+        "name": "pv_tv",
+        "title": "PV of terminal value",
+        "formula": "fcf * (1 + @tgr) / (@wacc - @tgr) / (1 + @wacc) ^ (fiscal_year - 2025)",
         "format": "$#,##0"
        }
       ],
@@ -986,12 +986,35 @@
         "year",
         "fcf",
         "discount_factor",
-        "pv_fcf",
-        "implied_value"
+        "pv_fcf"
        ],
        "total": [
         "fcf",
         "pv_fcf"
+       ],
+       "key": "pv_fcf",
+       "summary": [
+        {
+         "name": "sum_pv",
+         "label": "PV of FCF 2026E–28E",
+         "field": "pv_fcf",
+         "agg": "sum",
+         "format": "$#,##0"
+        },
+        {
+         "name": "pv_tv",
+         "label": "PV of terminal value",
+         "field": "pv_tv",
+         "agg": "last",
+         "format": "$#,##0"
+        },
+        {
+         "name": "ev",
+         "label": "Enterprise value",
+         "expr": "sum_pv + pv_tv",
+         "format": "$#,##0",
+         "key": true
+        }
        ]
       }
      }
@@ -1293,7 +1316,7 @@
     "values": {
      "type": "array",
      "default": null,
-     "desc": "Explicit option order; null = distinct values of the bound dataset in data order (fallback Base / Upside / Downside)"
+     "desc": "Explicit option order; null = distinct values of the bound dataset in canonical order (downside cases, base, upside cases; fallback Downside / Base / Upside)"
     },
     "labels": {
      "type": "object",
@@ -1328,7 +1351,7 @@
     "tones": {
      "type": "string|object|boolean",
      "default": "auto",
-     "desc": "Status dot colour: 'auto' (Upside = positive, Downside = negative), false, or {value: 'pos'|'neg'|'base'}"
+     "desc": "Scenario identity dot: 'auto' (Upside = accent-3 dot, Base = accent dot, Downside = hollow grey dot; pos / neg colours stay reserved for change), false, or {value: 'pos'|'neg'|'base'}"
     },
     "metric": {
      "type": "object",
@@ -2031,7 +2054,7 @@
     "refLines": {
      "type": "array",
      "default": [],
-     "desc": "[{price, label, color}] further per-share reference lines, e.g. the offer price with color 'accent2'"
+     "desc": "[{price, label, color}] further per-share reference lines, e.g. the offer price. House style draws reference and offer lines in the theme reference colour (dashed), told apart by their captions; color overrides it"
     },
     "evMetric": {
      "type": "object",
@@ -2201,8 +2224,7 @@
       "refLines": [
        {
         "price": 52.0,
-        "label": "Offer $52.00",
-        "color": "accent2"
+        "label": "Offer $52.00"
        }
       ],
       "evMetric": {
@@ -2282,6 +2304,11 @@
      "type": "array",
      "default": null,
      "desc": "Daily: [from, to] ISO dates; default = whole months spanned by the data"
+    },
+    "weekdays": {
+     "type": "string",
+     "default": "auto",
+     "desc": "Daily weekday rows: 'auto' (Sat / Sun rows only when data falls on a weekend) | 'all' | 'weekdays'"
     },
     "yearTotal": {
      "type": "boolean",
@@ -2605,7 +2632,7 @@
     "layout": {
      "type": "string",
      "default": "band",
-     "desc": "band = line in its own band above the bars (no label collisions) | overlay = classic dual axes with aligned ticks"
+     "desc": "band = line in its own band above the bars (no label collisions; the line carries its own value labels) | overlay = classic dual axes with aligned ticks, axis titles and a zero-based line axis"
     },
     "barStack": {
      "type": "boolean",
@@ -2641,6 +2668,16 @@
      "type": "string",
      "default": "Projected",
      "desc": "Caption above the estimate band ('' hides it)"
+    },
+    "lineColor": {
+     "type": "string",
+     "default": "auto",
+     "desc": "First line colour: 'auto' (ink-2 in the band layout, a palette colour clear of the bars in overlay) | token ('accent2' marks a target metric) | colour"
+    },
+    "axisTitles": {
+     "type": "boolean|string",
+     "default": "auto",
+     "desc": "Value-axis titles with units, e.g. 'Revenue (USD m)' / 'EBITDA margin (%)': 'auto' (overlay layout) | true | false"
     },
     "cagr": {
      "type": "boolean|string|object|array",
@@ -2881,9 +2918,9 @@
      "desc": "'auto' (zero for areas, otherwise fit the data) | 'dataMin' | number"
     },
     "legend": {
-     "type": "boolean",
-     "default": true,
-     "desc": "Legend top-left (shown when there is more than one series)"
+     "type": "boolean|string",
+     "default": "auto",
+     "desc": "'auto' = legend top-left unless the end labels already name the series (4 or fewer) | true | false"
     }
    },
    "interactions": [
@@ -3027,7 +3064,7 @@
     "range52w": {
      "type": "string|boolean",
      "default": "lines",
-     "desc": "'lines' | 'band' | false — 52-week high / low"
+     "desc": "'lines' (neutral ink-3 dotted lines, labels placed clear of event pins) | 'band' (shaded range) | false — 52-week high / low from the high / low fields (else close)"
     },
     "lastPrice": {
      "type": "boolean",
@@ -3237,6 +3274,11 @@
      "default": false,
      "desc": "Append the % change to the right-hand labels"
     },
+    "delta": {
+     "type": "boolean|string",
+     "default": "auto",
+     "desc": "▲ / ▼ change token after the right-hand labels (e.g. '#1 Northbridge Capital ▲1'): 'auto' = with direction colours when change is off | true | false"
+    },
     "labels": {
      "type": "string",
      "default": "both",
@@ -3425,6 +3467,11 @@
      "default": "sum",
      "desc": "Aggregation of duplicate rows per facet and x: sum | avg | last"
     },
+    "maxPanels": {
+     "type": "number",
+     "default": 24,
+     "desc": "Panel cap (also limited to what fits the block height); further facets are left out with a '+N more not shown' note, highlighted facets always kept"
+    },
     "format": {
      "type": "string",
      "default": null,
@@ -3557,6 +3604,11 @@
      "type": "boolean",
      "default": false,
      "desc": "Also draw the comparison series' mean"
+    },
+    "highlight": {
+     "type": "boolean",
+     "default": true,
+     "desc": "The y series is the target: drawn in accent2, the colour the target wears across the deck (false = accent)"
     },
     "endLabels": {
      "type": "boolean",
@@ -3697,7 +3749,7 @@
     "labels": {
      "type": "boolean|string",
      "default": "auto",
-     "desc": "Value labels: true | false | 'auto'"
+     "desc": "Value labels: true | false | 'auto' (few bars; fitted in pixels: inside-stack labels that do not fit are dropped, crowded column labels turn vertical)"
     },
     "sort": {
      "type": "string",
@@ -3737,12 +3789,12 @@
     "format": {
      "type": "string",
      "default": null,
-     "desc": "Value format code; defaults to the y field format"
+     "desc": "Value format code; defaults to the y field format (labels then drop decimals for figures >= 100, e.g. $1,463)"
     },
     "legend": {
      "type": "boolean",
      "default": true,
-     "desc": "Top-left legend (shown with more than one series)"
+     "desc": "Top-left legend (shown with more than one series; wraps onto a second row on narrow blocks)"
     },
     "zoom": {
      "type": "boolean",
@@ -3924,7 +3976,7 @@
     "variance": {
      "type": "string",
      "default": "pct",
-     "desc": "Variance column: 'pct' | 'abs' | null"
+     "desc": "Variance column: 'pct' | 'abs' (in percentage points, e.g. '+2.1pp', when the values are percentages) | null"
     },
     "valueTitle": {
      "type": "string",
@@ -4277,7 +4329,7 @@
     "marker": {
      "type": "number",
      "required": false,
-     "desc": "Optional third value drawn as a diamond in the reference colour --rk-ref (current price)"
+     "desc": "Optional third value drawn as a diamond (current price) in the brand colour, accent-2 on the target row (--rk-ref stays reserved for reference lines)"
     },
     "highlight": {
      "type": "boolean",
@@ -4330,7 +4382,7 @@
     "deltaFormat": {
      "type": "string",
      "default": null,
-     "desc": "Delta column format; default value format ('abs') or 0.0%"
+     "desc": "Delta column format; default value format ('abs'; percentage-point 'pp' when the values are percentages) or 0.0%"
     },
     "deltaTitle": {
      "type": "string",
@@ -4851,7 +4903,7 @@
     "peers": {
      "type": "string",
      "default": "outline",
-     "desc": "'outline' (thin categorical outlines) | 'muted' (thin grey outlines)"
+     "desc": "'outline' (thin categorical outlines, one legend entry each) | 'muted' (thin grey outlines, one 'Peers' legend entry)"
     },
     "median": {
      "type": "boolean",
@@ -4881,7 +4933,7 @@
     "legend": {
      "type": "boolean",
      "default": true,
-     "desc": "Legend (vertical at top-left on wide blocks); click to show / hide a company"
+     "desc": "Legend (a vertical column beside the radar on wide blocks, the pair centred in the block); click to show / hide a company"
     }
    },
    "interactions": [
@@ -4898,6 +4950,7 @@
      "title": "Peer scorecard (0–100)",
      "data": "peer_scores",
      "height": 360,
+     "span": 6,
      "options": {
       "encode": {
        "series": "company",
@@ -4912,7 +4965,8 @@
     {
      "title": "Operating profile vs. Industrial Automation peers (wide data)",
      "data": "peers",
-     "height": 340,
+     "height": 360,
+     "span": 6,
      "options": {
       "encode": {
        "series": "company",
@@ -5150,7 +5204,7 @@
     "orientation": {
      "type": "string",
      "default": "vertical",
-     "desc": "vertical | horizontal (horizontal suits long step names)"
+     "desc": "vertical | horizontal (horizontal suits long step names). A vertical bridge whose step names cannot wrap into their columns (narrow blocks) is drawn horizontally"
     },
     "inferTotals": {
      "type": "string|boolean",
@@ -5165,7 +5219,7 @@
     "colorBy": {
      "type": "string",
      "default": "sign",
-     "desc": "sign (pos / neg colours) | category (deltas coloured by the category channel, with legend)"
+     "desc": "sign (pos / neg colours) | category (deltas coloured by the category channel, with legend; driver colours never use red / green hues or the totals' colour)"
     },
     "invert": {
      "type": "boolean",
@@ -5254,7 +5308,8 @@
        "label": "step",
        "value": "value",
        "kind": "kind"
-      }
+      },
+      "axisBreak": "auto"
      }
     },
     {
@@ -5362,6 +5417,16 @@
      "default": "Total",
      "desc": "Caption under the centre total (null to hide)"
     },
+    "centerValue": {
+     "type": "string",
+     "default": "total",
+     "desc": "total | named — what the hole shows: the sum of all parts, or only the named parts (catch-all rows and 'Others' excluded)"
+    },
+    "othersMatch": {
+     "type": "string|string[]|boolean",
+     "default": "auto",
+     "desc": "Catch-all labels that are drawn last in the neutral colour and join 'Others': 'auto' (labels starting with 'Other' or ending in 'other(s)'), a list of labels, a regex string, or false"
+    },
     "highlight": {
      "type": "string|string[]",
      "default": null,
@@ -5390,6 +5455,7 @@
      "title": "Shareholder structure by investor type (m shares)",
      "data": "ownership",
      "height": 300,
+     "span": 7,
      "options": {
       "encode": {
        "label": "type",
@@ -5402,6 +5468,7 @@
      "title": "Revenue mix by segment — FY2025A (USD m)",
      "data": "segment_revenue",
      "height": 320,
+     "span": 7,
      "options": {
       "encode": {
        "label": "segment",
@@ -5426,7 +5493,8 @@
       "maxSlices": 7,
       "othersLabel": "Other holders",
       "highlight": "Ardent Family Holdings",
-      "centerLabel": "Disclosed"
+      "centerValue": "named",
+      "centerLabel": "Named holders"
      }
     }
    ],
@@ -5498,7 +5566,7 @@
     "labels": {
      "type": "string",
      "default": "auto",
-     "desc": "auto (player + share where it fits, share only in small cells) | share | none"
+     "desc": "auto (player + share where it fits — wrapped, or on one line in flat bands; never truncated, no anonymous bare shares) | share | none"
     },
     "showTotals": {
      "type": "boolean",
@@ -5672,7 +5740,7 @@
     "labels": {
      "type": "string",
      "default": "auto",
-     "desc": "auto (inner ring: name + share; outer: name) | name | none"
+     "desc": "auto (name + share of the view on every ring) | name | none — 11px, never truncated or shrunk: a label that does not fit its slice is left to the tooltip; a highlighted slice too thin for its label gets an outside callout"
     },
     "minLabelAngle": {
      "type": "number",
@@ -5852,7 +5920,7 @@
     "labels": {
      "type": "string",
      "default": "auto",
-     "desc": "auto (name + value + metric) | name | value | none"
+     "desc": "auto (name + value + metric) | name | value | none — fitted to each tile: figures are never cut (the share, then the metric, then the whole label drop out); names wrap or ellipsize; the highlighted target keeps its name"
     },
     "showShare": {
      "type": "boolean",
@@ -6054,6 +6122,11 @@
      "default": "0.0%",
      "desc": "Share format"
     },
+    "values": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Several stacked waffles (encode.facet): each segment's share (swatch + figure) under its waffle"
+    },
     "maxSize": {
      "type": "number",
      "default": 280,
@@ -6072,6 +6145,7 @@
      "title": "Shareholder structure by investor type (% of shares outstanding)",
      "data": "ownership",
      "height": 280,
+     "span": 7,
      "options": {
       "encode": {
        "label": "type",
@@ -6214,10 +6288,15 @@
     "sizeRange": {
      "type": "number[]",
      "default": [
-      6,
+      7,
       24
      ],
-     "desc": "[min, max] diameter in px when encode.size is set"
+     "desc": "[min, max] diameter in px when encode.size is set (>= 7px keeps the smallest dot legible)"
+    },
+    "sizeLegend": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Size key (circles at nice values, top right) when encode.size is set"
     },
     "sortGroups": {
      "type": "string",
@@ -6589,6 +6668,11 @@
      "default": "auto",
      "desc": "'auto' | 'category' | 'sequential' | 'diverging' (auto: numeric colour field -> continuous)"
     },
+    "colors": {
+     "type": "object",
+     "default": null,
+     "desc": "{category: theme token | colour} pins category colours (tokens: accent, accent3, pos, neg, cat1 …), e.g. scenarios {Base: 'accent', Upside: 'pos', Downside: 'neg'}"
+    },
     "mid": {
      "type": "number",
      "default": 0,
@@ -6705,7 +6789,7 @@
     "legend": {
      "type": "boolean",
      "default": true,
-     "desc": "Category legend (top-left)"
+     "desc": "Category legend (top-left; wraps onto extra rows, never pages)"
     }
    },
    "interactions": [
@@ -6783,7 +6867,12 @@
        "name": "scenario"
       },
       "timeField": "year",
-      "labels": true
+      "labels": true,
+      "colors": {
+       "Base": "accent",
+       "Upside": "pos",
+       "Downside": "neg"
+      }
      }
     }
    ],
@@ -7324,7 +7413,7 @@
     "legend": {
      "type": "boolean",
      "default": true,
-     "desc": "Category legend (top-left)"
+     "desc": "Category legend (top-left; wraps onto extra rows, never pages)"
     }
    },
    "interactions": [
@@ -7479,7 +7568,7 @@
     "highlight": {
      "type": "string|string[]",
      "default": null,
-     "desc": "Entity name(s) drawn in accent2 (e.g. the client's home market)"
+     "desc": "Entity name(s) drawn in accent2 (e.g. the client's home market). colorBy node: the highlighted arc and all its ribbons take accent2 at a moderate opacity while every other ribbon recedes; colorBy single: its inbound / outbound ribbons are told apart by a direction key"
     },
     "ribbonColor": {
      "type": "string",
@@ -7519,7 +7608,7 @@
     "colorKey": {
      "type": "boolean",
      "default": true,
-     "desc": "Small reading key, top-left ('Ribbon colour = …' or the spotlighted entity)"
+     "desc": "Reading key, top-left: 'Ribbon colour = …' (+ a 10px swatch for the highlighted flows), or with colorBy single + highlight an outbound / inbound swatch key"
     },
     "format": {
      "type": "string",
@@ -7551,7 +7640,7 @@
    ],
    "samples": [
     {
-     "title": "Cross-border industrials M&A, 2021–2026 YTD (USD bn) — acquirer → target country",
+     "title": "Cross-border industrials M&A, 2021–2026 YTD (USD bn) — acquirer to target country",
      "data": "deal_flows",
      "height": 460,
      "options": {
@@ -7810,7 +7899,7 @@
     "layout": {
      "type": "string",
      "default": "force",
-     "desc": "force: deterministic spring layout solved before paint (print-identical) | circular: categories on a ring, dominant highlighted hub in the centre | physics: live ECharts force simulation"
+     "desc": "force: deterministic spring layout solved before paint (print-identical), nudged so labels clear other nodes | circular: nodes at equal angular steps around the dominant highlighted hub (centre), categories contiguous | physics: live ECharts force simulation"
     },
     "highlight": {
      "type": "string|string[]",
@@ -7825,7 +7914,7 @@
     "labels": {
      "type": "boolean|string",
      "default": "auto",
-     "desc": "auto: label the largest nodes (+ highlighted) | true | false; all labels show on hover"
+     "desc": "auto: label the largest nodes (+ highlighted) | true | false. Each label takes the free side facing away from the hub (right / left / above / below / diagonal) on a paper chip; a label with no free position is hidden and shows on hover"
     },
     "labelTop": {
      "type": "number",
@@ -7866,7 +7955,12 @@
     "dashedTypes": {
      "type": "string[]",
      "default": [],
-     "desc": "Edge types drawn dashed (e.g. ['Competition'])"
+     "desc": "Edge types drawn dashed (listed in the edge key). House style reserves dashes for reference lines: prefer edgeColor to tell relationship types apart"
+    },
+    "edgeKey": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Edge key beside the category legend (top-left): line-width scale with min / max value, plus any dashed edge types"
     },
     "arrows": {
      "type": "boolean",
@@ -7951,9 +8045,6 @@
        "size": "size"
       },
       "highlight": "helios-industrial",
-      "dashedTypes": [
-       "Competition"
-      ],
       "labelTop": 24
      }
     },
@@ -7967,7 +8058,7 @@
       "layout": "circular",
       "highlight": "helios-industrial",
       "labels": true,
-      "edgeColor": "source",
+      "edgeColor": "auto",
       "arrows": true,
       "edgeOpacity": 0.35
      }
@@ -8077,7 +8168,7 @@
     "labels": {
      "type": "boolean",
      "default": true,
-     "desc": "Node labels: first column outside-left, others to the right with a paper halo"
+     "desc": "Node labels: first column outside-left, others to the right with a paper halo. Labels are planned against the node layout: where the next column is close they wrap / stack the value and % on separate lines, and a label that cannot clear its neighbours is hidden (tooltip only)"
     },
     "labelValues": {
      "type": "boolean",
@@ -8168,6 +8259,7 @@
       "linkColor": "source",
       "linkOpacity": 0.38,
       "nodeAlign": "justify",
+      "percentOf": "Revenue",
       "format": "$#,##0"
      }
     }
@@ -8239,7 +8331,7 @@
     "layout": {
      "type": "string",
      "default": "orthogonal",
-     "desc": "orthogonal (boxes + right-angle connectors) | radial"
+     "desc": "orthogonal (boxes + right-angle connectors; when a block is too narrow for a wide row of leaf entities they become a compact list of 2–4 columns with ownership on the country line) | radial (dendrogram: root in the centre, leaves on the outer ring, elbow links that never cross branches)"
     },
     "orient": {
      "type": "string",
@@ -8269,7 +8361,12 @@
     "highlight": {
      "type": "string|string[]",
      "default": null,
-     "desc": "Entity id(s) or name(s) outlined in accent2 (e.g. the issuer or the entity being sold)"
+     "desc": "Entity id(s) or name(s) ringed in accent2 (e.g. the issuer or the entity being sold); the box keeps its entity-type colour and the legend gains a 'Highlighted' key"
+    },
+    "balance": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Order siblings so subtrees with children sit in the middle (parents end up over the centre of the chart); false keeps data order"
     },
     "categoryColors": {
      "type": "object",
@@ -8284,7 +8381,7 @@
     "boxWidth": {
      "type": "number",
      "default": null,
-     "desc": "Box width in px; null fits the container (96–176 TB, 120–200 LR)"
+     "desc": "Box width in px; null fits the container (96–196 TB, 120–200 LR). Names wrap to 2–3 lines at 11px instead of being cut"
     },
     "roam": {
      "type": "boolean",
@@ -8427,7 +8524,7 @@
       4,
       26
      ],
-     "desc": "Min / max bubble radius in px"
+     "desc": "Min / max bubble radius in px on a map at least 1000px wide (sqrt scale, so area tracks the value); narrower maps scale the range down (to 62%) to limit overplotting"
     },
     "colorScale": {
      "type": "string",
@@ -8447,7 +8544,7 @@
     "labels": {
      "type": "number",
      "default": 5,
-     "desc": "Label the top N bubbles by size (0 = none); crowded labels hide automatically"
+     "desc": "Label the top N bubbles by size (0 = none). Each label sits beside its bubble, or further off with a leader line, wherever it covers the fewest other bubbles; labels that cannot be placed hide"
     },
     "labelValue": {
      "type": "boolean",
@@ -8522,6 +8619,10 @@
        "label": "name"
       },
       "labels": 6,
+      "sizeRange": [
+       3,
+       21
+      ],
       "tooltip": [
        "city",
        "country",
@@ -8589,7 +8690,7 @@
    ],
    "summary": "Compliance-safe China cartogram: the 34 provincial-level divisions as equal-size squares or hexagons on a geography-like grid, shaded by a metric — no boundaries, so no map-review (审图号) issue in client decks.",
    "summary_zh": "合规友好的中国省级方块地图：34 个省级行政区各占一个等大的方块（或六边形），按近似地理位置排布并按指标着色；不绘制任何边界线，客户材料中无需审图号。",
-   "description_zh": "用于在客户材料中展示按省汇总的指标（收入、增速、门店数、市场份额）。每个省级行政区（含台湾、香港、澳门，共 34 个）是一个同样大小的方块（或六边形），按地理相对位置排成 7 × 8 网格：黑龙江在右上，新疆、西藏在左侧，长江沿线（西藏—四川—重庆—湖北—安徽—江苏—上海）占一整行，海南在底部，港澳在广东下方，台湾在福建东侧；70 条省际陆地边界中有 63 条保留为相邻方块。因为不画边界、不涉及比例尺和领土轮廓，图表是示意图而非需要送审的“地图”，不会因边界画法引发合规问题（可选在空白角落标注“示意图，不代表实际边界”）；同时每个省面积相等，避免新疆、西藏、内蒙古等大省在视觉上压倒东部经济大省。数据可按 6 位行政区划代码（adcode，市/县级代码自动汇总到省）、中文或英文省名（带不带“省/市/自治区”均可，含 Inner Mongolia / Xizang / Macau 等常见写法）或 ISO 3166-2:CN 字母代码连接。方块颜色表示数值：顺序色阶或以中点为中心的发散色阶（如增速相对集团平均），默认按分位数分 5 档并取整为好看的分界值，图例显示每档省份数；也可用等距分档、自定义分界或连续色阶。方块上显示中文简称（空间不足时用一字简称）或英文名（空间不足时用 ISO 代码，长名自动换行），空间足够时第二行显示格式化数值；可用强调色描边突出重点省份。图例默认放在网格左上角的空白处（放不下时自动换行，或移到网格旁边/下方）。悬停显示全部字段、排名（多行汇总时注明合计/平均）；点击方块交叉筛选其他图表；悬停图例高亮该档省份，点击图例按档筛选；被其他图表筛掉的省份变为浅色“幽灵”方块，颜色变化平滑过渡，布局保持不变。",
+   "description_zh": "用于在客户材料中展示按省汇总的指标（收入、增速、门店数、市场份额）。每个省级行政区（含台湾、香港、澳门，共 34 个）是一个同样大小的方块（或六边形），按地理相对位置排成 7 × 8 网格：黑龙江在右上，新疆、西藏在左侧，长江沿线（西藏—四川—重庆—湖北—安徽—江苏—上海）占一整行，海南在底部，港澳在广东下方，台湾在福建东侧；70 条省际陆地边界中有 63 条保留为相邻方块。因为不画边界、不涉及比例尺和领土轮廓，图表是示意图而非需要送审的“地图”，不会因边界画法引发合规问题（可选在空白角落标注“示意图，不代表实际边界”）；同时每个省面积相等，避免新疆、西藏、内蒙古等大省在视觉上压倒东部经济大省。数据可按 6 位行政区划代码（adcode，市/县级代码自动汇总到省）、中文或英文省名（带不带“省/市/自治区”均可，含 Inner Mongolia / Xizang / Macau 等常见写法）或 ISO 3166-2:CN 字母代码连接。方块颜色表示数值：顺序色阶或以中点为中心的发散色阶（如增速相对集团平均），默认按自然断点（Jenks）分 5 档，分界值取两档之间最整的数（取整不会把省份移到别的档），头部省份自成一档，图例显示每档省份数；也可用分位数、等距分档、自定义分界或连续色阶；无数据省份用斜线填充，与最浅一档区分。方块上显示中文简称（空间不足时用一字简称）或英文名（空间不足时用 ISO 代码，长名自动换行），空间足够时第二行显示格式化数值；重点省份在方块外侧加 2px 强调色描边（中间留纸色间隔，强调色与填充色过近时改用墨色）并加粗标签。图例默认放在网格左上角的空白处（放不下时自动换行，或移到网格旁边/下方）。悬停显示全部字段、排名（多行汇总时注明合计/平均）；点击方块交叉筛选其他图表；悬停图例高亮该档省份，点击图例按档筛选；被其他图表筛掉的省份变为浅色“幽灵”方块，颜色变化平滑过渡，布局保持不变。",
    "best_for": [
     "Revenue / stores / headcount by province for China-client decks (no 审图号 needed)",
     "Growth vs. a group average by province (diverging around the average)",
@@ -8658,8 +8759,8 @@
     },
     "classify": {
      "type": "string",
-     "default": "quantile",
-     "desc": "quantile | equal — how sequential class breaks are found (then rounded to nice numbers)"
+     "default": "jenks",
+     "desc": "jenks (natural breaks: headline outliers get a class of their own) | quantile | equal — how sequential class breaks are found. Jenks breaks are the roundest number between the two classes they separate (rounding never moves a province across classes); quantile / equal breaks are rounded to nice numbers"
     },
     "breaks": {
      "type": "number[]",
@@ -8679,7 +8780,7 @@
     "highlight": {
      "type": "string|string[]",
      "default": null,
-     "desc": "Province key(s) outlined in the accent colour (adcode, name or ISO letters), e.g. the target's home province"
+     "desc": "Province key(s) (adcode, name or ISO letters) marked with a 2px ring outside the tile on a paper halo plus a bold label, e.g. the target's home province. The ring is the accent colour, or the ink colour when the accent sits too close to a highlighted fill"
     },
     "highlightLabel": {
      "type": "string",
@@ -8749,7 +8850,7 @@
      "title": "Revenue 2025A by province (USD m) — 广东 / 江苏 lead",
      "data": "china_provinces",
      "height": 500,
-     "span": 7,
+     "span": 5,
      "options": {
       "encode": {
        "id": "adcode",
@@ -8792,7 +8893,7 @@
      "title": "服务网点数量（连续色阶）",
      "data": "china_provinces",
      "height": 460,
-     "span": 6,
+     "span": 5,
      "options": {
       "encode": {
        "id": "province_zh",
@@ -8879,7 +8980,7 @@
     "classify": {
      "type": "string",
      "default": "quantile",
-     "desc": "quantile | equal — how sequential class breaks are found (then rounded to nice numbers)"
+     "desc": "quantile | jenks | equal — how sequential class breaks are found. quantile / equal breaks are rounded to nice numbers; jenks (natural breaks: outliers get a class of their own) uses the roundest number between the two classes it separates"
     },
     "breaks": {
      "type": "number[]",
@@ -8894,7 +8995,7 @@
     "labels": {
      "type": "number",
      "default": 5,
-     "desc": "Value labels on the top N countries (largest |value - mid|); 0 = none. Crowded labels hide automatically"
+     "desc": "Value callouts on the top N countries (largest |value - mid|); 0 = none. A callout sits on a large country, else beside it with a leader line where it covers the fewest other data countries; callouts that cannot be placed hide"
     },
     "tooltip": {
      "type": "string[]",
@@ -8919,7 +9020,7 @@
     "legendPosition": {
      "type": "string",
      "default": "bottomleft",
-     "desc": "Leaflet control corner: bottomleft | bottomright | topleft | topright"
+     "desc": "Leaflet control corner: bottomleft | bottomright | topleft | topright. The initial view reserves a column or band for the legend whenever it would cover a data country"
     },
     "filterField": {
      "type": "string",
@@ -8943,7 +9044,8 @@
     {
      "title": "Revenue 2025A by country (USD m)",
      "data": "revenue_by_country",
-     "height": 460,
+     "height": 480,
+     "span": 9,
      "options": {
       "encode": {
        "id": "iso_num",
@@ -9196,9 +9298,9 @@
     "topojson-client",
     "geo-world"
    ],
-   "summary": "Origin -> destination flows as curved arcs: width by value, colour by category, arrowheads, nodes sized by total flow, travelling-dot animation.",
-   "summary_zh": "以弧线展示起点到终点的流向：线宽表示金额，颜色区分类别，箭头指向目的地，节点大小表示总流量，带流动光点动画。",
-   "description_zh": "适合展示跨境并购、资本流动、贸易或客户迁移等“从哪里到哪里”的关系。每行一条流（起点/终点名称和经纬度、数值、可选笔数和类别）；相同起终点+类别的行自动合并。弧线宽度与数值成正比、箭头指向目标国，节点圆按流入+流出总额缩放并标注前 N 个国家。悬停某条弧线会突出该流并显示金额、笔数和占比；悬停国家节点会突出它的全部进出流量并显示净流出。点击弧线或图例按类别（如行业）交叉筛选其他图表。",
+   "summary": "Origin -> destination flows as solid curved arcs: width by value, colour by category, arrowheads, nodes sized by total flow, travelling dots on hover.",
+   "summary_zh": "以弧线展示起点到终点的流向：线宽表示金额，颜色区分类别，箭头指向目的地，节点大小表示总流量，悬停时显示流动光点。",
+   "description_zh": "适合展示跨境并购、资本流动、贸易或客户迁移等“从哪里到哪里”的关系。每行一条流（起点/终点名称和经纬度、数值、可选笔数和类别）；相同起终点+类别的行自动合并。弧线宽度与数值成正比、箭头指向目标国，节点圆按流入+流出总额缩放；标注前 N 个国家及总额超过阈值的国家，其余国家在空间允许时就近标注，必要时用引线。弧线为实线（带纸色衬边，交叉处清晰），流动光点只在悬停时出现，静态截图与打印不会出现虚线效果。悬停某条弧线会突出该流并显示金额、笔数和占比；悬停国家节点会突出它的全部进出流量并显示净流出。点击弧线或图例按类别（如行业）交叉筛选其他图表。",
    "best_for": [
     "Cross-border M&A by acquirer -> target country",
     "Capital / trade / supply flows between regions",
@@ -9296,7 +9398,7 @@
     "animate": {
      "type": "boolean",
      "default": true,
-     "desc": "Travelling dots along each arc (CSS; off for print / reduced motion)"
+     "desc": "Travelling dots along the hovered flows (CSS; only when motion is allowed). Arcs are always drawn solid, so static captures, print and PNG export never show dotted lines"
     },
     "nodes": {
      "type": "boolean",
@@ -9313,8 +9415,18 @@
     },
     "labels": {
      "type": "number",
-     "default": 6,
-     "desc": "Label the top N countries by total flow (0 = none)"
+     "default": 8,
+     "desc": "Label the top N countries by total flow (0 = none); each label sits beside its node or off it with a leader line, away from other nodes"
+    },
+    "labelMin": {
+     "type": "number",
+     "default": 0.1,
+     "desc": "Also label every country whose total flow is at least this share of the largest country's total (0 = top N only)"
+    },
+    "labelRest": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Also label every remaining country where its label fits right beside the node without covering another node or label (isolated destinations such as Brazil or Australia)"
     },
     "flowLabels": {
      "type": "number",
@@ -9366,7 +9478,7 @@
     "Hover a flow to isolate it (tooltip: from -> to, value, deals, share)",
     "Hover a country to isolate its inbound / outbound flows (tooltip: in, out, net)",
     "Click a flow or legend category to cross-filter",
-    "Arcs draw in on render; travelling dots show direction",
+    "Arcs draw in on render; travelling dots show the direction of hovered flows (motion only)",
     "Zoom / pan",
     "PNG export"
    ],
@@ -9388,7 +9500,7 @@
       },
       "maxFlows": 10,
       "flowLabels": 4,
-      "labels": 6,
+      "labels": 8,
       "widthRange": [
        1.5,
        10
@@ -9407,13 +9519,12 @@
    "engine": "leaflet",
    "deps": [
     "leaflet",
-    "leaflet-heat",
     "topojson-client",
     "geo-world"
    ],
-   "summary": "Kernel density surface of point locations, optionally weighted by a value, in the theme's sequential colours; toggle to reveal the underlying points.",
+   "summary": "Kernel density surface of point locations, optionally weighted by a value, in the theme's sequential colours with a numeric legend (total within a stated radius); toggle to reveal the underlying points.",
    "summary_zh": "点位的核密度热力面（可按数值加权），使用主题顺序色阶；可一键叠加显示原始点位。",
-   "description_zh": "用连续的热力面展示点位在空间上的集中程度，适合看“哪里最密集 / 规模最集中”，例如产能、门店、客户或交易的地理集中度。每行一个点（lat / lon），可指定 weight 字段（如产能、收入）加权，权重按全量数据归一化，邻近点叠加。颜色来自主题顺序色阶，图例为相对密度（低 → 高）并注明点数与合计；radius / blur 控制平滑程度。右上角按钮可叠加原始点位，悬停查看详情、点击交叉筛选。",
+   "description_zh": "用连续的热力面展示点位在空间上的集中程度，适合看“哪里最密集 / 规模最集中”，例如产能、门店、客户或交易的地理集中度。每行一个点（lat / lon），可指定 weight 字段（如产能、收入）加权，邻近点按距离加权叠加。颜色来自主题顺序色阶，核半径为固定的地理距离（radius 按初始视图、1000px 宽地图的像素设定，随地图宽度缩放），因此图例给出具体数值：半径范围内按距离加权的合计（如“约 400 km 内的建筑面积”），并注明点数与合计。暗色主题下色阶止于次浅色，不出现发光效果。右上角按钮可叠加原始点位并标注最大的 N 个点位，悬停查看详情、点击交叉筛选。",
    "best_for": [
     "Concentration of capacity / revenue / customers",
     "Hundreds+ of points where individual markers are noise",
@@ -9440,7 +9551,7 @@
     "weight": {
      "type": "number",
      "required": false,
-     "desc": "Optional weight per point (normalised to the largest point)"
+     "desc": "Optional weight per point (e.g. floor area); the surface and legend show the distance-weighted total within the kernel radius"
     },
     "label": {
      "type": "string",
@@ -9458,22 +9569,17 @@
     "radius": {
      "type": "number",
      "default": 26,
-     "desc": "Kernel radius in px"
-    },
-    "blur": {
-     "type": "number",
-     "default": 20,
-     "desc": "Blur in px"
+     "desc": "Kernel radius in px on a 1000px-wide map at the initial view; scaled with the map width (a 760px page gets a smaller kernel, so nearby clusters stay apart). The kernel is geographic: it zooms with the map, and the legend states it in km"
     },
     "intensity": {
      "type": "number",
-     "default": 0.85,
-     "desc": "Weight of the heaviest single point (0-1); overlapping points add up and saturate at 1"
+     "default": 1,
+     "desc": "Colour domain = the densest spot of the unfiltered data / intensity, rounded up to a nice number (> 1 saturates the peaks sooner)"
     },
     "minOpacity": {
      "type": "number",
      "default": 0.12,
-     "desc": "Floor opacity of the faintest density"
+     "desc": "Opacity of the faintest visible density (the surface fades in from the kernel edge)"
     },
     "gradient": {
      "type": "object",
@@ -9490,6 +9596,11 @@
      "default": true,
      "desc": "On-map button to show / hide the points (hidden in print)"
     },
+    "labels": {
+     "type": "number",
+     "default": 5,
+     "desc": "Callouts (name and weight) on the N largest points while the points overlay is shown, with leader lines where they sit off the point (0 = none)"
+    },
     "tooltip": {
      "type": "string[]",
      "default": [],
@@ -9503,7 +9614,7 @@
     "legend": {
      "type": "boolean",
      "default": true,
-     "desc": "Show the density legend with point count / total"
+     "desc": "Density legend with numeric ticks (0 / half / top of the colour domain, in the weight's units within ~N km), point count and total"
     },
     "legendPosition": {
      "type": "string",
@@ -9560,7 +9671,6 @@
       },
       "points": true,
       "radius": 34,
-      "blur": 26,
       "fit": [
        [
         -12,
@@ -9622,7 +9732,7 @@
     "columns": {
      "type": "array",
      "default": null,
-     "desc": "[{field, expr?, title?, format?, group?, heat?: 'seq'|'div'|false, mid?, reverse?, nm?: [lo, hi], sign?, stats?: false, align?, width?, note?}] — field names or specs; null = every numeric field. Include the label field to position it; expr derives a column with an RK formula"
+     "desc": "[{field, expr?, title?, format?, group?, heat?: 'seq'|'div'|false, mid?, reverse?, nm?: [lo, hi], sign? (change column: '+' / parentheses, arrow), stats?: false, align?, width?, note?}] — field names or specs; null = every numeric field. Include the label field to position it; expr derives a column with an RK formula"
     },
     "groupBy": {
      "type": "string",
@@ -9675,7 +9785,12 @@
     "notes": {
      "type": "object",
      "default": {},
-     "desc": "{\"<label value>\": \"(1)\"} footnote markers after row labels (the note text goes in the block footer)"
+     "desc": "{\"<label value>\": \"(1)\"} footnote markers after row labels"
+    },
+    "footnotes": {
+     "type": "object",
+     "default": {},
+     "desc": "{\"(1)\": \"Pending completion\"} text for the markers, written above the source line in the block footer"
     },
     "sort": {
      "type": "object",
@@ -9690,7 +9805,7 @@
     "heatIntensity": {
      "type": "number",
      "default": 0.5,
-     "desc": "0–1 strength of heat-map tints"
+     "desc": "0–1 span of the theme ramp used for heat columns (0.5 = seq-2…seq-6 / div-2…div-6); text colour is picked for 4.5:1 contrast"
     },
     "scroll": {
      "type": "boolean",
@@ -9829,6 +9944,9 @@
       "notes": {
        "Upland Drives": "(1)",
        "Tarrant Automation": "(1)"
+      },
+      "footnotes": {
+       "(1)": "Announced, pending completion; terms as announced."
       },
       "columns": [
        {
@@ -10380,10 +10498,15 @@
      "default": false,
      "desc": "false | 'seq' | 'div' — colour the leaf cells"
     },
+    "heatMinN": {
+     "type": "number",
+     "default": 1,
+     "desc": "Cells aggregating fewer records stay uncoloured and out of the heat range (e.g. 2 so a single deal is not read as the high)"
+    },
     "heatIntensity": {
      "type": "number",
      "default": 0.5,
-     "desc": "0–1 strength of heat tints"
+     "desc": "0–1 span of the theme ramp used (0.5 = seq-2…seq-6 / div-2…div-6); text colour is picked for 4.5:1 contrast"
     },
     "titles": {
      "type": "object",
@@ -10466,6 +10589,7 @@
       "agg": "median",
       "totalCol": true,
       "heat": "seq",
+      "heatMinN": 2,
       "colSort": null
      }
     },
@@ -10564,7 +10688,7 @@
     "deltaFormat": {
      "type": "string",
      "default": null,
-     "desc": "Format in Δ mode (defaults to '+fmt;-fmt;fmt' of the cell format)"
+     "desc": "Format in Δ mode (defaults to '+fmt;(fmt);fmt' of the cell format: negatives in parentheses)"
     },
     "heat": {
      "type": "string|boolean",
@@ -10584,7 +10708,7 @@
     "heatIntensity": {
      "type": "number",
      "default": 0.55,
-     "desc": "0–1 strength of the heat tints"
+     "desc": "0–1 span of the theme ramp used (0.5 ≈ div-2…div-6 / seq-2…seq-6); text colour is picked for 4.5:1 contrast"
     },
     "mode": {
      "type": "string",
@@ -11024,12 +11148,12 @@
     "palette": {
      "type": "string",
      "default": "categorical",
-     "desc": "Phase colours: categorical | sequential (ordered phases in shades of the theme ramp)"
+     "desc": "Phase colours: categorical | sequential (ordered phases on the theme's ordinal ramp, early = light, late = dark; spread over the phases left by the block's 'where')"
     },
     "milestoneLabel": {
      "type": "string",
      "default": "date",
-     "desc": "Text right of each diamond: date | label | none"
+     "desc": "Text right of each diamond (paper halo): date | label (the name, only when the row-label column is hidden with labelWidth 0; otherwise the date, as the row already names the milestone) | none"
     },
     "milestoneName": {
      "type": "string",
@@ -11128,7 +11252,6 @@
       "groupHeaders": false,
       "palette": "sequential",
       "barLabel": "owner",
-      "milestoneLabel": "label",
       "today": "2026-10-14",
       "calendar": "months"
      }
@@ -11212,7 +11335,7 @@
     "kindColors": {
      "type": "object",
      "default": null,
-     "desc": "{kind: colour token} e.g. {\"m&a\": \"accent2\", \"guidance\": \"neg\"}; tokens: accent, accent2, accent3, pos, neg, ink2, cat1..cat8 or an index"
+     "desc": "{kind: colour token} e.g. {\"m&a\": \"accent3\", \"guidance\": \"cat2\"}; tokens: accent, accent2, accent3, pos, neg, ink2, cat1..cat8 or an index. accent2 is the highlight colour: while options.highlight is set, a kind mapped to it falls back to the palette (console warning)"
     },
     "kindShapes": {
      "type": "object",
@@ -11257,7 +11380,7 @@
     "highlight": {
      "type": "string|string[]",
      "default": null,
-     "desc": "Event label(s) to emphasise (bold title, accent-2 date, larger marker)"
+     "desc": "Event label(s) to emphasise: bold title, date in the text-safe accent-2 ink, accent-2 ring around the (kind-coloured) marker"
     },
     "selectBy": {
      "type": "string",
@@ -11299,9 +11422,6 @@
        "guidance": "Guidance",
        "rating": "Credit rating"
       },
-      "kindColors": {
-       "m&a": "accent2"
-      },
       "highlight": "Press reports of sponsor interest",
       "today": "2026-10-14"
      }
@@ -11325,10 +11445,10 @@
      }
     },
     {
-     "title": "Guidance, M&A and rating events — vertical layout with details",
+     "title": "Guidance, M&A and rating events — vertical, with details",
      "data": "price_events",
      "height": 600,
-     "span": 5,
+     "span": 7,
      "options": {
       "orientation": "vertical",
       "where": "kind in [\"m&a\", \"guidance\", \"rating\"]",
@@ -11337,17 +11457,14 @@
        "earnings": "Earnings",
        "guidance": "Guidance",
        "rating": "Credit rating"
-      },
-      "kindColors": {
-       "m&a": "accent2"
       }
      }
     },
     {
-     "title": "Process milestones — proportional vertical spacing",
+     "title": "Process milestones — proportional spacing",
      "data": "deal_timeline",
      "height": 520,
-     "span": 4,
+     "span": 5,
      "options": {
       "where": "milestone == true",
       "encode": {

@@ -19,7 +19,6 @@
 (function () {
   'use strict';
   var h = RK.util.h, isNum = RK.util.isNum;
-  var NONE = '∅';                   // sentinel value: multi-select with nothing ticked (matches no row)
   var applied = {};                       // "blockId|key" -> default applied once (survives re-render)
 
   var SVG = {
@@ -80,9 +79,9 @@
   function indexOfCI(list, v) { for (var i = 0; i < list.length; i++) if (same(list[i], v)) return i; return -1; }
   function fmtVal(v, fmt) { return typeof v === 'string' && !RK.format.isDateCode(fmt) ? v : RK.format(v, fmt); }
 
-  /** Field title / format from whichever dataset defines the field (for cross-filter chips). */
-  function fieldInfo(name) {
-    var ids = RK.data.ids();
+  /** Field title / format from the selection's own dataset(s), else whichever dataset defines it (cross-filter chips). */
+  function fieldInfo(name, datasets) {
+    var ids = (datasets || []).concat(RK.data.ids()).filter(function (id) { return RK.data.get(id); });
     for (var i = 0; i < ids.length; i++) {
       var f = RK.data.get(ids[i]).field(name);
       if (f) return f;
@@ -136,15 +135,15 @@
 
     function sel() {
       var f = RK.store.filter(c.key);
-      if (!f || f.op !== 'in' || !f.values) return null; // null = everything
-      return f.values.length === 1 && f.values[0] === NONE ? [] : f.values.slice();
+      if (!f || f.op !== 'in' || !f.values) return null; // null = everything, [] = nothing ticked
+      return f.values.slice();
     }
     function isOn(v, s) { return s === null ? multi : indexOfCI(s, v) >= 0; }
     function commit(arr) {
       if (!multi) { put(c, arr && arr.length ? { op: 'in', values: [arr[0]] } : null); return; }
       var ordered = values.filter(function (v) { return indexOfCI(arr, v) >= 0; });
       if (ordered.length >= values.length) put(c, null);
-      else put(c, { op: 'in', values: ordered.length ? ordered : [NONE] });
+      else put(c, { op: 'in', values: ordered, allowEmpty: true });   // nothing ticked matches no row
     }
     function visible() {
       var t = q.toLowerCase();
@@ -399,7 +398,8 @@
       var max = Math.max.apply(null, counts) || 1;
       hist.innerHTML = '';
       counts.forEach(function (n) {
-        hist.appendChild(h('i', { style: { height: (n ? Math.max(12, n / max * 100) : 0) + '%' }, title: n ? n + ' row' + (n > 1 ? 's' : '') : null }));
+        // square-root heights with a floor: one-off bins stay visible without a ragged skyline
+        hist.appendChild(h('i', { style: { height: (n ? 30 + 70 * Math.sqrt(n / max) : 0) + '%' }, title: n ? n + ' row' + (n > 1 ? 's' : '') : null }));
       });
     }
     function sync() {
@@ -578,8 +578,9 @@
           Object.keys(fs).forEach(function (key) {
             var s = fs[key];
             if (!s.source || ownKeys.indexOf(key) >= 0 || s.source === ctx.id) return;
-            var info = fieldInfo(s.field);
-            var text = s.op === 'in' ? summarise(s.values || [], info.format, 3)
+            var info = fieldInfo(s.field, s.datasets);
+            // 'in' lists and either-end link selections (op 'expr' carrying values) read as values
+            var text = s.values ? (s.values.length ? summarise(s.values, info.format, 3) : 'None')
               : s.op === 'between' ? RK.format(s.min, info.format) + ' – ' + RK.format(s.max, info.format)
               : s.op === 'search' ? '“' + s.text + '”' : (s.expr || '');
             list.push({ key: key, label: info.title || s.field || 'Selection', text: text, cross: true });

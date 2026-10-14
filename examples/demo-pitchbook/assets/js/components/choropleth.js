@@ -10,6 +10,144 @@
 
   function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
 
+  /* ---------------- colour guards (same block in the map components) ---------------- */
+  /** CIELAB (D65) of a colour. */
+  function lab(c) {
+    var p = RK.theme.parseColor(c).slice(0, 3).map(function (v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    var x = (p[0] * 0.4124 + p[1] * 0.3576 + p[2] * 0.1805) / 0.95047, y = p[0] * 0.2126 + p[1] * 0.7152 + p[2] * 0.0722,
+      z = (p[0] * 0.0193 + p[1] * 0.1192 + p[2] * 0.9505) / 1.08883;
+    function f(v) { return v > 0.008856 ? Math.cbrt(v) : 7.787 * v + 16 / 116; }
+    return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))];
+  }
+  /** CIE76 colour difference; kL < 1 weighs lightness less (hue tells thin marks apart better than lightness). */
+  function dE(a, b, kL) {
+    var p = lab(a), q = lab(b);
+    return Math.sqrt(Math.pow((p[0] - q[0]) * (kL || 1), 2) + Math.pow(p[1] - q[1], 2) + Math.pow(p[2] - q[2], 2));
+  }
+  /** Mix a fill toward `to` until it is at least ΔE `min` from every background it sits on (land, paper). */
+  function separate(c, bgs, min, to) {
+    for (var k = 0; k <= 10; k++) {
+      var x = k ? RK.theme.mix(c, to, k * 0.08) : c;
+      if (bgs.every(function (b) { return !b || dE(x, b) >= min; })) return x;
+    }
+    return RK.theme.mix(c, to, 0.8);
+  }
+
+  /** Roundest number x with lo < x <= hi (coarsest step first): a class break inside the gap between two values. */
+  function roundIn(lo, hi) {
+    if (!(hi > lo)) return hi;
+    var p = Math.pow(10, Math.ceil(Math.log10(Math.max(Math.abs(lo), Math.abs(hi)) || 1)) + 1);
+    for (; p > (hi - lo) / 1e6; p /= 10) {
+      for (var k = 0, M = [10, 5, 2.5, 2, 1]; k < M.length; k++) {
+        var st = p * M[k] / 10, x = Math.floor(lo / st) * st + st;
+        if (x <= hi + 1e-12) return +x.toPrecision(12);
+      }
+    }
+    return hi;
+  }
+  /** Fisher-Jenks natural breaks on sorted values: start index of classes 2..k (minimum within-class variance). */
+  function jenks(s, k) {
+    var n = s.length, p1 = [0], p2 = [0], D = [], B = [], i, j, m;
+    for (i = 0; i < n; i++) { p1.push(p1[i] + s[i]); p2.push(p2[i] + s[i] * s[i]); }
+    function ssd(a, b) { var c = b - a + 1, sm = p1[b + 1] - p1[a]; return p2[b + 1] - p2[a] - sm * sm / c; }
+    for (j = 0; j < k; j++) { D.push([]); B.push([]); for (i = 0; i < n; i++) { D[j].push(Infinity); B[j].push(0); } }
+    for (i = 0; i < n; i++) D[0][i] = ssd(0, i);
+    for (j = 1; j < k; j++) {
+      for (i = j; i < n; i++) {
+        for (m = j; m <= i; m++) { var c = D[j - 1][m - 1] + ssd(m, i); if (c < D[j][i]) { D[j][i] = c; B[j][i] = m; } }
+      }
+    }
+    var out = [];
+    for (j = k - 1, i = n - 1; j > 0; j--) { m = B[j][i]; out.unshift(m); i = m - 1; }
+    return out;
+  }
+
+  /* ---------------- callout labels (same block in choropleth, bubble-map, flow-map, geo-heat) ----------------
+   * Labels for the top marks, each on the best of a ring of candidate boxes around its mark (8 directions x 4
+   * distances, plus the centre when it.center), never over a map control or another label. opts.cost(box, item, centre)
+   * scores what a box covers (other marks, data areas); a leader line joins a label that sits off its mark. Optional
+   * items (it.optional) are only placed right beside their mark at a cost <= opts.optionalCost (default 0.5).
+   *   var co = callouts(map, {cost: fn, maxCost: 5});
+   *   co.set([{latlng, html, cls, prio, r, center, leader, optional}], maxShown);
+   */
+  function callouts(map, opts) {
+    opts = opts || {};
+    var L = window.L, group = L.layerGroup().addTo(map), items = [], cap = Infinity;
+    if (!map.getPane('rk-labels')) map.createPane('rk-labels').style.zIndex = 640;
+    // [dx, dy, preference]: right first, then left, above, below, the diagonals
+    var DIRS = [[1, 0, 0], [-1, 0, 0.15], [0, -1, 0.25], [0, 1, 0.3], [0.8, -0.7, 0.35], [-0.8, -0.7, 0.45], [0.8, 0.7, 0.45], [-0.8, 0.7, 0.5]];
+    var GAPS = [3, 14, 28, 46, 70];
+    function hit(a, b, pad) { return a.x < b.x + b.w + pad && a.x + a.w + pad > b.x && a.y < b.y + b.h + pad && a.y + a.h + pad > b.y; }
+    function place() {
+      var size = map.getSize(), c0 = map.getContainer().getBoundingClientRect(), placed = [], shown = 0;
+      var hard = [].map.call(map.getContainer().querySelectorAll('.leaflet-control'), function (c) {
+        var r = c.getBoundingClientRect();
+        return { x: r.left - c0.left, y: r.top - c0.top, w: r.width, h: r.height };
+      });
+      items.slice().sort(function (a, b) { return b.it.prio - a.it.prio; }).forEach(function (x) {
+        var icon = x.m.getElement();
+        if (!icon) return;
+        var span = icon.querySelector('.rk-geo-label'), lead = icon.querySelector('.rk-geo-leader');
+        var p = map.latLngToContainerPoint(x.it.latlng), r = x.it.r || 0, w = span.offsetWidth, h = span.offsetHeight, best = null;
+        function consider(dx, dy, k, centre) {
+          var b = { x: p.x + dx, y: p.y + dy, w: w, h: h };
+          if (b.x < 2 || b.y < 2 || b.x + w > size.x - 2 || b.y + h > size.y - 2) return;
+          if (hard.some(function (q) { return hit(b, q, 2); }) || placed.some(function (q) { return hit(b, q, 3); })) return;
+          var cost = k + (opts.cost ? opts.cost(b, x.it, centre) : 0);
+          if (!best || cost < best.cost) best = { dx: dx, dy: dy, b: b, cost: cost };
+        }
+        if (shown < cap && w) {
+          if (x.it.center) consider(-w / 2, -h / 2, 0, true);
+          DIRS.forEach(function (d) {
+            (x.it.optional ? GAPS.slice(0, 1) : GAPS).forEach(function (g, gi) {
+              var e = r + g;
+              consider(d[0] > 0 ? d[0] * e : d[0] < 0 ? d[0] * e - w : -w / 2, d[1] > 0 ? d[1] * e : d[1] < 0 ? d[1] * e - h : -h / 2, d[2] + gi * 0.55, false);
+            });
+          });
+        }
+        var lim = x.it.optional ? (opts.optionalCost != null ? opts.optionalCost : 0.5) : opts.maxCost;
+        var ok = !!best && !(lim != null && best.cost > lim);
+        span.classList.toggle('is-hidden', !ok);
+        if (lead) lead.style.display = 'none';
+        if (!ok) return;
+        shown++;
+        placed.push(best.b);
+        span.style.transform = 'translate(' + Math.round(best.dx) + 'px,' + Math.round(best.dy) + 'px)';
+        // leader: from the mark's edge to the nearest point of the label box
+        var nx = Math.max(best.b.x, Math.min(p.x, best.b.x + w)) - p.x, ny = Math.max(best.b.y, Math.min(p.y, best.b.y + h)) - p.y;
+        var D = Math.sqrt(nx * nx + ny * ny);
+        if (lead && x.it.leader !== false && D - r > 6) {
+          var ln = lead.querySelector('line'), k = r ? (r + 1) / D : 0;
+          ln.setAttribute('x1', (nx * k).toFixed(1)); ln.setAttribute('y1', (ny * k).toFixed(1));
+          ln.setAttribute('x2', nx.toFixed(1)); ln.setAttribute('y2', ny.toFixed(1));
+          lead.style.display = '';
+        }
+      });
+    }
+    map.on('zoomend moveend resize', place);
+    return {
+      set: function (list, n) {
+        var ink = RK.theme.tokens().ink3;
+        cap = n == null ? Infinity : n;
+        group.clearLayers();
+        items = list.map(function (it) {
+          var svg = '<svg class="rk-geo-leader" width="1" height="1" style="position:absolute;left:0;top:0;overflow:visible;pointer-events:none;display:none">' +
+            '<line stroke="' + ink + '" stroke-width="0.8"/>' + (it.r ? '' : '<circle r="1.8" fill="' + ink + '"/>') + '</svg>';
+          var m = L.marker(it.latlng, {
+            pane: 'rk-labels', interactive: false, keyboard: false,
+            icon: L.divIcon({ className: 'rk-geo-label-anchor', iconSize: null, html: svg + '<span class="rk-geo-label ' + (it.cls || '') + '">' + it.html + '</span>' })
+          });
+          group.addLayer(m);
+          return { m: m, it: it };
+        });
+        place();
+      },
+      place: place
+    };
+  }
+  /* ---------------- end callouts ---------------- */
+
+
   /** ISO 3166-1 alpha-3 -> numeric for every world-110m country, so ISO3 keys join too. */
   var ISO3 = {};
   ('FJI242 TZA834 ESH732 CAN124 USA840 KAZ398 UZB860 PNG598 IDN360 ARG032 CHL152 COD180 SOM706 KEN404 SDN729 TCD148 HTI332 DOM214 RUS643 BHS044 FLK238 NOR578 GRL304 ATF260 TLS626 ZAF710 LSO426 MEX484 URY858 BRA076 BOL068 PER604 COL170 PAN591 CRI188 NIC558 HND340 SLV222 GTM320 BLZ084 VEN862 GUY328 SUR740 FRA250 ECU218 PRI630 JAM388 CUB192 ZWE716 BWA072 NAM516 SEN686 MLI466 MRT478 BEN204 NER562 NGA566 CMR120 TGO768 GHA288 CIV384 GIN324 GNB624 LBR430 SLE694 BFA854 CAF140 COG178 GAB266 GNQ226 ZMB894 MWI454 MOZ508 SWZ748 AGO024 BDI108 ISR376 LBN422 MDG450 PSE275 GMB270 TUN788 DZA012 JOR400 ARE784 QAT634 KWT414 IRQ368 OMN512 VUT548 KHM116 THA764 LAO418 MMR104 VNM704 PRK408 KOR410 MNG496 IND356 BGD050 BTN064 NPL524 PAK586 AFG004 TJK762 KGZ417 TKM795 IRN364 SYR760 ARM051 SWE752 BLR112 UKR804 POL616 AUT040 HUN348 MDA498 ROU642 LTU440 LVA428 EST233 DEU276 BGR100 GRC300 TUR792 ALB008 HRV191 CHE756 LUX442 BEL056 NLD528 PRT620 ESP724 IRL372 NCL540 SLB090 NZL554 AUS036 LKA144 CHN156 TWN158 ITA380 DNK208 GBR826 ISL352 AZE031 GEO268 PHL608 MYS458 BRN096 SVN705 FIN246 SVK703 CZE203 ERI232 JPN392 PRY600 YEM887 SAU682 ATA010 CYP196 MAR504 EGY818 LBY434 ETH231 DJI262 UGA800 RWA646 BIH070 MKD807 SRB688 MNE499 TTO780 SSD728').split(' ').forEach(function (x) { ISO3[x.slice(0, 3)] = x.slice(3); });
@@ -36,10 +174,17 @@
     return pts;
   }
 
-  /** Class breaks: explicit, nice-rounded quantiles, or nice equal intervals. */
+  /** Class breaks: explicit, natural breaks (Jenks), nice-rounded quantiles, or nice equal intervals. */
   function classBreaks(o, vals, ext) {
     if (Array.isArray(o.breaks) && o.breaks.length) return o.breaks.slice().sort(function (a, b) { return a - b; });
     var n = Math.max(2, o.bins | 0), out = [];
+    if (o.classify === 'jenks') {
+      // each break is the roundest number between the last value of one class and the first of the next
+      var sv = vals.slice().sort(function (a, b) { return a - b; }), uniq = RK.util.unique(sv);
+      if (uniq.length <= n) { for (var u = 1; u < uniq.length; u++) out.push(roundIn(uniq[u - 1], uniq[u])); }
+      else jenks(sv, n).forEach(function (m) { if (sv[m] > sv[m - 1]) out.push(roundIn(sv[m - 1], sv[m])); });
+      return RK.util.unique(out).filter(function (b) { return b > ext[0] && b <= ext[1]; });
+    }
     if (o.classify === 'equal') {
       var step = RK.util.niceStep(ext[1] - ext[0], n);
       for (var x = Math.ceil(ext[0] / step) * step; x < ext[1]; x += step) if (x > ext[0]) out.push(+x.toPrecision(10));
@@ -58,15 +203,18 @@
     var o = ctx.options, t = ctx.theme, ext = RK.util.extent(vals);
     var seq = G.seqStops(t);
     var div = o.scale === 'diverging', mid = +o.mid || 0;
+    // every class stays clearly apart from the no-data land and the sea / paper (palest class, dark-theme midpoints)
+    var bgs = [t.mapLand || t.surface2, t.mapWater || t.paper];
+    function lift(c, hi) { return c == null ? c : separate(c, bgs, 15, hi ? (div ? t.div[t.div.length - 1] : seq[seq.length - 1]) : t.div[0]); }
     var classed = (o.bins > 0 || (Array.isArray(o.breaks) && o.breaks.length)) && vals.length > 1;
     if (!classed) {
       if (div) {
         var dev = Math.max(Math.abs(ext[0] - mid), Math.abs(ext[1] - mid)) || 1;
-        var dc = RK.theme.diverging([mid - dev, mid + dev], mid);
-        return { color: dc, legend: G.legendRamp(t.div, [RK.format(mid - dev, fmt), RK.format(mid, fmt), RK.format(mid + dev, fmt)]) };
+        var dc0 = RK.theme.diverging([mid - dev, mid + dev], mid), dc = function (v) { return lift(dc0(v), v >= mid); };
+        return { color: dc, legend: G.legendRamp(t.div.map(function (c, i, a) { return lift(c, i >= (a.length - 1) / 2); }), [RK.format(mid - dev, fmt), RK.format(mid, fmt), RK.format(mid + dev, fmt)]) };
       }
-      var sc = RK.theme.sequential(ext, seq);
-      return { color: sc, legend: G.legendRamp(seq, [RK.format(ext[0], fmt), RK.format(ext[1], fmt)]) };
+      var sc0 = RK.theme.sequential(ext, seq), sc = function (v) { return lift(sc0(v), true); };
+      return { color: sc, legend: G.legendRamp(seq.map(function (c) { return lift(c, true); }), [RK.format(ext[0], fmt), RK.format(ext[1], fmt)]) };
     }
     var breaks;
     if (div && !(Array.isArray(o.breaks) && o.breaks.length)) {
@@ -82,10 +230,10 @@
     if (div) {
       var ramp = RK.theme.ramp(t.div);
       var nNeg = breaks.filter(function (b) { return b <= mid; }).length, m = Math.max(nNeg, nCls - nNeg) || 1;
-      colors = breaks.concat([null]).map(function (_, j) { return ramp(j < nNeg ? 0.5 - 0.5 * (nNeg - j) / m : 0.5 + 0.5 * (j - nNeg + 1) / m); });
+      colors = breaks.concat([null]).map(function (_, j) { return lift(ramp(j < nNeg ? 0.5 - 0.5 * (nNeg - j) / m : 0.5 + 0.5 * (j - nNeg + 1) / m), j >= nNeg); });
     } else {
       var r = RK.theme.ramp(seq);
-      colors = breaks.concat([null]).map(function (_, j) { return r(nCls > 1 ? j / (nCls - 1) : 1); });
+      colors = breaks.concat([null]).map(function (_, j) { return lift(r(nCls > 1 ? j / (nCls - 1) : 1), true); });
     }
     function classOf(v) { var j = 0; while (j < breaks.length && v >= breaks[j]) j++; return j; }
     var lf = G.tidyFmt(fmt, breaks), top = colors.map(function (c, j) { return j; }).reverse();   // highest class first
@@ -99,6 +247,14 @@
         note: function (j) { return String(shown.filter(function (v) { return classOf(v) === j; }).length); }   // countries per class
       })
     };
+  }
+
+  var hatchSeq = 0;
+
+  /** Data bounds with the polar extremes clamped (Canadian Arctic, Antarctic islands), wider than RK.geo's world clamp. */
+  function clampFit(pts) {
+    var b = window.L.latLngBounds(pts);
+    return window.L.latLngBounds([[Math.max(b.getSouth(), -56), b.getWest()], [Math.min(b.getNorth(), 74), b.getEast()]]);
   }
 
   RK.component({
@@ -133,8 +289,61 @@
       });
       function fid(f) { return f.id != null ? f.id : 'n:' + f.properties.name; }
       var layers = {}, recs = {}, S = null, timer = null;
+      map.options.zoomSnap = 0;   // fit the data exactly (a 0.25 zoom snap leaves up to a fifth of the block empty)
       var area = L.geoJSON(null, { onEachFeature: wire }).addTo(map);
-      var labels = view.labels(), legend = view.legend();
+      var legend = view.legend();
+      var hatch = hatchPattern();
+
+      /* point -> country (outer rings, bbox first): what a callout box would cover */
+      var shapes = fc.features.filter(function (f) { return f.id !== '010'; }).map(function (f) {
+        var g = f.geometry, polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+        var rings = polys.map(function (pl) { return pl[0]; }), bb = [180, 90, -180, -90];
+        rings.forEach(function (r) { r.forEach(function (c) { bb[0] = Math.min(bb[0], c[0]); bb[1] = Math.min(bb[1], c[1]); bb[2] = Math.max(bb[2], c[0]); bb[3] = Math.max(bb[3], c[1]); }); });
+        return { id: fid(f), rings: rings, bb: bb };
+      });
+      function inRing(x, y, r) {
+        var inside = false;
+        for (var i = 0, j = r.length - 1; i < r.length; j = i++) {
+          if ((r[i][1] > y) !== (r[j][1] > y) && x < (r[j][0] - r[i][0]) * (y - r[i][1]) / (r[j][1] - r[i][1]) + r[i][0]) inside = !inside;
+        }
+        return inside;
+      }
+      function countryAt(lon, lat) {
+        for (var i = 0; i < shapes.length; i++) {
+          var q = shapes[i];
+          if (lon < q.bb[0] || lon > q.bb[2] || lat < q.bb[1] || lat > q.bb[3]) continue;
+          if (q.rings.some(function (r) { return inRing(lon, lat, r); })) return q.id;
+        }
+        return null;
+      }
+      /** Callout cost: share of the box over other data countries (worst), its own country, other land (sea is free). */
+      function coverCost(b, it, centre) {
+        var own = 0, other = 0, land = 0, n = 0;
+        for (var i = 0; i < 5; i++) {
+          for (var j = 0; j < 3; j++) {
+            var ll = map.containerPointToLatLng([b.x + b.w * (i + 0.5) / 5, b.y + b.h * (j + 0.5) / 3]), id = countryAt(ll.lng, ll.lat);
+            n++;
+            if (id == null) continue;
+            if (id === it.id) own++; else if (recs[id] && recs[id].v != null) other++; else land++;
+          }
+        }
+        if (centre) return own >= n * 0.85 && !other ? 0 : 99;   // inside a large country: label sits on it
+        return (10 * other + 4 * own + 0.6 * land) / n;
+      }
+      var labels = callouts(map, { cost: coverCost, maxCost: 5 });
+
+      /** Hatch for countries in the data without a value (SVG pattern in the map's own renderer). */
+      function hatchPattern() {
+        var svg = map.getPanes().overlayPane.querySelector('svg'), NS = 'http://www.w3.org/2000/svg';
+        if (!svg) return t.mapLand || t.surface2;
+        var id = 'rk-choro-hatch-' + (++hatchSeq), defs = svg.querySelector('defs') || svg.insertBefore(document.createElementNS(NS, 'defs'), svg.firstChild);
+        var bg = t.mapLand || t.surface2, ln = RK.theme.mix(bg, t.ink, t.dark ? 0.24 : 0.2);
+        var pat = document.createElementNS(NS, 'pattern');
+        pat.setAttribute('id', id); pat.setAttribute('width', '6'); pat.setAttribute('height', '6'); pat.setAttribute('patternUnits', 'userSpaceOnUse');
+        pat.innerHTML = '<rect width="6" height="6" fill="' + bg + '"/><path d="M-1 1L1 -1M0 6L6 0M5 7L7 5" stroke="' + ln + '" stroke-width="1"/>';
+        defs.appendChild(pat);
+        return 'url(#' + id + ')';
+      }
 
       function filterField(c) { return c.options.filterField || c.enc.id; }
       /** Key -> feature: ISO numeric, ISO alpha-3, basemap name or a common alias. */
@@ -165,7 +374,7 @@
 
       function styleOf(rec) {
         var ff = filterField(cur), sel = cur.selected(ff), on = !sel.length || sel.indexOf(rec.row[ff]) >= 0;
-        var fill = rec.v == null ? (t.mapLand || t.surface2) : S.scale.color(rec.v);
+        var fill = rec.v == null ? hatch : S.scale.color(rec.v);
         return {
           fillColor: fill, fillOpacity: on ? 1 : 0.22,
           color: sel.length && on ? t.ink : (t.mapBorder || t.paper), weight: sel.length && on ? 1.2 : 0.6, opacity: 1
@@ -216,10 +425,12 @@
         // value labels: top N, pill at the main-polygon centroid
         var o = cur.options, enc = cur.enc, mid = o.scale === 'diverging' ? +o.mid || 0 : 0;
         var n = Math.max(0, o.labels | 0);
+        // value callouts on the top N: on the country when it is large enough, else beside it with a leader line,
+        // where they cover the fewest other data countries
         labels.set((n ? S.ranked : []).map(function (rec) {
           var name = (enc.label && rec.row[enc.label]) || rec.f.properties.name;
           return {
-            latlng: G.centroid(rec.f) || [0, 0], prio: Math.abs(rec.v - mid), pos: ['c'], cls: 'rk-choro__label',
+            latlng: G.centroid(rec.f) || [0, 0], id: rec.id, prio: Math.abs(rec.v - mid), center: true, cls: 'rk-choro__label',
             html: '<b>' + RK.util.escapeHTML(name) + '</b><span>' + RK.util.escapeHTML(RK.format(rec.v, S.fmt)) + '</span>'
           };
         }), n);
@@ -227,12 +438,17 @@
           var hasNull = S.list.some(function (x) { return x.v == null; });
           legend.set(h('div.rk-geo-leg',
             G.legendSection(o.legendTitle || G.fieldTitle(cur, enc.value), S.scale.legend),
-            h('div.rk-geo-leg__item.rk-geo-leg__nodata', h('i.rk-geo-leg__sw', { style: { background: t.mapLand || t.surface2 } }), h('span', hasNull ? 'No data / n.a.' : 'No data'))));
+            h('div.rk-geo-leg__item.rk-geo-leg__nodata', h('i.rk-geo-leg__sw', { style: { background: t.mapLand || t.surface2, 'box-shadow': 'inset 0 0 0 0.5px ' + RK.theme.mix(t.mapLand || t.surface2, t.ink, 0.25) } }), h('span', 'No data')),
+            hasNull ? h('div.rk-geo-leg__item.rk-geo-leg__nodata', h('i.rk-geo-leg__sw.rk-choro__hatch'), h('span', 'n.a. (no value)')) : null));
         } else legend.set(null);
         if (first) {
           var pts = [];
           S.list.forEach(function (x) { pts = pts.concat(mainBounds(x.f)); });
-          view.fit(G.fitTarget(o.fit, pts), 12, function () { return S.list.map(function (x) { return { ll: G.centroid(x.f) || [0, 0], r: 6 }; }); });
+          // the legend must not cover any data country: test its outline vertices, not just the centroids
+          var edge = pts.filter(function (p, i) { return i % 3 === 0; }).map(function (p) { return { ll: p, r: 0 }; });
+          // 'data': every data country whole (Tierra del Fuego, northern Scandinavia), polar extremes still clamped
+          var tgt = o.fit === 'data' && pts.length ? clampFit(pts) : G.fitTarget(o.fit, pts);
+          view.fit(tgt, 12, function () { return edge; });
           labels.place();
         }
       }

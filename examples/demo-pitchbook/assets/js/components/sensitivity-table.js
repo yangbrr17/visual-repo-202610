@@ -11,10 +11,62 @@
 
   var MODES = [['value', 'Value'], ['delta', 'Δ vs base'], ['pct', '% vs base']];
 
-  /** '+fmt;-fmt;fmt' from a value format, so deltas read "+$2.15" / "-1.4%". */
+  /** Format sections of a code (split on ';' outside quotes). */
+  function sections(code) {
+    var out = [], cur = '', q = false;
+    for (var i = 0; i < code.length; i++) {
+      var ch = code[i];
+      if (ch === '"') q = !q;
+      if (ch === ';' && !q) { out.push(cur); cur = ''; } else cur += ch;
+    }
+    out.push(cur);
+    return out;
+  }
+  function numericCode(code) {
+    var c = code && (RK.format.presets[code] || code);
+    return typeof c === 'string' && /[0#?]/.test(c.replace(/"[^"]*"/g, '')) && !RK.format.isDateCode(c) ? c : null;
+  }
+  /** Accounting negatives (house rule): '$#,##0.00' -> '$#,##0.00;($#,##0.00)'; an explicit '-' section -> parentheses. */
+  function acct(code) {
+    var c = numericCode(code);
+    if (!c) return code;
+    var s = sections(c);
+    if (s.length === 1) return c + ';(' + c.replace(/^\+/, '') + ')';
+    if (/^-/.test(s[1])) s[1] = '(' + s[1].slice(1) + ')';
+    return s.join(';');
+  }
+  /** '+fmt;(fmt);fmt' from a value format, so deltas read "+$2.15" / "($1.40)". */
   function deltaFormat(fmt) {
-    var f = String(fmt || '#,##0.0').split(';')[0];
-    return '+' + f + ';-' + f + ';' + f;
+    var f = sections(String(numericCode(fmt) || '#,##0.0'))[0].replace(/^\+/, '');
+    return '+' + f + ';(' + f + ');' + f;
+  }
+
+  /** Readable text on a heat fill: the fill is nudged (away from the text colour) until contrast >= 4.5:1. */
+  function readable(bg, t) {
+    var T = RK.theme, dk = t.dark ? t.paper : t.ink, lt = t.dark ? t.ink : '#ffffff';
+    for (var i = 0; i < 14; i++) {
+      var cd = T.contrast(bg, dk), cl = T.contrast(bg, lt);
+      if (Math.max(cd, cl) >= 4.5) return { bg: bg, fg: cd >= cl ? dk : lt };
+      bg = T.mix(bg, cd >= cl ? lt : dk, 0.06);
+    }
+    return { bg: bg, fg: T.contrast(bg, dk) >= T.contrast(bg, lt) ? dk : lt };
+  }
+  /**
+   * Heat scale on the theme ramp clamped to its inner stops (div-2..div-6 / seq-2..seq-6 at the default
+   * intensity): the midpoint is the theme's visible neutral (never a paper-coloured hole, also in ink), the
+   * ends stay chromatic, and the text keeps 4.5:1.
+   */
+  function heatScale(t, kind, domain, mid, intensity, reverse) {
+    var all = (kind === 'div' ? t.div : t.seq).slice(), k = util.isNum(intensity) ? intensity : 0.5, stops;
+    if (kind === 'div') {
+      var c = Math.floor((all.length - 1) / 2), r = Math.max(1, Math.min(c, Math.round(k * 4)));
+      stops = all.slice(c - r, c + r + 1);
+    } else {
+      stops = all.slice(1, Math.max(3, Math.min(all.length, Math.round(k * 10) + 1)));
+    }
+    if (reverse) stops.reverse();
+    var sc = kind === 'div' ? RK.theme.diverging(domain, mid, stops) : RK.theme.sequential(domain, stops);
+    return function (v) { return util.isNum(v) ? readable(sc(v), t) : null; };
   }
 
   function nearestIndex(list, v) {
@@ -99,11 +151,11 @@
 
       function formats() {
         var o = cur.options, enc = cur.enc;
-        var vf = o.format || cur.fmtOf(enc.value) || '#,##0.00';
+        var vf = acct(o.format || cur.fmtOf(enc.value) || '#,##0.00');
         return {
           value: vf,
-          delta: o.deltaFormat || deltaFormat(vf),
-          pct: '+0.0%;-0.0%;0.0%',
+          delta: o.deltaFormat ? acct(o.deltaFormat) : deltaFormat(vf),
+          pct: '+0.0%;(0.0%);0.0%',
           row: o.rowFormat || cur.fmtOf(enc.row),
           col: o.colFormat || cur.fmtOf(enc.col)
         };
@@ -127,10 +179,8 @@
         for (var i = 0; i < g.rows.length; i++) for (var j = 0; j < g.cols.length; j++) vals.push(g.cell(i, j));
         var nums = vals.filter(util.isNum);
         var ext = util.extent(nums);
-        var stops = (o.heat === 'seq' ? t.seq : t.div).slice();
-        if (o.reverse) stops.reverse();
         var mid = o.mid != null ? o.mid : (util.isNum(bv) ? bv : RK.expr.agg.median(nums));
-        var scale = !o.heat ? null : o.heat === 'seq' ? RK.theme.sequential(ext, stops) : RK.theme.diverging(ext, mid, stops);
+        var scale = !o.heat ? null : heatScale(t, o.heat === 'seq' ? 'seq' : 'div', ext, mid, o.heatIntensity, o.reverse);
         var sameShape = cells.length === g.rows.length && cells[0] && cells[0].length === g.cols.length && how !== 'rebuild';
 
         root.classList.toggle('has-heat', !!scale);
@@ -145,9 +195,9 @@
           next.push([]);
           for (j = 0; j < g.cols.length; j++) {
             var td = cells[i][j], v = g.cell(i, j), isBase = i === b.i && j === b.j;
-            var fill = scale && util.isNum(v) ? RK.theme.mix(t.paper, scale(v), o.heatIntensity) : null;
-            td.style.backgroundColor = fill || '';
-            td.style.color = fill ? RK.theme.textOn(fill) : '';
+            var fill = scale && util.isNum(v) ? scale(v) : null;
+            td.style.backgroundColor = fill ? fill.bg : '';
+            td.style.color = fill ? fill.fg : '';
             td.classList.toggle('is-base', isBase);
             td.classList.toggle('is-na', !util.isNum(v));
             td._rk = { i: i, j: j, v: v, row: g.rows[i], col: g.cols[j] };

@@ -11,34 +11,85 @@
   var MINUS = '−';
   var BAR = 0.62;          // bar width as share of the category band (connectors use the same value)
 
-  function isNum(v) { return typeof v === 'number' && isFinite(v); }
+  var isNum = util.isNum;
 
-  /** Re-run the layout without animation when the width changes (label room is measured in px). */
-  function relayout(render) {
-    return function (ctx) {
-      var api = render(ctx), last = ctx, update = api.update, w = api.chart.getWidth();
-      api.update = function (c) { last = c; w = api.chart.getWidth(); update(c); };
-      api.resize = function () {
-        api.chart.resize();
-        if (Math.abs(api.chart.getWidth() - w) > 4) { w = api.chart.getWidth(); update(Object.assign({}, last, { motion: false })); }
-      };
-      return api;
-    };
+  /** Axis tick format: the value format with no more decimals than the tick step needs (1,200 not 1,200.0). */
+  function tickFmt(fmt, step) {
+    var code = RK.format.presets[fmt] || fmt;
+    if (typeof code !== 'string' || !step || !/[0#]/.test(code) || RK.format.isDateCode(code)) return fmt;
+    var sec = code.split(';')[0].replace(/"[^"]*"/g, ''), scale = Math.pow(1000, ((sec.match(/[0#](,+)[^0#]*$/) || [])[1] || '').length);
+    var v = Math.abs(step) * (/%/.test(sec) ? 100 : 1) / scale, dec = 0;
+    while (dec < 4 && Math.abs(Math.round(v * Math.pow(10, dec)) - v * Math.pow(10, dec)) > 1e-6) dec++;
+    return code.replace(/([0#])\.([0#]+)/g, function (m, a, d) { var n = Math.min(dec, d.length); return a + (n ? '.' + d.slice(0, n) : ''); });
   }
 
+  /** Value text with a true minus sign (matches the signed delta labels). */
+  function num(v, f) { return RK.format(v, f).replace(/^-/, MINUS); }
+
+  /** Words of a label, breakable after spaces, hyphens and slashes; '&' / '+' stay with the following word. */
+  function words(text) {
+    var raw = String(text == null ? '' : text).match(/[^\s\-\/]+[\s\-\/]*|[\s\-\/]+/g) || [], out = [];
+    for (var i = 0; i < raw.length; i++) {
+      if (/^[&+]\s*$/.test(raw[i]) && i + 1 < raw.length) { raw[i + 1] = raw[i] + raw[i + 1]; continue; }
+      out.push(raw[i]);
+    }
+    return out;
+  }
   /** Greedy word wrap that may also break after hyphens / slashes (ECharts 'break' splits words mid-way). */
-  var measureCtx = null;
   function wrap(text, width, font) {
-    text = String(text == null ? '' : text);
-    if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
-    measureCtx.font = font;
-    var words = (text.match(/[^\s\-\/]*[\s\-\/]*/g) || [text]), lines = [], cur = '';
-    words.forEach(function (w) {
+    var lines = [], cur = '';
+    words(text).forEach(function (w) {
       var next = cur + w;
-      if (cur && measureCtx.measureText(next.trim()).width > width) { lines.push(cur.trim()); cur = w; } else cur = next;
+      if (cur && C.measure(next.trim(), font) > width) { lines.push(cur.trim()); cur = w; } else cur = next;
     });
     if (cur.trim()) lines.push(cur.trim());
-    return lines.join('\n');
+    return lines;
+  }
+  /** Can every label be wrapped into the band (no word wider than the band, at most 3 lines)? */
+  function fits(steps, width, size, sans) {
+    return steps.every(function (s) {
+      var font = (s.kind !== 'delta' ? '600 ' : '') + size + 'px ' + sans;
+      return words(s.label).every(function (w) { return C.measure(w.trim(), font) <= width; }) && wrap(s.label, width, font).length <= 3;
+    });
+  }
+
+  /**
+   * Driver colours for colorBy 'category'. Red / green hues mean decrease / increase in a bridge, so they are
+   * never used for a category, nor are greys (read as n.a.) or the totals' own colour family; every colour keeps
+   * >= 3:1 against the paper (and is not near-white on dark paper). Falls back to tints / shades of the safe ones.
+   */
+  function driverPalette(t, n, sub) {
+    var th = RK.theme, dark = t.dark, reserved = [t.accent, sub, t.paper, t.ink, t.neutral];
+    function hsl(c) {
+      var p = th.parseColor(c), r = p[0] / 255, g = p[1] / 255, b = p[2] / 255;
+      var mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, h = 0, sat = 0, d = mx - mn;
+      if (d) {
+        sat = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+        h = 60 * (mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4);
+      }
+      return { h: h, s: sat };
+    }
+    function hueDiff(a, b) { var x = Math.abs(a - b) % 360; return x > 180 ? 360 - x : x; }
+    var posH = hsl(t.pos).h, negH = hsl(t.neg).h, acc = hsl(t.accent);
+    function ok(c, out, strict) {
+      var h = hsl(c), cr = th.contrast(c, t.paper);
+      if (h.s < (strict ? 0.25 : 0.18) || cr < 3 || cr > (dark ? 9.5 : 12)) return false;
+      if (hueDiff(h.h, negH) < (strict ? 28 : 15) || th.distance(c, t.neg) < (strict ? 100 : 80)) return false;
+      if (hueDiff(h.h, posH) < (strict ? 30 : 20) || th.distance(c, t.pos) < (strict ? 100 : 80) || (h.h >= 80 && h.h <= 160)) return false;
+      if (acc.s >= 0.25 && hueDiff(h.h, acc.h) < 15 && th.distance(c, t.accent) < 160) return false;
+      if (reserved.some(function (r) { return r && th.distance(c, r) < 90; })) return false;
+      return !out.some(function (o) { return th.distance(c, o) < 60; });
+    }
+    var cands = t.cat.concat([t.accent2, t.accent3]).filter(Boolean), out = [];
+    function add(list, strict) { list.forEach(function (c) { if (out.length < n && out.indexOf(c) < 0 && ok(c, out, strict)) out.push(c); }); }
+    function variants(list, k) { var v = []; list.forEach(function (c) { v.push(th.mix(c, t.ink, k), th.mix(c, t.paper, k)); }); return v; }
+    add(cands, true);
+    var base = out.slice();
+    add(variants(base, 0.3), true); add(variants(base, 0.45), true);
+    add(cands, false);
+    add(variants(out.slice(), 0.3), false); add(variants(out.slice(), 0.45), false);
+    if (out.length < n) out = out.concat(th.palette({ exclude: [t.accent, t.pos, t.neg], n: n }).slice(out.length));   // never undefined
+    return out;
   }
 
   /** Normalise free-text kinds: start/end/total -> total, sub* -> subtotal, anything else -> delta. */
@@ -96,15 +147,25 @@
 
   function build(ctx, inst) {
     var o = ctx.options, t = ctx.theme, enc = ctx.enc;
-    var horiz = o.orientation === 'horizontal';
     var steps = walk(ctx);
     var fmt = o.format || ctx.fmtOf(enc.value) || '#,##0.0';
     var pos = o.invert ? t.neg : t.pos, neg = o.invert ? t.pos : t.neg;
     var sub = t.accent3 || RK.theme.mix(t.accent, t.paper, 0.4);
+    var hasSub = steps.some(function (s) { return s.kind === 'subtotal'; });
     var cats = util.unique(steps.filter(function (s) { return s.kind === 'delta' && s.category != null; }).map(function (s) { return s.category; }));
     var byCat = o.colorBy === 'category' && cats.length > 0;
-    var catPal = t.cat.slice(1);       // cat[0] is (usually) the total accent
-    function catColor(c) { var k = cats.indexOf(c); return k < 0 ? t.neutral : catPal[k % catPal.length]; }
+    var catPal = byCat ? driverPalette(t, cats.length, hasSub ? sub : null) : [];   // never red / green, never like the totals
+    function catColor(c) { var k = cats.indexOf(c); return k < 0 ? t.neutral : catPal[k]; }
+
+    // ---- orientation: a vertical bridge whose step names cannot wrap into their bands turns horizontal ----
+    var W = inst.getWidth() || ctx.el.clientWidth || 800;
+    var bandPx = (W - 8 - (o.valueAxis ? 48 : 0)) / Math.max(1, steps.length);
+    var catFont = 11;
+    var horiz = o.orientation === 'horizontal';
+    if (!horiz) {
+      if (!fits(steps, bandPx - 6, 11, t.fontSans)) catFont = 10;
+      if (catFont === 10 && !fits(steps, bandPx - 6, 10, t.fontSans)) { horiz = true; catFont = 11; }
+    }
 
     function colorOf(s) {
       if (s.kind === 'total') return t.accent;
@@ -114,12 +175,12 @@
       return s.value > 0 ? pos : neg;
     }
     function signed(v) {
-      if (o.deltaFormat) return RK.format(v, o.deltaFormat);
+      if (o.deltaFormat) return num(v, o.deltaFormat);
       if (!isNum(v)) return RK.format(v, fmt);
       var s = RK.format(Math.abs(v), fmt);
       return v > 0 ? '+' + s : v < 0 && /[1-9]/.test(s) ? MINUS + s : s;
     }
-    function labelOf(s) { return s.kind === 'delta' ? signed(s.value) : RK.format(s.value, fmt); }
+    function labelOf(s) { return C.richSafe(s.kind === 'delta' ? signed(s.value) : num(s.value, fmt)); }
 
     // ---- value axis bounds (labels sit inside the plot, so pad both ends) ----
     var levels = [0];
@@ -138,10 +199,8 @@
     }
 
     // ---- category labels: wrap to the band width (re-laid out on resize) ----
-    var W = inst.getWidth() || ctx.el.clientWidth || 800;
-    var bandPx = Math.max(40, (W - 24) / Math.max(1, steps.length));
     var labelW = horiz ? Math.min(200, Math.max(110, W * 0.22)) : bandPx - 6;
-    var bold = { fontWeight: 600, color: t.ink, lineHeight: 13 };
+    var bold = { fontWeight: 600, color: t.ink, lineHeight: 13, fontSize: catFont };
     var catAxis = {
       type: 'category',
       data: steps.map(function (s) { return s.label; }),
@@ -149,10 +208,10 @@
       axisLine: { show: true, onZero: ext[0] >= 0, lineStyle: { color: t.axis } },
       axisTick: { show: false },
       axisLabel: {
-        interval: 0, color: t.ink2, fontSize: 11, lineHeight: 13,
+        interval: 0, color: t.ink2, fontSize: catFont, lineHeight: 13,
         formatter: function (v, i) {
           var s = steps[i], tot = s && s.kind !== 'delta';
-          var lines = wrap(v, labelW, (tot ? '600 ' : '') + '11px ' + t.fontSans).split('\n');
+          var lines = wrap(v, labelW, (tot ? '600 ' : '') + catFont + 'px ' + t.fontSans).map(C.richSafe);
           return tot ? lines.map(function (l) { return '{b|' + l + '}'; }).join('\n') : lines.join('\n');
         },
         rich: { b: bold }
@@ -162,7 +221,7 @@
       type: 'value', min: axMin, max: axMax, interval: interval,
       // kept "shown" with invisible parts: the axis must exist for the break zigzag to be drawn
       axisLine: { show: false }, axisTick: { show: false },
-      axisLabel: { show: !!o.valueAxis, formatter: C.axisFmt(fmt) },
+      axisLabel: { show: !!o.valueAxis, formatter: function (v) { return num(v, tickFmt(fmt, interval)); } },
       splitLine: { show: !!o.valueAxis }
     };
     if (brk) {
@@ -186,6 +245,7 @@
       },
       {
         id: 'bars', name: ctx.title(enc.value), type: 'bar', stack: 'wf', stackStrategy: 'all', barWidth: (BAR * 100) + '%',
+        barMinHeight: 2,   // small steps against a large total stay visible as a sliver, never vanish
         animationDelay: delay,
         emphasis: { focus: 'none', itemStyle: { opacity: 0.85 } },
         label: {
@@ -205,7 +265,7 @@
           };
         }),
         markLine: ext[0] < 0 ? {
-          silent: true, symbol: ['none', 'none'], label: { show: false },
+          silent: true, symbol: ['none', 'none'], label: { show: false }, precision: 10,
           lineStyle: { color: t.axis, type: 'solid', width: 1 },
           data: [horiz ? { xAxis: 0 } : { yAxis: 0 }]
         } : undefined
@@ -255,9 +315,9 @@
           if (s.kind === 'delta') {
             rows.push({ color: colorOf(s), label: 'Change', value: signed(s.value) });
             if (o.pctOfStart && first && first.value && s.i > first.i) rows.push({ label: '% of ' + first.label, value: RK.format(s.value == null ? null : s.value / Math.abs(first.value), '+0.0%;' + MINUS + '0.0%;0.0%') });
-            rows.push({ label: 'Running total', value: RK.format(s.end, fmt), bold: true });
+            rows.push({ label: 'Running total', value: num(s.end, fmt), bold: true });
           } else {
-            rows.push({ color: colorOf(s), label: s.kind === 'subtotal' ? 'Subtotal' : 'Total', value: RK.format(s.value, fmt), bold: true });
+            rows.push({ color: colorOf(s), label: s.kind === 'subtotal' ? 'Subtotal' : 'Total', value: num(s.value, fmt), bold: true });
             if (s.diff && Math.abs(s.diff) > Math.abs(s.value) * 1e-6) rows.push({ label: 'Unreconciled vs. walk', value: signed(s.diff) });
           }
           if (s.category != null && s.kind === 'delta') rows.unshift({ label: ctx.title(enc.category), value: s.category });
@@ -275,7 +335,7 @@
     deps: ['echarts'],
     defaults: {
       encode: { label: 'step', value: 'value', kind: 'kind', category: null },
-      orientation: 'vertical',   // vertical | horizontal
+      orientation: 'vertical',   // vertical | horizontal (a vertical bridge turns horizontal when its step names cannot fit the bands)
       inferTotals: 'auto',       // 'auto' (first + last are totals when there is no kind field) | 'first' | 'last' | 'both' | false
       endTotal: null,            // label of a computed closing total appended after the last row
       colorBy: 'sign',           // sign | category (deltas coloured by encode.category, with legend)
@@ -288,10 +348,12 @@
       axisBreak: false,          // false | 'auto' | {start, end, gap} — break the axis between zero and the walk
       pctOfStart: true,          // tooltip: delta as % of the opening total
       legend: true,
-      crossFilter: false         // true = click a step to cross-filter on the label field
+      crossFilter: false,        // true = click a step to cross-filter on the label field
+      crossFilterScope: 'dataset' // step names are not a shared business dimension: filter this dataset only
     },
-    render: relayout(C(build, {
+    render: C(build, {
+      rebuildOnResize: true,     // category labels are wrapped to the measured band width
       select: function (p, c) { return p.seriesId === 'bars' ? { field: c.enc.label, value: p.name } : null; }
-    }))
+    })
   });
 })();

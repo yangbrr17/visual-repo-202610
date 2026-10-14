@@ -7,10 +7,25 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
-  /** Axis tick format: no decimals when the tick step is whole ($30 rather than $30.00). */
-  function tickFmt(fmt, step) {
-    var code = RK.format.presets[fmt] || fmt;
-    return step % 1 === 0 && RK.format.decimals(code) ? code.replace(/0\.0+/g, '0') : code;
+  /**
+   * Category label lines: one line when it fits, else break before an opening parenthesis
+   * ("Trading comparables / (EV / EBITDA)"), else greedy word wrap.
+   */
+  function labelLines(text, font, maxW) {
+    text = String(text == null ? '' : text);
+    if (C.measure(text, font) <= maxW) return [text];
+    var k = text.indexOf(' (');
+    if (k > 0) {
+      var a = text.slice(0, k), b = text.slice(k + 1);
+      if (C.measure(a, font) <= maxW && C.measure(b, font) <= maxW) return [a, b];
+    }
+    var words = text.split(/\s+/), lines = [], cur = '';
+    words.forEach(function (w) {
+      var next = cur ? cur + ' ' + w : w;
+      if (C.measure(next, font) <= maxW || !cur) cur = next; else { lines.push(cur); cur = w; }
+    });
+    if (cur) lines.push(cur);
+    return lines;
   }
 
   RK.component({
@@ -44,7 +59,7 @@
       var groups = enc.group ? util.unique(rows.map(function (r) { return r[enc.group]; })) : [];
       var peers = groups.filter(function (g) { return refGroups.indexOf(g) < 0; });
       var byGroup = !!enc.group && o.groupColors !== false;
-      var all = RK.theme.palette({ n: Math.max(2, peers.length) + 4, exclude: [t.accent2, t.ref] });
+      var all = RK.theme.palette({ n: Math.max(2, peers.length) + 4, exclude: [t.accent2, t.ref, t.neg] });
       var pal = all.filter(function (c) { var x = RK.theme.parseColor(c); return Math.max(x[0], x[1], x[2]) - Math.min(x[0], x[1], x[2]) >= 40; });
       if (pal.length < 2) pal = all;
       function groupColor(g) { return refGroups.indexOf(g) >= 0 ? t.neutral : pal[peers.indexOf(g)]; }
@@ -55,19 +70,36 @@
       var refs = (o.refLines || []).filter(function (r) { return r && util.isNum(r.value); });
       var ext = util.extent(lows.concat(highs, refs.map(function (r) { return r.value; })));
 
-      // geometry (px): category labels left (max 170, wrapped), value labels need ~44px on the right
-      var W = ctx.el.clientWidth || 600;
-      var labW = Math.min(170, Math.max.apply(null, labels.map(function (l) { return C.measure(l, '11px ' + t.fontSans); }).concat([40])));
-      var x0 = 4 + labW + 8, plotW = Math.max(160, W - 44 - x0);
+      // geometry in px, computed here (grid without containLabel) so label collisions can be checked exactly:
+      // category labels left (wrapped, max 170 / 28% of the width), value labels outside the bar ends
+      var W = ctx.el.clientWidth || 600, catFont = '11px ' + t.fontSans, numFont = '11px ' + t.fontNum;
+      var catCap = Math.min(170, Math.max(90, W * 0.28));
+      var catLines = labels.map(function (l) { return labelLines(l, catFont, catCap); });
+      var labW = Math.max.apply(null, catLines.map(function (ls) { return Math.max.apply(null, ls.map(function (x) { return C.measure(x, catFont); })); }).concat([40]));
+      var gridRight = 12, x0 = 4 + Math.ceil(labW) + 8, plotW = Math.max(160, W - gridRight - x0);
       // tick count adapts to the available width so labels never collide
       var step = util.niceStep((ext[1] - ext[0]) * 1.2 || 1, Math.max(2, Math.min(7, Math.floor(plotW / 70))));
       var axMin = Math.floor((ext[0] - step * 0.4) / step) * step, axMax = Math.ceil((ext[1] + step * 0.4) / step) * step;
+      var xOf = function (v) { return x0 + (v - axMin) / (axMax - axMin) * plotW; };
+      // the axis must hold the low / high labels: widen it a step at a time until the outermost labels fit
+      if (o.showValues) {
+        for (var grow = 0; grow < 6; grow++) {
+          var okL = true, okR = true;
+          rows.forEach(function (r, i) {
+            if (util.isNum(lows[i]) && xOf(lows[i]) - 4 - C.measure(RK.format(lows[i], fmt), numFont) - 4 < x0 + 2) okL = false;
+            if (util.isNum(highs[i]) && xOf(highs[i]) + 4 + C.measure(RK.format(highs[i], fmt), numFont) + 4 > x0 + plotW + gridRight - 2) okR = false;
+          });
+          if (okL && okR) break;
+          if (!okL) axMin -= step;
+          if (!okR) axMax += step;
+        }
+      }
 
       // reference-line labels sit above the plot; close values are spread apart so labels never overlap
       var refFont = '600 11px ' + t.fontSans;
       var refW = refs.map(function (r) { return C.measure(r.label || RK.format(r.value, fmt), refFont); });
       var gap = Math.max.apply(null, refW.concat([0])) + 12;
-      var xs = refs.map(function (r) { return x0 + (r.value - axMin) / (axMax - axMin) * plotW; });
+      var xs = refs.map(function (r) { return xOf(r.value); });
       var spread = C.spreadLabels(xs, gap, gap / 2, W - gap / 2);
       var mark = refs.map(function (r, k) {
         var col = r.color || t.ref;
@@ -102,21 +134,25 @@
           } : undefined
         }
       ];
-      // low / high labels on a ghost series above the reference lines; a label crossed by a reference line is
-      // backed by what is painted behind it (paper, or the band) so the dashed line never runs through the figures
+      // low / high labels on a ghost series above the reference lines; a label crossed by a reference line
+      // (+-3px) gets a chip in the colour painted behind it (paper, or the band) so the dashed line stops at the
+      // figures instead of striking them through
       if (o.showValues) {
         var band = o.refBand ? [Math.min(o.refBand.from, o.refBand.to), Math.max(o.refBand.from, o.refBand.to)] : null;
-        var bandFill = RK.theme.mix(t.accent2, t.paper, 0.88), perPx = (axMax - axMin) / plotW, ends = [];
+        var bandFill = RK.theme.mix(t.accent2, t.paper, 0.88), ends = [];
+        var refX = refs.map(function (r) { return xOf(r.value); });
         var end = function (v, i, side) {
           if (!util.isNum(v)) return;
-          var w = C.measure(RK.format(v, fmt), '11px ' + t.fontNum) + 4;
-          var a = v + side * 4 * perPx, b = v + side * (4 + w) * perPx, lo = Math.min(a, b) - 2 * perPx, hi = Math.max(a, b) + 2 * perPx, mid = (a + b) / 2;
-          var crossed = refs.some(function (r) { return r.value >= lo && r.value <= hi; });
-          ends.push({ value: [v, i], label: { position: side < 0 ? 'left' : 'right', backgroundColor: !crossed ? null : band && mid >= band[0] && mid <= band[1] ? bandFill : t.paper } });
+          var w = C.measure(RK.format(v, fmt), numFont) * 1.06 + 4;
+          var xa = xOf(v) + side * 4, xb = xOf(v) + side * (4 + w), lo = Math.min(xa, xb) - 3, hi = Math.max(xa, xb) + 3;
+          var crossed = refX.some(function (x) { return x >= lo && x <= hi; });
+          var midV = axMin + ((xa + xb) / 2 - x0) / plotW * (axMax - axMin);
+          ends.push({ value: [v, i], label: { position: side < 0 ? 'left' : 'right', backgroundColor: !crossed ? null : band && midV >= band[0] && midV <= band[1] ? bandFill : t.paper } });
         };
         rows.forEach(function (r, i) { end(lows[i], i, -1); end(highs[i], i, 1); });
         series.push({
-          id: 'values', type: 'scatter', silent: true, symbolSize: 0, z: 6, tooltip: { show: false }, data: ends,
+          // scatter defaults to opacity 0.8, which the labels (and their chips) inherit: keep them opaque
+          id: 'values', type: 'scatter', silent: true, symbolSize: 0, z: 6, tooltip: { show: false }, data: ends, itemStyle: { opacity: 1 },
           label: { show: true, distance: 4, padding: [1, 2], color: t.ink2, fontSize: 11, fontFamily: t.fontNum,
             formatter: function (p) { return RK.format(p.value[0], fmt); } }
         });
@@ -128,7 +164,7 @@
 
       return {
         legend: C.legend(ctx, { show: showLegend, data: groups, selectedMode: false }),
-        grid: { left: 4, right: 44, top: top, bottom: 4, containLabel: true },
+        grid: { left: x0, right: gridRight, top: top, bottom: 24, containLabel: false },
         tooltip: {
           trigger: 'item',
           formatter: function (p) {
@@ -143,13 +179,14 @@
             return C.tip(r[enc.label], tr, enc.note ? r[enc.note] : (ctx.dataset.has('basis') ? r.basis : null));
           }
         },
-        xAxis: { type: 'value', min: axMin, max: axMax, interval: step, axisLabel: { formatter: C.axisFmt(tickFmt(fmt, step)) } },
+        xAxis: { type: 'value', min: axMin, max: axMax, interval: step, axisLabel: { formatter: C.tickFmt(fmt, step), hideOverlap: true } },
         yAxis: {
           type: 'category', data: labels, inverse: true,
           axisLine: { show: true, lineStyle: { color: t.axis } },
           axisLabel: {
             color: function (v, i) { return rows[i] && isRef(rows[i]) ? t.ink3 : t.ink2; },
-            fontSize: 11, width: 170, overflow: 'break', lineHeight: 14
+            fontSize: 11, lineHeight: 14, margin: 8,
+            formatter: function (v, i) { return (catLines[i] || [String(v)]).join('\n'); }
           }
         },
         series: series

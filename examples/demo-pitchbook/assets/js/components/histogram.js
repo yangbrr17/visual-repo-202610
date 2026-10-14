@@ -46,6 +46,12 @@
     var whole = !/\.\d*[1-9]/.test(RK.format(step, fmt));
     return function (v) { var s = RK.format(v, fmt); return whole ? s.replace(/\.0+(?=\D*$)/, '') : s; };
   }
+  /** The format with one more decimal when it has none ('0%' -> '0.0%'): statistics must not round together. */
+  function oneDecimal(code) {
+    code = String(RK.format.presets[code] || code || 'auto');
+    if (code === 'auto' || /\.[0#]/.test(code)) return code;
+    return code.split(';').map(function (sec) { return sec.replace(/([#0,]*0)/, '$1.0'); }).join(';');
+  }
   var STAT = {
     median: { label: 'Median', fn: function (s) { return quantile(s, 0.5); } },
     mean: { label: 'Mean', fn: function (s) { return mean(s); } },
@@ -121,7 +127,7 @@
       var f = RK.store.filter(filterKey(ctx));
       var selBin = f && f.op === 'between' ? bins.filter(function (b) { return Math.abs(b.x0 - f.min) < w * 1e-6; })[0] : null;
 
-      var base = t.accent3 || t.cat[1];
+      var base = t.accent;   // undifferentiated peers: the same accent as lollipop / bullet / scatter
       var data = bins.map(function (b) {
         return { value: [b.x0, b.x1, yOf(b.rows.length), b.rows.length, b.i], bin: b, last: b.i === k - 1 };
       });
@@ -139,30 +145,48 @@
           emphasis: { style: { fill: RK.theme.mix(fill, t.ink, 0.2) } },
           enterFrom: { shape: { y: p1[1], height: 0 } }
         }];
-        if (o.labels && b.rows.length) {
-          kids.push({ type: 'text', silent: true, transition: ['x', 'y'], x: x + wd / 2, y: y - 3,
-            style: { text: RK.format(api.value(2), yFmt), fill: isT ? t.ink : t.ink2, font: (isT ? '700 ' : '') + '10.5px ' + t.fontNum, align: 'center', verticalAlign: 'bottom', opacity: dim ? 0.4 : 1 },
-            enterFrom: { y: p1[1], style: { opacity: 0 } } });
-        }
         return { type: 'group', children: kids };
+      }
+      /* bar value labels: their own series above the KDE and the reference lines, on a paper knock-out box */
+      function renderLabel(params, api) {
+        var b = bins[params.dataIndex];
+        if (!o.labels || !b.rows.length) return null;
+        var p0 = api.coord([api.value(0), api.value(2)]), p1 = api.coord([api.value(1), 0]);
+        var isT = b.i === tBin, dim = selBin && selBin !== b;
+        return { type: 'text', silent: true, transition: ['x', 'y'], x: (p0[0] + p1[0]) / 2, y: p0[1] - 3,
+          style: { text: RK.format(api.value(2), yFmt), fill: isT ? t.ink : t.ink2, font: (isT ? '700 ' : '') + '10.5px ' + t.fontNum, align: 'center', verticalAlign: 'bottom',
+            opacity: dim ? 0.4 : 1, backgroundColor: t.paper, padding: [1, 2, 0, 2], borderRadius: 2 },   // knock-out box: lines pass behind
+          enterFrom: { y: p1[1], style: { opacity: 0 } } };
       }
 
       /* reference lines: stats in the lower label row (alternating sides), target in the upper row */
       var statLines = (o.stats || []).filter(function (s) { return STAT[s]; }).map(function (s) {
         return { key: s, label: STAT[s].label, v: STAT[s].fn(sorted) };
       }).sort(function (a, b) { return a.v - b.v; });
+      // statistics: ink-3 [4, 3] 1px, 10.5px italic labels, one decimal more than the axis format so a median
+      // and a mean never print as the same number; labels alternate sides of their line (first one ends at it)
+      var sFmt = oneDecimal(fmt);
+      var plotW = Math.max(120, (ctx.el.clientWidth || 600) - 80), pxPer = plotW / (k * w);
+      var statFont = 'italic 10.5px ' + t.fontSans, prevEnd = -Infinity, row2 = false;
       var lines = statLines.map(function (s, j) {
+        var txt = s.label + ' ' + RK.format(s.v, sFmt), tw = C.measure(txt, statFont) + 4;
         var align = statLines.length === 1 ? 'center' : (j === 0 ? 'right' : 'left');
+        var px = (s.v - start) * pxPer, x0 = align === 'right' ? px - tw : align === 'left' ? px : px - tw / 2;
+        var lift = x0 < prevEnd + 6;   // would touch the previous label: lift it one row (above the plot)
+        if (lift) row2 = true; else prevEnd = x0 + tw;
         return {
           xAxis: s.v, lineStyle: { color: t.ink3, type: [4, 3], width: 1 },
-          label: { show: true, position: 'end', distance: 4, color: t.ink3, fontSize: 10, align: align, padding: align === 'right' ? [0, 2, 0, 0] : align === 'left' ? [0, 0, 0, 2] : 0,
-            formatter: s.label + ' ' + RK.format(s.v, fmt) }
+          label: { show: true, position: 'end', distance: lift ? 18 : 4, color: t.ink3, fontSize: 10.5, fontStyle: 'italic', align: align,
+            padding: align === 'right' ? [0, 2, 0, 0] : align === 'left' ? [0, 0, 0, 2] : 0,
+            textBorderColor: t.paper, textBorderWidth: 3, formatter: function () { return txt; } }
         };
       });
       if (util.isNum(tVal)) {
+        // offer / price: reference line (t.ref, [4, 3], 1.2px, italic 600); the subject: accent-2 solid, bold ink label
         lines.push({
-          xAxis: tVal, lineStyle: isRef ? { color: t.ref, type: [5, 3], width: 1.5 } : { color: t.accent2, type: 'solid', width: 1.5 },
-          label: { show: true, position: 'end', distance: 18, color: isRef ? t.ref : t.ink, fontWeight: 700, fontSize: 10.5, formatter: tText }
+          xAxis: tVal, lineStyle: isRef ? { color: t.ref, type: [4, 3], width: 1.2 } : { color: t.accent2, type: 'solid', width: 1.5 },
+          label: { show: true, position: 'end', distance: row2 ? 32 : 18, color: isRef ? t.ref : t.ink, fontWeight: isRef ? 600 : 700, fontStyle: isRef ? 'italic' : 'normal',
+            fontSize: 10.5, textBorderColor: t.paper, textBorderWidth: 3, formatter: function () { return tText; } }
         });
       }
 
@@ -195,7 +219,7 @@
 
       return {
         legend: { show: false },
-        grid: C.grid(ctx, { top: 34 + (util.isNum(tVal) ? 14 : 0), left: 2, right: 12, bottom: 2, containLabel: false }),
+        grid: C.grid(ctx, { top: 34 + (util.isNum(tVal) ? 14 : 0) + (row2 ? 14 : 0), left: 2, right: 12, bottom: 2, containLabel: false }),
         graphic: graphic,
         tooltip: {
           trigger: 'item',
@@ -229,14 +253,22 @@
           splitLine: { show: true, lineStyle: { color: t.grid } }
         },
         series: [
+          { id: 'bins', type: 'custom', renderItem: renderItem, data: data, encode: { x: [0, 1], y: 2 }, z: 2 },
+          // KDE on a paper casing so it separates from the bars (dark themes included)
           {
-            id: 'bins', type: 'custom', renderItem: renderItem, data: data, encode: { x: [0, 1], y: 2 }, z: 2,
-            markLine: lines.length ? { silent: true, symbol: ['none', 'none'], animationDuration: 600, data: lines } : undefined
+            id: 'kde-case', type: 'line', data: curve, smooth: true, symbol: 'none', silent: true, z: 3,
+            lineStyle: { color: t.paper, width: 3.5, opacity: 0.9 }, tooltip: { show: false }, animationDuration: 900
           },
           {
-            id: 'kde', type: 'line', data: curve, smooth: true, symbol: 'none', silent: true, z: 3,
+            id: 'kde', type: 'line', data: curve, smooth: true, symbol: 'none', silent: true, z: 3.1,
             lineStyle: { color: t.ink2, width: 1.5 }, tooltip: { show: false }, animationDuration: 900
           },
+          {
+            // reference lines above bars and curve; precision: ECharts would round 0.3666 to 0.37
+            id: 'ref', type: 'scatter', data: [], silent: true, tooltip: { show: false }, z: 3.5,
+            markLine: lines.length ? { silent: true, symbol: ['none', 'none'], precision: 10, animationDuration: 600, data: lines } : undefined
+          },
+          { id: 'labels', type: 'custom', renderItem: renderLabel, data: data, encode: { x: [0, 1], y: 2 }, z: 5, silent: true, tooltip: { show: false } },
           {
             id: 'rug', type: 'scatter', data: rug, symbol: 'rect', symbolOffset: [0, 7], clip: false, z: 4,
             emphasis: { scale: 1.6 }, animationDelay: function (i) { return 200 + i * 10; }

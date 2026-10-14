@@ -10,6 +10,15 @@
   var util = RK.util, h = util.h;
   // generic field names (link tables, bridges...) cross-filter only this dataset (house rule: scoped selections)
   var GENERIC = /^(type|kind|source|target|step|stage|metric|status|name|label|key|id|category|group|series)$/i;
+  var CCY = { '$': 'USD', '€': 'EUR', '£': 'GBP', '¥': 'JPY' };
+
+  /** Unit implied by a value format ('$#,##0.0"bn"' -> 'USD bn'), so the header carries it like the cells. */
+  function unitOf(fmt) {
+    var c = String((fmt && RK.format.presets[fmt]) || fmt || '');
+    var cur = c.replace(/"[^"]*"/g, '').match(/[$€£¥]/), suf = c.match(/"\s*(tn|bn|mm|m|k)\s*"/i);
+    if (!cur && !suf) return null;
+    return [cur ? CCY[cur[0]] : null, suf ? suf[1] : null].filter(Boolean).join(' ');
+  }
 
   RK.component({
     id: 'league-table',
@@ -33,7 +42,7 @@
       ctx.el.classList.add('is-auto');
       var thead = h('thead'), tbody = h('tbody');
       var table = h('table.rk-table.rk-league__table', thead, tbody);
-      var root = h('div.rk-league', table);
+      var root = h('div.rk-league', h('div.rk-league__scroll', table));   // narrow blocks scroll sideways instead of spilling out
       ctx.el.appendChild(root);
 
       function has(f) { return f && cur.dataset.has(f); }
@@ -79,20 +88,25 @@
         var o = cur.options, enc = cur.enc, T = o.titles || {};
         function th(ch, cls, text) {
           var on = sort && sort.ch === ch, sortable = o.sortable !== false && (ch === 'value' || ch === 'share' || ch === 'count');
+          // numeric headers sit flush with their figures: the sort glyph goes left of the text and takes no room until sorted
+          var num = / is-num|^is-num/.test(cls);
+          var glyph = sortable ? h('span.rk-sort', { 'aria-hidden': 'true' }, on ? (sort.dir === 'asc' ? '▲' : '▼') : '') : null;
           return h('th', {
             class: cls + (sortable ? ' is-sortable' : '') + (on ? ' is-sorted' : ''),
             scope: 'col',
             dataset: sortable ? { ch: ch } : null,
             'aria-sort': on ? (sort.dir === 'asc' ? 'ascending' : 'descending') : null
-          }, text, sortable ? h('span.rk-sort', { 'aria-hidden': 'true' }, on ? (sort.dir === 'asc' ? '▲' : '▼') : '') : null);
+          }, num ? glyph : null, String(text == null ? '' : text), num ? null : glyph);
         }
+        var vTitle = T.value || cur.title(enc.value), unit = unitOf(o.format || cur.fmtOf(enc.value));
+        if (!T.value && unit && !/\(/.test(vTitle)) vTitle += ' (' + unit + ')';
         var showChg = o.showChange !== false && has(enc.prior);
         thead.innerHTML = '';
         thead.appendChild(h('tr',
           h('th.rk-league__rank.is-num', { scope: 'col' }, T.rank || 'Rank'),
           showChg ? h('th.rk-league__chg', { scope: 'col', title: 'Change vs prior rank' }, T.change || '+/–') : null,
           h('th.rk-league__name', { scope: 'col' }, T.name || cur.title(enc.name)),
-          th('value', 'rk-league__bar', T.value || cur.title(enc.value)),
+          th('value', 'rk-league__bar', vTitle),
           has(enc.share) ? th('share', 'is-num rk-league__share', T.share || cur.title(enc.share)) : null,
           has(enc.count) ? th('count', 'is-num rk-league__count', T.count || cur.title(enc.count)) : null));
         root.classList.toggle('no-chg', !showChg);
@@ -106,11 +120,28 @@
         var max = Math.max.apply(null, list.map(function (d) { return util.isNum(d.value) ? d.value : 0; }).concat([0])) || 1;
         var sel = cur.selected(enc.name);
         var showChg = o.showChange !== false && has(enc.prior);
+        var nCols = 2 + (showChg ? 1 : 0) + 1 + (has(enc.share) ? 1 : 0) + (has(enc.count) ? 1 : 0);
         var next = new Map(), bars = [];
         drawHead();
         root.classList.toggle('has-sel', sel.length > 0);
         if (animate && cur.motion) RK.motion.flip(tbody, paint); else paint();
-        function paint() { tbody.innerHTML = ''; list.forEach(row); }
+        function paint() {
+          tbody.innerHTML = '';
+          list.forEach(function (d, i) {
+            // gap marker before a highlight pinned below the cut: "··· ranks 6–10"
+            if (d.pinned && (i === 0 || !list[i - 1].pinned)) {
+              var prev = i > 0 ? list[i - 1].rank : 0, from = (util.isNum(prev) ? prev : 0) + 1, to = util.isNum(d.rank) ? d.rank - 1 : null;
+              if (to == null || to >= from) {
+                var gap = h('tr.rk-league__gap', { 'aria-hidden': 'true' },
+                  h('td', { colspan: nCols }, h('span.rk-league__dots', '⋯'),
+                    to == null ? '' : (to > from ? 'ranks ' + from + '–' + to : 'rank ' + from)));
+                gap.dataset.key = 'gap';
+                tbody.appendChild(gap);
+              }
+            }
+            row(d, i);
+          });
+        }
         function row(d, i) {
           var pct = util.isNum(d.value) ? Math.max(0, d.value) / max * 100 : 0;
           var fill = h('i.rk-league__fill');
@@ -123,7 +154,7 @@
           },
             h('td.rk-league__rank.is-num', d.rank == null ? '' : String(d.rank)),
             showChg ? changeCell(d) : null,
-            h('td.rk-league__name', { title: d.name }, d.name),
+            h('td.rk-league__name', { title: String(d.name == null ? '' : d.name) }, String(d.name == null ? '' : d.name)),
             h('td.rk-league__bar', h('div.rk-league__track', h('div.rk-league__lane', fill, val))),
             has(enc.share) ? h('td.is-num.rk-league__share', RK.format(d.r[enc.share], sf)) : null,
             has(enc.count) ? h('td.is-num.rk-league__count', RK.format(d.r[enc.count], cf)) : null);

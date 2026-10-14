@@ -28,25 +28,60 @@
     return h('div.rk-kpi__spark', svg, dot);
   }
 
+  /**
+   * Caption text as nodes: hyphenated date tokens ("Sep-26", "09-Oct-2026") never break inside, and the
+   * CSS balances the lines so no word is left alone ("… 1 year / ago").
+   */
+  function caption(text) {
+    var out = [];
+    String(text).split(/(\s+)/).forEach(function (part) {
+      if (!part) return;
+      if (/\S-\S/.test(part)) out.push(h('span.rk-kpi__nw', part));
+      else out.push(part);
+    });
+    return out;
+  }
+
+  /** Balanced column count: as many as fit (>= minW px each), spread so the last row is not left short. */
+  function balancedCols(n, width, minW) {
+    var fit = Math.max(1, Math.floor((width + 1) / minW));
+    if (n <= fit) return n;
+    var rows = Math.ceil(n / fit);
+    return Math.ceil(n / rows);
+  }
+
   RK.component({
     id: 'kpi-tiles',
     deps: [],
     defaults: {
       encode: { label: 'label', value: 'value', format: 'format', delta: 'delta', deltaFormat: 'delta_format', period: 'period', spark: 'spark', good: 'good' },
-      columns: null,        // null = auto-fit
+      columns: null,        // null = balanced auto (as many as fit, rows evened out: 6 -> 3 x 2 at ~760px)
       countUp: true,
       sparkline: true,
       variant: 'plain'      // plain | boxed | accent
     },
     render: function (ctx) {
-      var o = ctx.options, enc = ctx.enc, t = ctx.theme;
       ctx.el.classList.add('is-auto');
-      var grid = h('div.rk-kpi', { class: 'rk-kpi--' + o.variant, style: o.columns ? { '--rk-kpi-cols': o.columns } : null });
+      var grid = h('div.rk-kpi'), prev = null, current = ctx;
 
-      function build(rows) {
-        grid.innerHTML = '';
-        rows.forEach(function (r, i) {
-          var fmt = (enc.format && r[enc.format]) || ctx.fmtOf(enc.value) || 'auto';
+      /** Columns (explicit or balanced for the current width) + row-start / next-row classes for the rules. */
+      function layout() {
+        var o = current.options, tiles = grid.children, n = tiles.length;
+        var cols = o.columns ? +o.columns : balancedCols(n, ctx.el.clientWidth || grid.clientWidth || 900, o.variant === 'boxed' ? 170 : 160);
+        grid.style.setProperty('--rk-kpi-cols', String(Math.max(1, cols)));
+        for (var i = 0; i < n; i++) {
+          tiles[i].classList.toggle('is-row-start', i % cols === 0);
+          tiles[i].classList.toggle('is-next-row', i >= cols);
+        }
+      }
+
+      function build(c) {
+        current = c;
+        var o = c.options, enc = c.enc, t = c.theme, next = {};
+        grid.className = 'rk-kpi rk-kpi--' + o.variant;
+        grid.textContent = '';
+        c.rows.forEach(function (r, i) {
+          var fmt = (enc.format && r[enc.format]) || c.fmtOf(enc.value) || 'auto';
           var valueEl = h('div.rk-kpi__value.rk-num');
           var delta = enc.delta ? r[enc.delta] : null;
           var good = (enc.good && r[enc.good]) || 'up';
@@ -58,21 +93,31 @@
               h('span.rk-kpi__arrow', { 'aria-hidden': 'true' }, delta === 0 ? '■' : (positive ? '▲' : '▼')),
               RK.format(delta, dfmt));
           }
-          var spark = o.sparkline && enc.spark && Array.isArray(r[enc.spark]) ? sparkline(r[enc.spark], t.accent3 || t.cat[1], RK.theme.alpha(t.accent3 || t.cat[1], 0.12)) : null;
-          var tile = h('div.rk-kpi__tile', { style: { '--rk-i': i } },
-            h('div.rk-kpi__label', r[enc.label]),
+          var line = t.accent3 || t.cat[1];
+          var spark = o.sparkline && enc.spark && Array.isArray(r[enc.spark]) ? sparkline(r[enc.spark], line, RK.theme.alpha(line, 0.12)) : null;
+          // data cells are only ever text children (never props / HTML)
+          var labelText = r[enc.label] == null ? '' : String(r[enc.label]);
+          var periodText = enc.period && r[enc.period] != null && r[enc.period] !== '' ? String(r[enc.period]) : null;
+          var tile = h('div.rk-kpi__tile', { style: { '--rk-i': String(i) } },
+            h('div.rk-kpi__label', { title: labelText }, labelText),
             valueEl,
-            h('div.rk-kpi__meta', deltaEl, enc.period && r[enc.period] ? h('span.rk-kpi__period', r[enc.period]) : null),
+            h('div.rk-kpi__meta', deltaEl, periodText ? h('span.rk-kpi__period', caption(periodText)) : null),
             spark);
           grid.appendChild(tile);
-          RK.motion.countUp(valueEl, r[enc.value], { format: fmt, animate: o.countUp && ctx.motion });
+          // first reveal counts up from 0; filter / param updates glide from the previous figure
+          var key = r[enc.label] + '#' + i, value = r[enc.value];
+          next[key] = value;
+          RK.motion.countUp(valueEl, value, { format: fmt, from: prev && RK.util.isNum(prev[key]) ? prev[key] : 0, duration: prev ? 700 : 1100, animate: o.countUp && c.motion });
         });
+        prev = next;
+        layout();
       }
-      build(ctx.rows);
       ctx.el.appendChild(grid);
+      build(ctx);
       return {
-        update: function (c) { ctx = c; build(c.rows); },
-        destroy: function () { grid.remove(); }
+        update: build,
+        resize: layout,
+        destroy: function () { grid.remove(); ctx.el.classList.remove('is-auto'); }
       };
     }
   });

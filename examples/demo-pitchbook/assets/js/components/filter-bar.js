@@ -398,7 +398,8 @@
       var max = Math.max.apply(null, counts) || 1;
       hist.innerHTML = '';
       counts.forEach(function (n) {
-        hist.appendChild(h('i', { style: { height: (n ? Math.max(12, n / max * 100) : 0) + '%' }, title: n ? n + ' row' + (n > 1 ? 's' : '') : null }));
+        // square-root heights with a floor: one-off bins stay visible without a ragged skyline
+        hist.appendChild(h('i', { style: { height: (n ? 30 + 70 * Math.sqrt(n / max) : 0) + '%' }, title: n ? n + ' row' + (n > 1 ? 's' : '') : null }));
       });
     }
     function sync() {

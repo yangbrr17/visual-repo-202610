@@ -29,21 +29,23 @@
       eventsData: null,        // dataset id with events {date, label, kind, detail} -> numbered pins
       eventsEncode: { date: 'date', label: 'label', kind: 'kind', detail: 'detail' },
       eventsSeries: null,      // series the pins sit on (default: highlight, else the first series)
-      refLines: [],            // [{value, label, color}] horizontal reference lines
+      refLines: [],            // [{value, label, color}] horizontal reference lines (default colour: theme ref)
       zoom: 'auto',            // 'auto' (on for time axes) | true | false
       xType: 'auto',           // 'auto' | 'time' | 'category' | 'value'
       xFormat: null,           // x format for tooltips (dates default to the field format / 'dd mmm yyyy')
       format: null,            // value format; defaults to the y field format ('#,##0.0' when rebased)
       yMin: 'auto',            // 'auto' (zero for areas, else fit the data) | 'dataMin' | number
-      legend: true
+      legend: 'auto'           // 'auto' (off when end labels already name <= 4 series) | true | false
     },
     render: function (ctx) {
       var state = { zoom: null, legendSel: null, labelIds: [], model: null, yAxis: null, raf: 0 };
       var api = C(function (c, inst) { return build(c, inst, state); }, {
-        select: function (p, c) {
-          if (!c.enc.series || Array.isArray(c.enc.y) || p.componentType !== 'series' || p.seriesType !== 'line') return null;
-          var s = state.model && state.model.byId[p.seriesId];
-          return s ? { field: c.enc.series, value: s.name } : null;
+        rebuildOnResize: true,     // date-tick density and the end-label margin depend on the plot size
+        select: function (p, c, chart) {
+          // clicks on the line body carry seriesIndex but no seriesId; generic series fields are scoped by core
+          var sm = chart.getModel().getSeriesByIndex(p.seriesIndex);
+          var s = state.model && sm && state.model.byId[sm.id];
+          return s && c.enc.series && !Array.isArray(c.enc.y) && p.seriesType === 'line' ? { field: c.enc.series, value: s.name } : null;
         }
       })(ctx);
       var inst = api.chart;
@@ -81,8 +83,8 @@
         update: function (c) { current = c; api.update(c); layoutEndLabels(inst, c, state, 'update'); },
         resize: function () { api.resize(); layoutEndLabels(inst, current, state, 'instant'); },
         destroy: function () { api.destroy(); },
-        exportImage: function () { return exportPNG(inst, current.theme); },
-        exportSVG: function () { return cleanSVG(inst, current.theme); }
+        exportImage: api.exportImage,
+        exportSVG: api.exportSVG
       };
     }
   });
@@ -110,7 +112,8 @@
     var fmt = o.format || (o.rebase != null ? '#,##0.0' : data.yFormat) || 'auto';
     var hl = o.highlight;
     var stacked = o.area === 'stacked';
-    var pal = palette(t, hl != null);
+    // stacked areas are parts of a whole -> ordinal ramp; otherwise peers stay clear of the accent2 highlight
+    var pal = stacked && data.series.length <= t.ord.length ? t.ord : RK.theme.palette({ n: data.series.length });
     var sel = enc.series && !Array.isArray(enc.y) ? ctx.selected(enc.series) : [];
 
     var pi = 0;
@@ -122,7 +125,7 @@
         vals = raw.map(function (v) { return v == null || base == null ? null : v / base * o.rebase; });
       }
       var isHl = hl != null && s.name === hl;
-      var color = isHl ? t.accent2 : pal[pi++ % pal.length];
+      var color = isHl ? t.accent2 : pal[pi++];
       var muted = hl != null && !isHl;
       if (muted) color = RK.theme.mix(color, t.paper, 0.12);
       var dimmed = sel.length && sel.indexOf(s.name) < 0;
@@ -162,27 +165,6 @@
     series.forEach(function (s) { byId[s.key] = s; byId[s.key + 'f'] = s; });
     return { xType: xType, isTime: isTime, isValue: isValue, isCat: !isTime && !isValue, xs: xs, xv: xv,
       series: series, byId: byId, fmt: fmt, stacked: stacked, fIdx: fIdx };
-  }
-
-  /**
-   * Series colours. accent2 is reserved for the highlighted series (the target), so nothing close to it
-   * is used for other lines; with a highlight, the context series use the calm semantic tokens first
-   * (accent, accent3, ink3).
-   */
-  function palette(t, highlight) {
-    var base = highlight ? [t.accent, t.accent3, t.ink3].concat(t.cat) : t.cat.slice();
-    var out = [];
-    base.forEach(function (c) {
-      if (!c) return;
-      if (colorDist(c, t.accent2) < 72) return;
-      if (out.some(function (x) { return colorDist(x, c) < 46; })) return;
-      out.push(c);
-    });
-    return out.length ? out : t.cat.slice();
-  }
-  function colorDist(a, b) {
-    var x = RK.theme.parseColor(a), y = RK.theme.parseColor(b);
-    return Math.sqrt(Math.pow(x[0] - y[0], 2) + Math.pow(x[1] - y[1], 2) + Math.pow(x[2] - y[2], 2));
   }
 
   /** ISO date / Date -> local-time ms (the same parsing RK.format uses), null when unparseable. */
@@ -292,7 +274,9 @@
     var showLabels = o.labels === 'auto' ? model.isCat && n <= 12 && !model.stacked && (o.highlight != null || model.series.length <= 2) : !!o.labels;
     var showSymbols = o.symbols === 'auto' ? model.isCat && n <= 24 && !model.stacked : !!o.symbols;
     var pins = state.pins = preparePins(ctx, model);
-    var hasLegend = o.legend !== false && model.series.length > 1;
+    // direct labels beat a legend: end labels that carry the names replace it for a few series
+    var named = o.endLabels === true || o.endLabels === 'name';
+    var hasLegend = o.legend !== false && model.series.length > 1 && (o.legend === true || !(named && model.series.length <= 4));
     var slider = useZoom && o.zoomSlider !== false && !ctx.print;
 
     // reserve the right margin for the end labels
@@ -314,6 +298,22 @@
     var tk = state.ticks = model.isTime && n ? dateTicks(windowFromZoom(model, state.zoom), state.plotW) : null;
 
     var y = state.yAxis = yAxisFor(ctx, state);
+    // the "Projected" caption sits above the plot: keep it clear of point labels near the top of the band
+    var capLift = 0;
+    if (showLabels && model.fIdx > 0 && o.forecastLabel && y && util.isNum(y.max) && y.max > y.min) {
+      var hiV = null;
+      model.series.forEach(function (s) {
+        if (!(o.labels === true || o.highlight == null || s.hl)) return;
+        for (var j = model.fIdx; j < n; j++) if (util.isNum(s.values[j]) && (hiV == null || s.values[j] > hiV)) hiV = s.values[j];
+      });
+      if (hiV != null) {
+        // a label tops out ~19px above its point; the caption's baseline sits 5px above the plot
+        var dPx = (y.max - hiV) / (y.max - y.min) * state.gridH;
+        capLift = Math.max(0, Math.ceil(16 - dPx));
+        var needTop = 19 + capLift + (hasLegend ? 22 : 0);
+        if (top < needTop) { state.gridH -= needTop - top; top = needTop; }
+      }
+    }
 
     var xAxisData = function (s, mask) {
       if (model.isCat) return s.values.map(function (v, i) { return mask && !mask(i) ? null : v; });
@@ -368,9 +368,9 @@
     });
 
     // reference lines / estimates band / rebase baseline on a silent helper series (survives legend toggles)
-    var marks = markSeries(ctx, model, fmt);
+    var marks = markSeries(ctx, model, fmt, capLift);
     if (marks) series.push(marks);
-    if (pins.length) series.push(pinSeries(ctx, model, pins));
+    if (pins.length) series.push(pinSeries(ctx, model, pins, state));
 
     var xAxis = model.isCat ? {
       id: 'x', type: 'category', data: model.xs, boundaryGap: showLabels || showSymbols,
@@ -381,28 +381,20 @@
       splitLine: { show: false },
       axisLine: { show: true, lineStyle: { color: t.axis } },
       axisTick: model.isTime ? { show: true, length: 3, lineStyle: { color: t.axis }, customValues: tk.values } : { show: true },
-      axisLabel: model.isTime ? tickLabel(tk) : { formatter: axisFmt(o.xFormat || ctx.fmtOf(ctx.enc.x) || 'auto') },
+      axisLabel: model.isTime ? tickLabel(tk) : { formatter: C.tickFmt(o.xFormat || ctx.fmtOf(ctx.enc.x) || 'auto') },
       axisPointer: { show: true, type: 'line', label: { show: false } }
     };
 
-    var dz = [];
-    if (useZoom) {
-      var z = state.zoom || { start: 0, end: 100 };
-      dz.push({ id: 'dzi', type: 'inside', xAxisIndex: 0, filterMode: 'none', start: z.start, end: z.end });
-      if (slider) {
-        state.slider = state.slider || { left: 56, right: right };
-        dz.push({ id: 'dzs', type: 'slider', xAxisIndex: 0, filterMode: 'none', start: z.start, end: z.end, height: 18, bottom: 6,
-          showDetail: false, brushSelect: false, left: state.slider.left, right: state.slider.right });
-      }
-    } else state.slider = null;
+    // core zoom: Ctrl/Cmd + wheel or pinch (plain wheel scrolls the report), drag to pan, slider unless printing
+    var z = state.zoom || { start: 0, end: 100 };
+    state.slider = slider ? state.slider || { left: 56, right: right } : null;
+    var dz = useZoom ? C.zoom(ctx, 'x', slider ? { id: 'dzs', bottom: 6, left: state.slider.left, right: state.slider.right, start: z.start, end: z.end } : null) : [];
+    if (dz.length) util.merge(dz[0], { id: 'dzi', start: z.start, end: z.end });
 
     var legendNames = model.series.map(function (s) { return s.name; });
     return {
       animationDurationUpdate: 600,
-      legend: C.legend(ctx, {
-        show: hasLegend, data: legendNames.map(function (nm) { return { name: nm, icon: 'rect' }; }),
-        itemWidth: 16, itemHeight: 4, selected: state.legendSel || undefined
-      }),
+      legend: C.legend(ctx, { show: hasLegend, data: legendNames, selected: state.legendSel || undefined }),
       grid: C.grid(ctx, { top: top, bottom: bottom, right: right, left: 4 }),
       tooltip: {
         trigger: 'axis', confine: true,
@@ -412,7 +404,7 @@
       xAxis: xAxis,
       yAxis: {
         id: 'y', type: 'value', min: y ? y.min : null, max: y ? y.max : null, interval: y ? y.interval : null,
-        axisLabel: { formatter: axisFmt(fmt, function () { return state.yAxis && state.yAxis.interval; }) }
+        axisLabel: { formatter: C.tickFmt(fmt, function () { return state.yAxis && state.yAxis.interval; }) }
       },
       dataZoom: dz,
       series: series
@@ -426,21 +418,6 @@
     var below = 0, total = 0;
     a.values.forEach(function (v, i) { if (v != null && b.values[i] != null) { total++; if (v < b.values[i]) below++; } });
     return total && below / total > 0.5;
-  }
-
-  /**
-   * Axis labels: drop the decimals when every tick is a whole number ("$40" not "$40.00", "100" not "100.0"),
-   * keep them on all ticks otherwise ("9.5x", "10.0x"). getStep returns the live tick interval when known.
-   */
-  function axisFmt(fmt, getStep) {
-    var code = String(RK.format.presets[fmt] || fmt);
-    var intFmt = code.replace(/\.[0#]+/g, '');
-    var isInt = function (v) { return Math.abs(v - Math.round(v)) < 1e-9; };
-    return function (v) {
-      var step = getStep ? getStep() : null;
-      var whole = /%/.test(code) ? false : util.isNum(step) ? isInt(step) && isInt(v) : isInt(v);
-      return RK.format(v, whole ? intFmt : fmt);
-    };
   }
 
   /**
@@ -478,14 +455,16 @@
     return { customValues: tk.values, hideOverlap: true, formatter: function (v) { return RK.format(new Date(v), f); } };
   }
 
-  function markSeries(ctx, model, fmt) {
+  function markSeries(ctx, model, fmt, capLift) {
     var o = ctx.options, t = ctx.theme;
     var lines = (o.refLines || []).map(function (r) {
+      var col = RK.theme.resolve(r.color) || t.ref;          // token names ('pos', 'accent2') or literal colours
       return {
         yAxis: r.value, name: r.label || '',
-        lineStyle: { color: r.color || t.ink3, type: r.type || 'dashed', width: 1.25 },
+        lineStyle: { color: col, type: r.type || 'dashed', width: 1.25 },
         // label on a paper chip so it stays legible where it crosses the lines
-        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: r.color || t.ink2, fontWeight: 600, fontSize: 10.5,
+        // text from a function: "{a}", "{b}", "{c}" in a label are never template-substituted
+        label: { formatter: refText(r, fmt), position: 'insideStartTop', color: col, fontWeight: 600, fontSize: 10.5,
           backgroundColor: RK.theme.alpha(t.paper, 0.85), padding: [1, 4], borderRadius: 2 }
       };
     });
@@ -499,7 +478,8 @@
       area = {
         silent: true,
         itemStyle: { color: RK.theme.alpha(t.ink3, t.dark ? 0.1 : 0.06) },
-        label: { show: !!o.forecastLabel, position: 'top', distance: 5, color: t.ink3, fontSize: 10.5, fontStyle: 'italic', formatter: o.forecastLabel || '' },
+        label: { show: !!o.forecastLabel, position: 'top', distance: 5 + (capLift || 0), color: t.ink3, fontSize: 10.5, fontStyle: 'italic',
+          formatter: function () { return String(o.forecastLabel || ''); } },
         data: [[{ xAxis: from }, { xAxis: to }]]
       };
     }
@@ -511,22 +491,48 @@
     };
   }
 
+  function refText(r, fmt) {
+    var text = r.label != null && r.label !== '' ? String(r.label) : RK.format(r.value, fmt);
+    return function () { return text; };
+  }
+
   /* ------------------------------------------------------------------ *
    * Event pins (custom series): numbered markers on stems, staggered when close
    * ------------------------------------------------------------------ */
-  function pinSeries(ctx, model, pins) {
+  function pinSeries(ctx, model, pins, state) {
     var t = ctx.theme;
-    var pinColor = t.ink2, txt = RK.theme.onColor(pinColor, t.ink, '#ffffff');
-    var R = 8;
+    var pinColor = t.ink2, txt = RK.theme.textOn(pinColor);
+    var R = 8.5;
+    var xOf = function (i) { return model.isCat ? i : model.xv[i]; };
     return {
-      id: 'events', type: 'custom', name: '__events', z: 6, clip: true, silent: false, tooltip: { show: false },
+      // not clipped: a pin on the last point may reach into the right margin rather than be cut in half
+      id: 'events', type: 'custom', name: '__events', z: 6, clip: false, silent: false, tooltip: { show: false },
       encode: { x: 0, y: 1 },
-      data: pins.map(function (p) { return [model.isCat ? p.i : model.xv[p.i], p.y, p.n]; }),
+      data: pins.map(function (p) { return [xOf(p.i), p.y, p.n]; }),
       renderItem: function (params, api) {
         var c = params.context;
         var cs = params.coordSys;
         if (!c.pos) {
-          c.pos = pins.map(function (p) { return api.coord([model.isCat ? p.i : model.xv[p.i], p.y]); });
+          c.pos = pins.map(function (p) { return api.coord([xOf(p.i), p.y]); });
+          // a pin stands above every visible line near it (not only its own series), so it never hides data
+          c.top = pins.map(function (p, k) {
+            var px = c.pos[k][0], top = c.pos[k][1], bot = c.pos[k][1];
+            [-1, 1].forEach(function (dir) {
+              for (var j = dir < 0 ? p.i : p.i + 1; j >= 0 && j < model.xv.length; j += dir) {
+                var x = api.coord([xOf(j), 0])[0];
+                if (Math.abs(x - px) > R + 3) break;
+                model.series.forEach(function (s) {
+                  if (!isShown(state, s)) return;
+                  var v = model.stacked ? s.top[j] : s.values[j];
+                  if (!util.isNum(v)) return;
+                  var y = api.coord([xOf(j), v])[1];
+                  if (y < top) top = y;
+                  if (y > bot) bot = y;
+                });
+              }
+            });
+            return [top, bot];
+          });
           c.lv = [];
           c.pos.forEach(function (pt, k) {
             var used = {};
@@ -538,9 +544,9 @@
         }
         var k = params.dataIndex, pt = c.pos[k];
         if (!pt || pt[0] < cs.x - 1 || pt[0] > cs.x + cs.width + 1) return null;
-        var stem = 14 + c.lv[k] * (2 * R + 4);
-        var up = pt[1] - stem - R >= cs.y - 2;
-        var cy = up ? pt[1] - stem : pt[1] + stem;
+        var lift = 14 + c.lv[k] * (2 * R + 4);
+        var up = c.top[k][0] - lift - R >= cs.y - 2;
+        var cy = up ? c.top[k][0] - lift : c.top[k][1] + lift;
         return {
           type: 'group',
           blur: { style: { opacity: 1 } },      // annotations stay crisp when a line is focused
@@ -548,7 +554,7 @@
             { type: 'line', shape: { x1: pt[0], y1: pt[1], x2: pt[0], y2: cy + (up ? R : -R) }, style: { stroke: pinColor, lineWidth: 1, opacity: 0.7 }, blur: { style: { opacity: 0.7 } } },
             { type: 'circle', shape: { cx: pt[0], cy: pt[1], r: 2.5 }, style: { fill: pinColor, stroke: t.paper, lineWidth: 1 }, blur: { style: { opacity: 1 } } },
             { type: 'circle', shape: { cx: pt[0], cy: cy, r: R }, style: { fill: pinColor, stroke: t.paper, lineWidth: 1.25 }, blur: { style: { opacity: 1 } } },
-            { type: 'text', x: pt[0], y: cy, style: { text: String(api.value(2)), fill: txt, font: '600 10px ' + t.fontNum, align: 'center', verticalAlign: 'middle' }, blur: { style: { opacity: 1 } } }
+            { type: 'text', x: pt[0], y: cy, style: { text: String(api.value(2)), fill: txt, font: '600 11px ' + t.fontNum, align: 'center', verticalAlign: 'middle' }, blur: { style: { opacity: 1 } } }
           ]
         };
       }
@@ -606,16 +612,10 @@
    * End labels: value tag + name in the right margin, de-collided vertically,
    * with a leader line to the last visible point. Drawn as ECharts graphic elements.
    * ------------------------------------------------------------------ */
-  var measureCtx = null;
-  function textWidth(str, font) {
-    if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
-    measureCtx.font = font;
-    return measureCtx.measureText(str).width;
-  }
   function labelWidth(mode, s, vtxt, t) {
     var w = 0;
-    if (mode !== 'name') w += textWidth(vtxt, '600 10.5px ' + t.fontNum) + 10;
-    if (mode !== 'value') w += (w ? 5 : 0) + textWidth(s.name, (s.hl ? '600 ' : '400 ') + '11px ' + t.fontSans);
+    if (mode !== 'name') w += C.measure(vtxt, '600 10.5px ' + t.fontNum) + 10;
+    if (mode !== 'value') w += (w ? 5 : 0) + C.measure(s.name, (s.hl ? '600 ' : '400 ') + '11px ' + t.fontSans);
     return w;
   }
 
@@ -650,19 +650,24 @@
         if (!pt || !util.isNum(pt[0]) || !util.isNum(py)) return;
         items.push({ s: s, i: i, px: pt[0], py: pt[1], y: util.clamp(py, g.y, g.y + g.height) });
       });
-      spread(items, 15, g.y - 4, g.y + g.height + 4);
+      // label centres >= 15px apart, label boxes inside the plot height (+4px)
+      var ly = C.spreadLabels(items.map(function (it) { return it.y; }), 15, g.y + 3.5, g.y + g.height - 3.5);
+      items.forEach(function (it, k) { it.ly = ly[k]; });
       var lx = g.x + g.width + 8;
       items.forEach(function (it) {
         var s = it.s, id = 'el-' + s.key;
         var vtxt = RK.format(s.values[it.i], model.fmt);
         var rich = {
           // graphic elements take zrender style names: fill (not color)
-          v: { backgroundColor: s.color, fill: RK.theme.onColor(s.solid, t.ink, '#ffffff'), padding: [2, 4, 1, 4], borderRadius: 2,
+          v: { backgroundColor: s.color, fill: RK.theme.textOn(s.solid), padding: [2, 4, 1, 4], borderRadius: 2,
                fontSize: 10.5, fontWeight: 600, fontFamily: t.fontNum, lineHeight: 14 },
           n: { fill: s.dimmed ? RK.theme.alpha(t.ink2, 0.4) : (s.hl ? t.ink : t.ink2), fontSize: 11, fontWeight: s.hl ? 600 : 400, fontFamily: t.fontSans, padding: [0, 0, 0, 4], lineHeight: 14 }
         };
-        var text = o.endLabels === 'value' ? '{v|' + vtxt + '}' : o.endLabels === 'name' ? '{n|' + esc(s.name) + '}' : '{v|' + vtxt + '}{n|' + esc(s.name) + '}';
-        if (o.endLabels === 'name') rich.n.fill = s.dimmed ? s.color : (t.dark ? RK.theme.mix(s.solid, t.ink, 0.25) : s.solid);
+        // data strings never reach the rich-text markup unescaped ("{v|...}" in a name would restyle it)
+        var vs = C.richSafe(vtxt), ns = C.richSafe(s.name);
+        var text = o.endLabels === 'value' ? '{v|' + vs + '}' : o.endLabels === 'name' ? '{n|' + ns + '}' : '{v|' + vs + '}{n|' + ns + '}';
+        // names in the series colour must still read as text (>= 4.5:1): the target uses accent2Ink
+        if (o.endLabels === 'name') rich.n.fill = s.dimmed ? s.color : (s.hl ? t.accent2Ink : textInk(s.solid, t));
         var needLeader = Math.abs(it.ly - it.py) > 1.5 || lx - it.px > 10;
         var anim = animFor(ctx, mode);
         elements.push(util.merge({ id: id + '-l', type: 'polyline', z: 8, silent: true, invisible: !needLeader,
@@ -690,6 +695,13 @@
     if (patch.graphic || patch.dataZoom) inst.setOption(patch);
   }
 
+  /** The series colour, deepened toward the ink until it reads as text on the paper (WCAG 4.5:1). */
+  function textInk(col, t) {
+    var c = col;
+    for (var k = 1; k <= 6 && RK.theme.contrast(c, t.paper) < 4.5; k++) c = RK.theme.mix(col, t.ink, 0.15 * k);
+    return c;
+  }
+
   function animFor(ctx, mode) {
     if (!ctx.motion) return {};
     if (mode === 'enter') return { enterFrom: { style: { opacity: 0 } }, enterAnimation: { duration: 350, delay: 850 } };
@@ -697,66 +709,4 @@
     return { updateAnimation: { duration: 0 } };
   }
 
-  /** Spread label centres so they are >= gap apart, staying close to their anchors (cluster merge). */
-  function spread(items, gap, lo, hi) {
-    items.sort(function (a, b) { return a.y - b.y; });
-    var groups = items.map(function (it) { return { items: [it], sum: it.y }; });
-    function top(gr) {
-      var size = gr.items.length * gap;
-      var c = gr.sum / gr.items.length;
-      return util.clamp(c - size / 2, lo, Math.max(lo, hi - size));
-    }
-    var merged = true;
-    while (merged) {
-      merged = false;
-      for (var k = 1; k < groups.length; k++) {
-        var a = groups[k - 1], b = groups[k];
-        if (top(a) + a.items.length * gap > top(b) + 1e-6) {
-          groups.splice(k - 1, 2, { items: a.items.concat(b.items), sum: a.sum + b.sum });
-          merged = true;
-          break;
-        }
-      }
-    }
-    groups.forEach(function (gr) {
-      var y0 = top(gr);
-      gr.items.forEach(function (it, j) { it.ly = y0 + gap * (j + 0.5); });
-    });
-  }
-
-  function esc(s) { return String(s == null ? '' : s).replace(/[{}|]/g, ' '); }
-
-  /* ------------------------------------------------------------------ *
-   * Export. Workaround for a core issue (rk.chart exportPNG): ECharts' SVG string keeps the theme's
-   * double-quoted font names inside style="…" — invalid XML, so the browser refuses to rasterise it.
-   * Swap them to single quotes before exporting.
-   * ------------------------------------------------------------------ */
-  function cleanSVG(inst, t) {
-    var svg = inst.renderToSVGString ? inst.renderToSVGString() : null;
-    if (!svg) return null;
-    [t.fontSans, t.fontNum, t.fontSerif].forEach(function (f) {
-      if (f && f.indexOf('"') >= 0) svg = svg.split(f).join(f.replace(/"/g, "'"));
-    });
-    return svg;
-  }
-  function exportPNG(inst, t) {
-    var bg = t.paper || '#ffffff';
-    var zr = inst.getZr && inst.getZr();
-    var svg = zr && zr.painter && zr.painter.type === 'canvas' ? null : cleanSVG(inst, t);
-    if (!svg) return Promise.resolve(inst.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: bg }));
-    var w = inst.getWidth(), h = inst.getHeight();
-    return new Promise(function (resolve, reject) {
-      var img = new Image();
-      img.onload = function () {
-        var c = document.createElement('canvas');
-        c.width = w * 2; c.height = h * 2;
-        var g = c.getContext('2d');
-        g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
-        g.drawImage(img, 0, 0, c.width, c.height);
-        resolve(c.toDataURL('image/png'));
-      };
-      img.onerror = reject;
-      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-    });
-  }
 })();

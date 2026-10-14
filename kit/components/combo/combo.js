@@ -68,7 +68,9 @@
       // labels: 'auto' = on when the bars are wide enough to carry them
       var groups = o.barStack ? 1 : Math.max(1, bars.length);
       var barPx = (inst.getWidth() - 110) / Math.max(1, n) * 0.62 / groups;
-      var autoBars = barPx >= 34 && n <= 16, autoLine = n <= 16;
+      // line labels need their own width per category (narrow blocks: the axis carries the values instead)
+      var lineLabW = C.measure(RK.format(0.888, o.lineFormat || ctx.fmtOf(lines.length ? lines[0].field : null) || '0.0%'), '600 10.5px ' + t.fontNum);
+      var autoBars = barPx >= 34 && n <= 16, autoLine = n <= 16 && (inst.getWidth() - 110) / Math.max(1, n) >= lineLabW + 6;
       var showBarLabels = o.labels === true || o.labels === 'bars' || (o.labels === 'auto' && autoBars);
       var showLineLabels = o.labels === true || o.labels === 'line' || (o.labels === 'auto' && autoLine);
       var labelPad = showBarLabels ? 18 : 6;
@@ -196,6 +198,7 @@
           lineStyle: { width: 2, color: col },
           itemStyle: { color: col, borderColor: t.paper, borderWidth: 1 },
           emphasis: { focus: 'none', scale: 1.3 },
+          labelLayout: { hideOverlap: true },          // crowded (narrow) blocks drop colliding labels rather than stack them
           label: showLineLabels ? { show: true, position: 'top', distance: 6, color: labCol, fontSize: 10.5, fontWeight: 600, fontFamily: t.fontNum,
             // overlay: the line crosses the bars, so its labels sit on small paper chips
             backgroundColor: band ? null : RK.theme.alpha(t.paper, 0.92), padding: band ? 0 : [1, 3], borderRadius: 2,
@@ -248,6 +251,9 @@
           s.end = o.barStack ? pos : s.values;
           s.rate = cagrRate(s.values[s.from], s.values[s.to], periodsBetween(cats[s.from], cats[s.to], s.to - s.from));
           s.text = (s.label || (cagrs.length > 1 ? shortX(cats[s.from]) + '–' + shortX(cats[s.to]) + ' CAGR' : 'CAGR')) + ': ' + RK.format(s.rate, o.cagrFormat);
+          s.pillW = C.measure(s.text, '600 10.5px ' + t.fontNum) + 20;
+          s.shortText = 'CAGR ' + RK.format(s.rate, o.cagrFormat);          // for brackets narrower than their caption
+          s.shortW = C.measure(s.shortText, '600 10.5px ' + t.fontNum) + 20;
           for (var k = s.from; k <= s.to; k++) level = Math.max(level, tops[k]);
           s.padL = cagrs.some(function (x) { return x !== s && x.to === s.from; }) ? 5 : 0;
           s.padR = cagrs.some(function (x) { return x !== s && x.from === s.to; }) ? 5 : 0;
@@ -270,14 +276,16 @@
             var y1 = api.coord([s.from, Math.max(0, s.end[s.from] || 0)])[1] - labelPad - 2;
             var y2 = api.coord([s.to, Math.max(0, s.end[s.to] || 0)])[1] - labelPad - 1;
             var accent = t.dark ? t.ink : t.accent;
+            var short = s.pillW > Math.abs(x2 - x1) + 40, pw = short ? s.shortW : s.pillW;
             var fade = { style: { opacity: 0 } };
             return {
               type: 'group',
               children: [
                 { type: 'polyline', shape: { points: [[x1, y1], [x1, yTop], [x2, yTop], [x2, y2 - 5]] }, style: { stroke: ink, lineWidth: 1, fill: null }, enterFrom: fade },
                 { type: 'polygon', shape: { points: [[x2 - 3.5, y2 - 6], [x2 + 3.5, y2 - 6], [x2, y2]] }, style: { fill: ink }, enterFrom: fade },
-                { type: 'text', x: (x1 + x2) / 2, y: yTop, enterFrom: fade,
-                  style: { text: s.text, align: 'center', verticalAlign: 'middle', fill: accent, font: '600 10.5px ' + t.fontNum,
+                // the pill stays inside the plot even when the bracket is narrower than its text
+                { type: 'text', x: U.clamp((x1 + x2) / 2, params.coordSys.x + pw / 2, params.coordSys.x + params.coordSys.width - pw / 2), y: yTop, enterFrom: fade,
+                  style: { text: short ? s.shortText : s.text, align: 'center', verticalAlign: 'middle', fill: accent, font: '600 10.5px ' + t.fontNum,
                     backgroundColor: t.paper, borderColor: accent, borderWidth: 1, borderRadius: 10, padding: [3, 9] } }
               ]
             };

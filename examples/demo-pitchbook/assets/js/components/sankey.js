@@ -19,9 +19,6 @@
     return v;
   }
 
-  /** Rich-text safe label (ECharts treats {…|…} as style markup). */
-  function safe(s) { return String(s == null ? '' : s).replace(/[{}|]/g, ' '); }
-
   /**
    * Nodes in first-seen order with in/out totals and a stage (column) index that mirrors
    * ECharts' nodeAlign: longest path from a source ('left'), to a sink ('right'), or sinks
@@ -136,7 +133,7 @@
         if (c) custom[n.name] = c;
         else if (hi.indexOf(n.name) < 0 && !isCost(n.name)) free.push(n.name);
       });
-      var pal = RK.theme.palette({ n: free.length, exclude: [t.accent2, costs.length ? t.neg : null].concat(Object.keys(custom).map(function (k) { return custom[k]; })) });
+      var pal = RK.theme.palette({ n: free.length, exclude: [t.accent2, costs.length ? t.neg : null, costs.length ? t.ref : null].concat(Object.keys(custom).map(function (k) { return custom[k]; })) });
       function nodeColor(n) {
         if (custom[n.name]) return custom[n.name];
         if (hi.indexOf(n.name) >= 0) return t.accent2;
@@ -158,52 +155,170 @@
         });
       }
 
-      // label metrics: first column labels sit outside-left, everything else to the right
+      // ---- labels: plan every label against the real node layout (ECharts' own rules) so names and
+      // values never run into the next column. Each node tries progressively more compact variants
+      // (name / value  % -> name / value / % -> name / value -> wrapped name / value -> name) and is
+      // hidden (tooltip only) when nothing fits.
       var showLabels = o.labels !== false;
       var nameFont = '600 11px ' + t.fontSans, valFont = '10.5px ' + t.fontNum;
       var top = vert ? (showLabels ? 34 : 6) : 10, bottom = vert ? (showLabels ? 34 : 6) : 10;
-      function valueText(n) {
-        var s = RK.format(n.value, fmt);
-        if (refNode && refNode.value && refNode !== n) s += '  ' + RK.format(n.value / refNode.value, '0.0%');
-        return s;
+      var labelPad = 8, labelDist = labelPad - 2, LH = 14;
+      function valueStr(n) { return RK.format(n.value, fmt); }
+      function pctStr(n) { return refNode && refNode.value && refNode !== n ? RK.format(n.value / refNode.value, '0.0%') : null; }
+      function valueText(n) { var p = pctStr(n); return valueStr(n) + (p ? '  ' + p : ''); }
+      function segW(seg) { return measure(seg[1], seg[0] === 'n' ? nameFont : valFont); }
+      function variant(lines) {
+        var w = 0;
+        lines.forEach(function (ln) { var lw = 0; ln.forEach(function (sg, i) { lw += segW(sg) + (i ? measure('  ', valFont) : 0); }); w = Math.max(w, lw); });
+        return { lines: lines, w: Math.ceil(w), h: lines.length * LH };
+      }
+      /** Greedy word wrap of a node name into at most maxLines lines no wider than maxW (null if a word does not fit). */
+      function wrapName(name, maxW, maxLines) {
+        var words = String(name).split(/\s+/), lines = [], cur = '';
+        for (var i = 0; i < words.length; i++) {
+          var next = cur ? cur + ' ' + words[i] : words[i];
+          if (measure(next, nameFont) <= maxW || !cur) cur = next;
+          else { lines.push(cur); cur = words[i]; }
+        }
+        if (cur) lines.push(cur);
+        if (lines.length > maxLines || lines.some(function (l) { return measure(l, nameFont) > maxW + 0.5; })) return null;
+        return lines;
+      }
+      /** Candidate label variants, most informative first. crowded: neighbours too close for two lines. */
+      function variants(n, maxW, crowded) {
+        var name = n.name, out = [];
+        if (!o.labelValues) {
+          out.push(variant([[['n', name]]]));
+        } else {
+          var v = valueStr(n), p = pctStr(n);
+          var full = p ? v + '  ' + p : v;
+          var stacked = variant([[['n', name]], [['v', full]]]), inl = variant([[['n', name], ['v', full]]]);
+          if (crowded) out.push(inl, stacked); else out.push(stacked, inl);
+          var wv = maxW ? wrapName(name, maxW, 2) : null, wl = wv && wv.length > 1 ? wv.map(function (l) { return [['n', l]]; }) : null;
+          if (p) {
+            out.push(variant([[['n', name]], [['v', v]], [['v', p]]]));
+            if (wl) out.push(variant(wl.concat([[['v', full]]])), variant(wl.concat([[['v', v]], [['v', p]]])));
+            var inlV = variant([[['n', name], ['v', v]]]), stV = variant([[['n', name]], [['v', v]]]);
+            if (crowded) out.push(inlV, stV); else out.push(stV, inlV);
+          }
+          if (wl) out.push(variant(wl.concat([[['v', v]]])));
+        }
+        if (maxW) {
+          var wn = wrapName(name, maxW, 2);
+          if (wn && wn.length > 1) out.push(variant(wn.map(function (l) { return [['n', l]]; })));
+        }
+        if (o.labelValues) out.push(variant([[['n', name]]]));
+        return out;
       }
 
-      // Estimate the node layout (same ky rule as ECharts) to find columns where two-line labels
-      // would collide; those nodes get a single-line "Name  value" label instead.
-      var inline = new Set();
-      if (showLabels && o.labelValues && !vert) {
-        var avail = Math.max(60, (ctx.el.clientHeight || 320) - top - bottom);
+      var plan = new Map(), firstW = 0, lastW = 0;
+      if (showLabels && !vert) {
+        var W = ctx.el.clientWidth || 600, Hh = ctx.el.clientHeight || 320;
+        var availH = Math.max(60, Hh - top - bottom);
+        // node heights / y positions: same rule as ECharts (min ky over columns, stacked from the top, pushed up at the bottom)
         var cols = util.groupBy(nodes, function (n) { return n.depth; });
         var ky = Infinity;
         cols.forEach(function (col) {
           var sum = col.reduce(function (s, n) { return s + n.value; }, 0);
-          if (sum > 0) ky = Math.min(ky, (avail - (col.length - 1) * o.nodeGap) / sum);
+          if (sum > 0) ky = Math.min(ky, (availH - (col.length - 1) * o.nodeGap) / sum);
         });
-        if (isFinite(ky)) {
-          cols.forEach(function (col) {
-            var y = 0, centres = col.map(function (n) { var hgt = Math.max(1, n.value * ky), c = y + hgt / 2; y += hgt + o.nodeGap; return c; });
-            col.forEach(function (n, i) {
-              var near = Math.min(i > 0 ? centres[i] - centres[i - 1] : Infinity, i < col.length - 1 ? centres[i + 1] - centres[i] : Infinity);
-              if (near < 30) inline.add(n.name);
+        if (!isFinite(ky)) ky = 0;
+        var geo = new Map();
+        cols.forEach(function (col) {
+          var y = 0;
+          col.forEach(function (n) { var hgt = n.value * ky; geo.set(n.name, { y: y, h: hgt }); y += hgt + o.nodeGap; });
+          var over = y - o.nodeGap - availH;
+          if (over > 0) {      // ECharts pushes overflowing columns back up from the bottom edge
+            var lim = availH;
+            for (var ci = col.length - 1; ci >= 0; ci--) {
+              var gg = geo.get(col[ci].name);
+              if (gg.y + gg.h > lim) gg.y = lim - gg.h;
+              lim = gg.y - o.nodeGap;
+            }
+          }
+          col.forEach(function (n, i) {
+            var gg = geo.get(n.name), c = gg.y + gg.h / 2;
+            var prev = i > 0 ? geo.get(col[i - 1].name) : null, nxt = i < col.length - 1 ? geo.get(col[i + 1].name) : null;
+            gg.cy = top + c;
+            gg.near = Math.min(prev ? c - (prev.y + prev.h / 2) : Infinity, nxt ? (nxt.y + nxt.h / 2) - c : Infinity);
+          });
+        });
+        var placed = [];
+        function hits(b) {
+          return placed.some(function (p) { return b.x0 < p.x1 + 3 && b.x1 > p.x0 - 3 && b.y0 < p.y1 + 1 && b.y1 > p.y0 - 1; });
+        }
+        // outer columns first: their widths fix the plot box (left / right margins); cap them so the
+        // middle keeps room (long first-column names wrap onto two lines instead)
+        var sideCap = Math.max(90, Math.round(W * (W < 900 ? 0.19 : 0.24)));
+        function pickSide(n, left) {
+          var gg = geo.get(n.name), list = variants(n, sideCap, gg.near < 30), pick = null;
+          for (var i = 0; i < list.length && !pick; i++) {
+            var vt = list[i], b = { x0: 0, x1: 1, y0: gg.cy - vt.h / 2, y1: gg.cy + vt.h / 2 };
+            if (vt.w <= sideCap && !hits(b)) pick = vt;
+          }
+          if (!pick) {          // nothing fits the cap: narrowest variant that does not collide
+            list.slice().sort(function (a, b2) { return a.w - b2.w; }).some(function (vt) {
+              var b = { x0: 0, x1: 1, y0: gg.cy - vt.h / 2, y1: gg.cy + vt.h / 2 };
+              if (!hits(b)) { pick = vt; return true; }
+              return false;
             });
+          }
+          if (pick) { plan.set(n.name, pick); placed.push({ x0: 0, x1: 1, y0: gg.cy - pick.h / 2, y1: gg.cy + pick.h / 2, side: left ? 'L' : 'R' }); }
+          else plan.set(n.name, null);
+          return pick ? pick.w : 0;
+        }
+        var lastCol = g.maxDepth > 0 ? (cols.get(g.maxDepth) || []) : [];
+        (g.maxDepth > 0 ? (cols.get(0) || []) : []).forEach(function (n) { firstW = Math.max(firstW, pickSide(n, true)); });
+        placed = [];
+        lastCol.forEach(function (n) { lastW = Math.max(lastW, pickSide(n, false)); });
+        if (!g.maxDepth) nodes.forEach(function (n) { lastW = Math.max(lastW, pickSide(n, false)); });
+        // now the plot box is known: x positions as ECharts computes them
+        var left = firstW + labelPad + 4, right = lastW + labelPad + 4;
+        var kx = g.maxDepth ? (W - left - right - o.nodeWidth) / g.maxDepth : 0;
+        nodes.forEach(function (n) { var gg = geo.get(n.name); gg.x = left + n.depth * kx; });
+        // real label boxes for the outer columns
+        placed = [];
+        nodes.forEach(function (n) {
+          var vt = plan.get(n.name), gg = geo.get(n.name);
+          if (!vt || (n.depth !== 0 && n.depth !== g.maxDepth) || (n.depth === 0 && !g.maxDepth)) return;
+          var x0 = n.depth === 0 && g.maxDepth ? gg.x - labelDist - vt.w : gg.x + o.nodeWidth + labelDist;
+          placed.push({ x0: x0, x1: x0 + vt.w, y0: gg.cy - vt.h / 2, y1: gg.cy + vt.h / 2 });
+        });
+        nodes.forEach(function (n) {
+          var gg = geo.get(n.name);
+          placed.push({ x0: gg.x, x1: gg.x + o.nodeWidth, y0: top + gg.y, y1: top + gg.y + Math.max(1, gg.h), node: n.name });
+        });
+        // interior columns, right to left: each label must clear every later node and every placed label
+        for (var d = g.maxDepth - 1; d >= 1; d--) {
+          (cols.get(d) || []).forEach(function (n) {
+            var gg = geo.get(n.name), x0 = gg.x + o.nodeWidth + labelDist;
+            // room to the next obstacle on this label's rows sets the wrap width
+            var room = W - 2 - x0;
+            placed.forEach(function (p) {
+              if (p.node === n.name || p.x0 < x0) return;
+              if (p.y0 < gg.cy + LH && p.y1 > gg.cy - LH) room = Math.min(room, p.x0 - 3 - x0);
+            });
+            var list = variants(n, Math.max(24, room), gg.near < 30), pick = null;
+            for (var i = 0; i < list.length && !pick; i++) {
+              var vt = list[i], b = { x0: x0, x1: x0 + vt.w, y0: gg.cy - vt.h / 2, y1: gg.cy + vt.h / 2 };
+              if (b.x1 <= W - 2 && !placed.some(function (p) { return p.node !== n.name && b.x0 < p.x1 + 3 && b.x1 > p.x0 - 3 && b.y0 < p.y1 + 1 && b.y1 > p.y0 - 1; })) pick = vt;
+            }
+            plan.set(n.name, pick);
+            if (pick) placed.push({ x0: x0, x1: x0 + pick.w, y0: gg.cy - pick.h / 2, y1: gg.cy + pick.h / 2 });
           });
         }
-      }
-      function labelWidth(n) {
-        var w = measure(n.name, nameFont);
-        if (o.labelValues) w = inline.has(n.name) ? w + 8 + measure(valueText(n), valFont) : Math.max(w, measure(valueText(n), valFont));
-        return Math.ceil(w);
-      }
-      var firstW = 0, lastW = 0;
-      if (showLabels) {
+      } else if (showLabels) {
         nodes.forEach(function (n) {
-          if (n.depth === 0) firstW = Math.max(firstW, labelWidth(n));
-          if (n.depth === g.maxDepth || (!n.outs.length && o.nodeAlign !== 'left')) lastW = Math.max(lastW, labelWidth(n));
+          plan.set(n.name, variant(o.labelValues ? [[['n', n.name]], [['v', valueText(n)]]] : [[['n', n.name]]]));
         });
-        // left-aligned sinks in the last column also need room
-        nodes.forEach(function (n) { if (n.depth === g.maxDepth) lastW = Math.max(lastW, labelWidth(n)); });
       }
-      var labelPad = 8;
+      function labelText(n) {
+        var vt = plan.get(n.name);
+        if (!vt) return '';
+        return vt.lines.map(function (ln) {
+          return ln.map(function (sg) { return '{' + sg[0] + '|' + C.richSafe(sg[1]) + '}'; }).join('  ');
+        }).join('\n');
+      }
 
       var data = nodes.map(function (n) {
         var c = nodeColor(n);
@@ -215,7 +330,7 @@
           value: n.value,
           itemStyle: { color: c, borderWidth: 0, opacity: dim ? 0.25 : 1 },
           label: {
-            show: showLabels,
+            show: showLabels && !!plan.get(n.name),
             position: vert ? (first ? 'top' : 'bottom') : (first ? 'left' : 'right'),
             opacity: dim ? 0.45 : 1
           }
@@ -269,20 +384,18 @@
           links: linkData,
           lineStyle: { color: linkColor, curveness: 0.5, opacity: o.linkOpacity },
           label: {
-            distance: labelPad - 2,
+            distance: labelDist,
             color: t.ink,
             fontSize: 11,
             lineHeight: 14,
             fontFamily: t.fontSans,
             formatter: function (p) {
               var n = g.byName.get(p.name);
-              if (!n) return '';
-              if (!o.labelValues) return '{n|' + safe(n.name) + '}';
-              return '{n|' + safe(n.name) + '}' + (inline.has(n.name) ? '  ' : '\n') + '{v|' + safe(valueText(n)) + '}';
+              return n ? labelText(n) : '';
             },
             rich: {
-              n: { fontWeight: 600, fontSize: 11, color: t.ink, fontFamily: t.fontSans, lineHeight: 14, textBorderColor: t.paper, textBorderWidth: 3 },
-              v: { fontSize: 10.5, color: t.ink2, fontFamily: t.fontNum, lineHeight: 13, textBorderColor: t.paper, textBorderWidth: 3 }
+              n: { fontWeight: 600, fontSize: 11, color: t.ink, fontFamily: t.fontSans, lineHeight: LH, textBorderColor: t.paper, textBorderWidth: 2 },
+              v: { fontSize: 10.5, color: t.ink2, fontFamily: t.fontNum, lineHeight: LH, textBorderColor: t.paper, textBorderWidth: 2 }
             }
           },
           emphasis: {
@@ -296,7 +409,7 @@
         }]
       };
     }, {
-      rebuildOnResize: true,     // label crowding is estimated from the container height
+      rebuildOnResize: true,     // labels are planned against the layout of the current container size
       on: {
         click: function (p, ctx) {
           if (p.dataType === 'node') selectNode(ctx, p.name);

@@ -7,16 +7,6 @@
   'use strict';
   var C = RK.chart;
 
-  var measurer = null;
-  /** Pixel width of a string in a CSS font (canvas measureText; rough fallback without canvas). */
-  function textWidth(s, font) {
-    s = String(s == null ? '' : s);
-    try {
-      measurer = measurer || document.createElement('canvas').getContext('2d');
-      measurer.font = font;
-      return measurer.measureText(s).width;
-    } catch (e) { return s.length * 6.2; }
-  }
   function truncate(s, w, font) {
     var ef = window.echarts && window.echarts.format;
     return ef && ef.truncateText ? ef.truncateText(String(s), w, font, '…') : String(s);
@@ -41,24 +31,34 @@
     if (o.sort === 'desc') items.sort(bySize);
     else if (o.sort === 'asc') items.sort(function (a, b) { return a.value - b.value; });
 
+    // catch-all rows ("Retail & other", "Other holders") are not named parts: they go last, in the neutral
+    // colour, and join the "Others" bucket when there is one (never two "other" slices side by side)
+    var catchAll = isCatchAll(o);
+    var catches = items.filter(function (d) { return catchAll(d.name); });
+    items = items.filter(function (d) { return !catchAll(d.name); });
     // tail beyond maxSlices (by size, whatever the display order) -> "Others" (always last)
-    var max = o.maxSlices;
-    if (max && max > 1 && items.length > max) {
-      var keep = new Set(items.slice().sort(bySize).slice(0, max - 1).map(function (d) { return d.name; }));
-      var members = items.filter(function (d) { return !keep.has(d.name); }).sort(bySize);
+    var max = o.maxSlices, members = [];
+    if (max && max > 1 && items.length + catches.length > max) {
+      var keep = new Set(items.slice().sort(bySize).slice(0, Math.max(1, max - 1)).map(function (d) { return d.name; }));
+      members = items.filter(function (d) { return !keep.has(d.name); });
       items = items.filter(function (d) { return keep.has(d.name); });
+    }
+    if (members.length || catches.length > 1) {
+      members = members.concat(catches).sort(bySize);
       items.push({ name: o.othersLabel, value: members.reduce(function (s, d) { return s + d.value; }, 0), members: members, others: true });
+    } else if (catches.length) {
+      items.push(RK.util.merge(catches[0], { members: [catches[0]], others: true }));
     }
     var total = items.reduce(function (s, d) { return s + d.value; }, 0);
+    var named = items.reduce(function (s, d) { return d.others ? s : s + d.value; }, 0);
     items.forEach(function (d) { d.share = total ? d.value / total : null; });
 
     // colours: stable rank in the unfiltered data, so slices keep their colour while filtering
     var t = ctx.theme;
     var hl = o.highlight == null ? [] : [].concat(o.highlight).map(String);
-    // with a highlight, drop palette colours that read like the accent so the target stands alone
-    var pal = t.cat.filter(function (c) { return !hl.length || !near(c, t.accent2); });
-    if (!pal.length) pal = t.cat;
     var rank = collect(ctx.allRows).sort(bySize).map(function (d) { return d.name; });
+    // with a highlight, no other slice may read like the accent; tints extend the palette instead of repeating it
+    var pal = RK.theme.palette(hl.length ? { n: rank.length } : { exclude: [], n: rank.length });
     items.forEach(function (d, i) {
       var r = rank.indexOf(d.name);
       var base = d.others ? t.neutral : hl.indexOf(d.name) >= 0 ? t.accent2 : pal[(r < 0 ? i : r) % pal.length];
@@ -69,12 +69,17 @@
 
     var fmt = o.format || ctx.fmtOf(enc.value) || 'auto';
     var display = o.display === 'auto' ? (/%/.test(RK.format.presets[fmt] || fmt) ? 'value' : 'both') : o.display;
-    return { items: items, total: total, fmt: fmt, pctFmt: o.pctFormat || '0.0%', display: display };
+    return { items: items, total: total, named: named, centre: o.centerValue === 'named' ? named : total, fmt: fmt, pctFmt: o.pctFormat || '0.0%', display: display };
   }
 
-  function near(a, b) {
-    var x = RK.theme.parseColor(a), y = RK.theme.parseColor(b);
-    return Math.sqrt(Math.pow(x[0] - y[0], 2) + Math.pow(x[1] - y[1], 2) + Math.pow(x[2] - y[2], 2)) < 64;
+  /** Labels that name a catch-all bucket: options.othersMatch (list / regex string) or, by default ('auto'),
+   *  the othersLabel and any label starting with "Other(s)" or ending in "other(s)". */
+  function isCatchAll(o) {
+    var m = o.othersMatch;
+    if (m === false || m == null) return function (n) { return n === o.othersLabel; };
+    if (Array.isArray(m)) return function (n) { return n === o.othersLabel || m.indexOf(n) >= 0; };
+    var re = m === 'auto' ? /^others?\b|\bothers?$/i : new RegExp(String(m), 'i');
+    return function (n) { return n === o.othersLabel || re.test(n); };
   }
 
   function dimmed(ctx, d) {
@@ -91,17 +96,33 @@
     var fontName = '11.5px ' + t.fontSans, fontNum = '11.5px ' + t.fontNum;
     if (L.side) {
       var showV = m.display !== 'pct', showP = m.display !== 'value';
-      var nameW = Math.max.apply(null, m.items.map(function (d) { return textWidth(d.name, fontName); }).concat([textWidth(ctx.title(ctx.enc.label), '600 10px ' + t.fontSans), 40]));
-      var valW = showV ? Math.max(56, textWidth(RK.format(m.total, m.fmt), '600 ' + fontNum) + 18) : 0;
-      var pctW = showP ? 58 : 0;
+      var nameW = Math.max.apply(null, m.items.map(function (d) { return C.measure(d.name, fontName); }).concat([C.measure(ctx.title(ctx.enc.label), '600 10px ' + t.fontSans), 40]));
+      var valW = showV ? Math.max(56, C.measure(RK.format(m.total, m.fmt), '600 ' + fontNum) + 18) : 0;
+      // the % column fits its header and its widest figure (never clipped at narrow spans)
+      var pctW = showP ? Math.max(58, C.measure('% of total', '600 10px ' + t.fontSans) + 8, C.measure(RK.format(1, m.pctFmt), '600 ' + fontNum) + 12) : 0;
       nameW = Math.min(Math.ceil(nameW) + 8, 200);
       var tableW = 18 + nameW + valW + pctW;
       var gap = Math.max(28, Math.min(56, W * 0.05));
-      var R = Math.min(H / 2 - 6, (W - tableW - gap) / 2, 190);
-      if (R < 56) {                                   // narrow: shrink the name column first
-        nameW = Math.max(60, nameW - (56 - R) * 2);
+      var R = Math.min(H / 2 - 6, (W - tableW - gap - 10) / 2, 190);
+      if (R < 56) {                                   // narrow: shrink the name column first (names ellipsize, figures never)
+        nameW = Math.max(48, nameW - (56 - R) * 2);
         tableW = 18 + nameW + valW + pctW;
-        R = Math.max(44, Math.min(H / 2 - 6, (W - tableW - gap) / 2));
+        R = Math.max(40, Math.min(H / 2 - 6, (W - tableW - gap - 10) / 2));
+        if (2 * R + gap + tableW > W - 4) {           // still too wide: tighter gap, then the name column again
+          gap = 18;
+          nameW = Math.max(40, Math.min(nameW, W - 4 - 2 * R - gap - 18 - valW - pctW));
+          tableW = 18 + nameW + valW + pctW;
+        }
+      }
+      // wide blocks: the exhibit grows with the span (more gap, wider table up to ~40% of the width)
+      var spare = W - (2 * R + gap + tableW) - 16;
+      if (spare > 80) {
+        var grow = Math.min(spare * 0.5, Math.max(0, Math.min(380, W * 0.36) - tableW));
+        nameW += grow * 0.7; valW += showV ? grow * 0.15 : 0; pctW += showP ? grow * 0.15 : 0;
+        if (!showV) nameW += grow * 0.15;
+        if (!showP) nameW += grow * 0.15;
+        tableW = 18 + nameW + valW + pctW;
+        gap = Math.min(96, gap + Math.max(0, (W - (2 * R + gap + tableW)) * 0.15));
       }
       var groupW = 2 * R + gap + tableW;
       var x0 = Math.max(4, (W - groupW) / 2);
@@ -140,7 +161,8 @@
       label: labels ? {
         show: true, position: 'outside', alignTo: 'labelLine', edgeDistance: 6, bleedMargin: 4,
         color: t.ink2, fontSize: 11, lineHeight: 15,
-        formatter: function (p) { var d = m.items[p.dataIndex]; return '{n|' + d.name + '}\n{v|' + readout(d) + '}'; },
+        // rich text: richSafe keeps braces in a name from opening / closing style runs
+        formatter: function (p) { var d = m.items[p.dataIndex]; return '{n|' + C.richSafe(d.name) + '}\n{v|' + C.richSafe(readout(d)) + '}'; },
         rich: {
           n: { color: t.ink, fontSize: 11.5, fontWeight: 600, fontFamily: t.fontSans, lineHeight: 15 },
           v: { color: t.ink3, fontSize: 11, fontFamily: t.fontNum, lineHeight: 15 }
@@ -159,7 +181,7 @@
     };
   }
 
-  /** Legend table + centre total as graphic elements (merged, so the total can count up/over). */
+  /** Legend table + centre total as graphic elements (the total counts up from 0, then from the previous total). */
   function graphics(ctx, m, L, first) {
     var o = ctx.options, t = ctx.theme, els = [];
     var anim = ctx.motion;
@@ -170,11 +192,11 @@
       var showLbl = o.centerLabel && L.r0 > 38;
       var val = {
         id: 'ctr-val', type: 'text', x: L.cx, y: L.cy + (showLbl ? -7 : 0), z: 1, silent: true,
-        style: { text: RK.format(m.total, m.fmt), fill: t.ink, font: '600 ' + vSize + 'px ' + t.fontNum, textAlign: 'center', textVerticalAlign: 'middle' },
-        extra: { v: m.total }, transition: ['extra'],
+        style: { text: RK.format(m.centre, m.fmt), fill: t.ink, font: '600 ' + vSize + 'px ' + t.fontNum, textAlign: 'center', textVerticalAlign: 'middle' },
+        extra: { v: m.centre }, transition: ['extra'],
         during: function (api) { api.setStyle('text', RK.format(api.getExtra('v'), m.fmt)); }
       };
-      if (anim && first) { val.enterFrom = { extra: { v: 0 } }; val.enterAnimation = { duration: 1000 }; }
+      if (anim && L.from !== m.centre) { val.enterFrom = { extra: { v: L.from || 0 } }; val.enterAnimation = { duration: first ? 1000 : 600 }; }
       if (!anim) val.transition = [];
       els.push(val);
       els.push({
@@ -217,6 +239,8 @@
           { id: 'row-' + i + '-v', type: 'text', silent: true, x: xVal, y: cy, invisible: !T.showV, style: { text: RK.format(d.value, m.fmt), fill: dim ? ink : t.ink, font: weight + '11.5px ' + t.fontNum, textAlign: 'right', textVerticalAlign: 'middle' } },
           { id: 'row-' + i + '-p', type: 'text', silent: true, x: xPct, y: cy, invisible: !T.showP, style: { text: RK.format(d.share, m.pctFmt), fill: dim ? ink : t.ink3, font: weight + '11.5px ' + t.fontNum, textAlign: 'right', textVerticalAlign: 'middle' } }
         ];
+        // wide tables: a hairline under each row keeps the eye on the line from name to figure
+        if (T.nameW > 200 && i < m.items.length - 1) parts.push({ id: 'row-' + i + '-rule', type: 'line', silent: true, shape: { x1: xName, y1: cy + T.rowH / 2, x2: x + T.w, y2: cy + T.rowH / 2 }, style: { stroke: t.grid, lineWidth: 1 } });
         els.push(hit);
         parts.forEach(function (el) { els.push(RK.util.merge(el, enterRow(i))); });
       });
@@ -242,7 +266,7 @@
           { label: '% of total', value: RK.format(d.share, m.pctFmt) }
         ];
         var foot = null;
-        if (d.others) {
+        if (d.others && d.members.length > 1) {
           var names = d.members.slice(0, 5).map(function (x) { return x.name; });
           foot = d.members.length + ' items: ' + names.join(', ') + (d.members.length > 5 ? ', …' : '');
         }
@@ -254,11 +278,13 @@
   /** Toggle the cross-filter for a slice ("Others" toggles all of its members). */
   function pick(ctx, d) {
     if (!d || ctx.options.crossFilter === false) return;
-    var f = ctx.enc.label;
+    var f = ctx.enc.label;   // generic label fields ('type' …) stay within this dataset (core scoping)
     if (!d.others) { ctx.select(f, d.name); return; }
     var sel = ctx.selected(f);
     var all = d.members.every(function (x) { return sel.indexOf(x.name) >= 0; });
-    d.members.forEach(function (x) { if (all || sel.indexOf(x.name) < 0) ctx.select(f, x.name); });
+    // all members selected -> drop them, else add the missing ones (one store write)
+    ctx.setSelection(f, all ? sel.filter(function (n) { return !d.members.some(function (x) { return x.name === n; }); })
+      : sel.concat(d.members.map(function (x) { return x.name; }).filter(function (n) { return sel.indexOf(n) < 0; })));
   }
 
   RK.component({
@@ -275,23 +301,51 @@
       innerRadius: 0.62,       // hole as a share of the outer radius (0 = pie)
       center: true,            // total in the hole (count-up)
       centerLabel: 'Total',
+      centerValue: 'total',    // total | named — 'named' sums the named parts only (catch-all / Others excluded)
+      othersMatch: 'auto',     // catch-all labels that join "Others": 'auto' (Other… / …& other) | [labels] | regex string | false
       highlight: null,         // label(s) drawn in the accent colour (e.g. the client)
       format: null,            // value format; defaults to the value field format
       pctFormat: '0.0%'
     },
     render: function (ctx) {
-      var state = { m: null, L: null, first: true, w: 0, h: 0, ctx: ctx, ids: [] };
+      var state = { m: null, L: null, first: true, ctx: ctx, prevTotal: 0 };
+      // hover readout in the hole (HTML: transient, so it does not need to be part of exports)
+      var h = RK.util.h;
+      var rName = h('div.rk-donut__name'), rVal = h('div.rk-donut__value.rk-num'), rPct = h('div.rk-donut__pct');
+      var readout = h('div.rk-donut__readout', { 'aria-hidden': 'true' }, rName, rVal, rPct);
+      function hover(d) {
+        var L = state.L, m = state.m;
+        if (!d || !L || !L.readout) { readout.classList.remove('is-on'); return; }
+        rName.textContent = d.name;
+        rVal.textContent = RK.format(d.value, m.fmt);
+        rPct.textContent = RK.format(d.share, m.pctFmt) + ' of total' + (d.others && d.members.length > 1 ? ' · ' + d.members.length + ' items' : '');
+        readout.classList.add('is-on');
+      }
+
       var base = C(function (c, inst) {
+        if (!state.first) hover(null);
         state.ctx = c;
-        state.m = model(c);
-        state.w = inst.getWidth(); state.h = inst.getHeight();
-        state.L = layout(c, state.m, state.w, state.h);
+        var m = state.m = model(c);
+        var L = state.L = layout(c, m, inst.getWidth(), inst.getHeight());
+        L.inst = inst;
+        L.onPick = function (d) { pick(state.ctx, d); };
+        L.onHover = hover;
+        var d = Math.floor(L.r0 * 1.8);
+        readout.style.cssText = 'left:' + L.cx + 'px;top:' + L.cy + 'px;width:' + d + 'px;height:' + d + 'px;--rk-donut-v:' + Math.round(Math.max(13, Math.min(24, L.r0 * 0.3))) + 'px';
+        // the legend table / centre total are replaced on every build (RK.chart replace-merges 'graphic'),
+        // so the total counts up from the previous value via enterFrom
+        L.from = state.first ? 0 : state.prevTotal;
+        var els = graphics(c, m, L, state.first);
+        state.prevTotal = m.centre;
+        state.first = false;
         return {
           legend: { show: false },
-          tooltip: tooltip(c, state.m, state.L),
-          series: [seriesOption(c, state.m, state.L)]
+          tooltip: tooltip(c, m, L),
+          graphic: { elements: els },
+          series: [seriesOption(c, m, L)]
         };
       }, {
+        rebuildOnResize: true,   // radius + legend table are laid out in pixels
         on: {
           click: function (p) { if (p.seriesId === 'donut') pick(state.ctx, state.m.items[p.dataIndex]); },
           mouseover: function (p) { if (p.seriesId === 'donut') hover(state.m.items[p.dataIndex]); },
@@ -299,45 +353,10 @@
           globalout: function () { hover(null); }
         }
       })(ctx);
-      var inst = base.chart;
-
-      // hover readout in the hole (HTML: transient, so it does not need to be part of exports)
-      var h = RK.util.h;
-      var rName = h('div.rk-donut__name'), rVal = h('div.rk-donut__value.rk-num'), rPct = h('div.rk-donut__pct');
-      var readout = h('div.rk-donut__readout', { 'aria-hidden': 'true' }, rName, rVal, rPct);
       ctx.el.appendChild(readout);
-      function hover(d) {
-        var L = state.L, m = state.m;
-        if (!d || !L || !L.readout) { readout.classList.remove('is-on'); return; }
-        rName.textContent = d.name;
-        rVal.textContent = RK.format(d.value, m.fmt);
-        rPct.textContent = RK.format(d.share, m.pctFmt) + ' of total' + (d.others ? ' · ' + d.members.length + ' items' : '');
-        readout.classList.add('is-on');
-      }
 
-      function paint() {
-        var L = state.L;
-        L.inst = inst;
-        L.onPick = function (d) { pick(state.ctx, d); };
-        L.onHover = hover;
-        var d = Math.floor(L.r0 * 1.8);
-        readout.style.cssText = 'left:' + L.cx + 'px;top:' + L.cy + 'px;width:' + d + 'px;height:' + d + 'px;--rk-donut-v:' + Math.round(Math.max(13, Math.min(24, L.r0 * 0.3))) + 'px';
-        var els = graphics(state.ctx, state.m, L, state.first);
-        var ids = els.map(function (e) { return e.id; });
-        state.ids.forEach(function (id) { if (ids.indexOf(id) < 0) els.push({ id: id, $action: 'remove' }); });
-        state.ids = ids;
-        inst.setOption({ graphic: { elements: els } });
-        state.first = false;
-      }
-      paint();
-
-      var update = base.update, resize = base.resize, destroy = base.destroy;
-      base.update = function (c) { hover(null); update(c); paint(); };
+      var destroy = base.destroy;
       base.destroy = function () { readout.remove(); destroy(); };
-      base.resize = function () {
-        resize();
-        if (Math.abs(inst.getWidth() - state.w) > 1 || Math.abs(inst.getHeight() - state.h) > 1) base.update(state.ctx);
-      };
       return base;
     }
   });
