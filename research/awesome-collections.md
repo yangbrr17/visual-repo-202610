@@ -4,7 +4,7 @@
 > **依据**
 > - 主要来源：`research/raw/07-collections.md`（下称 07）。
 > - 补充来源：02（地图）、04（pitchbook）、05（图标）、06（中国生态）、08（AI）、09（架构）各篇笔记。
-> - 现状核对：`research/catalog.json`（239 个库）、`research/landscape.md` §3（FT 覆盖矩阵）、`kit/catalog.json`（52 个组件）、`kit/categories.json`（12 类）、`vendor/vendor.json`、`docs/architecture.md`。
+> - 现状核对：`research/catalog.json`（239 个库）、`research/landscape.md` §3（FT 覆盖矩阵）、`kit/catalog.json`（53 个组件）、`kit/categories.json`（12 类）、`vendor/vendor.json`、`docs/architecture.md`。
 >
 > **口径**
 > - 最近提交日期、条目数、许可都来自 07 在 2026-10-14 的实查：`git clone --depth 1` 取 HEAD 日期，按 README 标题和列表项计数，raw LICENSE 看许可。Star 数是 shields.io 的取整值。本文不另行估算。
@@ -25,11 +25,11 @@
    | **Leaflet Plugins DB** | 地图插件目录 | 已 vendor 2 个插件，下一批的候选也从这里出 |
    | **hal9ai/awesome-dataviz** | 库雷达，用来发现新库 | `research/catalog.json` 的种子；每月 diff 一次 |
 
-2. **现状：我们 52 个组件已覆盖 FT 72 种图型中的 49 种，另有 5 种部分覆盖**（landscape §3）。合集能直接补上的缺口有四个：
+2. **现状：我们 53 个组件已覆盖 FT 72 种图型中的 50 种，另有 5 种部分覆盖**（landscape §3）。原先列出的 4 个"合集能直接补上的缺口"里，equalised cartogram 已经补上，还剩 3 个：
    - Fan chart → `@echarts-x/custom-line-range`。
    - Violin → `@echarts-x/custom-violin`。
-   - Equalised cartogram → `china-tilemap`。代码在 `kit/components/china-tilemap/china-tilemap.js`，**开发中**，还没有 manifest，没进 catalog。
    - Surplus/deficit filled line → ECharts 的 area 配方。
+   - （已完成）Equalised cartogram → `china-tilemap`。manifest 和 `china_provinces` 样例数据已进 `kit/catalog.json`；只覆盖中国省级，世界区域和美国州版本还没有。
 3. **版权与许可的红线：**
    - **只借概念、不抄内容：** Data Viz Catalogue 和 Datavizproject 有版权但没有许可。FT 的配色、字体、logo 不在 MIT 范围内。
    - **复用列表文字要署名：** awesome-dataviz 是 CC BY 4.0。
@@ -58,7 +58,7 @@
 |---|---|---|---|---|---|---|---|
 | **awesome-dataviz**（hal9ai；fasouto 和 javierluraschi 两个旧地址都重定向到这里） | https://github.com/hal9ai/awesome-dataviz · 镜像站 https://awesomedataviz.com | ✅ 2026-10-13 · 4.4k★ | 约 420 条 / 24 节（镜像站显示 365 个工具）；JS 部分约 133 条，其中 Charting 35、Financial charts 9、Maps 22、Misc 23；另有 Dashboards & BI 13 条 | CC BY 4.0 | 新库雷达。2025–26 年的新秀都在里面：ChartGPU、Vela、Flint、mapcn、Perspective 新 org | `research/catalog.json` 的种子；每月 diff Financial、Maps、Misc 三节 | **adopt** |
 | **chartjs/awesome** | https://github.com/chartjs/awesome | 🟡 2026-03-23 · 2.7k★ | 75 行，其中 50 行标注支持 v4；每行有 v2/v3/v4 支持矩阵 | MIT | Chart.js 插件矩阵：zoom、annotation、datalabels、financial、geo、matrix、sankey、treemap、boxplot | 我们不用 Chart.js。只作为"某种图在其他引擎怎么做"的旁证 | adopt（只限 Chart.js 方向） |
-| **awesome-echarts**（ecomfe） | https://github.com/ecomfe/awesome-echarts | 🟡 2025-01-16 · 1.6k★ | 约 52 条（89 个链接里有 37 个是目录） | CC0 1.0 | 扩展清单：wordcloud、liquidfill、echarts-leaflet；Python 绑定 pyecharts | 旧扩展大多只声明支持 echarts ^5，**已被官方 `@echarts-x/*` 取代**（06 §4.2）。社区画廊 makeapie.com 已失效 | reference |
+| **awesome-echarts**（ecomfe） | https://github.com/ecomfe/awesome-echarts | 🔴 2025-01-16 · 1.6k★（07 标为 🟡，但距今已约 21 个月，按本文图例应为 🔴） | 约 52 条（89 个链接里有 37 个是目录） | CC0 1.0 | 扩展清单：wordcloud、liquidfill、echarts-leaflet；Python 绑定 pyecharts | 旧扩展大多只声明支持 echarts ^5，**已被官方 `@echarts-x/*` 取代**（06 §4.2）。社区画廊 makeapie.com 已失效 | reference |
 | **awesome-geojson**（tmcw） | https://github.com/tmcw/awesome-geojson | ✅ 2026-09-23 · 2.6k★ | 123 条 / 8 节，其中 conversion 35 条 | CC0 1.0 | GeoJSON 处理工具：turf、geojson-rewind、simplify、topojson | 服务于 Python builder 和 `tools/build_geo.py`（切日界线、简化），不进前端 | reference |
 | **awesome-maplibre** | https://github.com/maplibre/awesome-maplibre | ✅ 2026-10-14 · 1.1k★ | 236 条 / 约 12 节 | BSD-3 | MapLibre 插件；ECharts↔MapLibre 绑定 | 只在将来启用 "served mode" 矢量底图时有用。MapLibre 6 是 ESM-only，`file://` 下最后可用的是 5.24.0 | reference |
 | **awesome-vector-tiles**（mapbox） | https://github.com/mapbox/awesome-vector-tiles | ✅ 2026-08-10 · 2.6k★ | 142 条 / 9 节 | CC0 1.0 | PMTiles / MBTiles 工具链 | 只在需要街道级离线底图时用（02 §6.4） | reference |
@@ -75,7 +75,7 @@
 | 合集 | URL | 维护 | 规模 | 许可 | 借什么 | 映射到 ReportKit | Verdict |
 |---|---|---|---|---|---|---|---|
 | **FT Visual Vocabulary**（chart-doctor 海报 + ft-interactive D3 模板） | https://github.com/Financial-Times/chart-doctor/tree/main/visual-vocabulary · https://github.com/ft-interactive/visual-vocabulary | 🔴 2024-03-12 / 2021-08-18（内容不过时）· 3.4k / 350★ | **9 类 72 种图型**；有机读的 `chartTypes.csv`（列为 `chartName, category, img, avail, description`）；42 种有 D3 v4 模板（共 58 个模板目录） | 软件 MIT；**FT 内容和品牌保留版权** | 主分类法；FT 的 "frame" 概念，即固定的 print / web / social 输出尺寸 | `kit/categories.json` 的骨架，映射见 §2.1。坑：CSV 用老 Mac 的 CR 换行，`wc -l` 显示 0，要用 Python `csv` 模块解析 | **adopt** |
-| **data-to-viz.com**（holtzy） | https://www.data-to-viz.com · https://github.com/holtzy/data_to_viz | 🟡 2024-10-18 · 1.1k★ | 6 个数据形态根节点、约 39 个图型页、12 条精选 caveat（共 74 个文件）、约 20 个数据格式 "story"、20 多个示例 CSV | 仓库 MIT | 按数据形态选图的决策树；caveat 可以直接变成 lint 规则；示例数据集的命名方式 | gallery 的第二筛选维度；测试数据命名（§2.2） | **adopt** |
+| **data-to-viz.com**（holtzy） | https://www.data-to-viz.com · https://github.com/holtzy/data_to_viz | 🔴 2024-10-18（07 标为 🟡，但已约 24 个月；内容是决策树，不过时）· 1.1k★ | 6 个数据形态根节点、约 39 个图型页、12 条精选 caveat（共 74 个文件）、约 20 个数据格式 "story"、20 多个示例 CSV | 仓库 MIT | 按数据形态选图的决策树；caveat 可以直接变成 lint 规则；示例数据集的命名方式 | gallery 的第二筛选维度；测试数据命名（§2.2） | **adopt** |
 | **Data Viz Catalogue**（Severino Ribecca） | https://datavizcatalogue.com | ✅ | 60 种方法 / 16 种功能 | **有版权、无许可** | 金融类图型的查漏清单，这些 FT 没有：Kagi、Point & Figure、Span、OHLC、Candlestick、Marimekko、Error bars | 只用来核对完整性，**不复制文字和缩略图** | reference |
 | **Data Viz Project**（Ferdio） | https://datavizproject.com | ✅ | 166 种图型；4 个分面：Family、Input、Function、Shape | **有版权、无许可** | 分面筛选的 UX | 同上 | reference |
 | awesome-dataviz 的 Catalogs 节 | 同 1.1 | — | 11 条：R Graph Gallery、From Data to Viz、AnyChart Chartopedia、Depict Data Studio Chart Chooser、5 个 Wikipedia 列表等 | 各自不同 | — | 07 没有逐个深入核实。需要时再看 | reference |
@@ -84,7 +84,7 @@
 
 | 合集 | URL | 维护 | 规模 | 许可 | 借什么 | 映射到 ReportKit | Verdict |
 |---|---|---|---|---|---|---|---|
-| **Apache ECharts examples** | https://echarts.apache.org/examples · https://github.com/apache/echarts-examples | ✅ 2026-09-24 · 400★（仓库） | **377 个 2D 示例 + 59 个 GL 示例**，301 个 TS 文件。`src/data/chart-list-data.js` 是机读的，每条有 `id, title, titleCN, category[], difficulty, since`。**28 个示例标为 `since: 6.0.0`** | Apache-2.0 | 直接改写成组件。v6 新能力：axis breaks、intraday breaks、matrix 坐标系、chord、jitter | 35 个 ECharts 组件的 recipe 来源，逐个映射见 §2.3。改写代码合法，保留 NOTICE 即可（`vendor/echarts/NOTICE` 已随包分发） | **adopt** |
+| **Apache ECharts examples** | https://echarts.apache.org/examples · https://github.com/apache/echarts-examples | ✅ 2026-09-24 · 400★（仓库） | **377 个 2D 示例 + 59 个 GL 示例**，301 个 TS 文件。`src/data/chart-list-data.js` 是机读的，每条有 `id, title, titleCN, category[], difficulty, since`。**28 个示例标为 `since: 6.0.0`** | Apache-2.0 | 直接改写成组件。v6 新能力：axis breaks、intraday breaks、matrix 坐标系、chord、jitter | 36 个 ECharts 组件的 recipe 来源，逐个映射见 §2.3。改写代码合法，保留 NOTICE 即可（`vendor/echarts/NOTICE` 已随包分发） | **adopt** |
 | **Vega-Lite examples** | https://vega.github.io/vega-lite/examples/ · 索引在 https://github.com/vega/vega-lite/blob/main/site/_data/examples.json | ✅ 2026-10-08 · 5.5k★ | **203 个画廊条目 / 6 组**，共 633 个 spec 文件；其中 Interactive 32 个 | BSD-3 | 语法级交互模式：刷选、联动、多视图、标注图层 | 我们 `encode` 的通道名尽量和它对齐（roadmap-step2 §5）；将来写 VL→block spec 的导入器 | consider |
 | **Plotly.js gallery** | https://plotly.com/javascript/ | ✅（展示的是 v4.1.x） | 12 节；Financial 节有 waterfall、indicators、candlestick、funnel、带 rangeselector 的时间序列 | MIT | 时间范围按钮（1M/6M/YTD/1Y）、indicator 卡片 | `price-volume`、`candlestick` 的时间范围按钮；`kpi-tiles` | reference（plotly.min.js 有 4.7 MB，不 vendor） |
 | **D3 Graph Gallery**（holtzy） | https://d3-graph-gallery.com · https://github.com/holtzy/D3-graph-gallery | ✅ 2026-08-01 · 855★ | 47 个图族页面、165 个示例 HTML | MIT | 每类图都有短小易读的 D3 片段 | 做 SVG 组件时参考（例如 `waffle`）。**代码是 d3 v4/v6**：`d3.v4.js` 出现 183 次，`d3.v6.js` 126 次 | reference |
@@ -102,7 +102,7 @@
 | 合集 | URL | 维护 | 规模 | 许可 | 借什么 | 映射到 ReportKit | Verdict |
 |---|---|---|---|---|---|---|---|
 | **shadcn/ui charts** | https://ui.shadcn.com/charts | ✅ 2026-10-14 · 126k★ | **70 个 block**：area 10、bar 10、line 10、pie 11、radar 14、radial 6、tooltip 9。基于 Recharts 3.8.0 和 React 19 | MIT | tooltip 版式（indicator line/dot/dashed）、`--chart-1..5` CSS 变量调色板、带中心标签的 radial KPI | 用来打磨 `rk.chart` 的 tooltip 和 `kpi-tiles` 的样式；调色板思路和我们的 `--rk-*` token 一致 | reference |
-| **Tremor Raw / Tremor Blocks** | https://tremor.so · https://github.com/tremorlabs/tremor · https://github.com/tremorlabs/tremor-blocks | 🟡 Raw 2025-10-10 / Blocks 2025-01-22。2025-01 被 Vercel 收购，npm 包 `@tremor/react` 停在 3.18.7 | Raw 约 35 个组件；Blocks 300 多个 | Raw Apache-2.0；Blocks MIT | KPI 原语的词汇：**BarList**、**CategoryBar**、**Tracker**、**SparkChart** | 组件映射见 §2.6 | reference |
+| **Tremor Raw / Tremor Blocks** | https://tremor.so · https://github.com/tremorlabs/tremor · https://github.com/tremorlabs/tremor-blocks | 🟡 Raw 2025-10-10 / 🔴 Blocks 2025-01-22。2025-01 被 Vercel 收购，npm 包 `@tremor/react` 停在 3.18.7 | Raw 约 35 个组件；Blocks 300 多个 | Raw Apache-2.0；Blocks MIT | KPI 原语的词汇：**BarList**、**CategoryBar**、**Tracker**、**SparkChart** | 组件映射见 §2.6 | reference |
 | **Tabler**（`@tabler/core` 1.6.1） | https://github.com/tabler/tabler | ✅ 2026-10-11 · 42k★ | 139 个 Astro 预览页 | MIT | 版式网格、卡片、暗色模式 | ⚠ 其中 23 页用 **ApexCharts 7.0.0**（双许可），**不要照抄图表 widget**；CSS 有 635 KB，不当依赖（05） | reference |
 | **AdminLTE 4**（4.10.0） | https://github.com/ColorlibHQ/AdminLTE | ✅ 2026-10-08 · 46k★ | Bootstrap 5.3.8 的页面集 | MIT | 依赖许可干净：Chart.js 4.5.1、jsvectormap 1.7、Tabulator 6.6.1 | 和我们一样选了 Tabulator 6.6.1，算一个旁证。⚠ 演示页从 cdn.jsdelivr.net 加载，不能离线 | consider（只看版式） |
 
@@ -140,7 +140,7 @@
 
 ### 2.1 FT Visual Vocabulary → `kit/categories.json`
 
-我们的 12 个类别 = FT 的 9 类，加上 5 个投行或报告骨架专用类，再按投行阅读习惯重新命名。对应关系：
+我们的 12 个类别 = FT 的 9 类合并成 7 类（Ranking 和 Magnitude 合为 `comparison`，Correlation 和 Distribution 合为 `distribution`），再加 5 个投行或报告骨架专用类，并按投行阅读习惯重新命名。对应关系：
 
 | FT 类别（种数） | ReportKit 类别 | 承接组件 | 覆盖（✓/◐/✗，见 landscape §3.1） |
 |---|---|---|---|
@@ -151,7 +151,7 @@
 | Distribution（8） | `distribution` | `histogram`、`boxplot`、`beeswarm`、`dumbbell` | 4 / 1 / 3 |
 | Part-to-whole（11） | `composition` 结构占比；瀑布归 `bridge` | `donut`、`treemap`、`sunburst`、`waffle`、`marimekko`、`bar`（堆叠） | 8 / 0 / 3 |
 | Magnitude（12） | `comparison` | `bar`、`lollipop`、`radar`、`bullet`、`parallel`、`marimekko` | 10 / 0 / 2 |
-| Spatial（8） | `geo` 地理空间 | `choropleth`、`bubble-map`、`flow-map`、`geo-heat`、`cluster-map`；开发中的 `china-tilemap` | 4 / 1 / 3 |
+| Spatial（8） | `geo` 地理空间 | `choropleth`、`bubble-map`、`flow-map`、`geo-heat`、`cluster-map`、`china-tilemap` | 5 / 1 / 2 |
 | Flow（4） | `flow` 流向与关系 | `sankey`、`chord`、`network`、`waterfall` | 4 / 0 / 0 |
 | （FT 没有） | `valuation` · `table` · `timeline` · `layout` · `controls` | `football-field`；5 个表格；`gantt`、`timeline`；`kpi-tiles`、`text-block`；4 个控件 | 19 个投行或骨架组件，占 37% |
 | **合计** | | | **49 ✓ / 5 ◐ / 18 ✗**（72 种） |

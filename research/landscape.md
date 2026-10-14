@@ -408,11 +408,12 @@
 - 复杂变化分阶段过渡（[Heer & Robertson 2007](https://idl.uw.edu/papers/animated-transitions)）。
 - **禁止：** parallax、弹跳 / 弹性、劫持滚动、关键数字随滚动变化、打字机效果、循环动画。
 
-**我们采用了什么：** 05 §3.6 指出 `rk.motion.js` 有 5 个缺口，已补上 4 个：
+**我们采用了什么：** 05 §3.6 指出 `rk.motion.js` 有 5 个缺口，现在都已处理，只剩缺口 2 里的 `?motion=off` URL 参数没做：
 - `beforeprint` 时挂载全部懒加载 block 并关闭动画（`rk.runtime.js` 的 `renderAllNow()`）；
 - 实时监听 `prefers-reduced-motion`；
 - `RK.motion.swap()` 封装 View Transitions；
-- count-up 写入 `aria-label`，并在 `document.hidden` 时跳过动画。
+- count-up 写入 `aria-label`，支持从旧值补间到新值（`from`，`kpi-tiles`、`text-block`、`league-table` 已使用）；
+- `document.hidden` 时跳过动画。
 
 **以后要回头看的：**
 1. 增加 `?motion=off` URL 参数，供截图和审阅使用。
@@ -468,6 +469,7 @@
 **我们采用了什么：**
 - 只用 ECharts，不引入任何 AntV 或 VisActor 运行时依赖。
 - `candlestick` 的涨跌色取主题的 `--pos`/`--neg`（西式），不用 ECharts 默认的红涨绿跌（`#eb5454` / `#47b262`）。
+- `china-tilemap`：中国省级 tile-grid 方块图，作为中国地图的合规替代方案（见 `research/china-ecosystem.md` §9.3）。
 
 **以后要回头看的：**
 1. 增加 `convention: 'western' | 'cn'` token，切换 K 线、瀑布图、涨跌颜色。
@@ -567,7 +569,7 @@
 - `param-slider`：What-if 参数 `@wacc`、`@tgr`，相关计算字段实时重算。
 
 **以后要回头看的：**
-1. 合入 `research/engine-audit.md` 的 36 个补丁。目前 0/128 通过，其中 F1 取整问题让显示结果与 Excel 不一致。
+1. ~~合入 `research/engine-audit.md` 的 36 个补丁~~：已完成，回归测试 164/164 通过，F1 取整已与 Excel 一致。剩余跟进：Q9 自引用检查移植到 Python validator；组件里的 `toFixed` 改用 `RK.format.fixed`。
 2. 给 `RK.expr` 加函数注册表，并接入 Formula.js。
 3. 内部存储改为列式 + bitset。08 估计 1M 行可从约 0.7 s 降到 0.15–0.25 s，这比引入 DuckDB 更划算。
 4. 由 builder 输出严格 CSP，并为每个 vendor 库加 CSP smoke 测试。
@@ -627,7 +629,7 @@
 ## 3. 组件覆盖矩阵：FT Visual Vocabulary × ReportKit 组件
 
 **数据口径：**
-- 组件取自 52 个 `kit/components/*/manifest.json`。`tools/build_catalog.py` 会把它们汇编成 `kit/catalog.json`，但 git 里的那份只有 10 个组件，已过期。
+- 组件取自 53 个 `kit/components/*/manifest.json`。`tools/build_catalog.py` 会把它们汇编成 `kit/catalog.json`（git 里的版本已同步，53 个组件）。
 - FT 图型取自 07 附录 A（`chartTypes.csv`，共 72 行，跨类重复的图型分别计数）。
 - 状态：✓ 有组件直接支持；◐ 可以用现有组件近似；✗ 缺失。
 
@@ -642,9 +644,9 @@
 | Distribution 分布 | 8 | 4 | 1 | 3 | `histogram`、`boxplot`、`beeswarm`、`dumbbell` |
 | Part-to-whole 部分与整体 | 11 | 8 | 0 | 3 | `bar`、`marimekko`、`donut`、`treemap`、`sunburst`、`waffle`、`waterfall` |
 | Magnitude 量级 | 12 | 10 | 0 | 2 | `bar`、`marimekko`、`lollipop`、`radar`、`bullet`、`parallel` |
-| Spatial 空间 | 8 | 4 | 1 | 3 | `choropleth`、`bubble-map`、`flow-map`、`geo-heat`、`cluster-map` |
+| Spatial 空间 | 8 | 5 | 1 | 2 | `choropleth`、`bubble-map`、`flow-map`、`geo-heat`、`cluster-map`、`china-tilemap` |
 | Flow 流向 | 4 | 4 | 0 | 0 | `sankey`、`waterfall`、`chord`、`network` |
-| **合计** | **72** | **49** | **5** | **18** | 68% 完整覆盖，加上部分覆盖为 75% |
+| **合计** | **72** | **50** | **5** | **17** | 69% 完整覆盖，加上部分覆盖为 76% |
 
 ### 3.2 逐项明细
 
@@ -714,7 +716,7 @@
 | Spatial | proportional-symbol | `bubble-map` | ✓ | — |
 | Spatial | flow | `flow-map` | ✓ | — |
 | Spatial | contour | — | ✗ | 低 |
-| Spatial | equalised-cartogram | — | ✗ | **高**：tile-grid 是中国地图的合规方案（02 §6.3） |
+| Spatial | equalised-cartogram | `china-tilemap` | ✓ | 中国 34 个省级行政区的等大方块 / 六边形，是中国地图的合规方案（02 §6.3）；世界区域、美国州版本还没有 |
 | Spatial | scaled-cartogram-value | — | ✗ | 低 |
 | Spatial | dot-density | `cluster-map` | ◐ | 聚合点，非真正的点密度 |
 | Spatial | heat-map | `geo-heat` | ✓ | — |
@@ -725,7 +727,7 @@
 
 ### 3.3 FT 词表之外的组件
 
-52 个组件中，36 个已出现在上表里（`timeline`、`cluster-map` 只算部分覆盖）。另外 16 个（31%）是投行特有或报告骨架类组件，FT 词表里没有对应图型。04 §11 也指出，football field、sensitivity grid、AVP、league table 是 FT 没有单独命名的 IB 图型。
+53 个组件中，37 个已出现在上表里（`timeline`、`cluster-map` 只算部分覆盖）。另外 16 个（30%）是投行特有或报告骨架类组件，FT 词表里没有对应图型。04 §11 也指出，football field、sensitivity grid、AVP、league table 是 FT 没有单独命名的 IB 图型。
 
 | kit 类别 | 组件 |
 |---|---|
@@ -744,7 +746,7 @@
 | P0 | Premiums paid（分位数柱 + 隐含价 chips） | ECharts bar；样本可交叉筛选 | 04 §8.9 |
 | P0 | 财务摘要表（A/E 分隔、growth / margin 行、CAGR） | 扩展 `pivot-table` 或新增 DOM 表 | 04 §8.11 |
 | P1 | Fan chart / 区间带 | vendor `@echarts-x/custom-line-range` | 01 §8，06 §15.1 |
-| P1 | Tile-grid cartogram（中国 / 世界区域 / 美国州） | ECharts custom 或纯 SVG | 02 §6.3、§10.3 |
+| P1 | Tile-grid cartogram（世界区域 / 美国州；中国版已由 `china-tilemap` 实现） | 复用 `china-tilemap` 的 ECharts 布局和图例代码，换网格表 | 02 §6.3、§10.3 |
 | P1 | "% of time in range" 分桶表 | 扩展 `multiple-history` | 04 §8.10 |
 | P1 | Violin | vendor `@echarts-x/custom-violin` | 01 §0.3 |
 | P1 | think-cell 差值箭头、全局 `roundToTotal` | 做成装饰插件 | 04 §0.11、§13.12 |
@@ -776,7 +778,7 @@ Step 2 指本地部署的 LLM、可导入的 skills、客户自定义指标与�
    - Vega-Lite 6.5：ask 模式下的临时出图；
    - Perspective 5.6.0：只用于 served mode。
 6. **先修地基，再上 LLM：**
-   - 合入引擎审计补丁；
+   - 合入引擎审计补丁（已完成，164/164）；
    - 实现函数注册表 + Formula.js；
    - 内部存储改为列式 + bitset；
    - 加 `specVersion` 和迁移链（08 §10 中的 P0/P1 分期）。
@@ -806,7 +808,7 @@ Step 2 指本地部署的 LLM、可导入的 skills、客户自定义指标与�
 | 3 | 增加 `"build"` 类型：在 vendor 阶段用 esbuild 把 ESM 打成 IIFE | 用于 Motion mini（4.4 KB）、NumberFlow、Flint | 05 §2.11 |
 | 4 | 在 CI 里加真正的 `file://` smoke 测试（Chromium 加 Firefox，并设 `strict_origin_policy=true`）和拦截网络的离线审计 | 现在的 smoke 测试走 http server，测不出 `file://` 下的失败 | 02 §2，09 §0 |
 | 5 | 对每个 vendor 库跑严格 CSP smoke 测试 | 新库如果用 `new Function`，严格 CSP 会失效 | 08 §11.5 |
-| 6 | 自动重新生成 `kit/catalog.json`，并检查它与 manifest 一致 | 现在过期了：10 个对 52 个 | §0.4 |
+| 6 | 自动重新生成 `kit/catalog.json`，并检查它与 manifest 一致 | 重新生成已有：`tools/check.sh` 每次运行 `build_catalog.py --strict`（目前 53/53 一致）。还缺一步：在 CI 里用 `git diff --exit-code` 检查生成文件是否已提交 | §0.4 |
 
 **观察清单：**
 
