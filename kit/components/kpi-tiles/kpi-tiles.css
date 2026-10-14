@@ -1,0 +1,22 @@
+/* kpi-tiles */
+.rk-kpi { display: grid; grid-template-columns: repeat(var(--rk-kpi-cols, auto-fit), minmax(150px, 1fr)); gap: 0; }
+.rk-kpi__tile { position: relative; padding: 12px 16px 12px 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.rk-kpi__tile + .rk-kpi__tile { padding-left: 16px; border-left: 1px solid var(--rk-rule); }
+.rk-kpi__label { font-size: var(--rk-fs-xs); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--rk-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rk-kpi__value { font-size: clamp(22px, 1.4vw + 12px, 32px); font-weight: 600; line-height: 1.1; color: var(--rk-accent); letter-spacing: -.01em; }
+[data-rk-theme="ink"] .rk-kpi__value { color: var(--rk-ink); }
+.rk-kpi__meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--rk-fs-sm); color: var(--rk-ink-3); }
+.rk-kpi__delta { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 3px; font-weight: 600; font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; }
+.rk-kpi__delta.is-good { color: var(--rk-pos); background: color-mix(in srgb, var(--rk-pos) 12%, transparent); }
+.rk-kpi__delta.is-bad { color: var(--rk-neg); background: color-mix(in srgb, var(--rk-neg) 12%, transparent); }
+.rk-kpi__delta.is-flat { color: var(--rk-ink-3); background: var(--rk-surface); }
+.rk-kpi__arrow { font-size: 8px; }
+.rk-kpi__spark { position: relative; height: 30px; margin-top: 4px; clip-path: inset(-4px 100% -4px -4px); animation: rk-kpi-draw 1.1s var(--rk-ease) calc(var(--rk-i, 0) * 90ms + 150ms) forwards; }
+.rk-kpi__spark svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.rk-kpi__dot { position: absolute; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; }
+@keyframes rk-kpi-draw { to { clip-path: inset(-4px -4px -4px -4px); } }
+@media (prefers-reduced-motion: reduce) { .rk-kpi__spark { animation: none; clip-path: none; } }
+@media print { .rk-kpi__spark { animation: none; clip-path: none; } }
+.rk-kpi--boxed { gap: 12px; }
+.rk-kpi--boxed .rk-kpi__tile, .rk-kpi--boxed .rk-kpi__tile + .rk-kpi__tile { padding: 14px 16px; border: 1px solid var(--rk-rule); border-radius: var(--rk-radius); background: var(--rk-surface); }
+.rk-kpi--accent .rk-kpi__tile { border-top: 3px solid var(--rk-accent); padding-top: 10px; }

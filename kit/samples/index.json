@@ -1,0 +1,508 @@
+{
+ "reportkit": "0.1",
+ "generator": "tools/make_sample_data.py",
+ "seed": 2026,
+ "asOf": "2026-10-10",
+ "datasets": {
+  "peers": {
+   "title": "Trading comparables",
+   "rows": 18,
+   "fields": [
+    "company",
+    "ticker",
+    "sector",
+    "region",
+    "country",
+    "hq_city",
+    "lat",
+    "lon",
+    "is_target",
+    "share_price",
+    "mkt_cap",
+    "net_debt",
+    "ev",
+    "revenue_24a",
+    "revenue_25e",
+    "revenue_26e",
+    "ebitda_25e",
+    "ebitda_26e",
+    "ebitda_margin_25e",
+    "rev_growth_25e",
+    "ev_revenue_25e",
+    "ev_ebitda_25e",
+    "ev_ebitda_26e",
+    "pe_25e",
+    "net_debt_ebitda",
+    "price_52w_low",
+    "price_52w_high",
+    "dividend_yield",
+    "tsr_1y"
+   ],
+   "path": "datasets/peers.json",
+   "purpose": "Comps table, scatter (EV/EBITDA vs growth / margin), bubble, ranked bar, box plot, geo markers (lat/lon), global filters on sector / region"
+  },
+  "price_ohlc": {
+   "title": "Helios Industrial (HLX) daily share price",
+   "rows": 522,
+   "fields": [
+    "date",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume"
+   ],
+   "path": "datasets/price_ohlc.json",
+   "purpose": "Candlestick + volume, line with dataZoom, event annotations (with price_events)"
+  },
+  "price_perf": {
+   "title": "Relative share price performance",
+   "rows": 424,
+   "fields": [
+    "date",
+    "series",
+    "value"
+   ],
+   "path": "datasets/price_perf.json",
+   "purpose": "Multi-series rebased line chart (long format: date / series / value)"
+  },
+  "price_events": {
+   "title": "Helios Industrial share price events",
+   "rows": 12,
+   "fields": [
+    "date",
+    "label",
+    "kind",
+    "detail"
+   ],
+   "path": "datasets/price_events.json",
+   "purpose": "Event markers / annotations on price charts, event timeline"
+  },
+  "ntm_multiple": {
+   "title": "NTM EV/EBITDA history",
+   "rows": 106,
+   "fields": [
+    "date",
+    "target",
+    "peer_median"
+   ],
+   "path": "datasets/ntm_multiple.json",
+   "purpose": "Two-line trading-multiple history, premium/discount area"
+  },
+  "financials": {
+   "title": "Helios Industrial financial summary",
+   "rows": 10,
+   "fields": [
+    "year",
+    "period",
+    "fiscal_year",
+    "revenue",
+    "gross_profit",
+    "ebitda",
+    "ebit",
+    "net_income",
+    "capex",
+    "fcf",
+    "ebitda_margin",
+    "revenue_growth"
+   ],
+   "path": "datasets/financials.json",
+   "purpose": "Financial summary table, combo bar+line (revenue + margin), A/E styling"
+  },
+  "segment_revenue": {
+   "title": "Revenue by segment and region",
+   "rows": 96,
+   "fields": [
+    "year",
+    "segment",
+    "region",
+    "revenue"
+   ],
+   "path": "datasets/segment_revenue.json",
+   "purpose": "Stacked bar / area by segment or region, pivot table, small multiples"
+  },
+  "quarterly": {
+   "title": "Quarterly results vs. consensus",
+   "rows": 11,
+   "fields": [
+    "quarter",
+    "date",
+    "revenue",
+    "ebitda",
+    "ebitda_margin",
+    "consensus_revenue",
+    "beat_miss_pct"
+   ],
+   "path": "datasets/quarterly.json",
+   "purpose": "Beat/miss bars, actual vs consensus columns, margin line"
+  },
+  "valuation_ranges": {
+   "title": "Valuation summary: implied value per share",
+   "rows": 8,
+   "fields": [
+    "method",
+    "group",
+    "low",
+    "high",
+    "basis",
+    "order"
+   ],
+   "path": "datasets/valuation_ranges.json",
+   "purpose": "Football field (low/high by method, grouped)"
+  },
+  "ebitda_bridge": {
+   "title": "EBITDA bridge FY25A to FY26E",
+   "rows": 11,
+   "fields": [
+    "step",
+    "value",
+    "kind",
+    "category"
+   ],
+   "path": "datasets/ebitda_bridge.json",
+   "purpose": "Waterfall / bridge (total + delta steps, colour by category)"
+  },
+  "ev_equity_bridge": {
+   "title": "Enterprise value to equity value bridge",
+   "rows": 7,
+   "fields": [
+    "step",
+    "value",
+    "kind"
+   ],
+   "path": "datasets/ev_equity_bridge.json",
+   "purpose": "Waterfall from EV to equity value"
+  },
+  "sensitivity_dcf": {
+   "title": "DCF sensitivity: implied share price",
+   "rows": 35,
+   "fields": [
+    "wacc",
+    "tgr",
+    "value"
+   ],
+   "path": "datasets/sensitivity_dcf.json",
+   "purpose": "Sensitivity heat table (WACC x TGR), what-if param demos"
+  },
+  "sensitivity_lbo": {
+   "title": "LBO sensitivity: sponsor IRR",
+   "rows": 25,
+   "fields": [
+    "entry_multiple",
+    "exit_multiple",
+    "irr"
+   ],
+   "path": "datasets/sensitivity_lbo.json",
+   "purpose": "IRR heat table (entry x exit multiple)"
+  },
+  "revenue_by_country": {
+   "title": "Revenue by country (FY25A)",
+   "rows": 36,
+   "fields": [
+    "iso3",
+    "iso_num",
+    "country",
+    "region",
+    "revenue",
+    "growth",
+    "employees",
+    "lat",
+    "lon"
+   ],
+   "path": "datasets/revenue_by_country.json",
+   "purpose": "World choropleth (iso_num = world-atlas id), bubble map, ranked bar"
+  },
+  "assets_locations": {
+   "title": "Global footprint",
+   "rows": 47,
+   "fields": [
+    "name",
+    "type",
+    "city",
+    "country",
+    "lat",
+    "lon",
+    "capacity",
+    "utilization",
+    "opened"
+   ],
+   "path": "datasets/assets_locations.json",
+   "purpose": "Point / cluster / heat map (Leaflet), footprint table"
+  },
+  "deal_flows": {
+   "title": "Cross-border industrials M&A flows (2021–2026 YTD)",
+   "rows": 26,
+   "fields": [
+    "from_country",
+    "from_lat",
+    "from_lon",
+    "to_country",
+    "to_lat",
+    "to_lon",
+    "value",
+    "deals",
+    "sector"
+   ],
+   "path": "datasets/deal_flows.json",
+   "purpose": "Flow / arc map (lines between lat/lon), chord-style flows"
+  },
+  "china_provinces": {
+   "title": "Greater China revenue by province (FY25A)",
+   "rows": 34,
+   "fields": [
+    "province",
+    "province_zh",
+    "adcode",
+    "revenue",
+    "growth",
+    "stores"
+   ],
+   "path": "datasets/china_provinces.json",
+   "purpose": "China province choropleth (adcode), ranked bar"
+  },
+  "market_share": {
+   "title": "Market share by segment (2025)",
+   "rows": 30,
+   "fields": [
+    "segment",
+    "player",
+    "revenue"
+   ],
+   "path": "datasets/market_share.json",
+   "purpose": "Marimekko / mosaic, 100% stacked bar"
+  },
+  "ownership": {
+   "title": "Shareholder structure",
+   "rows": 15,
+   "fields": [
+    "holder",
+    "type",
+    "shares_m",
+    "pct",
+    "change_qoq_m",
+    "country"
+   ],
+   "path": "datasets/ownership.json",
+   "purpose": "Shareholder table, donut by investor type, bar of holders"
+  },
+  "deal_timeline": {
+   "title": "Project Atlas indicative timetable",
+   "rows": 22,
+   "fields": [
+    "workstream",
+    "task",
+    "start",
+    "end",
+    "phase",
+    "milestone",
+    "owner"
+   ],
+   "path": "datasets/deal_timeline.json",
+   "purpose": "Gantt with phases and milestones"
+  },
+  "league_table": {
+   "title": "Global industrials M&A league table (LTM Sep-2026)",
+   "rows": 12,
+   "fields": [
+    "rank",
+    "bank",
+    "deal_value_bn",
+    "deals",
+    "market_share",
+    "prior_rank"
+   ],
+   "path": "datasets/league_table.json",
+   "purpose": "Ranked league table, horizontal bar with rank change"
+  },
+  "precedents": {
+   "title": "Selected precedent transactions",
+   "rows": 21,
+   "fields": [
+    "date",
+    "target",
+    "acquirer",
+    "target_country",
+    "sector",
+    "ev",
+    "ev_revenue",
+    "ev_ebitda",
+    "premium_1d",
+    "premium_30d",
+    "consideration",
+    "status"
+   ],
+   "path": "datasets/precedents.json",
+   "purpose": "Precedent transactions table, scatter of EV/EBITDA over time, premium box plot"
+  },
+  "segments_tree": {
+   "title": "Revenue hierarchy: group > segment > product line (FY25A)",
+   "rows": 18,
+   "fields": [
+    "id",
+    "parent",
+    "name",
+    "value",
+    "growth"
+   ],
+   "path": "datasets/segments_tree.json",
+   "purpose": "Treemap, sunburst, indented tree (id / parent)"
+  },
+  "pnl_flow": {
+   "title": "FY25A P&L flow (revenue to net income)",
+   "rows": 13,
+   "fields": [
+    "source",
+    "target",
+    "value"
+   ],
+   "path": "datasets/pnl_flow.json",
+   "purpose": "Sankey (revenue to net income)"
+  },
+  "corr_matrix": {
+   "title": "1-year daily return correlation",
+   "rows": 64,
+   "fields": [
+    "x",
+    "y",
+    "value"
+   ],
+   "path": "datasets/corr_matrix.json",
+   "purpose": "Correlation heatmap"
+  },
+  "peer_scores": {
+   "title": "Peer scorecard",
+   "rows": 30,
+   "fields": [
+    "company",
+    "metric",
+    "score"
+   ],
+   "path": "datasets/peer_scores.json",
+   "purpose": "Radar / spider chart, scorecard heatmap"
+  },
+  "kpis": {
+   "title": "Key performance indicators",
+   "rows": 6,
+   "fields": [
+    "id",
+    "label",
+    "value",
+    "format",
+    "delta",
+    "delta_format",
+    "period",
+    "spark",
+    "good"
+   ],
+   "path": "datasets/kpis.json",
+   "purpose": "KPI tiles with delta and sparkline"
+  },
+  "org_structure": {
+   "title": "Simplified legal entity structure",
+   "rows": 15,
+   "fields": [
+    "id",
+    "parent",
+    "name",
+    "country",
+    "ownership_pct",
+    "entity_type"
+   ],
+   "path": "datasets/org_structure.json",
+   "purpose": "Org / legal-entity tree diagram"
+  },
+  "pipeline_funnel": {
+   "title": "Commercial pipeline (LTM Sep-26)",
+   "rows": 5,
+   "fields": [
+    "stage",
+    "count",
+    "value"
+   ],
+   "path": "datasets/pipeline_funnel.json",
+   "purpose": "Funnel chart"
+  },
+  "scenarios": {
+   "title": "Management plan scenarios",
+   "rows": 18,
+   "fields": [
+    "scenario",
+    "year",
+    "revenue",
+    "ebitda",
+    "fcf"
+   ],
+   "path": "datasets/scenarios.json",
+   "purpose": "Scenario line / fan chart, grouped bars"
+  },
+  "monthly_returns": {
+   "title": "Helios Industrial monthly TSR",
+   "rows": 57,
+   "fields": [
+    "year",
+    "month",
+    "return"
+   ],
+   "path": "datasets/monthly_returns.json",
+   "purpose": "Year x month heatmap of returns"
+  },
+  "daily_activity": {
+   "title": "Daily trading activity 2026 YTD",
+   "rows": 204,
+   "fields": [
+    "date",
+    "value"
+   ],
+   "path": "datasets/daily_activity.json",
+   "purpose": "Calendar heatmap"
+  },
+  "network_nodes": {
+   "title": "Ecosystem map: nodes",
+   "rows": 24,
+   "fields": [
+    "id",
+    "name",
+    "type",
+    "size"
+   ],
+   "path": "datasets/network_nodes.json",
+   "purpose": "Force-directed network graph (nodes)"
+  },
+  "network_edges": {
+   "title": "Ecosystem map: relationships",
+   "rows": 35,
+   "fields": [
+    "source",
+    "target",
+    "value",
+    "type"
+   ],
+   "path": "datasets/network_edges.json",
+   "purpose": "Force-directed network graph (edges)"
+  },
+  "debt_maturity": {
+   "title": "Debt maturity profile",
+   "rows": 40,
+   "fields": [
+    "year",
+    "instrument",
+    "amount"
+   ],
+   "path": "datasets/debt_maturity.json",
+   "purpose": "Stacked maturity-profile bars"
+  },
+  "yield_curve": {
+   "title": "USD sovereign yield curve",
+   "rows": 10,
+   "fields": [
+    "tenor",
+    "tenor_years",
+    "current",
+    "one_month_ago",
+    "one_year_ago"
+   ],
+   "path": "datasets/yield_curve.json",
+   "purpose": "Multi-line yield curve (tenor_years as numeric x)"
+  }
+ }
+}

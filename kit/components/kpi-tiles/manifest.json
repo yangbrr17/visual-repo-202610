@@ -1,0 +1,34 @@
+{
+  "id": "kpi-tiles",
+  "name": "KPI Tiles",
+  "name_zh": "关键指标卡",
+  "category": "layout",
+  "engine": "dom",
+  "deps": [],
+  "summary": "Headline numbers with count-up animation, favourable/unfavourable delta and a sparkline.",
+  "summary_zh": "关键指标数字卡片：数字滚动动画、同比/环比变化（自动判断好坏方向）与迷你趋势线。",
+  "description_zh": "用于执行摘要页或每个章节开头，突出 4–6 个核心数字（营收、EBITDA 利润率、EV/EBITDA、净杠杆、股东回报等）。每行数据是一张卡片，可以单独为每张卡片设置格式码；good 字段决定涨跌哪个方向是“好”（如杠杆率下降是好）。spark 字段是数字数组，绘制迷你趋势线。",
+  "best_for": ["Executive summary headline metrics", "Section openers", "Dashboard header"],
+  "avoid_when": ["More than ~8 tiles (use a table)"],
+  "channels": {
+    "label": {"type": "string", "required": true, "desc": "Tile label", "default": "label"},
+    "value": {"type": "number", "required": true, "desc": "Headline value", "default": "value"},
+    "format": {"type": "string", "required": false, "desc": "Per-row format code field", "default": "format"},
+    "delta": {"type": "number", "required": false, "desc": "Change vs. comparison period", "default": "delta"},
+    "deltaFormat": {"type": "string", "required": false, "desc": "Per-row delta format code field", "default": "delta_format"},
+    "period": {"type": "string", "required": false, "desc": "Comparison label, e.g. 'vs. FY24'", "default": "period"},
+    "spark": {"type": "number[]", "required": false, "desc": "Array of values for the sparkline", "default": "spark"},
+    "good": {"type": "string", "required": false, "desc": "'up' or 'down' — which direction is favourable", "default": "good"}
+  },
+  "options": {
+    "columns": {"type": "number", "default": null, "desc": "Fixed number of columns (auto-fit when null)"},
+    "countUp": {"type": "boolean", "default": true, "desc": "Animate numbers when they scroll into view"},
+    "sparkline": {"type": "boolean", "default": true, "desc": "Draw sparklines"},
+    "variant": {"type": "string", "default": "plain", "desc": "plain | boxed | accent"}
+  },
+  "interactions": ["Count-up on reveal", "Sparkline draw-in", "Updates live with filters"],
+  "samples": [
+    {"title": "Headline metrics", "data": "kpis", "height": 120, "options": {}},
+    {"title": "Boxed variant", "data": "kpis", "height": 140, "options": {"variant": "boxed", "columns": 3}}
+  ]
+}

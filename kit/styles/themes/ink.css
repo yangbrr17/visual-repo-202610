@@ -1,0 +1,53 @@
+/* Theme: Ink — dark presentation mode for screens / boardroom displays.
+   Not meant for print (print.css forces the paper look). */
+[data-rk-theme="ink"] {
+  color-scheme: dark;
+  --rk-canvas: #070c14;
+  --rk-paper: #0f1724;
+  --rk-surface: #152033;
+  --rk-surface-2: #1c2a40;
+  --rk-ink: #e8edf4;
+  --rk-ink-2: #b6c1d0;
+  --rk-ink-3: #8794a8;
+  --rk-rule: #2a3a52;
+  --rk-grid: #1e2b40;
+  --rk-axis: #52637c;
+  --rk-accent: #7fa7d9;
+  --rk-accent-2: #d6b47a;
+  --rk-accent-3: #5f8fcb;
+  --rk-highlight: #d6b47a;
+  --rk-pos: #5fb3a2;
+  --rk-neg: #e58f9c;
+  --rk-neutral: #5d6b80;
+  --rk-tooltip-bg: #1c2a40;
+  --rk-tooltip-ink: #e8edf4;
+  --rk-map-land: #1c2a40;
+  --rk-map-border: #0f1724;
+  --rk-map-water: #0f1724;
+  --rk-shadow-page: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 30px rgba(0, 0, 0, .35);
+
+  --rk-cat-1: #7fa7d9;
+  --rk-cat-2: #d6b47a;
+  --rk-cat-3: #5fb3a2;
+  --rk-cat-4: #e58f9c;
+  --rk-cat-5: #a3b1c6;
+  --rk-cat-6: #3e6fa8;
+  --rk-cat-7: #c9d5e6;
+  --rk-cat-8: #9c7cc0;
+
+  --rk-seq-1: #16233a;
+  --rk-seq-2: #1d3557;
+  --rk-seq-3: #284a78;
+  --rk-seq-4: #3a6aa3;
+  --rk-seq-5: #5f8fcb;
+  --rk-seq-6: #93b6e2;
+  --rk-seq-7: #cfe0f5;
+
+  --rk-div-1: #e58f9c;
+  --rk-div-2: #b56976;
+  --rk-div-3: #5c3a45;
+  --rk-div-4: #222d3d;
+  --rk-div-5: #2c4a70;
+  --rk-div-6: #4f7fb8;
+  --rk-div-7: #93b6e2;
+}

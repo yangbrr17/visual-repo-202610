@@ -1,0 +1,27 @@
+{
+ "id":"league_table",
+ "title":"Global industrials M&A league table (LTM Sep-2026)",
+ "schema":{"fields":[
+  {"name":"rank","type":"number","title":"Rank","format":"0"},
+  {"name":"bank","type":"string","title":"Adviser"},
+  {"name":"deal_value_bn","type":"number","title":"Deal value","format":"$#,##0.0\"bn\"","unit":"USD bn"},
+  {"name":"deals","type":"number","title":"Number of deals","format":"#,##0"},
+  {"name":"market_share","type":"number","title":"Market share","format":"0.0%"},
+  {"name":"prior_rank","type":"number","title":"Prior-year rank","format":"0"}
+ ]},
+ "data":[
+  {"rank":1,"bank":"Northbridge Capital","deal_value_bn":54.7,"deals":71,"market_share":0.142,"prior_rank":2},
+  {"rank":2,"bank":"Harborline Partners","deal_value_bn":48.8,"deals":64,"market_share":0.1268,"prior_rank":1},
+  {"rank":3,"bank":"Ashcombe & Co.","deal_value_bn":45.8,"deals":67,"market_share":0.119,"prior_rank":4},
+  {"rank":4,"bank":"Sterling Vale Securities","deal_value_bn":39.4,"deals":40,"market_share":0.1023,"prior_rank":3},
+  {"rank":5,"bank":"Kingsgate Advisory","deal_value_bn":33.3,"deals":49,"market_share":0.0865,"prior_rank":7},
+  {"rank":6,"bank":"Thornbury Brothers","deal_value_bn":30.1,"deals":43,"market_share":0.0782,"prior_rank":5},
+  {"rank":7,"bank":"Calder Rowe","deal_value_bn":24.6,"deals":32,"market_share":0.0639,"prior_rank":6},
+  {"rank":8,"bank":"Eastwick Mercantile","deal_value_bn":22.6,"deals":33,"market_share":0.0587,"prior_rank":10},
+  {"rank":9,"bank":"Lindqvist Bank","deal_value_bn":18.8,"deals":22,"market_share":0.0488,"prior_rank":8},
+  {"rank":10,"bank":"Oriel Bay Capital","deal_value_bn":15.9,"deals":16,"market_share":0.0413,"prior_rank":12},
+  {"rank":11,"bank":"Montclair Hayes","deal_value_bn":13.9,"deals":16,"market_share":0.0361,"prior_rank":9},
+  {"rank":12,"bank":"Redwood Arch Securities","deal_value_bn":11.6,"deals":17,"market_share":0.0301,"prior_rank":11}
+ ],
+ "meta":{"source":"Market data provider (synthetic); market data as of 10-Oct-2026","unit":"USD bn","notes":["Announced deals, full credit to each adviser; total market $385bn.","Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."],"asOf":"2026-10-10"}
+}

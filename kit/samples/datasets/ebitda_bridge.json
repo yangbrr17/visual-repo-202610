@@ -1,0 +1,24 @@
+{
+ "id":"ebitda_bridge",
+ "title":"EBITDA bridge FY25A to FY26E",
+ "schema":{"fields":[
+  {"name":"step","type":"string","title":"Step"},
+  {"name":"value","type":"number","title":"EBITDA impact","format":"#,##0.0;(#,##0.0)","unit":"USD m"},
+  {"name":"kind","type":"string","title":"Kind"},
+  {"name":"category","type":"string","title":"Category"}
+ ]},
+ "data":[
+  {"step":"FY25A EBITDA","value":897.2,"kind":"total","category":"Total"},
+  {"step":"Volume","value":74.0,"kind":"delta","category":"Organic"},
+  {"step":"Pricing","value":52.5,"kind":"delta","category":"Organic"},
+  {"step":"Mix","value":10.0,"kind":"delta","category":"Organic"},
+  {"step":"Input cost inflation","value":-41.0,"kind":"delta","category":"Cost"},
+  {"step":"Wage inflation","value":-24.5,"kind":"delta","category":"Cost"},
+  {"step":"Productivity & procurement","value":36.0,"kind":"delta","category":"Cost"},
+  {"step":"Brennick Robotics (full year)","value":12.5,"kind":"delta","category":"M&A"},
+  {"step":"FX translation","value":-6.5,"kind":"delta","category":"FX"},
+  {"step":"Growth investments (R&D, digital)","value":-13.7,"kind":"delta","category":"Investment"},
+  {"step":"FY26E EBITDA","value":996.5,"kind":"total","category":"Total"}
+ ],
+ "meta":{"source":"Project Atlas analysis (synthetic); Helios Industrial management plan","unit":"USD m","notes":["kind: total = absolute bar; delta = floating step. Deltas sum exactly to the change in EBITDA.","Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."],"asOf":"2026-10-10"}
+}

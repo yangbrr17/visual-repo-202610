@@ -1,0 +1,55 @@
+/* Theme: Navy classic — the default bulge-bracket pitchbook look.
+   Deep navy primary, cool blue tints, one muted gold accent, greys for context. */
+:root,
+[data-rk-theme="navy"] {
+  --rk-canvas: #eef1f5;       /* behind the pages */
+  --rk-paper: #ffffff;        /* page / sheet */
+  --rk-surface: #f6f8fb;      /* panels inside a page */
+  --rk-surface-2: #e9eef5;
+  --rk-ink: #0f1c2e;          /* primary text */
+  --rk-ink-2: #3c4a5d;        /* secondary text, axis titles */
+  --rk-ink-3: #6b778a;        /* tertiary: axis labels, footnotes */
+  --rk-rule: #c9d1dc;         /* borders, table rules */
+  --rk-grid: #e6eaf0;         /* chart gridlines */
+  --rk-axis: #8a95a6;
+  --rk-accent: #0b2d5b;       /* brand primary */
+  --rk-accent-2: #b08d57;     /* highlight accent (gold) */
+  --rk-accent-3: #4a78b0;
+  --rk-highlight: #b08d57;
+  --rk-pos: #2e7d6f;
+  --rk-neg: #b0414e;
+  --rk-neutral: #a3adbb;
+  --rk-tooltip-bg: #ffffff;
+  --rk-tooltip-ink: #0f1c2e;
+  --rk-map-land: #e3e8ef;
+  --rk-map-border: #ffffff;
+  --rk-map-water: #f6f8fb;
+
+  /* categorical — ordered for maximum separation in the first 4 */
+  --rk-cat-1: #0b2d5b;
+  --rk-cat-2: #4a78b0;
+  --rk-cat-3: #9dbcdd;
+  --rk-cat-4: #b08d57;
+  --rk-cat-5: #5e6b7a;
+  --rk-cat-6: #c8d2de;
+  --rk-cat-7: #2e7d6f;
+  --rk-cat-8: #8c3b4a;
+
+  /* sequential (light -> dark) */
+  --rk-seq-1: #f1f5fa;
+  --rk-seq-2: #d6e2f0;
+  --rk-seq-3: #afc6e2;
+  --rk-seq-4: #7fa3cd;
+  --rk-seq-5: #4e7db5;
+  --rk-seq-6: #285a94;
+  --rk-seq-7: #0b2d5b;
+
+  /* diverging (negative -> neutral -> positive) */
+  --rk-div-1: #8c3b4a;
+  --rk-div-2: #c07a85;
+  --rk-div-3: #e7c9cd;
+  --rk-div-4: #f3f1ee;
+  --rk-div-5: #c9d8ea;
+  --rk-div-6: #6f98c8;
+  --rk-div-7: #0b2d5b;
+}

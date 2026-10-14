@@ -1,0 +1,49 @@
+/* ==========================================================================
+   ReportKit design tokens
+   Every color / font / size used by the kit and by charts (via RK.theme) comes from
+   these custom properties. A theme file (themes/*.css) only overrides colors.
+   ========================================================================== */
+
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 400; font-display: swap; src: url("../fonts/inter/inter-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 500; font-display: swap; src: url("../fonts/inter/inter-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 600; font-display: swap; src: url("../fonts/inter/inter-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 700; font-display: swap; src: url("../fonts/inter/inter-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 400; font-display: swap; src: url("../fonts/source-serif-4/source-serif-4-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Source Serif 4"; font-style: italic; font-weight: 400; font-display: swap; src: url("../fonts/source-serif-4/source-serif-4-latin-400-italic.woff2") format("woff2"); }
+@font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 600; font-display: swap; src: url("../fonts/source-serif-4/source-serif-4-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 700; font-display: swap; src: url("../fonts/source-serif-4/source-serif-4-latin-700-normal.woff2") format("woff2"); }
+
+:root {
+  /* ---- typography ---- */
+  --rk-font-sans: "Inter", "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --rk-font-serif: "Source Serif 4", Georgia, "Times New Roman", "Songti SC", "SimSun", serif;
+  --rk-font-num: "Inter", "Helvetica Neue", Arial, sans-serif;   /* + font-variant-numeric: tabular-nums */
+  --rk-fs-xs: 10px;
+  --rk-fs-sm: 11px;
+  --rk-fs-base: 13px;
+  --rk-fs-md: 14px;
+  --rk-fs-lg: 17px;
+  --rk-fs-title: clamp(20px, 1.2vw + 12px, 27px);   /* page action title */
+  --rk-fs-display: clamp(30px, 2.4vw + 16px, 48px); /* cover */
+  --rk-lh: 1.45;
+
+  /* ---- spacing / shape ---- */
+  --rk-gap: 20px;
+  --rk-page-pad-x: clamp(20px, 3.2vw, 52px);
+  --rk-page-pad-y: clamp(20px, 2.6vw, 40px);
+  --rk-radius: 4px;
+  --rk-radius-lg: 8px;
+  --rk-topbar-h: 56px;
+  --rk-nav-w: 236px;
+  --rk-deck-max: 1320px;
+  --rk-chart-h: 320px;
+
+  /* ---- motion ---- */
+  --rk-ease: cubic-bezier(.2, .7, .2, 1);
+  --rk-dur: 520ms;
+  --rk-dur-fast: 160ms;
+
+  /* ---- elevation ---- */
+  --rk-shadow-page: 0 1px 2px rgba(16, 24, 40, .06), 0 8px 28px rgba(16, 24, 40, .07);
+  --rk-shadow-pop: 0 12px 40px rgba(16, 24, 40, .18);
+}

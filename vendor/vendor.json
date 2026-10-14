@@ -1,0 +1,143 @@
+{
+  "$comment": "Pinned third-party builds. Edit, then run: python3 tools/vendor.py",
+  "packages": [
+    {
+      "id": "echarts",
+      "npm": "echarts",
+      "version": "6.1.0",
+      "license": "Apache-2.0",
+      "repo": "https://github.com/apache/echarts",
+      "purpose": "Primary chart engine (40+ series types, dataZoom, brush, geo, sankey, treemap...)",
+      "files": {
+        "dist/echarts.min.js": "echarts.min.js",
+        "LICENSE": "LICENSE",
+        "NOTICE": "NOTICE",
+        "licenses/LICENSE-d3": "LICENSE-d3"
+      }
+    },
+    {
+      "id": "leaflet",
+      "npm": "leaflet",
+      "version": "1.9.4",
+      "license": "BSD-2-Clause",
+      "repo": "https://github.com/Leaflet/Leaflet",
+      "purpose": "Interactive maps: choropleth, proportional symbols, flows, clusters",
+      "files": {
+        "dist/leaflet.js": "leaflet.js",
+        "dist/leaflet.css": "leaflet.css",
+        "dist/images/": "images/",
+        "LICENSE": "LICENSE"
+      }
+    },
+    {
+      "id": "leaflet-markercluster",
+      "npm": "leaflet.markercluster",
+      "version": "1.5.3",
+      "license": "MIT",
+      "repo": "https://github.com/Leaflet/Leaflet.markercluster",
+      "purpose": "Marker clustering for dense point layers",
+      "files": {
+        "dist/leaflet.markercluster.js": "leaflet.markercluster.js",
+        "dist/MarkerCluster.css": "MarkerCluster.css",
+        "dist/MarkerCluster.Default.css": "MarkerCluster.Default.css",
+        "MIT-LICENCE.txt": "LICENSE"
+      }
+    },
+    {
+      "id": "leaflet-heat",
+      "npm": "leaflet.heat",
+      "version": "0.2.0",
+      "license": "BSD-2-Clause",
+      "repo": "https://github.com/Leaflet/Leaflet.heat",
+      "purpose": "Canvas density heatmap layer",
+      "files": {
+        "dist/leaflet-heat.js": "leaflet-heat.js",
+        "LICENSE": "LICENSE"
+      }
+    },
+    {
+      "id": "topojson-client",
+      "npm": "topojson-client",
+      "version": "3.1.0",
+      "license": "ISC",
+      "repo": "https://github.com/topojson/topojson-client",
+      "purpose": "TopoJSON -> GeoJSON in the browser",
+      "files": {
+        "dist/topojson-client.min.js": "topojson-client.min.js",
+        "LICENSE": "LICENSE"
+      }
+    },
+    {
+      "id": "world-atlas",
+      "npm": "world-atlas",
+      "version": "2.0.2",
+      "license": "ISC (data: Natural Earth, public domain)",
+      "repo": "https://github.com/topojson/world-atlas",
+      "purpose": "Offline world basemap (country polygons, ISO numeric ids)",
+      "files": {
+        "countries-110m.json": "countries-110m.json",
+        "countries-50m.json": "countries-50m.json",
+        "land-110m.json": "land-110m.json",
+        "LICENSE": "LICENSE"
+      }
+    },
+    {
+      "id": "tabulator",
+      "npm": "tabulator-tables",
+      "version": "6.6.1",
+      "license": "MIT",
+      "repo": "https://github.com/olifolkerd/tabulator",
+      "purpose": "Interactive data grid (sort, filter, group, freeze, export)",
+      "files": {
+        "dist/js/tabulator.min.js": "tabulator.min.js",
+        "dist/css/tabulator_simple.min.css": "tabulator_simple.min.css",
+        "LICENSE": "LICENSE"
+      }
+    },
+    {
+      "id": "geo-world",
+      "local": true,
+      "npm": "(generated from world-atlas by tools/build_geo.py)",
+      "version": "world-atlas 2.0.2",
+      "license": "ISC (data: Natural Earth, public domain)",
+      "repo": "https://github.com/topojson/world-atlas",
+      "purpose": "Offline world basemap as a classic script: RK.geo.register('world-110m', topojson)",
+      "files": {
+        "world-110m.js": "world-110m.js",
+        "LICENSE": "LICENSE"
+      }
+    },
+    {
+      "id": "font-inter",
+      "npm": "@fontsource/inter",
+      "version": "5.3.0",
+      "license": "OFL-1.1",
+      "repo": "https://github.com/rsms/inter",
+      "dest": "kit/fonts/inter",
+      "purpose": "UI / body / numbers (tabular figures) — bundled for offline use",
+      "files": {
+        "files/inter-latin-400-normal.woff2": "inter-latin-400-normal.woff2",
+        "files/inter-latin-500-normal.woff2": "inter-latin-500-normal.woff2",
+        "files/inter-latin-600-normal.woff2": "inter-latin-600-normal.woff2",
+        "files/inter-latin-700-normal.woff2": "inter-latin-700-normal.woff2",
+        "LICENSE": "LICENSE"
+      }
+    },
+    {
+      "id": "font-source-serif-4",
+      "npm": "@fontsource/source-serif-4",
+      "version": "5.3.1",
+      "license": "OFL-1.1",
+      "repo": "https://github.com/adobe-fonts/source-serif",
+      "dest": "kit/fonts/source-serif-4",
+      "purpose": "Action titles / headings (pitchbook serif)",
+      "files": {
+        "files/source-serif-4-latin-400-normal.woff2": "source-serif-4-latin-400-normal.woff2",
+        "files/source-serif-4-latin-600-normal.woff2": "source-serif-4-latin-600-normal.woff2",
+        "files/source-serif-4-latin-700-normal.woff2": "source-serif-4-latin-700-normal.woff2",
+        "files/source-serif-4-latin-400-italic.woff2": "source-serif-4-latin-400-italic.woff2",
+        "LICENSE": "LICENSE"
+      }
+    }
+  ]
+}

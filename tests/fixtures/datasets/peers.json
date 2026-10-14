@@ -1,0 +1,82 @@
+{
+ "id": "peers",
+ "title": "peers",
+ "schema": {
+  "fields": [
+   {
+    "name": "company",
+    "type": "string",
+    "title": "Company"
+   },
+   {
+    "name": "sector",
+    "type": "string",
+    "title": "Sector"
+   },
+   {
+    "name": "ev_ebitda_25e",
+    "type": "number",
+    "title": "EV/EBITDA 2025E",
+    "format": "0.0x"
+   },
+   {
+    "name": "is_target",
+    "type": "boolean",
+    "title": "Target"
+   }
+  ]
+ },
+ "data": [
+  {
+   "company": "Helios Industrial",
+   "sector": "Industrial Tech",
+   "ev_ebitda_25e": 9.8,
+   "is_target": true
+  },
+  {
+   "company": "Arcadia Systems",
+   "sector": "Industrial Tech",
+   "ev_ebitda_25e": 11.2,
+   "is_target": false
+  },
+  {
+   "company": "Borealis Controls",
+   "sector": "Automation",
+   "ev_ebitda_25e": 13.5,
+   "is_target": false
+  },
+  {
+   "company": "Cobalt Motion",
+   "sector": "Automation",
+   "ev_ebitda_25e": 8.1,
+   "is_target": false
+  },
+  {
+   "company": "Delphine Robotics",
+   "sector": "Automation",
+   "ev_ebitda_25e": 15.9,
+   "is_target": false
+  },
+  {
+   "company": "Eastwind Sensors",
+   "sector": "Sensors",
+   "ev_ebitda_25e": 10.4,
+   "is_target": false
+  },
+  {
+   "company": "Fjord Instruments",
+   "sector": "Sensors",
+   "ev_ebitda_25e": 12.7,
+   "is_target": false
+  },
+  {
+   "company": "Granite Dynamics",
+   "sector": "Industrial Tech",
+   "ev_ebitda_25e": 7.6,
+   "is_target": false
+  }
+ ],
+ "meta": {
+  "source": "fixture"
+ }
+}

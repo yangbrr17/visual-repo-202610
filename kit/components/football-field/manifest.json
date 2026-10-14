@@ -1,0 +1,35 @@
+{
+  "id": "football-field",
+  "name": "Football Field",
+  "name_zh": "估值足球场图",
+  "category": "valuation",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Valuation ranges by methodology as floating horizontal bars, with current / offer price reference lines.",
+  "summary_zh": "按估值方法展示估值区间的横向浮动条形图，叠加当前股价 / 报价参考线。",
+  "description_zh": "投行估值页的标志性图表。每一行是一种估值方法（DCF、可比公司、先例交易、52 周股价区间、分析师目标价等），横条两端为估值区间下限/上限，竖虚线标出当前股价或报价，阴影带可标出建议报价区间。可按 group 着色区分内在价值 / 市场法 / 交易法。",
+  "best_for": ["Equity value per share by methodology", "Enterprise value ranges", "Offer price positioning vs. intrinsic value"],
+  "avoid_when": ["Point estimates without ranges", "More than ~10 methodologies"],
+  "channels": {
+    "label": {"type": "string", "required": true, "desc": "Methodology name", "default": "method"},
+    "low": {"type": "number", "required": true, "desc": "Range low", "default": "low"},
+    "high": {"type": "number", "required": true, "desc": "Range high", "default": "high"},
+    "group": {"type": "string", "required": false, "desc": "Method family for colouring (Intrinsic / Market / Transaction)"},
+    "note": {"type": "string", "required": false, "desc": "Basis shown in the tooltip (e.g. '8.0x–10.0x EV/EBITDA 2026E')"},
+    "order": {"type": "number", "required": false, "desc": "Sort order (uses an 'order' field automatically when present)"}
+  },
+  "options": {
+    "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] vertical reference lines"},
+    "refBand": {"type": "object", "default": null, "desc": "{from, to, label} shaded band, e.g. proposed offer range"},
+    "format": {"type": "string", "default": null, "desc": "Value format (defaults to the low field's format)"},
+    "showValues": {"type": "boolean", "default": true, "desc": "Low / high labels at the bar ends"},
+    "groupColors": {"type": "boolean", "default": true, "desc": "Colour bars by group"}
+  },
+  "interactions": ["Hover tooltip with low / high / midpoint and basis", "Click a methodology to cross-filter", "PNG / CSV export"],
+  "samples": [
+    {"title": "Implied value per share (USD)", "data": "valuation_ranges", "height": 360,
+     "options": {"encode": {"label": "method", "low": "low", "high": "high", "group": "group", "note": "basis"},
+                 "refLines": [{"value": 42.5, "label": "Current $42.50"}, {"value": 52.0, "label": "Offer $52.00"}],
+                 "refBand": {"from": 48, "to": 55, "label": "Proposed range"}}}
+  ]
+}

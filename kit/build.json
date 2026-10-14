@@ -1,0 +1,32 @@
+{
+  "$comment": "Concatenation order used by the Python builder (py/reportkit) and the gallery. Paths are relative to kit/.",
+  "core": [
+    "core/rk.core.js",
+    "core/rk.format.js",
+    "core/rk.expr.js",
+    "core/rk.data.js",
+    "core/rk.theme.js",
+    "core/rk.chart.js",
+    "core/rk.geo.js",
+    "core/rk.motion.js",
+    "core/rk.runtime.js"
+  ],
+  "styles": [
+    "styles/tokens.css",
+    "styles/themes/navy.css",
+    "styles/themes/bronze.css",
+    "styles/themes/slate.css",
+    "styles/themes/ink.css",
+    "styles/base.css",
+    "styles/layout.css",
+    "styles/components.css",
+    "styles/print.css"
+  ],
+  "themes": [
+    "navy",
+    "bronze",
+    "slate",
+    "ink"
+  ],
+  "defaultTheme": "navy"
+}

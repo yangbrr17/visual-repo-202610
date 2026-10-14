@@ -1,0 +1,55 @@
+{
+ "id": "financials",
+ "title": "financials",
+ "schema": {
+  "fields": [
+   {
+    "name": "year",
+    "type": "string",
+    "title": "Year"
+   },
+   {
+    "name": "revenue",
+    "type": "number",
+    "title": "Revenue",
+    "format": "$#,##0"
+   },
+   {
+    "name": "ebitda",
+    "type": "number",
+    "title": "EBITDA",
+    "format": "$#,##0"
+   }
+  ]
+ },
+ "data": [
+  {
+   "year": "2022A",
+   "revenue": 3900,
+   "ebitda": 702.0
+  },
+  {
+   "year": "2023A",
+   "revenue": 4200,
+   "ebitda": 798.0
+  },
+  {
+   "year": "2024A",
+   "revenue": 4450,
+   "ebitda": 890.0
+  },
+  {
+   "year": "2025A",
+   "revenue": 4820,
+   "ebitda": 1031.5
+  },
+  {
+   "year": "2026E",
+   "revenue": 5150,
+   "ebitda": 1133.0
+  }
+ ],
+ "meta": {
+  "source": "fixture"
+ }
+}

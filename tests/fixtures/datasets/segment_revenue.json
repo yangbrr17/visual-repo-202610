@@ -1,0 +1,274 @@
+{
+ "id": "segment_revenue",
+ "title": "segment_revenue",
+ "schema": {
+  "fields": [
+   {
+    "name": "year",
+    "type": "string",
+    "title": "Year"
+   },
+   {
+    "name": "segment",
+    "type": "string",
+    "title": "Segment"
+   },
+   {
+    "name": "region",
+    "type": "string",
+    "title": "Region"
+   },
+   {
+    "name": "revenue",
+    "type": "number",
+    "title": "Revenue",
+    "format": "$#,##0"
+   }
+  ]
+ },
+ "data": [
+  {
+   "year": "2022A",
+   "segment": "Automation",
+   "region": "Americas",
+   "revenue": 300
+  },
+  {
+   "year": "2022A",
+   "segment": "Automation",
+   "region": "EMEA",
+   "revenue": 330
+  },
+  {
+   "year": "2022A",
+   "segment": "Sensors",
+   "region": "Americas",
+   "revenue": 420
+  },
+  {
+   "year": "2022A",
+   "segment": "Sensors",
+   "region": "EMEA",
+   "revenue": 450
+  },
+  {
+   "year": "2022A",
+   "segment": "Software",
+   "region": "Americas",
+   "revenue": 540
+  },
+  {
+   "year": "2022A",
+   "segment": "Software",
+   "region": "EMEA",
+   "revenue": 570
+  },
+  {
+   "year": "2022A",
+   "segment": "Services",
+   "region": "Americas",
+   "revenue": 660
+  },
+  {
+   "year": "2022A",
+   "segment": "Services",
+   "region": "EMEA",
+   "revenue": 690
+  },
+  {
+   "year": "2023A",
+   "segment": "Automation",
+   "region": "Americas",
+   "revenue": 340
+  },
+  {
+   "year": "2023A",
+   "segment": "Automation",
+   "region": "EMEA",
+   "revenue": 370
+  },
+  {
+   "year": "2023A",
+   "segment": "Sensors",
+   "region": "Americas",
+   "revenue": 460
+  },
+  {
+   "year": "2023A",
+   "segment": "Sensors",
+   "region": "EMEA",
+   "revenue": 490
+  },
+  {
+   "year": "2023A",
+   "segment": "Software",
+   "region": "Americas",
+   "revenue": 580
+  },
+  {
+   "year": "2023A",
+   "segment": "Software",
+   "region": "EMEA",
+   "revenue": 610
+  },
+  {
+   "year": "2023A",
+   "segment": "Services",
+   "region": "Americas",
+   "revenue": 700
+  },
+  {
+   "year": "2023A",
+   "segment": "Services",
+   "region": "EMEA",
+   "revenue": 730
+  },
+  {
+   "year": "2024A",
+   "segment": "Automation",
+   "region": "Americas",
+   "revenue": 380
+  },
+  {
+   "year": "2024A",
+   "segment": "Automation",
+   "region": "EMEA",
+   "revenue": 410
+  },
+  {
+   "year": "2024A",
+   "segment": "Sensors",
+   "region": "Americas",
+   "revenue": 500
+  },
+  {
+   "year": "2024A",
+   "segment": "Sensors",
+   "region": "EMEA",
+   "revenue": 530
+  },
+  {
+   "year": "2024A",
+   "segment": "Software",
+   "region": "Americas",
+   "revenue": 620
+  },
+  {
+   "year": "2024A",
+   "segment": "Software",
+   "region": "EMEA",
+   "revenue": 650
+  },
+  {
+   "year": "2024A",
+   "segment": "Services",
+   "region": "Americas",
+   "revenue": 740
+  },
+  {
+   "year": "2024A",
+   "segment": "Services",
+   "region": "EMEA",
+   "revenue": 770
+  },
+  {
+   "year": "2025A",
+   "segment": "Automation",
+   "region": "Americas",
+   "revenue": 420
+  },
+  {
+   "year": "2025A",
+   "segment": "Automation",
+   "region": "EMEA",
+   "revenue": 450
+  },
+  {
+   "year": "2025A",
+   "segment": "Sensors",
+   "region": "Americas",
+   "revenue": 540
+  },
+  {
+   "year": "2025A",
+   "segment": "Sensors",
+   "region": "EMEA",
+   "revenue": 570
+  },
+  {
+   "year": "2025A",
+   "segment": "Software",
+   "region": "Americas",
+   "revenue": 660
+  },
+  {
+   "year": "2025A",
+   "segment": "Software",
+   "region": "EMEA",
+   "revenue": 690
+  },
+  {
+   "year": "2025A",
+   "segment": "Services",
+   "region": "Americas",
+   "revenue": 780
+  },
+  {
+   "year": "2025A",
+   "segment": "Services",
+   "region": "EMEA",
+   "revenue": 810
+  },
+  {
+   "year": "2026E",
+   "segment": "Automation",
+   "region": "Americas",
+   "revenue": 460
+  },
+  {
+   "year": "2026E",
+   "segment": "Automation",
+   "region": "EMEA",
+   "revenue": 490
+  },
+  {
+   "year": "2026E",
+   "segment": "Sensors",
+   "region": "Americas",
+   "revenue": 580
+  },
+  {
+   "year": "2026E",
+   "segment": "Sensors",
+   "region": "EMEA",
+   "revenue": 610
+  },
+  {
+   "year": "2026E",
+   "segment": "Software",
+   "region": "Americas",
+   "revenue": 700
+  },
+  {
+   "year": "2026E",
+   "segment": "Software",
+   "region": "EMEA",
+   "revenue": 730
+  },
+  {
+   "year": "2026E",
+   "segment": "Services",
+   "region": "Americas",
+   "revenue": 820
+  },
+  {
+   "year": "2026E",
+   "segment": "Services",
+   "region": "EMEA",
+   "revenue": 850
+  }
+ ],
+ "meta": {
+  "source": "fixture"
+ }
+}

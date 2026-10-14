@@ -1,0 +1,93 @@
+{
+ "id": "valuation_ranges",
+ "title": "valuation_ranges",
+ "schema": {
+  "fields": [
+   {
+    "name": "method",
+    "type": "string",
+    "title": "Methodology"
+   },
+   {
+    "name": "group",
+    "type": "string",
+    "title": "Group"
+   },
+   {
+    "name": "low",
+    "type": "number",
+    "title": "Low",
+    "format": "$0.00"
+   },
+   {
+    "name": "high",
+    "type": "number",
+    "title": "High",
+    "format": "$0.00"
+   },
+   {
+    "name": "basis",
+    "type": "string",
+    "title": "Basis"
+   },
+   {
+    "name": "order",
+    "type": "number",
+    "title": "Order"
+   }
+  ]
+ },
+ "data": [
+  {
+   "method": "52-week trading range",
+   "group": "Reference",
+   "low": 34.1,
+   "high": 47.9,
+   "basis": "Low / high since Oct-25",
+   "order": 1
+  },
+  {
+   "method": "Analyst price targets",
+   "group": "Reference",
+   "low": 38.0,
+   "high": 55.0,
+   "basis": "12 brokers",
+   "order": 2
+  },
+  {
+   "method": "Trading comparables",
+   "group": "Market",
+   "low": 39.5,
+   "high": 51.2,
+   "basis": "9.0x\u201311.5x EV/EBITDA 2026E",
+   "order": 3
+  },
+  {
+   "method": "Precedent transactions",
+   "group": "Transaction",
+   "low": 46.3,
+   "high": 60.8,
+   "basis": "10.5x\u201313.5x LTM EBITDA",
+   "order": 4
+  },
+  {
+   "method": "DCF (perpetuity growth)",
+   "group": "Intrinsic",
+   "low": 44.0,
+   "high": 58.5,
+   "basis": "WACC 8.5\u20139.5%, TGR 2.0\u20133.0%",
+   "order": 5
+  },
+  {
+   "method": "LBO analysis",
+   "group": "Intrinsic",
+   "low": 41.2,
+   "high": 50.4,
+   "basis": "20\u201325% IRR, 5.5x leverage",
+   "order": 6
+  }
+ ],
+ "meta": {
+  "source": "fixture"
+ }
+}

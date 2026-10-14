@@ -1,0 +1,17 @@
+{
+ "id":"pipeline_funnel",
+ "title":"Commercial pipeline (LTM Sep-26)",
+ "schema":{"fields":[
+  {"name":"stage","type":"string","title":"Stage"},
+  {"name":"count","type":"number","title":"Opportunities","format":"#,##0"},
+  {"name":"value","type":"number","title":"Pipeline value","format":"$#,##0","unit":"USD m"}
+ ]},
+ "data":[
+  {"stage":"Leads identified","count":1240,"value":9850.0},
+  {"stage":"Qualified opportunities","count":612,"value":6125.0},
+  {"stage":"Proposal submitted","count":284,"value":3940.0},
+  {"stage":"Negotiation","count":118,"value":2185.0},
+  {"stage":"Closed won","count":76,"value":1410.0}
+ ],
+ "meta":{"source":"Helios Industrial filings and management information; ReportKit synthetic data","unit":"USD m","notes":["Stages are cumulative-exclusive snapshots; values are total contract value.","Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."],"asOf":"2026-10-10"}
+}

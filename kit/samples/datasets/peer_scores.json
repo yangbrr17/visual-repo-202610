@@ -1,0 +1,42 @@
+{
+ "id":"peer_scores",
+ "title":"Peer scorecard",
+ "schema":{"fields":[
+  {"name":"company","type":"string","title":"Company"},
+  {"name":"metric","type":"string","title":"Metric"},
+  {"name":"score","type":"number","title":"Score (0–100)","format":"0"}
+ ]},
+ "data":[
+  {"company":"Helios Industrial","metric":"Growth","score":46.0},
+  {"company":"Helios Industrial","metric":"Margin","score":40.0},
+  {"company":"Helios Industrial","metric":"ROIC","score":41.0},
+  {"company":"Helios Industrial","metric":"Leverage","score":39.0},
+  {"company":"Helios Industrial","metric":"Valuation","score":79.0},
+  {"company":"Helios Industrial","metric":"ESG","score":63.0},
+  {"company":"Corvane Automation","metric":"Growth","score":37.0},
+  {"company":"Corvane Automation","metric":"Margin","score":14.0},
+  {"company":"Corvane Automation","metric":"ROIC","score":59.0},
+  {"company":"Corvane Automation","metric":"Leverage","score":45.0},
+  {"company":"Corvane Automation","metric":"Valuation","score":44.0},
+  {"company":"Corvane Automation","metric":"ESG","score":52.0},
+  {"company":"Valdris Controls","metric":"Growth","score":52.0},
+  {"company":"Valdris Controls","metric":"Margin","score":47.0},
+  {"company":"Valdris Controls","metric":"ROIC","score":57.0},
+  {"company":"Valdris Controls","metric":"Leverage","score":27.0},
+  {"company":"Valdris Controls","metric":"Valuation","score":51.0},
+  {"company":"Valdris Controls","metric":"ESG","score":86.0},
+  {"company":"Tessaro Robotics","metric":"Growth","score":55.0},
+  {"company":"Tessaro Robotics","metric":"Margin","score":63.0},
+  {"company":"Tessaro Robotics","metric":"ROIC","score":26.0},
+  {"company":"Tessaro Robotics","metric":"Leverage","score":62.0},
+  {"company":"Tessaro Robotics","metric":"Valuation","score":41.0},
+  {"company":"Tessaro Robotics","metric":"ESG","score":16.0},
+  {"company":"Kanemori Systems","metric":"Growth","score":61.0},
+  {"company":"Kanemori Systems","metric":"Margin","score":67.0},
+  {"company":"Kanemori Systems","metric":"ROIC","score":64.0},
+  {"company":"Kanemori Systems","metric":"Leverage","score":37.0},
+  {"company":"Kanemori Systems","metric":"Valuation","score":52.0},
+  {"company":"Kanemori Systems","metric":"ESG","score":26.0}
+ ],
+ "meta":{"source":"Project Atlas analysis (synthetic); Helios Industrial management plan","notes":["Score = percentile rank among the 18 companies in peers (higher = better; Leverage and Valuation inverted: lower debt / cheaper = higher score).","Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."],"asOf":"2026-10-10"}
+}

@@ -1,0 +1,171 @@
+/* ==========================================================================
+   ReportKit shared component chrome: blocks, toolbar, tooltip, modal, controls,
+   pitchbook tables. Component-specific CSS lives in kit/components/<id>/<id>.css
+   ========================================================================== */
+
+/* ---------- block ---------- */
+.rk-block { position: relative; margin: 0; display: flex; flex-direction: column; min-width: 0; }
+.rk-block__head {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px;
+  padding-bottom: 6px; margin-bottom: 10px;
+  border-bottom: 1.5px solid var(--rk-accent);
+  padding-right: 120px;                 /* room for tools */
+  position: relative;
+}
+.rk-block__title { font-family: var(--rk-font-sans); font-size: var(--rk-fs-md); font-weight: 600; color: var(--rk-ink); letter-spacing: -.003em; }
+.rk-block__subtitle { margin: 0; flex-basis: 100%; font-size: var(--rk-fs-sm); color: var(--rk-ink-3); }
+.rk-block__body { position: relative; min-height: var(--rk-h, var(--rk-chart-h)); height: var(--rk-h, var(--rk-chart-h)); }
+.rk-block__body.is-auto, .rk-block--auto > .rk-block__body { height: auto; min-height: 0; }
+.rk-block__foot { margin-top: 6px; font-size: var(--rk-fs-xs); color: var(--rk-ink-3); line-height: 1.35; }
+.rk-block__foot p { margin: 0; }
+
+/* toolbar */
+.rk-block__tools {
+  position: absolute; right: 0; top: -4px;
+  display: flex; gap: 2px;
+  opacity: 0; transform: translateY(-2px);
+  transition: opacity var(--rk-dur-fast), transform var(--rk-dur-fast);
+}
+.rk-block:hover .rk-block__tools, .rk-block:focus-within .rk-block__tools { opacity: 1; transform: none; }
+.rk-block > .rk-block__tools { top: 0; z-index: 3; }
+.rk-iconbtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0;
+  border: 1px solid transparent; border-radius: var(--rk-radius);
+  background: transparent; color: var(--rk-ink-3); cursor: pointer;
+  transition: background var(--rk-dur-fast), color var(--rk-dur-fast), border-color var(--rk-dur-fast);
+}
+.rk-iconbtn:hover { background: var(--rk-surface); color: var(--rk-accent); border-color: var(--rk-rule); }
+
+/* messages */
+.rk-block__msg {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center;
+  padding: 16px; font-size: var(--rk-fs-sm); color: var(--rk-ink-3);
+  background: repeating-linear-gradient(135deg, var(--rk-surface) 0 8px, transparent 8px 16px);
+  border: 1px dashed var(--rk-rule); border-radius: var(--rk-radius);
+}
+.rk-block__msg.is-error { color: var(--rk-neg); border-color: color-mix(in srgb, var(--rk-neg) 40%, transparent); }
+.rk-boot-error { margin: 16px; padding: 12px 16px; border: 1px solid var(--rk-neg); border-radius: var(--rk-radius); color: var(--rk-neg); background: var(--rk-paper); }
+
+/* ---------- tooltip (ECharts formatter HTML) ---------- */
+.rk-tip { min-width: 150px; font-family: var(--rk-font-sans); }
+.rk-tip__title { font-weight: 600; font-size: 12px; margin-bottom: 4px; color: var(--rk-tooltip-ink); }
+.rk-tip__rows { width: 100%; border-collapse: collapse; font-size: 12px; }
+.rk-tip__rows td { padding: 1px 0; color: var(--rk-ink-2); white-space: nowrap; }
+.rk-tip__rows tr.is-strong td { color: var(--rk-tooltip-ink); font-weight: 600; border-top: 1px solid var(--rk-rule); padding-top: 3px; }
+.rk-tip__v { text-align: right; padding-left: 14px !important; font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; color: var(--rk-tooltip-ink) !important; }
+.rk-tip__dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+.rk-tip__foot { margin-top: 4px; font-size: 11px; color: var(--rk-ink-3); }
+
+/* ---------- modal ---------- */
+.rk-modal {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: rgba(10, 18, 30, .42);
+  opacity: 0; transition: opacity 200ms var(--rk-ease);
+}
+.rk-modal.is-open { opacity: 1; }
+.rk-modal__panel {
+  width: min(760px, 100%); max-height: 88vh; display: flex; flex-direction: column;
+  background: var(--rk-paper); border-radius: var(--rk-radius-lg); box-shadow: var(--rk-shadow-pop);
+  transform: translateY(10px) scale(.985); transition: transform 240ms var(--rk-ease);
+}
+.rk-modal__panel.is-wide { width: min(1200px, 100%); }
+.rk-modal.is-open .rk-modal__panel { transform: none; }
+.rk-modal__head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--rk-rule); }
+.rk-modal__title { font-size: var(--rk-fs-md); font-weight: 600; }
+.rk-modal__body { padding: 16px 18px; overflow: auto; }
+
+/* ---------- simple data table (view data) ---------- */
+.rk-datatable { overflow: auto; max-height: 64vh; }
+.rk-datatable table { width: 100%; font-size: 12px; }
+.rk-datatable th { position: sticky; top: 0; background: var(--rk-paper); text-align: left; font-weight: 600; color: var(--rk-ink-2); border-bottom: 1.5px solid var(--rk-accent); padding: 6px 10px; white-space: nowrap; }
+.rk-datatable td { padding: 5px 10px; border-bottom: 1px solid var(--rk-grid); white-space: nowrap; }
+.rk-datatable .is-num { text-align: right; }
+.rk-datatable tbody tr:hover td { background: var(--rk-surface); }
+
+/* ---------- pitchbook table (comps, precedents, sensitivity...) ---------- */
+.rk-table { width: 100%; font-size: 12px; color: var(--rk-ink); font-variant-numeric: tabular-nums; }
+.rk-table th, .rk-table td { padding: 5px 8px; text-align: left; white-space: nowrap; }
+.rk-table thead th {
+  font-size: var(--rk-fs-sm); font-weight: 600; color: var(--rk-ink-2);
+  vertical-align: bottom; border-bottom: 1.5px solid var(--rk-accent);
+}
+.rk-table thead tr.rk-table__group th { text-align: center; color: var(--rk-accent); border-bottom: 1px solid var(--rk-rule); font-size: var(--rk-fs-xs); text-transform: uppercase; letter-spacing: .06em; }
+.rk-table tbody td { border-bottom: 1px solid var(--rk-grid); }
+.rk-table .is-num { text-align: right; font-family: var(--rk-font-num); }
+.rk-table tr.is-target td { background: color-mix(in srgb, var(--rk-accent-2) 13%, transparent); font-weight: 600; }
+.rk-table tr.is-stat td { font-weight: 600; background: var(--rk-surface); border-bottom: 0; }
+.rk-table tr.is-stat:first-of-type td, .rk-table tr.is-stat-first td { border-top: 1.5px solid var(--rk-accent); }
+.rk-table tr.is-section td { font-weight: 600; color: var(--rk-accent); padding-top: 10px; border-bottom: 1px solid var(--rk-rule); }
+.rk-table th.is-sortable { cursor: pointer; user-select: none; }
+.rk-table th.is-sortable:hover { color: var(--rk-accent); }
+.rk-table th .rk-sort { display: inline-block; width: 8px; margin-left: 3px; color: var(--rk-ink-3); }
+.rk-table .is-neg { color: var(--rk-neg); }
+.rk-table .is-pos { color: var(--rk-pos); }
+.rk-table tbody tr { transition: background var(--rk-dur-fast); }
+.rk-table tbody tr:hover td { background: var(--rk-surface); }
+
+/* ---------- form controls ---------- */
+.rk-ctl { display: inline-flex; flex-direction: column; gap: 3px; min-width: 0; }
+.rk-ctl__label { font-size: var(--rk-fs-xs); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--rk-ink-3); }
+.rk-input, .rk-select {
+  height: 30px; padding: 0 10px;
+  border: 1px solid var(--rk-rule); border-radius: var(--rk-radius);
+  background: var(--rk-paper); color: var(--rk-ink);
+  font-size: 12.5px;
+  transition: border-color var(--rk-dur-fast), box-shadow var(--rk-dur-fast);
+}
+.rk-select { padding-right: 26px; appearance: none; -webkit-appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--rk-ink-3) 50%), linear-gradient(135deg, var(--rk-ink-3) 50%, transparent 50%); background-position: calc(100% - 13px) 50%, calc(100% - 9px) 50%; background-size: 4px 4px; background-repeat: no-repeat; }
+.rk-input:focus, .rk-select:focus { outline: none; border-color: var(--rk-accent-3); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rk-accent-3) 18%, transparent); }
+textarea.rk-input { height: auto; padding: 8px 10px; line-height: 1.45; resize: vertical; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 12.5px; }
+.rk-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px;
+  border: 1px solid var(--rk-rule); border-radius: var(--rk-radius);
+  background: var(--rk-paper); color: var(--rk-ink-2); font-size: 12.5px; font-weight: 500; cursor: pointer;
+  transition: background var(--rk-dur-fast), color var(--rk-dur-fast), border-color var(--rk-dur-fast);
+}
+.rk-btn:hover { border-color: var(--rk-accent-3); color: var(--rk-accent); }
+.rk-btn--primary { background: var(--rk-accent); border-color: var(--rk-accent); color: #fff; }
+.rk-btn--primary:hover { background: color-mix(in srgb, var(--rk-accent) 86%, #fff); color: #fff; }
+[data-rk-theme="ink"] .rk-btn--primary { color: #0f1724; }
+.rk-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px 0 10px;
+  border-radius: 999px; border: 1px solid var(--rk-rule); background: var(--rk-surface);
+  font-size: 11.5px; color: var(--rk-ink-2); white-space: nowrap;
+}
+.rk-chip button { border: 0; background: none; padding: 0; color: var(--rk-ink-3); cursor: pointer; line-height: 1; font-size: 14px; }
+.rk-chip button:hover { color: var(--rk-neg); }
+.rk-seg { display: inline-flex; padding: 2px; border: 1px solid var(--rk-rule); border-radius: calc(var(--rk-radius) + 2px); background: var(--rk-surface); }
+.rk-seg button { border: 0; background: none; height: 24px; padding: 0 10px; border-radius: var(--rk-radius); font-size: 12px; color: var(--rk-ink-2); cursor: pointer; transition: background var(--rk-dur-fast), color var(--rk-dur-fast), box-shadow var(--rk-dur-fast); }
+.rk-seg button.is-on { background: var(--rk-paper); color: var(--rk-accent); font-weight: 600; box-shadow: 0 1px 2px rgba(16, 24, 40, .12); }
+.rk-range { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--rk-accent) var(--rk-fill, 50%), var(--rk-grid) var(--rk-fill, 50%)); }
+.rk-range::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--rk-paper); border: 2px solid var(--rk-accent); box-shadow: 0 1px 3px rgba(0, 0, 0, .2); cursor: grab; }
+.rk-range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--rk-paper); border: 2px solid var(--rk-accent); cursor: grab; }
+
+/* ---------- callouts / text ---------- */
+.rk-prose { font-size: var(--rk-fs-base); color: var(--rk-ink-2); }
+.rk-prose ul { margin: 0; padding-left: 1.1em; }
+.rk-prose li { margin: 0 0 .45em; }
+.rk-prose li::marker { color: var(--rk-accent-2); }
+.rk-prose strong { color: var(--rk-ink); }
+
+/* ---------- legends (HTML) ---------- */
+.rk-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: var(--rk-fs-sm); color: var(--rk-ink-2); }
+.rk-legend__item { display: inline-flex; align-items: center; gap: 6px; }
+.rk-legend__swatch { width: 10px; height: 10px; border-radius: 2px; }
+.rk-legend__ramp { width: 120px; height: 8px; border-radius: 2px; }
+
+/* ---------- maps (Leaflet theming) ---------- */
+.rk-map { border-radius: var(--rk-radius); overflow: hidden; font-family: var(--rk-font-sans); }
+.rk-map.leaflet-container { background: var(--rk-map-water); font: inherit; }
+.rk-map .leaflet-control-zoom { border: 1px solid var(--rk-rule) !important; box-shadow: none !important; border-radius: var(--rk-radius) !important; overflow: hidden; }
+.rk-map .leaflet-control-zoom a { width: 26px; height: 26px; line-height: 24px; color: var(--rk-ink-2); background: var(--rk-paper); border-bottom-color: var(--rk-rule); }
+.rk-map .leaflet-control-zoom a:hover { color: var(--rk-accent); background: var(--rk-surface); }
+.rk-map .leaflet-control-attribution { background: color-mix(in srgb, var(--rk-paper) 80%, transparent); color: var(--rk-ink-3); font-size: 9px; }
+.rk-map .leaflet-control-attribution a { color: var(--rk-ink-3); }
+.rk-map .leaflet-tooltip { background: var(--rk-tooltip-bg); color: var(--rk-tooltip-ink); border: 1px solid var(--rk-rule); border-radius: 6px; box-shadow: 0 8px 24px rgba(15, 23, 42, .14); padding: 8px 10px; font-size: 12px; }
+.rk-map .leaflet-tooltip::before { display: none; }
+.rk-map-legend { padding: 8px 10px; background: color-mix(in srgb, var(--rk-paper) 92%, transparent); border: 1px solid var(--rk-rule); border-radius: var(--rk-radius); font-size: 11px; color: var(--rk-ink-2); line-height: 1.4; }
+.rk-map-legend__title { font-weight: 600; color: var(--rk-ink); margin-bottom: 4px; }
+.rk-map-legend__ticks { display: flex; justify-content: space-between; font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; color: var(--rk-ink-3); margin-top: 2px; }

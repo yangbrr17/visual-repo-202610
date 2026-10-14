@@ -1,0 +1,37 @@
+{
+ "id":"sensitivity_lbo",
+ "title":"LBO sensitivity: sponsor IRR",
+ "schema":{"fields":[
+  {"name":"entry_multiple","type":"number","title":"Entry EV/EBITDA 2026E","format":"0.0x"},
+  {"name":"exit_multiple","type":"number","title":"Exit EV/EBITDA 2030E","format":"0.0x"},
+  {"name":"irr","type":"number","title":"Sponsor IRR","format":"0.0%"}
+ ]},
+ "data":[
+  {"entry_multiple":8.0,"exit_multiple":8.0,"irr":0.2321},
+  {"entry_multiple":8.0,"exit_multiple":9.0,"irr":0.2859},
+  {"entry_multiple":8.0,"exit_multiple":10.0,"irr":0.3337},
+  {"entry_multiple":8.0,"exit_multiple":11.0,"irr":0.3768},
+  {"entry_multiple":8.0,"exit_multiple":12.0,"irr":0.4162},
+  {"entry_multiple":9.0,"exit_multiple":8.0,"irr":0.1494},
+  {"entry_multiple":9.0,"exit_multiple":9.0,"irr":0.1996},
+  {"entry_multiple":9.0,"exit_multiple":10.0,"irr":0.2442},
+  {"entry_multiple":9.0,"exit_multiple":11.0,"irr":0.2844},
+  {"entry_multiple":9.0,"exit_multiple":12.0,"irr":0.3212},
+  {"entry_multiple":10.0,"exit_multiple":8.0,"irr":0.0887},
+  {"entry_multiple":10.0,"exit_multiple":9.0,"irr":0.1362},
+  {"entry_multiple":10.0,"exit_multiple":10.0,"irr":0.1784},
+  {"entry_multiple":10.0,"exit_multiple":11.0,"irr":0.2165},
+  {"entry_multiple":10.0,"exit_multiple":12.0,"irr":0.2513},
+  {"entry_multiple":11.0,"exit_multiple":8.0,"irr":0.0412},
+  {"entry_multiple":11.0,"exit_multiple":9.0,"irr":0.0867},
+  {"entry_multiple":11.0,"exit_multiple":10.0,"irr":0.127},
+  {"entry_multiple":11.0,"exit_multiple":11.0,"irr":0.1635},
+  {"entry_multiple":11.0,"exit_multiple":12.0,"irr":0.1968},
+  {"entry_multiple":12.0,"exit_multiple":8.0,"irr":0.0026},
+  {"entry_multiple":12.0,"exit_multiple":9.0,"irr":0.0463},
+  {"entry_multiple":12.0,"exit_multiple":10.0,"irr":0.0852},
+  {"entry_multiple":12.0,"exit_multiple":11.0,"irr":0.1203},
+  {"entry_multiple":12.0,"exit_multiple":12.0,"irr":0.1524}
+ ],
+ "meta":{"source":"Project Atlas analysis (synthetic); Helios Industrial management plan","notes":["Entry 31-Dec-2026 on FY26E EBITDA (996.5); exit 31-Dec-2030 on FY30E EBITDA (1,369.5).","5.0x opening leverage at 8.5% cash interest, 100% cash sweep, 2.5% fees.","Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."],"asOf":"2026-10-10"}
+}

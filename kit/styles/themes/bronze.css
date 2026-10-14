@@ -1,0 +1,51 @@
+/* Theme: Bronze & ivory — warm private-bank / advisory palette.
+   Espresso ink, bronze primary, sand tints, navy as the counterpoint. */
+[data-rk-theme="bronze"] {
+  --rk-canvas: #efebe4;
+  --rk-paper: #fffdf9;
+  --rk-surface: #f7f3ec;
+  --rk-surface-2: #ede5d8;
+  --rk-ink: #2b221c;
+  --rk-ink-2: #4f443b;
+  --rk-ink-3: #85786b;
+  --rk-rule: #d8cdbd;
+  --rk-grid: #ece5da;
+  --rk-axis: #a39684;
+  --rk-accent: #6b4f36;
+  --rk-accent-2: #1f3a5f;
+  --rk-accent-3: #a78155;
+  --rk-highlight: #a78155;
+  --rk-pos: #4f6d5a;
+  --rk-neg: #9e4b3c;
+  --rk-neutral: #b8ad9f;
+  --rk-tooltip-bg: #fffdf9;
+  --rk-tooltip-ink: #2b221c;
+  --rk-map-land: #e9e1d4;
+  --rk-map-border: #fffdf9;
+  --rk-map-water: #f7f3ec;
+
+  --rk-cat-1: #6b4f36;
+  --rk-cat-2: #1f3a5f;
+  --rk-cat-3: #c9a97a;
+  --rk-cat-4: #7f8c8d;
+  --rk-cat-5: #a78155;
+  --rk-cat-6: #e3d6c1;
+  --rk-cat-7: #4f6d5a;
+  --rk-cat-8: #9e4b3c;
+
+  --rk-seq-1: #faf6ef;
+  --rk-seq-2: #efe3cf;
+  --rk-seq-3: #dfc7a3;
+  --rk-seq-4: #c9a97a;
+  --rk-seq-5: #a78155;
+  --rk-seq-6: #84603f;
+  --rk-seq-7: #5a3f2a;
+
+  --rk-div-1: #9e4b3c;
+  --rk-div-2: #c98d7f;
+  --rk-div-3: #ecd3cb;
+  --rk-div-4: #f5f1ea;
+  --rk-div-5: #cdd6e1;
+  --rk-div-6: #7d93b0;
+  --rk-div-7: #1f3a5f;
+}

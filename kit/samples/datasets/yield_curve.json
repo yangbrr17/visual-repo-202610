@@ -1,0 +1,24 @@
+{
+ "id":"yield_curve",
+ "title":"USD sovereign yield curve",
+ "schema":{"fields":[
+  {"name":"tenor","type":"string","title":"Tenor"},
+  {"name":"tenor_years","type":"number","title":"Tenor (years)","format":"0.00"},
+  {"name":"current","type":"number","title":"Current","format":"0.00%"},
+  {"name":"one_month_ago","type":"number","title":"1 month ago","format":"0.00%"},
+  {"name":"one_year_ago","type":"number","title":"1 year ago","format":"0.00%"}
+ ]},
+ "data":[
+  {"tenor":"3M","tenor_years":0.25,"current":0.0386,"one_month_ago":0.0395,"one_year_ago":0.0462},
+  {"tenor":"6M","tenor_years":0.5,"current":0.0379,"one_month_ago":0.0388,"one_year_ago":0.0448},
+  {"tenor":"1Y","tenor_years":1,"current":0.0366,"one_month_ago":0.0374,"one_year_ago":0.0427},
+  {"tenor":"2Y","tenor_years":2,"current":0.0351,"one_month_ago":0.036,"one_year_ago":0.0398},
+  {"tenor":"3Y","tenor_years":3,"current":0.0348,"one_month_ago":0.0357,"one_year_ago":0.0389},
+  {"tenor":"5Y","tenor_years":5,"current":0.0356,"one_month_ago":0.0363,"one_year_ago":0.0388},
+  {"tenor":"7Y","tenor_years":7,"current":0.0371,"one_month_ago":0.0377,"one_year_ago":0.0397},
+  {"tenor":"10Y","tenor_years":10,"current":0.0393,"one_month_ago":0.0398,"one_year_ago":0.0411},
+  {"tenor":"20Y","tenor_years":20,"current":0.0436,"one_month_ago":0.0439,"one_year_ago":0.0448},
+  {"tenor":"30Y","tenor_years":30,"current":0.0446,"one_month_ago":0.0448,"one_year_ago":0.0452}
+ ],
+ "meta":{"source":"Market data provider (synthetic); market data as of 10-Oct-2026","notes":["Illustrative curve; yields as decimals (0.0386 = 3.86%).","Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."],"asOf":"2026-10-10"}
+}

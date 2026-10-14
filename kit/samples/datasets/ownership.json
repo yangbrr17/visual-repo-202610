@@ -1,0 +1,30 @@
+{
+ "id":"ownership",
+ "title":"Shareholder structure",
+ "schema":{"fields":[
+  {"name":"holder","type":"string","title":"Holder"},
+  {"name":"type","type":"string","title":"Investor type"},
+  {"name":"shares_m","type":"number","title":"Shares held","format":"#,##0.0","unit":"m"},
+  {"name":"pct","type":"number","title":"% of shares outstanding","format":"0.0%"},
+  {"name":"change_qoq_m","type":"number","title":"Change QoQ","format":"+#,##0.00;-#,##0.00;0.00","unit":"m"},
+  {"name":"country","type":"string","title":"Country"}
+ ]},
+ "data":[
+  {"holder":"Granite Peak Asset Management","type":"Institutional","shares_m":12.4,"pct":0.0799,"change_qoq_m":-0.5,"country":"United States"},
+  {"holder":"Ardent Family Holdings","type":"Strategic","shares_m":11.6,"pct":0.0747,"change_qoq_m":0.0,"country":"United States"},
+  {"holder":"Pinnacle Index Funds","type":"Index fund","shares_m":10.9,"pct":0.0702,"change_qoq_m":-0.24,"country":"United States"},
+  {"holder":"Summit Broad Market Trust","type":"Index fund","shares_m":8.7,"pct":0.0561,"change_qoq_m":0.57,"country":"United States"},
+  {"holder":"Harrowgate Investors","type":"Institutional","shares_m":6.1,"pct":0.0393,"change_qoq_m":0.56,"country":"United Kingdom"},
+  {"holder":"Lakeshore Capital Advisors","type":"Institutional","shares_m":5.4,"pct":0.0348,"change_qoq_m":-0.22,"country":"United States"},
+  {"holder":"Nordlys Kapitalforvaltning","type":"Institutional","shares_m":3.9,"pct":0.0251,"change_qoq_m":0.31,"country":"Norway"},
+  {"holder":"Tokai Mutual Asset Management","type":"Institutional","shares_m":3.1,"pct":0.02,"change_qoq_m":-0.05,"country":"Japan"},
+  {"holder":"Bellwether Value Partners","type":"Institutional","shares_m":2.9,"pct":0.0187,"change_qoq_m":1.25,"country":"United States"},
+  {"holder":"Crescent Ridge Index Partners","type":"Index fund","shares_m":2.6,"pct":0.0168,"change_qoq_m":-0.19,"country":"United States"},
+  {"holder":"Rheinauen Investment","type":"Institutional","shares_m":2.2,"pct":0.0142,"change_qoq_m":-0.42,"country":"Germany"},
+  {"holder":"Elmstead Pension Plan","type":"Institutional","shares_m":1.9,"pct":0.0122,"change_qoq_m":-0.01,"country":"Canada"},
+  {"holder":"Directors & officers","type":"Insider","shares_m":2.4,"pct":0.0155,"change_qoq_m":0.0,"country":"United States"},
+  {"holder":"Employee share plan","type":"Insider","shares_m":1.6,"pct":0.0103,"change_qoq_m":0.0,"country":"United States"},
+  {"holder":"Retail & other","type":"Retail","shares_m":79.5,"pct":0.5122,"change_qoq_m":-1.06,"country":"Various"}
+ ],
+ "meta":{"source":"Share register analysis (synthetic), 30-Sep-2026","unit":"m shares","notes":["Basic shares outstanding 155.2m; rows sum to 100%.","Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."],"asOf":"2026-10-10"}
+}

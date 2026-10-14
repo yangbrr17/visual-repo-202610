@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en" data-rk-theme="navy" data-rk-autoboot="false">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReportKit component harness</title>
+<!--
+  Dev harness (needs http, e.g. `python3 -m http.server` from the repo root):
+    /tools/harness.html?c=bar                  all manifest samples of one component
+    /tools/harness.html?c=bar&theme=ink        another theme
+    /tools/harness.html?c=bar,football-field   several components
+  Sets window.__RK_HARNESS = {done, errors[], blocks[]} for tools/smoke.mjs.
+-->
+<style>
+  .hx-note { font: 12px/1.4 ui-monospace, Menlo, monospace; color: #6b778a; margin: 0 0 8px; }
+</style>
+</head>
+<body class="rk-report rk-report--no-nav">
+<main class="rk-deck" id="deck"></main>
+<script>
+(function () {
+  var Q = new URLSearchParams(location.search);
+  var comps = (Q.get('c') || 'bar').split(',').filter(Boolean);
+  var theme = Q.get('theme') || 'navy';
+  document.documentElement.setAttribute('data-rk-theme', theme);
+  var H = window.__RK_HARNESS = { done: false, errors: [], blocks: [] };
+  window.addEventListener('error', function (e) { H.errors.push(String(e.message || e)); });
+  var origErr = console.error;
+  console.error = function () { H.errors.push([].slice.call(arguments).map(String).join(' ')); origErr.apply(console, arguments); };
+
+  function getJSON(u) { return fetch(u).then(function (r) { if (!r.ok) throw new Error(r.status + ' ' + u); return r.json(); }); }
+  function css(href) { var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href; document.head.appendChild(l); }
+  function js(src) {
+    return new Promise(function (res, rej) {
+      var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = function () { rej(new Error('load failed ' + src)); };
+      document.body.appendChild(s);
+    });
+  }
+  function seq(list, fn) { return list.reduce(function (p, x) { return p.then(function () { return fn(x); }); }, Promise.resolve()); }
+
+  var build, vendor, manifests = {};
+  Promise.all([getJSON('../kit/build.json'), getJSON('../vendor/vendor.json')]).then(function (r) {
+    build = r[0]; vendor = r[1];
+    build.styles.forEach(function (s) { css('../kit/' + s); });
+    return Promise.all(comps.map(function (c) { return getJSON('../kit/components/' + c + '/manifest.json').then(function (m) { manifests[c] = m; }); }));
+  }).then(function () {
+    var deps = [];
+    comps.forEach(function (c) { (manifests[c].deps || []).forEach(function (d) { if (deps.indexOf(d) < 0) deps.push(d); }); });
+    var vjs = [];
+    vendor.packages.forEach(function (p) {
+      if (deps.indexOf(p.id) < 0) return;
+      Object.keys(p.files).forEach(function (src) {
+        var dst = p.files[src];
+        if (/\.css$/.test(dst)) css('../vendor/' + p.id + '/' + dst);
+        if (/\.js$/.test(dst)) vjs.push('../vendor/' + p.id + '/' + dst);
+      });
+    });
+    return seq(vjs, js)
+      .then(function () { return seq(build.core, function (f) { return js('../kit/' + f); }); })
+      .then(function () {
+        return seq(comps, function (c) {
+          css('../kit/components/' + c + '/' + c + '.css');
+          return js('../kit/components/' + c + '/' + c + '.js');
+        });
+      });
+  }).then(function () {
+    var ids = [];
+    comps.forEach(function (c) { (manifests[c].samples || []).forEach(function (s) {
+      [s.data].concat(Object.keys(s.options || {}).filter(function (k) { return /Data$/.test(k); }).map(function (k) { return s.options[k]; }))
+        .forEach(function (d) { if (d && ids.indexOf(d) < 0) ids.push(d); });
+    }); });
+    return Promise.all(ids.map(function (id) { return getJSON((Q.get('sd') || '../kit/samples/datasets/') + id + '.json').then(function (j) { return [id, j]; }); }));
+  }).then(function (pairs) {
+    var datasets = {};
+    pairs.forEach(function (p) { datasets[p[0]] = p[1]; });
+    return RK.boot({ bundle: { manifest: { report: { title: 'Harness' }, params: { wacc: { value: 0.09 }, tgr: { value: 0.025 } } }, datasets: datasets }, progress: false, ignoreSavedTheme: true, theme: theme });
+  }).then(function () {
+    var deck = document.getElementById('deck');
+    comps.forEach(function (c) {
+      var m = manifests[c];
+      (m.samples || []).forEach(function (s, i) {
+        var page = RK.util.h('section.rk-page', { 'data-rk-page': m.name + ' #' + (i + 1) },
+          RK.util.h('header.rk-page__head', RK.util.h('p.rk-page__kicker', m.category + ' · ' + c), RK.util.h('h2.rk-page__title', m.name + ' — ' + (s.title || 'sample ' + (i + 1)))),
+          RK.util.h('div.rk-page__body.rk-grid'));
+        var fig = RK.util.h('figure.rk-block', { style: { '--rk-span': s.span || 12 } },
+          RK.util.h('figcaption.rk-block__head', RK.util.h('h3.rk-block__title', s.title || m.name)),
+          RK.util.h('div.rk-block__body', { style: s.height ? { '--rk-h': s.height + 'px' } : null }),
+          RK.util.h('footer.rk-block__foot', 'Source: sample data (' + (s.data || 'none') + ')'));
+        page.querySelector('.rk-page__body').appendChild(fig);
+        deck.appendChild(page);
+        var b = RK.mount(fig, { component: c, data: s.data || null, options: s.options || {}, lazy: false });
+        H.blocks.push(b);
+      });
+    });
+    setTimeout(function () {
+      H.states = H.blocks.map(function (b) { return { id: b.id, component: b.component, state: b.state, msg: b._errorEl ? b._errorEl.textContent : null }; });
+      H.done = true;
+    }, 1600);
+  }).catch(function (e) { H.errors.push('harness: ' + (e && e.stack || e)); H.done = true; });
+})();
+</script>
+</body>
+</html>

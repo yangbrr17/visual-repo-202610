@@ -1,0 +1,122 @@
+{
+ "id": "kpis",
+ "title": "kpis",
+ "schema": {
+  "fields": [
+   {
+    "name": "label",
+    "type": "string"
+   },
+   {
+    "name": "value",
+    "type": "number"
+   },
+   {
+    "name": "format",
+    "type": "string"
+   },
+   {
+    "name": "delta",
+    "type": "number"
+   },
+   {
+    "name": "delta_format",
+    "type": "string"
+   },
+   {
+    "name": "period",
+    "type": "string"
+   },
+   {
+    "name": "spark",
+    "type": "array"
+   },
+   {
+    "name": "good",
+    "type": "string"
+   }
+  ]
+ },
+ "data": [
+  {
+   "label": "Revenue FY25A",
+   "value": 4820.5,
+   "format": "$#,##0\"m\"",
+   "delta": 0.084,
+   "delta_format": "+0.0%;-0.0%",
+   "period": "vs. FY24",
+   "spark": [
+    3.9,
+    4.0,
+    4.1,
+    4.3,
+    4.2,
+    4.4,
+    4.5,
+    4.6,
+    4.7,
+    4.8
+   ],
+   "good": "up"
+  },
+  {
+   "label": "EBITDA margin",
+   "value": 0.214,
+   "format": "0.0%",
+   "delta": 0.012,
+   "delta_format": "+0.0%;-0.0%",
+   "period": "vs. FY24",
+   "spark": [
+    18,
+    18.5,
+    19,
+    19.4,
+    20,
+    20.1,
+    20.6,
+    21,
+    21.4
+   ],
+   "good": "up"
+  },
+  {
+   "label": "EV / EBITDA NTM",
+   "value": 9.8,
+   "format": "0.0x",
+   "delta": -0.6,
+   "delta_format": "+0.0x;-0.0x",
+   "period": "vs. 1y ago",
+   "spark": [
+    11,
+    10.8,
+    10.5,
+    10.6,
+    10.2,
+    9.9,
+    9.8
+   ],
+   "good": "up"
+  },
+  {
+   "label": "Net debt / EBITDA",
+   "value": 1.6,
+   "format": "0.0x",
+   "delta": -0.4,
+   "delta_format": "+0.0x;-0.0x",
+   "period": "vs. FY24",
+   "spark": [
+    2.4,
+    2.2,
+    2.1,
+    2.0,
+    1.8,
+    1.7,
+    1.6
+   ],
+   "good": "down"
+  }
+ ],
+ "meta": {
+  "source": "fixture"
+ }
+}

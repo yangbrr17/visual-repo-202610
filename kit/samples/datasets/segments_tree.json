@@ -1,0 +1,32 @@
+{
+ "id":"segments_tree",
+ "title":"Revenue hierarchy: group > segment > product line (FY25A)",
+ "schema":{"fields":[
+  {"name":"id","type":"string","title":"Id"},
+  {"name":"parent","type":"string","title":"Parent"},
+  {"name":"name","type":"string","title":"Name"},
+  {"name":"value","type":"number","title":"Revenue 2025A","format":"$#,##0.0","unit":"USD m"},
+  {"name":"growth","type":"number","title":"Revenue growth 2025A","format":"0.0%"}
+ ]},
+ "data":[
+  {"id":"helios","parent":"","name":"Helios Industrial","value":4850.0,"growth":0.0742},
+  {"id":"fa","parent":"helios","name":"Factory Automation","value":1820.7,"growth":0.0533},
+  {"id":"fa-cells","parent":"fa","name":"Robotic work cells","value":634.1,"growth":0.0323},
+  {"id":"fa-plc","parent":"fa","name":"PLCs & controllers","value":516.1,"growth":0.0741},
+  {"id":"fa-vision","parent":"fa","name":"Machine vision systems","value":313.8,"growth":0.048},
+  {"id":"fa-handling","parent":"fa","name":"Conveyors & handling","value":356.7,"growth":0.0501},
+  {"id":"mc","parent":"helios","name":"Motion Control","value":1290.1,"growth":0.0583},
+  {"id":"mc-servo","parent":"mc","name":"Servo drives","value":567.0,"growth":0.0414},
+  {"id":"mc-motors","parent":"mc","name":"Precision motors","value":415.5,"growth":0.0191},
+  {"id":"mc-gear","parent":"mc","name":"Gearboxes & actuators","value":307.6,"growth":0.0276},
+  {"id":"si","parent":"helios","name":"Sensors & Instrumentation","value":1009.7,"growth":0.0942},
+  {"id":"si-sensors","parent":"si","name":"Industrial sensors","value":483.2,"growth":0.1127},
+  {"id":"si-metrology","parent":"si","name":"Metrology instruments","value":309.2,"growth":0.0593},
+  {"id":"si-cm","parent":"si","name":"Condition monitoring","value":217.3,"growth":0.1249},
+  {"id":"ss","parent":"helios","name":"Software & Services","value":729.5,"growth":0.1315},
+  {"id":"ss-mes","parent":"ss","name":"Factory software (MES)","value":245.7,"growth":0.1312},
+  {"id":"ss-field","parent":"ss","name":"Field services","value":287.3,"growth":0.1301},
+  {"id":"ss-parts","parent":"ss","name":"Spare parts & retrofits","value":196.5,"growth":0.1597}
+ ],
+ "meta":{"source":"Helios Industrial filings and management information; ReportKit synthetic data","unit":"USD m","notes":["parent = '' for the root; each parent's value equals the sum of its children.","Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."],"asOf":"2026-10-10"}
+}

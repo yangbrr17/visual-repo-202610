@@ -1,0 +1,17 @@
+{
+  "$comment": "Component categories (FT Visual Vocabulary + investment-banking specific). Order = display order.",
+  "categories": [
+    {"id": "layout", "name": "Layout & narrative", "name_zh": "版式与叙事", "desc": "Cover, headline numbers, key takeaways and text that frame the story.", "desc_zh": "封面、关键数字、核心结论与文字说明，搭建报告的叙事骨架。"},
+    {"id": "controls", "name": "Controls & query", "name_zh": "交互控件与查询", "desc": "Global filters, scenario switches, what-if parameters and the client query console.", "desc_zh": "全局筛选、情景切换、参数假设（what-if）与客户自助查询控制台。"},
+    {"id": "valuation", "name": "Valuation", "name_zh": "估值分析", "desc": "Football fields and other valuation summaries.", "desc_zh": "估值足球场图等估值总结类图表。"},
+    {"id": "trend", "name": "Change over time", "name_zh": "时间趋势", "desc": "Share price, financials and multiples over time.", "desc_zh": "股价、财务指标、估值倍数随时间的变化。"},
+    {"id": "comparison", "name": "Magnitude & ranking", "name_zh": "规模与排名", "desc": "Compare sizes and ranks across peers, segments or periods.", "desc_zh": "比较同业、业务板块或不同期间的规模与排名。"},
+    {"id": "bridge", "name": "Bridges & deviation", "name_zh": "桥接与偏差", "desc": "Walk from one number to another; variance versus a reference.", "desc_zh": "从一个数字走到另一个数字（如 EBITDA 桥），以及相对基准的偏差。"},
+    {"id": "composition", "name": "Part-to-whole", "name_zh": "结构占比", "desc": "Mix, share and hierarchy: donut, treemap, sunburst, Marimekko.", "desc_zh": "结构、份额与层级：环形图、矩形树图、旭日图、马赛克图。"},
+    {"id": "distribution", "name": "Distribution & correlation", "name_zh": "分布与相关", "desc": "Scatter, bubble, heatmap, box plot — relationships between metrics and their spread.", "desc_zh": "散点、气泡、热力矩阵、箱线图——指标间的关系与分布。"},
+    {"id": "flow", "name": "Flow & relationships", "name_zh": "流向与关系", "desc": "Sankey, chord, networks, entity structures and funnels.", "desc_zh": "桑基图、弦图、关系网络、股权/法人结构图与漏斗图。"},
+    {"id": "geo", "name": "Geospatial", "name_zh": "地理空间", "desc": "Offline maps: choropleth, proportional symbols, flows, clusters, density.", "desc_zh": "离线地图：分级着色、比例符号（气泡）、流向弧线、聚合点与密度热力。"},
+    {"id": "table", "name": "Tables", "name_zh": "表格", "desc": "Comps, sensitivity, pivot and interactive data grids.", "desc_zh": "可比公司表、敏感性分析表、透视表与交互式数据表格。"},
+    {"id": "timeline", "name": "Process & timeline", "name_zh": "流程与时间线", "desc": "Deal timetables, Gantt charts and milestones.", "desc_zh": "交易时间表、甘特图与里程碑。"}
+  ]
+}

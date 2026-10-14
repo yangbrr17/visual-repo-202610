@@ -1,0 +1,50 @@
+/* Theme: Slate modern — cooler, consulting-style palette with a teal accent. */
+[data-rk-theme="slate"] {
+  --rk-canvas: #edf0f3;
+  --rk-paper: #ffffff;
+  --rk-surface: #f5f7f9;
+  --rk-surface-2: #e7ebef;
+  --rk-ink: #18212b;
+  --rk-ink-2: #3f4b57;
+  --rk-ink-3: #6c7884;
+  --rk-rule: #cfd6dd;
+  --rk-grid: #e8ecf0;
+  --rk-axis: #8d98a4;
+  --rk-accent: #1f2a44;
+  --rk-accent-2: #1b8a8f;
+  --rk-accent-3: #3d7eaa;
+  --rk-highlight: #1b8a8f;
+  --rk-pos: #3a8b5c;
+  --rk-neg: #c0504d;
+  --rk-neutral: #a8b2bd;
+  --rk-tooltip-bg: #ffffff;
+  --rk-tooltip-ink: #18212b;
+  --rk-map-land: #e2e7ec;
+  --rk-map-border: #ffffff;
+  --rk-map-water: #f5f7f9;
+
+  --rk-cat-1: #1f2a44;
+  --rk-cat-2: #3d7eaa;
+  --rk-cat-3: #1b8a8f;
+  --rk-cat-4: #d0a85c;
+  --rk-cat-5: #8e9aaf;
+  --rk-cat-6: #a9d3d6;
+  --rk-cat-7: #4c956c;
+  --rk-cat-8: #b5525c;
+
+  --rk-seq-1: #f0f6f7;
+  --rk-seq-2: #cfe6e8;
+  --rk-seq-3: #9fcfd2;
+  --rk-seq-4: #67b0b5;
+  --rk-seq-5: #2f8f96;
+  --rk-seq-6: #1e6a76;
+  --rk-seq-7: #1f2a44;
+
+  --rk-div-1: #b5525c;
+  --rk-div-2: #d99aa0;
+  --rk-div-3: #f0d9db;
+  --rk-div-4: #f4f5f6;
+  --rk-div-5: #cfe6e8;
+  --rk-div-6: #67b0b5;
+  --rk-div-7: #1e6a76;
+}
