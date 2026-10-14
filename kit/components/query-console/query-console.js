@@ -1122,9 +1122,9 @@
           opt = {
             animation: ctx.motion, color: t.cat,
             title: n > 1 ? panels.map(function (p, i) {
-              return { text: p.title, left: labelW + i * (pw + valPad + gap), top: 2, textStyle: { fontSize: 11, fontWeight: 600, color: t.ink2, fontFamily: t.fontSans } };
+              return { text: p.title, left: labelW + i * (pw + valPad + gap), top: 2, textStyle: { fontSize: 11, fontWeight: 600, color: t.ink2, fontFamily: t.fontSans, width: pw + valPad - 8, overflow: 'truncate' } };
             }) : [],
-            grid: panels.map(function (p, i) { return { left: labelW + i * (pw + valPad + gap), width: pw, top: top, bottom: 22, containLabel: false }; }),
+            grid: panels.map(function (p, i) { return { left: labelW + i * (pw + valPad + gap), width: pw, top: top, bottom: n > 1 && showVals ? 6 : 22, containLabel: false }; }),
             tooltip: {
               trigger: 'axis', axisPointer: { type: 'shadow' }, confine: true,
               formatter: function (ps) {
@@ -1134,7 +1134,9 @@
               }
             },
             xAxis: panels.map(function (p, i) {
-              return { type: 'value', gridIndex: i, splitNumber: n > 1 ? 3 : 5, axisLabel: { formatter: axisFmt(p.format), hideOverlap: true }, splitLine: { lineStyle: { color: t.grid } } };
+              // labelled panels need no value axis (think-cell style); a single ranking keeps it
+              var bare = n > 1 && showVals;
+              return { type: 'value', gridIndex: i, splitNumber: n > 1 ? 3 : 5, axisLabel: { show: !bare, formatter: axisFmt(p.format), hideOverlap: true }, splitLine: { show: !bare, lineStyle: { color: t.grid } } };
             }),
             yAxis: panels.map(function (p, i) {
               return { type: 'category', gridIndex: i, data: catLabels, inverse: true, axisTick: { show: false },
@@ -1161,7 +1163,10 @@
           var series = [], legend = [];
           var single = !sdim && plotted.length === 1;
           var nBars = sdim ? 1 : plotted.filter(function (p) { return kind === 'bar' && p.axis === 0; }).length;
-          var showLabels = (kind === 'bar' && cats.length <= 24 && (single || (nBars <= 2 && cats.length <= 12))) || (kind === 'line' && cats.length <= 12 && plotted.length <= 2);
+          var hasRight = plotted.some(function (p) { return p.axis === 1; });
+          var barLabels = kind === 'bar' && cats.length <= 24 && (nBars === 1 || (!hasRight && nBars <= 2 && cats.length <= 8));
+          var lineLabels = cats.length <= 15 && (kind === 'bar' ? hasRight : plotted.length <= 2);
+          var showLabels = barLabels || lineLabels;
           if (sdim) {
             var gi = 0;
             RK.util.groupBy(rows, function (r) { return r[sdim.name]; }).forEach(function (list, name) {
@@ -1183,7 +1188,7 @@
               name: name, type: type, yAxisIndex: horiz ? 0 : axis,
               data: type === 'bar' ? barData(values, color, isSingle) : values,
               itemStyle: { color: color }, lineStyle: { color: color, width: 2 }, emphasis: { focus: 'series' },
-              label: showLabels && (type === 'bar' || axis === 1 || kind === 'line') ? labelCfg(fmt, type === 'bar' ? (horiz ? 'right' : 'top') : 'top') : { show: false }
+              label: (type === 'bar' ? barLabels : lineLabels) ? labelCfg(fmt, type === 'bar' ? (horiz ? 'right' : 'top') : 'top') : { show: false }
             };
             if (type === 'bar') { se.barMaxWidth = 34; se.barGap = '12%'; se.barCategoryGap = isSingle ? '36%' : '28%'; }
             else { se.symbol = 'circle'; se.symbolSize = cats.length > 30 ? 0 : 6; se.showSymbol = cats.length <= 30; se.z = 3; }
@@ -1191,15 +1196,27 @@
           }
           var p1 = plotted.filter(function (p) { return p.axis === 1; })[0];
           var catAxis = { type: 'category', data: catLabels, inverse: horiz, boundaryGap: kind === 'bar',
-            axisLabel: { interval: horiz || cats.length <= 16 ? 0 : 'auto', hideOverlap: true, width: horiz ? 150 : 90, overflow: 'truncate' } };
+            axisLabel: horiz ? { interval: 0, hideOverlap: true, width: 150, overflow: 'truncate' } : { interval: cats.length <= 16 ? 0 : 'auto', hideOverlap: true } };
           var valAxis = [{ type: 'value', scale: kind === 'line' && primaryKind !== 'num', axisLabel: { formatter: axisFmt(plotted[0] ? plotted[0].col.format : meas[0].format) }, splitLine: { lineStyle: { color: t.grid } } }];
-          if (p1) valAxis.push({ type: 'value', scale: true, position: 'right', axisLabel: { formatter: axisFmt(p1.col.format) }, splitLine: { show: false } });
+          if (p1 && kind === 'bar') {
+            // combo: bars in the lower ~60% of the plot, the second-unit line labelled above them (right axis hidden)
+            var barMax = 0, lo = Infinity, hi = -Infinity;
+            plotted.forEach(function (p) {
+              byCat(rows, p.col.name).forEach(function (v) {
+                if (!isNum(v)) return;
+                if (p.axis === 0) barMax = Math.max(barMax, v); else { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+              });
+            });
+            var span = (hi - lo) || Math.abs(hi) || 1;
+            if (barMax > 0) valAxis[0].max = function (e) { return RK.util.niceStep(e.max * 1.65, 1) * Math.ceil(e.max * 1.65 / RK.util.niceStep(e.max * 1.65, 1)); };
+            valAxis.push({ type: 'value', position: 'right', min: lo - span * 1.9, max: hi + span * 0.35, axisLabel: { show: false }, splitLine: { show: false }, axisLine: { show: false } });
+          } else if (p1) valAxis.push({ type: 'value', scale: true, position: 'right', axisLabel: { formatter: axisFmt(p1.col.format) }, splitLine: { show: false } });
           var zoom = kind === 'line' && cats.length > 40 ? [{ type: 'inside', xAxisIndex: 0, filterMode: 'none' }, { type: 'slider', xAxisIndex: 0, height: 16, bottom: 4, showDetail: false, brushSelect: false, filterMode: 'none' }] : [];
           var showLegend = legend.length > 1;
           opt = {
             animation: ctx.motion, color: t.cat,
             legend: { show: showLegend, top: 0, left: 0, type: 'scroll', data: legend },
-            grid: { left: 4, right: p1 ? 8 : (horiz && showLabels ? 36 : 14), top: showLegend ? 34 : 14, bottom: zoom.length ? 28 : 4, containLabel: true },
+            grid: { left: 4, right: p1 && kind !== 'bar' ? 8 : (horiz && showLabels ? 36 : 16), top: showLegend ? 34 : 14, bottom: zoom.length ? 28 : 4, containLabel: true },
             tooltip: {
               trigger: 'axis', axisPointer: { type: kind === 'bar' ? 'shadow' : 'line' }, confine: true,
               formatter: function (ps) {
