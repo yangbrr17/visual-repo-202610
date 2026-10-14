@@ -139,14 +139,8 @@
     }
   });
 
-  var measurer = null;
-  function textWidth(s, font) {
-    try {
-      measurer = measurer || document.createElement('canvas').getContext('2d');
-      measurer.font = font;
-      return measurer.measureText(String(s)).width;
-    } catch (e) { return String(s).length * 6.2; }
-  }
+  /** Generic node fields ('name', 'category' …) cross-filter only this block's dataset; business dimensions stay global. */
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
 
   /* ---------------- drill-down + breadcrumb ---------------- */
 
@@ -213,7 +207,9 @@
       var ch = chainOf(state.tree.roots, node.id);
       if (ch[viewDepth]) { zoom(state, ch[viewDepth].id); return; }
     }
-    if (ctx.options.crossFilter !== false && node.field) ctx.select(node.field, node.name);
+    if (ctx.options.crossFilter !== false && node.field) {
+      ctx.select(node.field, node.name, GENERIC.test(node.field) ? { scope: ctx.options.crossFilterScope || 'dataset' } : null);
+    }
   }
 
   function build(ctx, inst, state) {
@@ -242,7 +238,8 @@
       var sel = n.field ? ctx.selected(n.field) : [];
       return sel.length > 0 && sel.indexOf(n.name) < 0;
     }
-    var pal = t.cat;
+    // group colours; with a highlight no group may read like the accent2 target (tints extend instead of repeating)
+    var pal = RK.theme.palette(hl.length ? { n: tree.roots.length } : { exclude: [], n: tree.roots.length });
 
     function toData(list, parentColor, depth) {
       return list.slice().sort(function (a, b) { return o.sort === 'asc' ? a.value - b.value : b.value - a.value; }).map(function (n, i) {
@@ -257,7 +254,7 @@
         var item = {
           id: n.id, name: n.name, value: n.value, metric: n.metric, field: n.field,
           itemStyle: { color: fill, borderColor: isHl && byMetric ? t.accent2 : undefined, borderWidth: isHl && byMetric ? 2 : undefined },
-          label: { color: RK.theme.luminance(fill) > 0.3 ? (t.dark ? t.paper : t.ink) : '#ffffff' }   // dark text on mid/light fills (any theme)
+          label: { color: RK.theme.textOn(fill) }   // readable on the fill in light and dark themes
         };
         if (kids) item.children = toData(n.children, color, depth + 1);
         return item;
@@ -323,7 +320,7 @@
     // colour legend (metric mode): top-right ramp with low / mid / high ticks
     var graphic = [];
     var W = inst.getWidth();
-    if (state.nav) state.nav.style.maxWidth = (showLegend ? Math.max(120, W - Math.min(150, W * 0.22) - 24 - textWidth(ctx.title(enc.color) + (o.colorMid === 'avg' ? ' vs. weighted avg.' : ''), '11px ' + t.fontSans)) : W * 0.9) + 'px';
+    if (state.nav) state.nav.style.maxWidth = (showLegend ? Math.max(120, W - Math.min(150, W * 0.22) - 24 - C.measure(ctx.title(enc.color) + (o.colorMid === 'avg' ? ' vs. weighted avg.' : ''), '11px ' + t.fontSans)) : W * 0.9) + 'px';
     if (showLegend) {
       var lw = Math.min(150, W * 0.22), lx = W - lw - 2;
       var stops = (t.div || []).map(function (c, i, a) { return { offset: i / (a.length - 1), color: c }; });

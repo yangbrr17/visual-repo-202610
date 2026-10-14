@@ -56,12 +56,13 @@
           <div class="rk-block__body" style="--rk-h:150px"></div>
           <script type="application/json" data-rk-options>{"variant": "boxed", "columns": 6}</script>
         </figure>
-        <figure class="rk-block" style="--rk-span:12" data-rk="text-block" id="summary-key-takeaways">
-          <figcaption class="rk-block__head">
-            <h3 class="rk-block__title">Key takeaways</h3>
-          </figcaption>
-          <div class="rk-block__body" style="--rk-h:202px"></div>
+        <figure class="rk-block" style="--rk-span:12" data-rk="text-block" id="summary-text-block">
+          <div class="rk-block__body" style="--rk-h:150px"></div>
           <script type="application/json" data-rk-options>{"variant": "takeaways", "columns": 4, "items": [{"title": "Discount to peers", "text": "**9.2x** 2025E EBITDA vs. a peer median of **10.7x**, despite in-line margins of 18.5%."}, {"title": "Plan momentum", "text": "Revenue CAGR of **7.0%** 2025A–28E with the EBITDA margin expanding to **20.0%**."}, {"title": "Value of $45–55 per share", "text": "DCF, precedents and premiums paid imply a **6–29%** premium to the current $42.50."}, {"title": "Deep buyer universe", "text": "**$165bn** of cross-border industrials M&A since 2021; sponsors can pay c.$46 per share."}]}</script>
+        </figure>
+        <figure class="rk-block" style="--rk-span:12" data-rk="text-block" id="summary-text-block-2">
+          <div class="rk-block__body" style="--rk-h:80px"></div>
+          <script type="application/json" data-rk-options>{"variant": "callout", "kicker": "Recommendation", "tone": "accent2", "title": "Launch a two-stage auction in late October, targeting signing by end-March 2027", "text": "Board approval on 20-Oct; indicative offers due 11-Dec; final binding bids on 5-Mar-2027."}</script>
         </figure>
       </div>
       <footer class="rk-page__foot"><span class="rk-page__source">Sources: FactSet, company filings; market data as of 10-Oct-2026; Northbridge Capital analysis<span class="rk-page__notes">Note: Illustrative: all companies, banks and investors are fictional.</span></span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
@@ -104,20 +105,20 @@
         <p class="rk-page__subtitle">Revenue by segment and product line, USD m</p>
       </header>
       <div class="rk-page__body rk-grid">
-        <figure class="rk-block" style="--rk-span:6" data-rk="bar" data-rk-data="segment_revenue" id="mix-revenue-by-segment">
+        <figure class="rk-block" style="--rk-span:5" data-rk="line" data-rk-data="segment_totals" id="mix-revenue-by-segment">
           <figcaption class="rk-block__head">
             <h3 class="rk-block__title">Revenue by segment</h3>
-            <p class="rk-block__subtitle">2021A–2026E</p>
+            <p class="rk-block__subtitle">Indexed, 2021A = 100</p>
           </figcaption>
-          <div class="rk-block__body" style="--rk-h:356px"></div>
-          <script type="application/json" data-rk-options>{"encode": {"x": "year", "y": "revenue", "series": "segment"}, "stack": true, "format": "$#,##0"}</script>
+          <div class="rk-block__body" style="--rk-h:346px"></div>
+          <script type="application/json" data-rk-options>{"encode": {"x": "year", "y": "revenue", "series": "segment"}, "rebase": 100, "endLabels": "name", "legend": false, "labels": false}</script>
         </figure>
-        <figure class="rk-block" style="--rk-span:6" data-rk="treemap" data-rk-data="segments_tree" id="mix-fy25a-revenue-by-product-line">
+        <figure class="rk-block" style="--rk-span:7" data-rk="treemap" data-rk-data="segments_tree" id="mix-fy25a-revenue-by-product-line">
           <figcaption class="rk-block__head">
             <h3 class="rk-block__title">FY25A revenue by product line</h3>
             <p class="rk-block__subtitle">Area = revenue; colour = growth vs. the 7.4% group average</p>
           </figcaption>
-          <div class="rk-block__body" style="--rk-h:356px"></div>
+          <div class="rk-block__body" style="--rk-h:346px"></div>
           <script type="application/json" data-rk-options>{"encode": {"id": "id", "parent": "parent", "name": "name", "value": "value", "color": "growth"}, "colorMid": "avg", "rootName": "Helios Industrial"}</script>
         </figure>
       </div>
@@ -142,7 +143,7 @@
             <h3 class="rk-block__title">FY25A margin profile</h3>
           </figcaption>
           <div class="rk-block__body" style="--rk-h:372px"></div>
-          <script type="application/json" data-rk-options>{"variant": "stats", "columns": 1, "row": "year == \"2025A\"", "items": [{"expr": "gross_profit / revenue", "format": "0.0%", "label": "Gross margin", "note": "Gross profit {{gross_profit|$#,##0\"m\"}}"}, {"field": "ebitda_margin", "label": "EBITDA margin", "note": "Up from 15.8% in FY19A", "tone": "accent2"}, {"expr": "net_income / revenue", "format": "0.0%", "label": "Net margin", "note": "Net income {{net_income|$#,##0\"m\"}}"}, {"expr": "fcf / ebitda", "format": "0%", "label": "FCF conversion", "note": "Free cash flow / EBITDA"}]}</script>
+          <script type="application/json" data-rk-options>{"variant": "stats", "columns": 1, "row": "year == \"2025A\"", "items": [{"field": "ebitda_margin", "label": "EBITDA margin", "note": "Up from 15.8% in FY19A", "tone": "accent2"}, {"expr": "fcf / ebitda", "format": "0%", "label": "FCF conversion", "note": "Free cash flow {{fcf|$#,##0\"m\"}} / EBITDA"}, {"expr": "capex / revenue", "format": "0.0%", "label": "Capex intensity", "note": "Capex {{capex|$#,##0\"m\"}} / revenue"}]}</script>
         </figure>
       </div>
       <footer class="rk-page__foot"><span class="rk-page__source">Source: Company filings (FY25A)</span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
@@ -235,7 +236,7 @@
       <div class="rk-page__body rk-grid">
         <figure class="rk-block" style="--rk-span:12" data-rk="comps-table" data-rk-data="peers" id="comps-comps-table">
           <div class="rk-block__body" style="--rk-h:440px"></div>
-          <script type="application/json" data-rk-options>{"where": "sector != \"Software & Sensors\"", "pinTarget": "top", "stats": ["mean", "median"], "sort": {"field": "ev_ebitda_25e", "dir": "desc"}, "dense": true, "scroll": false, "columns": [{"field": "region", "title": "Region"}, {"field": "mkt_cap", "title": "Equity value", "group": "Market data"}, {"field": "ev", "title": "EV", "group": "Market data"}, {"field": "ev_revenue_25e", "title": "2025E", "group": "EV / Revenue"}, {"field": "ev_ebitda_25e", "title": "2025E", "group": "EV / EBITDA", "heat": "seq"}, {"field": "ev_ebitda_26e", "title": "2026E", "group": "EV / EBITDA", "heat": "seq"}, {"field": "pe_25e", "title": "2025E", "group": "P / E", "nm": [0, 50]}, {"field": "rev_growth_25e", "title": "Growth", "group": "2025E operating", "heat": "div", "mid": 0.065}, {"field": "ebitda_margin_25e", "title": "EBITDA margin", "group": "2025E operating"}, {"field": "net_debt_ebitda", "title": "ND / EBITDA", "group": "2025E operating"}]}</script>
+          <script type="application/json" data-rk-options>{"where": "sector != \"Software & Sensors\"", "groupBy": "sector", "pinTarget": "top", "stats": ["mean", "median"], "sort": {"field": "ev_ebitda_25e", "dir": "desc"}, "dense": true, "scroll": false, "columns": [{"field": "region", "title": "Region"}, {"field": "mkt_cap", "title": "Equity value", "group": "Market data"}, {"field": "ev", "title": "EV", "group": "Market data"}, {"field": "ev_revenue_25e", "title": "2025E", "group": "EV / Revenue"}, {"field": "ev_ebitda_25e", "title": "2025E", "group": "EV / EBITDA", "heat": "seq"}, {"field": "ev_ebitda_26e", "title": "2026E", "group": "EV / EBITDA", "heat": "seq"}, {"field": "pe_25e", "title": "2025E", "group": "P / E", "nm": [0, 50]}, {"field": "rev_growth_25e", "title": "Growth", "group": "2025E operating", "heat": "div", "mid": 0.065}, {"field": "ebitda_margin_25e", "title": "EBITDA margin", "group": "2025E operating"}, {"field": "net_debt_ebitda", "title": "ND / EBITDA", "group": "2025E operating"}]}</script>
         </figure>
       </div>
       <footer class="rk-page__foot"><span class="rk-page__source">Source: FactSet, company filings; market data as of 10-Oct-2026<span class="rk-page__notes">Note: Mean and median exclude Helios. Software &amp; Sensors peers (median 15.5x 2025E EBITDA) are shown on the peer positioning page; n.m. = not meaningful.</span></span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
@@ -252,15 +253,15 @@
             <h3 class="rk-block__title">EV / EBITDA vs. revenue growth</h3>
             <p class="rk-block__subtitle">Line = least-squares fit across peers</p>
           </figcaption>
-          <div class="rk-block__body" style="--rk-h:356px"></div>
-          <script type="application/json" data-rk-options>{"encode": {"x": "rev_growth_25e", "y": "ev_ebitda_25e", "label": "ticker", "name": "company", "color": "sector"}, "regression": true, "tooltipFields": ["ebitda_margin_25e", "mkt_cap"]}</script>
+          <div class="rk-block__body" style="--rk-h:346px"></div>
+          <script type="application/json" data-rk-options>{"encode": {"x": "rev_growth_25e", "y": "ev_ebitda_25e", "label": "ticker", "name": "company"}, "regression": true, "tooltipFields": ["sector", "ebitda_margin_25e", "mkt_cap"]}</script>
         </figure>
         <figure class="rk-block" style="--rk-span:6" data-rk="bubble" data-rk-data="peers" id="positioning-ebitda-margin-vs-revenue-growth">
           <figcaption class="rk-block__head">
             <h3 class="rk-block__title">EBITDA margin vs. revenue growth</h3>
             <p class="rk-block__subtitle">Bubble size = market capitalisation</p>
           </figcaption>
-          <div class="rk-block__body" style="--rk-h:356px"></div>
+          <div class="rk-block__body" style="--rk-h:346px"></div>
           <script type="application/json" data-rk-options>{"encode": {"x": "rev_growth_25e", "y": "ebitda_margin_25e", "size": "mkt_cap", "color": "sector", "label": "ticker", "name": "company"}, "tooltipFields": ["ev_ebitda_25e"]}</script>
         </figure>
       </div>
@@ -285,7 +286,7 @@
             <h3 class="rk-block__title">Valuation summary</h3>
             <p class="rk-block__subtitle">Shaded: indicative value range of $45–55 per share</p>
           </figcaption>
-          <div class="rk-block__body" style="--rk-h:356px"></div>
+          <div class="rk-block__body" style="--rk-h:346px"></div>
           <script type="application/json" data-rk-options>{"encode": {"label": "method", "low": "low", "high": "high", "group": "group", "note": "basis"}, "refLines": [{"value": 42.5, "label": "Current $42.50"}], "refBand": {"from": 45, "to": 55}}</script>
         </figure>
         <figure class="rk-block" style="--rk-span:5" data-rk="sensitivity-table" data-rk-data="sensitivity_dcf" id="valuation-dcf-sensitivity">
@@ -293,7 +294,7 @@
             <h3 class="rk-block__title">DCF sensitivity</h3>
             <p class="rk-block__subtitle">Implied value per share (USD); click a cell to move the base case</p>
           </figcaption>
-          <div class="rk-block__body" style="--rk-h:356px"></div>
+          <div class="rk-block__body" style="--rk-h:346px"></div>
           <script type="application/json" data-rk-options>{"encode": {"row": "wacc", "col": "tgr", "value": "value"}, "rowTitle": "WACC", "colTitle": "Terminal growth rate", "base": {"row": "@wacc", "col": "@tgr"}}</script>
         </figure>
       </div>
@@ -335,14 +336,14 @@
             <h3 class="rk-block__title">Selected precedent transactions</h3>
           </figcaption>
           <div class="rk-block__body" style="--rk-h:372px"></div>
-          <script type="application/json" data-rk-options>{"encode": {"label": "target"}, "labelTitle": "Target", "where": "date >= \"2023-01-01\"", "sort": {"field": "date", "dir": "desc"}, "stats": ["median", "high", "low"], "dense": true, "scroll": false, "columns": [{"field": "date", "title": "Announced", "format": "mmm yyyy"}, {"field": "target"}, {"field": "acquirer", "title": "Acquirer"}, {"field": "ev", "title": "EV (USD m)"}, {"field": "ev_revenue", "title": "Revenue", "group": "EV / LTM"}, {"field": "ev_ebitda", "title": "EBITDA", "group": "EV / LTM", "heat": "seq"}, {"field": "premium_30d", "title": "Premium", "group": "30-day VWAP"}]}</script>
+          <script type="application/json" data-rk-options>{"encode": {"label": "target"}, "labelTitle": "Target", "where": "date >= \"2023-01-01\"", "sort": {"field": "date", "dir": "desc"}, "stats": ["mean", "median"], "dense": true, "scroll": false, "columns": [{"field": "date", "title": "Announced", "format": "mmm yyyy"}, {"field": "target"}, {"field": "acquirer", "title": "Acquirer"}, {"field": "ev", "title": "EV (USD m)"}, {"field": "ev_revenue", "title": "Revenue", "group": "EV / LTM"}, {"field": "ev_ebitda", "title": "EBITDA", "group": "EV / LTM", "heat": "seq"}, {"field": "premium_30d", "title": "Premium", "group": "30-day VWAP"}]}</script>
         </figure>
         <figure class="rk-block" style="--rk-span:4" data-rk="histogram" data-rk-data="precedents" id="precedents-premium-to-30-day-vwap">
           <figcaption class="rk-block__head">
             <h3 class="rk-block__title">Premium to 30-day VWAP</h3>
             <p class="rk-block__subtitle">Transactions since 2019 with a disclosed premium</p>
           </figcaption>
-          <div class="rk-block__body" style="--rk-h:356px"></div>
+          <div class="rk-block__body" style="--rk-h:346px"></div>
           <script type="application/json" data-rk-options>{"encode": {"value": "premium_30d", "label": "target", "name": "target"}, "binWidth": 0.05, "format": "0%", "stats": ["median"]}</script>
         </figure>
       </div>
@@ -360,7 +361,7 @@
             <h3 class="rk-block__title">Enterprise value to equity value</h3>
             <p class="rk-block__subtitle">DCF base case (WACC 9.0%, terminal growth 2.5%) = $50.88 per share</p>
           </figcaption>
-          <div class="rk-block__body" style="--rk-h:356px"></div>
+          <div class="rk-block__body" style="--rk-h:346px"></div>
           <script type="application/json" data-rk-options>{"encode": {"label": "step", "value": "value", "kind": "kind"}, "format": "$#,##0"}</script>
         </figure>
         <figure class="rk-block" style="--rk-span:5" data-rk="sensitivity-table" data-rk-data="sensitivity_lbo" id="bridge-lbo-sponsor-irr">
@@ -368,7 +369,7 @@
             <h3 class="rk-block__title">LBO sponsor IRR</h3>
             <p class="rk-block__subtitle">Entry vs. exit EV / EBITDA multiple</p>
           </figcaption>
-          <div class="rk-block__body" style="--rk-h:356px"></div>
+          <div class="rk-block__body" style="--rk-h:346px"></div>
           <script type="application/json" data-rk-options>{"encode": {"row": "entry_multiple", "col": "exit_multiple", "value": "irr"}, "rowTitle": "Entry multiple", "colTitle": "Exit multiple", "mid": 0.2, "base": {"row": 9, "col": 9}}</script>
         </figure>
       </div>
@@ -409,22 +410,22 @@
       <header class="rk-page__head">
         <p class="rk-page__kicker">Shareholder base</p>
         <h2 class="rk-page__title">Twelve institutions and strategics hold 46% of the shares; Ardent Family (7.5%) is pivotal</h2>
-        <p class="rk-page__subtitle">Shares held (m) and principal legal entities</p>
+        <p class="rk-page__subtitle">Basic shares outstanding 155.2m</p>
       </header>
       <div class="rk-page__body rk-grid">
-        <figure class="rk-block" style="--rk-span:4" data-rk="donut" data-rk-data="ownership" id="ownership-shareholders-by-investor-type">
+        <figure class="rk-block" style="--rk-span:5" data-rk="donut" data-rk-data="ownership" id="ownership-shareholders-by-investor-type">
           <figcaption class="rk-block__head">
             <h3 class="rk-block__title">Shareholders by investor type</h3>
           </figcaption>
           <div class="rk-block__body" style="--rk-h:372px"></div>
-          <script type="application/json" data-rk-options>{"encode": {"label": "type", "value": "shares_m"}, "centerLabel": "Shares (m)", "layout": "labels"}</script>
+          <script type="application/json" data-rk-options>{"encode": {"label": "type", "value": "shares_m"}, "centerLabel": "Shares (m)"}</script>
         </figure>
-        <figure class="rk-block" style="--rk-span:8" data-rk="tree" data-rk-data="org_structure" id="ownership-simplified-legal-structure">
+        <figure class="rk-block" style="--rk-span:7" data-rk="bar" data-rk-data="ownership" id="ownership-largest-shareholders-of-shares">
           <figcaption class="rk-block__head">
-            <h3 class="rk-block__title">Simplified legal structure</h3>
+            <h3 class="rk-block__title">Largest shareholders (% of shares outstanding)</h3>
           </figcaption>
           <div class="rk-block__body" style="--rk-h:372px"></div>
-          <script type="application/json" data-rk-options>{"encode": {"id": "id", "parent": "parent", "name": "name", "country": "country", "pct": "ownership_pct", "category": "entity_type"}, "orient": "LR", "pctLabels": "partial", "highlight": "hlx"}</script>
+          <script type="application/json" data-rk-options>{"encode": {"x": "holder", "y": "pct"}, "where": "type != \"Retail\" and type != \"Insider\"", "orientation": "horizontal", "sort": "desc", "highlight": "Ardent Family Holdings", "format": "0.0%"}</script>
         </figure>
       </div>
       <footer class="rk-page__foot"><span class="rk-page__source">Source: Share register as of 30-Sep-2026; company information</span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
@@ -438,7 +439,7 @@
       <div class="rk-page__body rk-grid">
         <figure class="rk-block" style="--rk-span:12" data-rk="gantt" data-rk-data="deal_timeline" id="timetable-gantt">
           <div class="rk-block__body" style="--rk-h:408px"></div>
-          <script type="application/json" data-rk-options>{"today": "2026-10-14", "calendar": "months", "zoom": false}</script>
+          <script type="application/json" data-rk-options>{"today": "2026-10-14", "calendar": "months", "zoom": false, "groupHeaders": false}</script>
         </figure>
       </div>
       <footer class="rk-page__foot"><span class="rk-page__source">Source: Northbridge Capital</span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
@@ -452,10 +453,24 @@
       <div class="rk-page__body rk-grid">
         <figure class="rk-block" style="--rk-span:12" data-rk="query-console" data-rk-data="peers" id="explore-query-console">
           <div class="rk-block__body" style="--rk-h:440px"></div>
-          <script type="application/json" data-rk-options>{"datasets": ["peers", "financials", "precedents", "segment_revenue"], "highlight": "Helios Industrial", "builder": {"values": [{"agg": "median", "field": "ev_ebitda_25e"}, {"agg": "median", "field": "ebitda_margin_25e"}], "rows": ["sector"], "sort": {"col": "v0", "dir": "desc"}}, "examples": [{"label": "Sector medians", "query": "median(ev_ebitda_25e), median(ebitda_margin_25e) by sector from peers"}, {"label": "European peers by EV/EBITDA", "query": "company, ev / ebitda_25e as \"EV/EBITDA\" format \"0.0x\" from peers where region == \"Europe\" sort 2 desc"}, {"label": "FY25A revenue by segment", "query": "sum(revenue) as \"Revenue\" by segment from segment_revenue where year == \"2025A\" sort 2 desc"}]}</script>
+          <script type="application/json" data-rk-options>{"datasets": ["peers", "financials", "precedents", "segment_revenue"], "highlight": "Helios Industrial", "tab": "query", "builder": {"values": [{"agg": "median", "field": "ev_ebitda_25e"}, {"agg": "median", "field": "ebitda_margin_25e"}], "rows": ["sector"], "sort": {"col": "v0", "dir": "desc"}}, "examples": [{"label": "Sector medians", "query": "median(ev_ebitda_25e), median(ebitda_margin_25e) by sector from peers"}, {"label": "European peers by EV/EBITDA", "query": "company, ev / ebitda_25e as \"EV/EBITDA\" format \"0.0x\" from peers where region == \"Europe\" sort 2 desc"}, {"label": "FY25A revenue by segment", "query": "sum(revenue) as \"Revenue\" by segment from segment_revenue where year == \"2025A\" sort 2 desc"}]}</script>
         </figure>
       </div>
       <footer class="rk-page__foot"><span class="rk-page__source">Source: All analysis runs locally in your browser; no data leaves this file.</span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
+    </section>
+    <section class="rk-page" id="appendix-structure" data-rk-page="Appendix · structure">
+      <header class="rk-page__head">
+        <p class="rk-page__kicker">Appendix · structure</p>
+        <h2 class="rk-page__title">Appendix: simplified legal structure</h2>
+        <p class="rk-page__subtitle">Principal legal entities; direct ownership shown where below 100%</p>
+      </header>
+      <div class="rk-page__body rk-grid">
+        <figure class="rk-block" style="--rk-span:12" data-rk="tree" data-rk-data="org_structure" id="appendix-structure-tree">
+          <div class="rk-block__body" style="--rk-h:440px"></div>
+          <script type="application/json" data-rk-options>{"encode": {"id": "id", "parent": "parent", "name": "name", "country": "country", "pct": "ownership_pct", "category": "entity_type"}, "pctLabels": "partial", "highlight": "hlx", "roam": false}</script>
+        </figure>
+      </div>
+      <footer class="rk-page__foot"><span class="rk-page__source">Source: Company information as of 30-Sep-2026</span><span class="rk-page__conf">Strictly private &amp; confidential</span><span class="rk-page__num"></span></footer>
     </section>
     <section class="rk-page" id="appendix-precedents" data-rk-page="Appendix · data">
       <header class="rk-page__head">

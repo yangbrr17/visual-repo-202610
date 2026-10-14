@@ -6,8 +6,6 @@
 (function () {
   'use strict';
   var C = RK.chart, U = RK.util;
-  // legend glyph for line series (the empty sub-paths keep the icon box square so it is not stretched)
-  var LINE_ICON = 'path://M7,0L7,0Z M7,14L7,14Z M0,6.2L14,6.2L14,7.8L0,7.8Z';
 
   RK.component({
     id: 'multiple-history',
@@ -15,7 +13,7 @@
     defaults: {
       encode: { x: 'date', y: 'target', compare: 'peer_median' },
       sigma: 1,              // 0 | 1 | 2 — standard-deviation bands drawn around the mean
-      meanLine: true,        // dashed mean line
+      meanLine: true,        // dashed mean line (ink-3, house style for averages)
       lookback: null,        // years used for mean / σ (null = full history), e.g. 2
       compareMean: false,    // also draw the comparison series' mean
       endLabels: true,       // current value pills + mean / σ labels at the right edge
@@ -55,7 +53,7 @@
 
       var lastY = lastValue(ys), lastC = cs ? lastValue(cs) : null;
       var yColor = t.accent, cColor = t.dark ? t.ink3 : RK.theme.mix(t.ink3, t.paper, 0.15);
-      var meanColor = t.accent2;
+      var meanColor = t.ink3;                 // averages: ink-3 dashed (accent2 is reserved for a highlighted target)
 
       /* ---------------- bands + reference lines on the main series ---------------- */
       var areas = [], marks = [];
@@ -73,7 +71,7 @@
           });
         }
         if (o.meanLine !== false) {
-          marks.push([{ coord: [from, st.mean], lineStyle: { color: meanColor, type: [5, 3], width: 1.4 } }, { coord: [last, st.mean] }]);
+          marks.push([{ coord: [from, st.mean], lineStyle: { color: meanColor, type: [5, 3], width: 1.25 } }, { coord: [last, st.mean] }]);
         }
       }
       if (cst && o.compareMean) {
@@ -95,7 +93,7 @@
         }
       }
       var font = '600 10.5px ' + t.fontNum;
-      var labelW = labels.reduce(function (m, l) { return Math.max(m, measure(l.text, font) + (l.kind === 'pill' ? 12 : 0)); }, 0);
+      var labelW = labels.reduce(function (m, l) { return Math.max(m, Math.ceil(C.measure(l.text, font)) + (l.kind === 'pill' ? 12 : 0)); }, 0);
       var layout = null;
 
       var series = [{
@@ -122,7 +120,7 @@
             var cs2 = params.coordSys;
             if (params.dataIndex === 0 || !layout) {
               // one pass for all labels: y from the value, then push apart (min gap 16px) inside the plot
-              layout = spread(labels.map(function (l) { return api.coord([last, l.v])[1]; }), 16, cs2.y + 6, cs2.y + cs2.height - 6);
+              layout = C.spreadLabels(labels.map(function (l) { return api.coord([last, l.v])[1]; }), 16, cs2.y + 6, cs2.y + cs2.height - 6);
             }
             var l = labels[params.dataIndex], y0 = api.coord([last, l.v])[1], y = layout[params.dataIndex];
             var x = cs2.x + cs2.width + 10;
@@ -132,8 +130,8 @@
                 style: { stroke: l.kind === 'pill' ? l.bg : t.rule, lineWidth: 1, fill: null } });
             }
             var st2 = l.kind === 'pill'
-              ? { text: l.text, fill: textOn(l.bg, t), backgroundColor: l.bg, padding: [2, 5], borderRadius: 2, font: font }
-              : { text: l.text, fill: l.kind === 'mean' ? RK.theme.mix(meanColor, t.ink, t.dark ? 0 : 0.3) : (l.kind === 'cmean' ? cColor : t.ink3),
+              ? { text: l.text, fill: RK.theme.textOn(l.bg), backgroundColor: l.bg, padding: [2, 5], borderRadius: 2, font: font }
+              : { text: l.text, fill: l.kind === 'mean' ? t.ink2 : (l.kind === 'cmean' ? cColor : t.ink3),
                 font: l.kind === 'sd' ? '10px ' + t.fontNum : font };
             st2.align = 'left'; st2.verticalAlign = 'middle';
             kids.push({ type: 'text', x: x, y: y, style: st2, enterFrom: { style: { opacity: 0 } } });
@@ -143,12 +141,10 @@
       }
 
       var dfmt = o.dateFormat || 'mmm yy';
-      // blocks rendered on screen are only resized at beforeprint, so read the live print flag too
-      var printing = ctx.print || !!(RK.runtime && RK.runtime.printing);
-      var slider = o.zoom !== false && o.zoomSlider !== false && !printing;
+      var slider = o.zoom !== false && o.zoomSlider !== false && !ctx.print;
       return {
-        legend: C.legend(ctx, { show: o.legend !== false && !!cs, itemWidth: 16,
-          data: series.filter(function (x) { return x.type === 'line'; }).map(function (x) { return { name: x.name, icon: LINE_ICON }; }) }),
+        legend: C.legend(ctx, { show: o.legend !== false && !!cs,
+          data: series.filter(function (x) { return x.type === 'line'; }).map(function (x) { return x.name; }) }),
         grid: C.grid(ctx, { top: o.legend !== false && cs ? 32 : 14, right: labelW ? labelW + 16 : 12, bottom: slider ? 32 : 4 }),
         tooltip: {
           trigger: 'axis',
@@ -175,11 +171,11 @@
           axisLabel: { formatter: function (v) { return RK.format(new Date(v), dfmt); }, hideOverlap: true },
           splitLine: { show: false }
         },
-        yAxis: { type: 'value', min: yMin, max: yMax, interval: step, axisLabel: { formatter: axisFmt(fmt, step) } },
-        dataZoom: o.zoom !== false ? C.zoom({ options: o, print: printing }, 'x', { labelFormatter: function (v) { return RK.format(new Date(v), 'dd mmm yy'); } }) : [],
+        yAxis: { type: 'value', min: yMin, max: yMax, interval: step, axisLabel: { formatter: tickFmt(fmt, step) } },
+        dataZoom: o.zoom !== false ? C.zoom(ctx, 'x') : [],
         series: series
       };
-    }, { rebuildOnResize: true })   // also re-evaluates the print flag when the page is laid out for print
+    }, { rebuildOnResize: true })   // right-edge label layout is in pixels
   });
 
   /* ------------------------------------------------------------------ *
@@ -207,48 +203,6 @@
     return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
   }
 
-  /**
-   * Spread label y positions so neighbours are at least `gap` apart inside [lo, hi]:
-   * overlapping labels are merged into clusters centred on their original mean (no one-way drift).
-   */
-  function spread(ys, gap, lo, hi) {
-    var items = ys.map(function (y, i) { return { i: i, y: y }; }).sort(function (a, b) { return a.y - b.y; });
-    var cl = items.map(function (it) { return { items: [it] }; });
-    function place(c) {
-      var n = c.items.length, size = (n - 1) * gap;
-      var mean = c.items.reduce(function (s, it) { return s + it.y; }, 0) / n;
-      c.top = Math.max(lo, Math.min(hi - size, mean - size / 2));
-      c.size = size;
-    }
-    cl.forEach(place);
-    for (var guard = 0; guard < 200; guard++) {
-      var merged = false;
-      for (var j = 1; j < cl.length; j++) {
-        if (cl[j].top < cl[j - 1].top + cl[j - 1].size + gap - 0.01) {
-          cl[j - 1].items = cl[j - 1].items.concat(cl[j].items);
-          cl.splice(j, 1);
-          place(cl[j - 1]);
-          merged = true;
-          break;
-        }
-      }
-      if (!merged) break;
-    }
-    var out = ys.slice();
-    cl.forEach(function (c) { c.items.forEach(function (it, k) { out[it.i] = c.top + k * gap; }); });
-    return out;
-  }
-
-  var canvas = null;
-  function measure(text, font) {
-    try {
-      canvas = canvas || document.createElement('canvas');
-      var g = canvas.getContext('2d');
-      g.font = font;
-      return Math.ceil(g.measureText(String(text)).width);
-    } catch (e) { return String(text).length * 6.5; }
-  }
-
   /** "+0.0x;-0.0x" style signed variant of a single-section format code. */
   function signed(code) {
     code = RK.format.presets[code] || code;
@@ -256,15 +210,20 @@
     return '+' + code + ';−' + code + ';' + code;
   }
 
-  /** Axis formatter that drops decimals when the tick step is whole ("8.0x" -> "8x"). */
-  function axisFmt(code, step) {
-    code = RK.format.presets[code] || code || 'auto';
-    var trimmed = String(code).replace(/([0#])\.[0#]+/g, '$1');
-    function num(s) { return parseFloat(String(s).replace(/[^\d.\-]/g, '')); }
-    var whole = trimmed !== code && step != null && num(RK.format(step, code)) === num(RK.format(step, trimmed));
-    return function (v) { return RK.format(v, whole ? trimmed : code); };
+  /**
+   * Axis tick formatter (house style: no decimals when the tick step is whole at display precision,
+   * "$6,000" not "$6,000.0", "20%" not "20.0%"). step: number, function returning the live step,
+   * or an array of tick values; null decides per value.
+   */
+  function tickFmt(code, step) {
+    code = String(RK.format.presets[code] || code || 'auto');
+    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
+    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
+    function whole(v) { return num(v, code) === num(v, trimmed); }
+    return function (v) {
+      var s = typeof step === 'function' ? step() : step;
+      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
+      return RK.format(v, ok ? trimmed : code);
+    };
   }
-
-  /** Readable text on a fill in any theme (dark themes have a light ink, so "dark text" is the paper colour). */
-  function textOn(fill, t) { return RK.theme.onColor(fill, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#fff'); }
 })();

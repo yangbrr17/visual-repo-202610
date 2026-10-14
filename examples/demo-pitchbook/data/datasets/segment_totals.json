@@ -1,0 +1,36 @@
+{
+  "id": "segment_totals",
+  "title": "Revenue by segment",
+  "schema": {"fields": [
+    {"name": "year", "type": "string", "title": "Year"},
+    {"name": "segment", "type": "string", "title": "Segment"},
+    {"name": "revenue", "type": "number", "title": "Revenue", "format": "$#,##0", "unit": "USD m"}
+  ]},
+  "data": [
+    {"year": "2021A", "segment": "Factory Automation", "revenue": 1462.8},
+    {"year": "2021A", "segment": "Motion Control", "revenue": 1018.6},
+    {"year": "2021A", "segment": "Sensors & Instrumentation", "revenue": 697.1},
+    {"year": "2021A", "segment": "Software & Services", "revenue": 433.5},
+    {"year": "2022A", "segment": "Factory Automation", "revenue": 1581.7},
+    {"year": "2022A", "segment": "Motion Control", "revenue": 1105.8},
+    {"year": "2022A", "segment": "Sensors & Instrumentation", "revenue": 782.9},
+    {"year": "2022A", "segment": "Software & Services", "revenue": 507.6},
+    {"year": "2023A", "segment": "Factory Automation", "revenue": 1663.1},
+    {"year": "2023A", "segment": "Motion Control", "revenue": 1167.8},
+    {"year": "2023A", "segment": "Sensors & Instrumentation", "revenue": 854.9},
+    {"year": "2023A", "segment": "Software & Services", "revenue": 576.2},
+    {"year": "2024A", "segment": "Factory Automation", "revenue": 1728.5},
+    {"year": "2024A", "segment": "Motion Control", "revenue": 1219.0},
+    {"year": "2024A", "segment": "Sensors & Instrumentation", "revenue": 922.8},
+    {"year": "2024A", "segment": "Software & Services", "revenue": 644.7},
+    {"year": "2025A", "segment": "Factory Automation", "revenue": 1820.7},
+    {"year": "2025A", "segment": "Motion Control", "revenue": 1290.1},
+    {"year": "2025A", "segment": "Sensors & Instrumentation", "revenue": 1009.7},
+    {"year": "2025A", "segment": "Software & Services", "revenue": 729.5},
+    {"year": "2026E", "segment": "Factory Automation", "revenue": 1910.0},
+    {"year": "2026E", "segment": "Motion Control", "revenue": 1359.8},
+    {"year": "2026E", "segment": "Sensors & Instrumentation", "revenue": 1100.2},
+    {"year": "2026E", "segment": "Software & Services", "revenue": 820.0}
+  ],
+  "meta": {"source": "Company filings, Helios management plan (FY26E–FY28E)", "unit": "USD m"}
+}

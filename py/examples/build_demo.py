@@ -81,9 +81,18 @@ def plot_h(title: str, *, block_sub: bool = False, block_head: bool = True, page
     `above` = height of a row stacked above (incl. its head and the 20 px row gap)."""
     h = 404 if len(title) <= 66 else 372
     h += 0 if page_sub else 26
-    h -= 16 if block_sub else 0
+    h -= 26 if block_sub else 0
     h += 0 if block_head else 36
     return h - above
+
+
+def segment_totals() -> list[dict]:
+    """Revenue by segment and year (the sample is by segment x region): aggregate in Python."""
+    tot: dict[tuple, float] = {}
+    for r in sample("segment_revenue")["data"]:
+        k = (r["year"], r["segment"])
+        tot[k] = tot.get(k, 0.0) + r["revenue"]
+    return [{"year": y, "segment": s, "revenue": round(v, 1)} for (y, s), v in tot.items()]
 
 
 def dcf_rows() -> list[dict]:
@@ -114,6 +123,10 @@ def build(out: Path) -> Path:
                "ownership", "org_structure", "deal_timeline", "segments_tree", "pnl_flow", "league_table"]:
         r.dataset(ds, SAMPLES / f"{ds}.json")
     r.dataset("kpis", kpis())
+    r.dataset("segment_totals", segment_totals(), title="Revenue by segment",
+              fields={"year": {"title": "Year"}, "segment": {"title": "Segment"},
+                      "revenue": {"title": "Revenue", "format": "$#,##0", "unit": "USD m"}},
+              source=SRC_PLAN, unit="USD m")
     for ds in ["peers", "precedents", "deal_flows"]:
         r.dataset(ds, relabel(ds, "sector", SECTOR_SHORT))
 
@@ -164,7 +177,7 @@ def build(out: Path) -> Path:
                subtitle="USD unless otherwise stated; market data as of 10-Oct-2026",
                source=[SRC_MKT, SRC_NB], notes=FICTIONAL)
     p.block("kpi-tiles", data="kpis", height=150, options={"variant": "boxed", "columns": 6})
-    p.block("text-block", height=plot_h(t, above=150 + 20), title="Key takeaways", options={
+    p.block("text-block", height=150, options={
         "variant": "takeaways", "columns": 4,
         "items": [
             {"title": "Discount to peers",
@@ -176,6 +189,10 @@ def build(out: Path) -> Path:
             {"title": "Deep buyer universe",
              "text": "**$165bn** of cross-border industrials M&A since 2021; sponsors can pay c.$46 per share."},
         ]})
+    p.block("text-block", height=80, options={
+        "variant": "callout", "kicker": "Recommendation", "tone": "accent2",
+        "title": "Launch a two-stage auction in late October, targeting signing by end-March 2027",
+        "text": "Board approval on 20-Oct; indicative offers due 11-Dec; final binding bids on 5-Mar-2027."})
 
     # ------------------------------------------------------------------ 01 business
     r.section("Business overview", subtitle="Financial profile, business mix and global footprint")
@@ -193,11 +210,11 @@ def build(out: Path) -> Path:
     t = "Sensors and Software & Services (36% of revenue) grow at 11%, twice the rate of the core"
     p = r.page(t, kicker="Business mix", id="mix", subtitle="Revenue by segment and product line, USD m",
                source=SRC_PLAN)
-    p.block("bar", data="segment_revenue", span=6, height=plot_h(t, block_sub=True), title="Revenue by segment",
-            subtitle="2021A–2026E",
-            options={"encode": {"x": "year", "y": "revenue", "series": "segment"}, "stack": True,
-                     "format": "$#,##0"})
-    p.block("treemap", data="segments_tree", span=6, height=plot_h(t, block_sub=True),
+    p.block("line", data="segment_totals", span=5, height=plot_h(t, block_sub=True), title="Revenue by segment",
+            subtitle="Indexed, 2021A = 100",
+            options={"encode": {"x": "year", "y": "revenue", "series": "segment"}, "rebase": 100,
+                     "endLabels": "name", "legend": False, "labels": False})
+    p.block("treemap", data="segments_tree", span=7, height=plot_h(t, block_sub=True),
             title="FY25A revenue by product line", subtitle="Area = revenue; colour = growth vs. the 7.4% group average",
             options={"encode": {"id": "id", "parent": "parent", "name": "name", "value": "value", "color": "growth"},
                      "colorMid": "avg", "rootName": "Helios Industrial"})
@@ -211,12 +228,11 @@ def build(out: Path) -> Path:
     p.block("text-block", data="financials", span=4, height=plot_h(t), title="FY25A margin profile", options={
         "variant": "stats", "columns": 1, "row": "year == \"2025A\"",
         "items": [
-            {"expr": "gross_profit / revenue", "format": "0.0%", "label": "Gross margin",
-             "note": "Gross profit {{gross_profit|$#,##0\"m\"}}"},
             {"field": "ebitda_margin", "label": "EBITDA margin", "note": "Up from 15.8% in FY19A", "tone": "accent2"},
-            {"expr": "net_income / revenue", "format": "0.0%", "label": "Net margin",
-             "note": "Net income {{net_income|$#,##0\"m\"}}"},
-            {"expr": "fcf / ebitda", "format": "0%", "label": "FCF conversion", "note": "Free cash flow / EBITDA"},
+            {"expr": "fcf / ebitda", "format": "0%", "label": "FCF conversion",
+             "note": "Free cash flow {{fcf|$#,##0\"m\"}} / EBITDA"},
+            {"expr": "capex / revenue", "format": "0.0%", "label": "Capex intensity",
+             "note": "Capex {{capex|$#,##0\"m\"}} / revenue"},
         ]})
 
     t = "60% of revenue is earned outside North America, served from 47 sites in 24 countries"
@@ -255,7 +271,8 @@ def build(out: Path) -> Path:
                notes="Mean and median exclude Helios. Software & Sensors peers (median 15.5x 2025E EBITDA) are "
                      "shown on the peer positioning page; n.m. = not meaningful.")
     p.block("comps-table", data="peers", height=plot_h(t, block_head=False), options={
-        "where": "sector != \"Software & Sensors\"", "pinTarget": "top", "stats": ["mean", "median"],
+        "where": "sector != \"Software & Sensors\"", "groupBy": "sector", "pinTarget": "top",
+        "stats": ["mean", "median"],
         "sort": {"field": "ev_ebitda_25e", "dir": "desc"}, "dense": True, "scroll": False,
         "columns": [
             {"field": "region", "title": "Region"},
@@ -275,9 +292,8 @@ def build(out: Path) -> Path:
                source=SRC_MKT, notes="Regression across 17 listed peers (Helios excluded).")
     p.block("scatter", data="peers", span=6, height=plot_h(t, block_sub=True), title="EV / EBITDA vs. revenue growth",
             subtitle="Line = least-squares fit across peers",
-            options={"encode": {"x": "rev_growth_25e", "y": "ev_ebitda_25e", "label": "ticker", "name": "company",
-                                "color": "sector"},
-                     "regression": True, "tooltipFields": ["ebitda_margin_25e", "mkt_cap"]})
+            options={"encode": {"x": "rev_growth_25e", "y": "ev_ebitda_25e", "label": "ticker", "name": "company"},
+                     "regression": True, "tooltipFields": ["sector", "ebitda_margin_25e", "mkt_cap"]})
     p.block("bubble", data="peers", span=6, height=plot_h(t, block_sub=True), title="EBITDA margin vs. revenue growth",
             subtitle="Bubble size = market capitalisation",
             options={"encode": {"x": "rev_growth_25e", "y": "ebitda_margin_25e", "size": "mkt_cap", "color": "sector",
@@ -320,7 +336,7 @@ def build(out: Path) -> Path:
     p.block("comps-table", data="precedents", span=8, height=plot_h(t), title="Selected precedent transactions",
             options={
                 "encode": {"label": "target"}, "labelTitle": "Target", "where": "date >= \"2023-01-01\"",
-                "sort": {"field": "date", "dir": "desc"}, "stats": ["median", "high", "low"], "dense": True,
+                "sort": {"field": "date", "dir": "desc"}, "stats": ["mean", "median"], "dense": True,
                 "scroll": False,
                 "columns": [
                     {"field": "date", "title": "Announced", "format": "mmm yyyy"},
@@ -363,20 +379,20 @@ def build(out: Path) -> Path:
             options={"highlight": FIRM, "top": 10, "titles": {"value": "Value", "count": "Deals"}})
 
     t = "Twelve institutions and strategics hold 46% of the shares; Ardent Family (7.5%) is pivotal"
-    p = r.page(t, kicker="Shareholder base", id="ownership", subtitle="Shares held (m) and principal legal entities",
+    p = r.page(t, kicker="Shareholder base", id="ownership", subtitle="Basic shares outstanding 155.2m",
                source="Share register as of 30-Sep-2026; company information")
-    p.block("donut", data="ownership", span=4, height=plot_h(t), title="Shareholders by investor type",
-            options={"encode": {"label": "type", "value": "shares_m"}, "centerLabel": "Shares (m)", "layout": "labels"})
-    p.block("tree", data="org_structure", span=8, height=plot_h(t), title="Simplified legal structure",
-            options={"encode": {"id": "id", "parent": "parent", "name": "name", "country": "country",
-                                "pct": "ownership_pct", "category": "entity_type"},
-                     "orient": "LR", "pctLabels": "partial", "highlight": "hlx"})
+    p.block("donut", data="ownership", span=5, height=plot_h(t), title="Shareholders by investor type",
+            options={"encode": {"label": "type", "value": "shares_m"}, "centerLabel": "Shares (m)"})
+    p.block("bar", data="ownership", span=7, height=plot_h(t), title="Largest shareholders (% of shares outstanding)",
+            options={"encode": {"x": "holder", "y": "pct"}, "where": "type != \"Retail\" and type != \"Insider\"",
+                     "orientation": "horizontal", "sort": "desc", "highlight": "Ardent Family Holdings",
+                     "format": "0.0%"})
 
     t = "A two-stage auction can deliver signing by end-March 2027 and closing in July"
     p = r.page(t, kicker="Next steps", id="timetable", subtitle="Indicative timetable; today = 14-Oct-2026",
                source=FIRM)
     p.block("gantt", data="deal_timeline", height=plot_h(t, block_head=False),
-            options={"today": "2026-10-14", "calendar": "months", "zoom": False})
+            options={"today": "2026-10-14", "calendar": "months", "zoom": False, "groupHeaders": False})
 
     # ------------------------------------------------------------------ appendix
     t = "Explore the data: build your own metrics and queries"
@@ -385,7 +401,7 @@ def build(out: Path) -> Path:
                source="All analysis runs locally in your browser; no data leaves this file.")
     p.block("query-console", data="peers", height=plot_h(t, block_head=False), options={
         "datasets": ["peers", "financials", "precedents", "segment_revenue"],
-        "highlight": "Helios Industrial",
+        "highlight": "Helios Industrial", "tab": "query",
         "builder": {"values": [{"agg": "median", "field": "ev_ebitda_25e"}, {"agg": "median", "field": "ebitda_margin_25e"}],
                     "rows": ["sector"], "sort": {"col": "v0", "dir": "desc"}},
         "examples": [
@@ -395,6 +411,15 @@ def build(out: Path) -> Path:
             {"label": "FY25A revenue by segment",
              "query": "sum(revenue) as \"Revenue\" by segment from segment_revenue where year == \"2025A\" sort 2 desc"},
         ]})
+
+    t = "Appendix: simplified legal structure"
+    p = r.page(t, kicker="Appendix · structure", id="appendix-structure",
+               subtitle="Principal legal entities; direct ownership shown where below 100%",
+               source="Company information as of 30-Sep-2026")
+    p.block("tree", data="org_structure", height=plot_h(t, block_head=False),
+            options={"encode": {"id": "id", "parent": "parent", "name": "name", "country": "country",
+                                "pct": "ownership_pct", "category": "entity_type"},
+                     "pctLabels": "partial", "highlight": "hlx", "roam": False})
 
     t = "Appendix: full precedent transaction set"
     p = r.page(t, kicker="Appendix · data", id="appendix-precedents",

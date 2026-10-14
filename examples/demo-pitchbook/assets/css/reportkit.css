@@ -1334,7 +1334,6 @@ textarea.rk-input { height: auto; padding: 8px 10px; line-height: 1.45; resize: 
 }
 .rk-pv-range button:hover { color: var(--rk-accent); }
 .rk-pv-range button:focus-visible { outline: 2px solid var(--rk-accent-3); outline-offset: -2px; }
-@media print { .rk-pv-range { display: none; } }
 
 .rk-tip .rk-pv-tip-event {
   max-width: 290px; white-space: normal; line-height: 1.4;

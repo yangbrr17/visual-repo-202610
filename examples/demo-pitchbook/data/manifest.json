@@ -111,6 +111,11 @@
       "title": "Key performance indicators",
       "rows": 6
     },
+    "segment_totals": {
+      "path": "datasets/segment_totals.json",
+      "title": "Revenue by segment",
+      "rows": 24
+    },
     "peers": {
       "path": "datasets/peers.json",
       "title": "Trading comparables",

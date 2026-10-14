@@ -21,7 +21,7 @@
       vwap: false,             // false | true (20-day) | number of days — rolling VWAP line
       range52w: 'lines',       // 'lines' | 'band' | false — 52-week high / low (high / low fields, else close)
       lastPrice: true,         // current price tag on the right axis + dotted guide
-      refLines: [],            // [{value, label, color}] e.g. offer price, unaffected price
+      refLines: [],            // [{value, label, color}] e.g. offer price, unaffected price (default colour: theme ref)
       eventsData: null,        // dataset id with events {date, label, kind, detail} -> numbered pins
       eventsEncode: { date: 'date', label: 'label', kind: 'kind', detail: 'detail' },
       range: 'all',            // initial window: 'all' | '1m' | '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | days
@@ -34,7 +34,8 @@
     },
     render: function (ctx) {
       var state = { zoom: null, legendSel: null, model: null, axes: null, extentKey: null };
-      var api = C(function (c, inst) { return build(c, inst, state); })(ctx);
+      // grid heights and date ticks are laid out in pixels: rebuild on resize
+      var api = C(function (c, inst) { return build(c, inst, state); }, { rebuildOnResize: true })(ctx);
       var inst = api.chart;
       var current = ctx;
       var selector = rangeSelector(ctx, state, inst);
@@ -72,14 +73,10 @@
       return {
         chart: inst,
         update: function (c) { current = c; api.update(c); selector.sync(); },
-        resize: function () {
-          api.resize();
-          // grid heights are laid out in pixels: rebuild when the height changes
-          if (Math.abs(inst.getHeight() - (state.h || 0)) > 1) api.update(current);
-        },
+        resize: api.resize,
         destroy: function () { selector.remove(); api.destroy(); },
-        exportImage: function () { return exportPNG(inst, current.theme); },
-        exportSVG: function () { return cleanSVG(inst, current.theme); }
+        exportImage: api.exportImage,
+        exportSVG: api.exportSVG
       };
     }
   });
@@ -254,7 +251,7 @@
     var useZoom = o.zoom !== false && m.n > 20;
     var slider = useZoom && o.zoomSlider !== false && !ctx.print;
     var hasLegend = o.legend !== false;
-    var H = state.h = inst.getHeight();
+    var H = inst.getHeight();
     var hasSelector = o.rangeSelector && !ctx.print && useZoom && m.n >= 30;
     var top = hasLegend || hasSelector ? 34 : 14, gap = 16, xLab = 22, bottom = slider ? 32 : 4;
     var avail = Math.max(120, H - top - gap - xLab - bottom);
@@ -264,17 +261,18 @@
 
     var ax = state.axes = axesFor(ctx, state);
     // fixed left margin so both panels share one x scale
-    var pAxisFmt = axisFmt(fmt, function () { return state.axes && state.axes.p.interval; });
+    var pAxisFmt = tickFmt(fmt, function () { return state.axes && state.axes.p.interval; });
+    var font = '11px ' + t.fontNum;
     var left = Math.ceil(Math.max(
-      textWidth(pAxisFmt(ax.p.max), t), textWidth(pAxisFmt(ax.p.min), t),
-      textWidth(RK.format(-ax.p.max, fmt), t) * 0.92,
-      hasVol ? textWidth(RK.format(ax.v.max, 'auto'), t) : 0)) + 14;
-    var right = o.lastPrice ? Math.ceil(textWidth(RK.format(m.close[m.n - 1], fmt), t, '600 10.5px ') + 18) : 14;
+      C.measure(pAxisFmt(ax.p.max), font), C.measure(pAxisFmt(ax.p.min), font),
+      C.measure(RK.format(-ax.p.max, fmt), font) * 0.92,
+      hasVol ? C.measure(RK.format(ax.v.max, 'auto'), font) : 0)) + 14;
+    var right = o.lastPrice ? Math.ceil(C.measure(RK.format(m.close[m.n - 1], fmt), '600 10.5px ' + t.fontNum) + 18) : 14;
     state.plotW = Math.max(120, inst.getWidth() - left - right);
     var tk = state.ticks = dateTicks(windowOf(m, state.zoom), state.plotW);
 
     var priceColor = t.accent;
-    var pal = palette(t, [priceColor, t.accent2]);
+    var pal = RK.theme.palette({ exclude: [priceColor, t.accent2], n: m.mas.length + 1 });   // overlays clear of price + highlight
     var series = [];
     var sel = state.legendSel;
 
@@ -289,11 +287,11 @@
       data: m.close.map(function (v, i) { return [m.xv[i], v, i]; })
     });
     m.mas.forEach(function (s, k) {
-      s.color = pal[k % pal.length];
+      s.color = pal[k];
       series.push(lineSeries(s, s.color, k === 1 ? [4, 3] : 'solid', m));
     });
     if (m.vwap) {
-      m.vwap.color = pal[m.mas.length % pal.length];
+      m.vwap.color = pal[m.mas.length];
       series.push(lineSeries(m.vwap, m.vwap.color, [1.5, 2.5], m));
     }
     var marks = markSeries(ctx, m, priceColor);
@@ -310,10 +308,8 @@
       });
     }
 
-    var legendData = [{ name: series[0].name, icon: 'rect', itemHeight: 4 }]
-      .concat(m.mas.map(function (s) { return { name: s.name, icon: 'rect', itemHeight: 3 }; }))
-      .concat(m.vwap ? [{ name: m.vwap.name, icon: 'rect', itemHeight: 3 }] : [])
-      .concat(hasVol ? [{ name: ctx.title(ctx.enc.volume) || 'Volume', icon: 'roundRect' }] : []);
+    var legendData = [series[0].name].concat(m.mas.map(function (s) { return s.name; }), m.vwap ? [m.vwap.name] : [],
+      hasVol ? [ctx.title(ctx.enc.volume) || 'Volume'] : []);
 
     var xBase = {
       type: 'time', min: 'dataMin', max: 'dataMax', splitLine: { show: false },
@@ -321,18 +317,14 @@
       axisTick: { show: true, length: 3, lineStyle: { color: t.axis }, customValues: tk.values },
       axisPointer: { label: { formatter: function (p) { return RK.format(new Date(p.value), 'dd mmm yyyy'); } } }
     };
-    var dz = [];
-    if (useZoom) {
-      var z = state.zoom;
-      dz.push({ id: 'dzi', type: 'inside', xAxisIndex: [0, 1], filterMode: 'none', start: z.start, end: z.end });
-      if (slider) dz.push({ id: 'dzs', type: 'slider', xAxisIndex: [0, 1], filterMode: 'none', start: z.start, end: z.end,
-        left: left, right: right, bottom: 6, height: 18, showDetail: false, brushSelect: false });
-    }
+    // core zoom (Ctrl/Cmd + wheel or pinch, drag to pan, slider unless printing) shared by both panels
+    var z = state.zoom, link = { xAxisIndex: [0, 1], start: z.start, end: z.end };
+    var dz = useZoom ? C.zoom(ctx, 'x', util.merge({ id: 'dzs', left: left, right: right, bottom: 6 }, link)) : [];
+    if (dz.length) util.merge(dz[0], { id: 'dzi' }, link);
 
     return {
       animationDurationUpdate: 500,
-      legend: C.legend(ctx, { show: hasLegend, data: legendData, itemWidth: 16, itemHeight: 4, right: o.rangeSelector && !ctx.print ? 250 : 0,
-        selected: sel || undefined }),
+      legend: C.legend(ctx, { show: hasLegend, data: legendData, right: o.rangeSelector && !ctx.print ? 250 : 0, selected: sel || undefined }),
       axisPointer: { link: [{ xAxisIndex: 'all' }], label: { backgroundColor: t.ink2, color: t.paper, fontSize: 10.5, padding: [3, 5], fontFamily: t.fontNum } },
       grid: [
         { id: 'gp', left: left, right: right, top: top, height: priceH, containLabel: false },
@@ -377,8 +369,8 @@
     var chip = RK.theme.alpha(t.paper, 0.85);       // label background: legible where it crosses the line
     var lines = [], area = null;
     (o.refLines || []).forEach(function (r) {
-      lines.push({ yAxis: r.value, lineStyle: { color: r.color || t.accent2, type: r.type || 'dashed', width: 1.25 },
-        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: r.color || t.accent2, fontWeight: 600, fontSize: 10.5, backgroundColor: chip, padding: [1, 4], borderRadius: 2 } });
+      lines.push({ yAxis: r.value, lineStyle: { color: r.color || t.ref, type: r.type || 'dashed', width: 1.25 },
+        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: r.color || t.ref, fontWeight: 600, fontSize: 10.5, backgroundColor: chip, padding: [1, 4], borderRadius: 2 } });
     });
     if (m.r52 && o.range52w === 'band') {
       area = { silent: true, itemStyle: { color: RK.theme.alpha(t.accent3 || t.accent, t.dark ? 0.12 : 0.07) },
@@ -395,7 +387,7 @@
       var last = m.close[m.n - 1];
       lines.push({ yAxis: last, lineStyle: { color: priceColor, type: [1.5, 2.5], width: 1, opacity: 0.8 },
         label: { formatter: RK.format(last, fmt), position: 'end', distance: 4, backgroundColor: priceColor,
-          color: RK.theme.onColor(priceColor, t.ink, '#ffffff'), padding: [3, 4, 2, 4], borderRadius: 2, fontWeight: 600, fontSize: 10.5, fontFamily: t.fontNum } });
+          color: RK.theme.textOn(priceColor), padding: [3, 4, 2, 4], borderRadius: 2, fontWeight: 600, fontSize: 10.5, fontFamily: t.fontNum } });
     }
     if (!lines.length && !area) return null;
     return {
@@ -407,7 +399,7 @@
 
   /** Numbered pins on stems; staggered vertically when they would touch. */
   function pinSeries(ctx, m, pins) {
-    var t = ctx.theme, pinColor = t.ink2, txt = RK.theme.onColor(pinColor, t.ink, '#ffffff'), R = 8;
+    var t = ctx.theme, pinColor = t.ink2, txt = RK.theme.textOn(pinColor), R = 8;
     return {
       id: 'events', type: 'custom', name: '__events', xAxisIndex: 0, yAxisIndex: 0, z: 6, clip: true, tooltip: { show: false },
       encode: { x: 0, y: 1 },
@@ -495,7 +487,7 @@
     var keepNarrow = w < 340 ? ['3m', '1y', 'all'] : w < 480 ? ['1m', '3m', '6m', '1y', 'all'] : null;
     if (keepNarrow && !keys) items = items.filter(function (r) { return keepNarrow.indexOf(r[0]) >= 0; });
     var btns = {};
-    var bar = h('div.rk-seg.rk-pv-range', { role: 'group', 'aria-label': 'Date range' }, items.map(function (r) {
+    var bar = h('div.rk-seg.rk-pv-range.rk-noprint', { role: 'group', 'aria-label': 'Date range' }, items.map(function (r) {
       var b = h('button', { type: 'button', 'aria-pressed': 'false', on: { click: function () {
         var z = zoomFor(state.model, r[0]);
         inst.dispatchAction({ type: 'dataZoom', start: z.start, end: z.end });
@@ -521,33 +513,20 @@
   /* ------------------------------------------------------------------ *
    * Small helpers
    * ------------------------------------------------------------------ */
-  function palette(t, avoid) {
-    var out = [];
-    [t.accent3, t.ink3].concat(t.cat).forEach(function (c) {
-      if (!c) return;
-      if (avoid.some(function (a) { return dist(a, c) < 60; })) return;
-      if (out.some(function (x) { return dist(x, c) < 60; })) return;
-      out.push(c);
-    });
-    return out.length ? out : t.cat.slice(1);
-  }
-  function dist(a, b) {
-    var x = RK.theme.parseColor(a), y = RK.theme.parseColor(b);
-    return Math.sqrt(Math.pow(x[0] - y[0], 2) + Math.pow(x[1] - y[1], 2) + Math.pow(x[2] - y[2], 2));
-  }
-
   /**
-   * Axis labels: drop the decimals when every tick is a whole number ("$40" not "$40.00", "100" not "100.0"),
-   * keep them on all ticks otherwise ("9.5x", "10.0x"). getStep returns the live tick interval when known.
+   * Axis tick formatter (house style: no decimals when the tick step is whole at display precision,
+   * "$6,000" not "$6,000.0", "20%" not "20.0%"). step: number, function returning the live step,
+   * or an array of tick values; null decides per value.
    */
-  function axisFmt(fmt, getStep) {
-    var code = String(RK.format.presets[fmt] || fmt);
-    var intFmt = code.replace(/\.[0#]+/g, '');
-    var isInt = function (v) { return Math.abs(v - Math.round(v)) < 1e-9; };
+  function tickFmt(code, step) {
+    code = String(RK.format.presets[code] || code || 'auto');
+    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
+    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
+    function whole(v) { return num(v, code) === num(v, trimmed); }
     return function (v) {
-      var step = getStep ? getStep() : null;
-      var whole = /%/.test(code) ? false : util.isNum(step) ? isInt(step) && isInt(v) : isInt(v);
-      return RK.format(v, whole ? intFmt : fmt);
+      var s = typeof step === 'function' ? step() : step;
+      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
+      return RK.format(v, ok ? trimmed : code);
     };
   }
 
@@ -583,46 +562,5 @@
   function tickLabel(tk) {
     var f = tk.unit === 'y' ? 'yyyy' : tk.unit === 'm' ? 'mmm-yy' : 'd mmm';
     return { customValues: tk.values, hideOverlap: true, formatter: function (v) { return RK.format(new Date(v), f); } };
-  }
-
-  var measureCtx = null;
-  function textWidth(str, t, weight) {
-    if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
-    measureCtx.font = (weight || '400 11px ') + t.fontNum;
-    return measureCtx.measureText(String(str)).width;
-  }
-
-  /* ------------------------------------------------------------------ *
-   * Export. Workaround for a core issue (rk.chart exportPNG): ECharts' SVG string keeps the theme's
-   * double-quoted font names inside style="…" — invalid XML, so the browser refuses to rasterise it.
-   * Swap them to single quotes before exporting.
-   * ------------------------------------------------------------------ */
-  function cleanSVG(inst, t) {
-    var svg = inst.renderToSVGString ? inst.renderToSVGString() : null;
-    if (!svg) return null;
-    [t.fontSans, t.fontNum, t.fontSerif].forEach(function (f) {
-      if (f && f.indexOf('"') >= 0) svg = svg.split(f).join(f.replace(/"/g, "'"));
-    });
-    return svg;
-  }
-  function exportPNG(inst, t) {
-    var bg = t.paper || '#ffffff';
-    var zr = inst.getZr && inst.getZr();
-    var svg = zr && zr.painter && zr.painter.type === 'canvas' ? null : cleanSVG(inst, t);
-    if (!svg) return Promise.resolve(inst.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: bg }));
-    var w = inst.getWidth(), h = inst.getHeight();
-    return new Promise(function (resolve, reject) {
-      var img = new Image();
-      img.onload = function () {
-        var c = document.createElement('canvas');
-        c.width = w * 2; c.height = h * 2;
-        var g = c.getContext('2d');
-        g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
-        g.drawImage(img, 0, 0, c.width, c.height);
-        resolve(c.toDataURL('image/png'));
-      };
-      img.onerror = reject;
-      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-    });
   }
 })();
