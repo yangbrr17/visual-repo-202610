@@ -386,6 +386,7 @@
 
       /* ---------------- print: static pitchbook table instead of the virtual grid ---------------- */
       var PRINT_CAP = 400;      // rows laid out before trimming to the block height
+      var PRINT_CAP_AUTO = 30;  // height "auto" blocks have no height to fit: a page's worth of rows
 
       /** Rows as the grid shows them: its own active view (sort, search, header filters) when it holds these rows. */
       function printRows() {
@@ -459,7 +460,8 @@
       }
       function buildPrint() {
         var v = printRows(), rows = v.rows, total = rows.length, sel = cur.selected(key);
-        var tbody = h('tbody', rows.slice(0, PRINT_CAP).map(function (d) {
+        var body = cur.el, auto = body.classList.contains('is-auto') || cur.block.classList.contains('rk-block--auto');
+        var tbody = h('tbody', rows.slice(0, auto ? PRINT_CAP_AUTO : PRINT_CAP).map(function (d) {
           var cls = (isTarget(d) ? 'is-target ' : '') + (sel.length && sel.indexOf(d[key]) >= 0 ? 'is-selected' : '');
           return h('tr', { class: cls.trim() || null }, specs.map(function (s) { return printCell(s, d); }));
         }));
@@ -492,7 +494,6 @@
         if (tbl.offsetWidth > availW + 0.5) wrap.classList.add('is-compact');
         if (tbl.offsetWidth > availW + 0.5) squeeze(tbl, tbody, availW);
         // height: the rows whose bottom edge fits above the footnote line
-        var body = cur.el, auto = body.classList.contains('is-auto') || cur.block.classList.contains('rk-block--auto');
         var avail = auto ? Infinity : body.clientHeight, trs = tbody.rows;
         setNote(trs.length);
         if (avail > 0 && wrap.offsetHeight > avail + 0.5 && trs.length > 1) {

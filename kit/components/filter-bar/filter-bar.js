@@ -12,8 +12,9 @@
  * Each filter reads its values / extent from `data` (dataset id, default: the block's dataset) and
  * writes RK.store.setFilter(key, spec) with key = field by default, so two bars on the same field stay
  * in sync; spec.label carries the control's label (or the field title) so the page's "Filtered view"
- * stamp and the block badges read "Region = Europe" rather than the raw field name. The chips row lists the bar's own filters AND chart cross-filter selections (store filters
- * with a `source`), each removable, plus "Reset all". Facet counts and the range histogram respect the
+ * stamp and the block badges read "Region = Europe" rather than the raw field name. The chips row lists
+ * the bar's own filters AND chart cross-filter selections (store filters with a `source`), each
+ * removable, plus "Reset all". Facet counts and the range histogram respect the
  * other active filters. Dropdowns are custom popovers attached to <body> (never clipped by a page),
  * fully keyboard operable (listbox / slider / switch ARIA patterns). Inline layout inside .rk-topbar:
  * the controls show their own state, chart selections become removable chips on the same line, and the

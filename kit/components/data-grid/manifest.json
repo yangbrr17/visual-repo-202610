@@ -7,7 +7,7 @@
   "deps": ["tabulator"],
   "summary": "Sortable, filterable, searchable grid (Tabulator 6) for appendix-style detail data, with frozen columns, grouped headers, paging and CSV download.",
   "summary_zh": "可排序、可筛选、可搜索的明细数据表（Tabulator 6），支持冻结列、分组表头、分页 / 虚拟滚动和 CSV 下载。",
-  "description_zh": "用于附录或明细页：列默认取自数据集 schema（标题、RK 格式码，数字右对齐），也可用 columns 指定顺序、分组表头与宽度。每列表头带筛选框（文本为包含匹配，数字支持“>10”“<=2.5”“5-10”“30%”），顶部有全局搜索和 CSV 下载，固定高度内虚拟滚动或按页显示。点击行会按 key 字段交叉筛选其他图表，全局筛选变化时以 replaceData 平滑刷新并保留排序与筛选；适合 20–5,000 行的交易清单、可比公司全表等。",
+  "description_zh": "用于附录或明细页：列默认取自数据集 schema（标题、RK 格式码，数字右对齐），也可用 columns 指定顺序、分组表头与宽度。每列表头带筛选框（文本为包含匹配，数字支持“>10”“<=2.5”“5-10”“30%”），顶部有全局搜索和 CSV 下载，固定高度内虚拟滚动或按页显示。点击行会按 key 字段交叉筛选其他图表，全局筛选变化时以 replaceData 平滑刷新并保留排序与筛选；适合 20–5,000 行的交易清单、可比公司全表等。打印时换成静态表格（与当前排序、搜索和列筛选一致），只印出块高度内放得下的行，并以“… 另有 n 行”脚注说明其余行。",
   "best_for": ["Full precedent-transaction or peer lists in an appendix", "Detail data behind a chart that clients want to search and download", "Long lists (hundreds to thousands of rows) with paging or virtual scroll"],
   "avoid_when": ["A formatted pitchbook comps page with statistic rows (use comps-table)", "Fewer than ~8 rows (a plain table reads better)"],
   "channels": {
@@ -29,7 +29,7 @@
     "layout": {"type": "string", "default": "fitDataStretch", "desc": "Tabulator layout: fitDataStretch | fitColumns | fitData"},
     "crossFilter": {"type": "boolean", "default": true, "desc": "Click a row to cross-filter other blocks on the key field"}
   },
-  "interactions": ["Click headers to sort", "Per-column header filters", "Global search", "Paging or virtual scroll", "Frozen first column", "Row click cross-filter (others dim)", "CSV download", "Live update with global filters"],
+  "interactions": ["Click headers to sort", "Per-column header filters", "Global search", "Paging or virtual scroll", "Frozen first column", "Row click cross-filter (others dim)", "CSV download", "Live update with global filters", "Prints as a static table in the grid's order: the rows that fit + \u201c\u2026 n more rows\u201d"],
   "samples": [
     {"title": "Precedent transactions — full list", "data": "precedents", "height": 470,
      "options": {"sort": {"field": "date", "dir": "desc"}, "highlight": "Brennick Robotics",

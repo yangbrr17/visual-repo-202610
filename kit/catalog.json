@@ -1219,7 +1219,7 @@
    },
    "interactions": [
     "Builder: pick aggregation / field / group-by / filter / sort / top N — runs as you edit",
-    "Query editor: syntax highlighting, autocomplete (Tab / Enter), live validation with line / column and wavy underline, Ctrl/Cmd+Enter",
+    "Query editor: syntax highlighting, autocomplete (Tab / Enter), live validation with line / column and wavy underline, Ctrl/⌘ + Enter runs",
     "Reference panel: click a field, @parameter or function to insert at the caret",
     "Sortable result columns; chart follows the table order",
     "Results respect global filters and re-run when filters or @parameters change",
@@ -1672,10 +1672,11 @@
     }
    },
    "interactions": [
-    "Offer stepper (− / +) and click-a-price-header to move the offer; sets the bound @param so sliders and other blocks follow",
+    "Offer stepper (− / +) and click (or Enter on) a price header to move the offer; sets the bound @param so sliders and other blocks follow",
     "Live recompute with number tweening when bound @params change",
     "Hovered column highlight + tooltip with the calculation (price ÷ reference − 1, price × shares, EV ÷ EBITDA)",
-    "Rows rise in on first reveal; a moved offer column fades in"
+    "Rows rise in on first reveal; a moved offer column fades in",
+    "PNG export"
    ],
    "samples": [
     {
@@ -2578,8 +2579,8 @@
    "interactions": [
     "Crosshair tooltip: OHLC, change vs. prior close, volume, MAs",
     "Hover near a pin to read the event",
-    "Slider, drag, Ctrl/Cmd + wheel or pinch zoom shared by candles and volume (plain wheel scrolls the page)",
-    "1M / 3M / 6M / YTD / 1Y / All range buttons",
+    "Zoom shared by candles and volume: slider; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)",
+    "Range buttons (1M / 3M / 6M / YTD / 1Y / 2Y / 5Y / All, as the history allows)",
     "Legend toggles MAs / volume",
     "PNG / CSV export"
    ],
@@ -2750,7 +2751,7 @@
     "Click a bar to cross-filter on the period",
     "Legend toggle",
     "Animated transitions on filter changes",
-    "Optional zoom (slider, drag, Ctrl/Cmd + wheel or pinch)",
+    "Optional zoom (zoom: true): slider; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)",
     "PNG / CSV export"
    ],
    "samples": [
@@ -2971,7 +2972,7 @@
    "interactions": [
     "Axis tooltip with all series (and % change when rebased)",
     "Hover near a pin to read the event",
-    "Slider, drag, Ctrl/Cmd + wheel or pinch zoom with automatic y re-fit (plain wheel scrolls the page)",
+    "Zoom with automatic y re-fit: slider; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)",
     "Legend toggle re-fits the axis",
     "Click a line to cross-filter (long data; generic series fields filter this dataset only)",
     "End labels follow zoom and filters",
@@ -3175,8 +3176,8 @@
    "interactions": [
     "Crosshair tooltip: date, close, 1-day and period change, volume, MAs",
     "Hover near a pin to read the event",
-    "Slider, drag, Ctrl/Cmd + wheel or pinch zoom shared by price and volume (plain wheel scrolls the page)",
-    "1M / 3M / 6M / YTD / 1Y / All range buttons",
+    "Zoom shared by price and volume: slider; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)",
+    "Range buttons (1M / 3M / 6M / YTD / 1Y / 2Y / 5Y / All, as the history allows)",
     "Legend toggles MAs / VWAP / volume",
     "PNG / CSV export"
    ],
@@ -3688,7 +3689,7 @@
    },
    "interactions": [
     "Crosshair tooltip with value, peer value, premium / (discount) and deviation from the mean in σ",
-    "Zoom and pan the time axis (slider, drag, Ctrl/Cmd + wheel or pinch)",
+    "Time-axis zoom: slider; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)",
     "Legend toggle",
     "Animated update when filters change",
     "PNG / CSV export"
@@ -3848,10 +3849,10 @@
     }
    },
    "interactions": [
-    "Axis tooltip with totals",
+    "Axis tooltip (with the stack total when stacked)",
     "Click a bar to cross-filter (generic fields such as type / kind filter this dataset only)",
     "Legend toggle",
-    "Optional zoom (slider, drag, Ctrl/Cmd + wheel or pinch)",
+    "Optional zoom (zoom: true): slider; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)",
     "PNG / CSV export"
    ],
    "samples": [
@@ -4696,7 +4697,7 @@
     "Hover tooltip with premium / (discount) to the median and period change",
     "Click a dot to cross-filter",
     "Legend toggles groups",
-    "Optional category zoom for long lists",
+    "Optional category zoom for long lists (zoom: true): slider; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)",
     "PNG / CSV export"
    ],
    "samples": [
@@ -6183,7 +6184,7 @@
     "Hover a square or legend row: that category stays in focus, tooltip with value / share / squares",
     "Click to cross-filter ('Others' toggles all of its members)",
     "Colours cross-fade and numbers count when filters change",
-    "PNG / SVG export"
+    "PNG / CSV export"
    ],
    "samples": [
     {
@@ -6375,7 +6376,7 @@
     "Click a dot to cross-filter by label; click a row to cross-filter by group (generic field names such as target / type / category stay scoped to this dataset)",
     "Non-selected dots dimmed",
     "Legend toggle (colorBy field)",
-    "Optional zoom with live re-layout",
+    "Optional zoom (zoom: true) with live re-layout: slider; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)",
     "Dots fan out from the group median on entry",
     "PNG / CSV export"
    ],
@@ -6841,7 +6842,7 @@
     "Hover tooltip with all four dimensions",
     "Click a bubble to cross-filter (toggle); box-select several",
     "Legend toggles categories; continuous colour band handles filter by value",
-    "Box zoom, Ctrl + wheel zoom, drag to pan, reset",
+    "Box-zoom and reset buttons; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)",
     "Timeline play / scrub with animated transitions and trails",
     "PNG / CSV export"
    ],
@@ -7066,7 +7067,7 @@
    "interactions": [
     "Hover tooltip (row · column: value)",
     "Hover the colour legend to highlight cells in that range",
-    "Optional click a cell to cross-filter its row or column",
+    "Optional (select: 'x' | 'y'): click a cell to cross-filter on its column or row",
     "Animated transitions when filters change",
     "PNG / CSV export"
    ],
@@ -7465,7 +7466,7 @@
     "Hover tooltip with both metrics (+ extra fields)",
     "Click a point to cross-filter (toggle)",
     "Box-select points to cross-filter",
-    "Box zoom, Ctrl + wheel zoom, drag to pan, reset",
+    "Box-zoom and reset buttons; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page)",
     "Legend toggles categories",
     "Animated transitions when filters change",
     "PNG / CSV export"
@@ -8067,7 +8068,7 @@
     "Hover a node: adjacency highlight + tooltip (category, size, connections)",
     "Hover an edge: relationship type and value",
     "Click a node to pin its neighbourhood and cross-filter",
-    "Ctrl/⌘ + wheel or pinch to zoom (a plain wheel scrolls the page), drag to pan, drag nodes",
+    "Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page and shows a hint); drag nodes",
     "Legend toggles categories",
     "Positions are kept across filter updates",
     "PNG / CSV export"
@@ -8452,7 +8453,7 @@
    "interactions": [
     "Hover an entity: country, type, parent, direct and effective (look-through) ownership",
     "Click an entity or its '+n' badge to collapse / expand (animated re-layout)",
-    "Ctrl/⌘ + wheel or pinch to zoom (a plain wheel scrolls the page), drag to pan",
+    "Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page and shows a hint)",
     "Re-lays out on resize",
     "PNG / CSV export"
    ],
@@ -8653,7 +8654,7 @@
     "Hover tooltip",
     "Click a bubble to cross-filter (others dim)",
     "Click a legend category to filter by it",
-    "Zoom / pan; labels re-place on zoom",
+    "Ctrl/⌘ + wheel or pinch to zoom; drag to pan; +/− buttons (plain wheel scrolls the page until the map is clicked); labels re-place on zoom",
     "Grow-in animation, smooth radius transitions on filter",
     "PNG export"
    ],
@@ -8930,7 +8931,7 @@
     "Click a tile to cross-filter (others dim; shared dimensions such as province filter the report, other fields such as adcode this dataset only)",
     "Hover a legend class to focus its tiles; click it to cross-filter the whole class",
     "Provinces excluded by other filters fade to pale ghost tiles with animated colour transitions; staggered west-to-east entrance",
-    "PNG / SVG export including legend and note; print-safe (SVG, no animation)"
+    "PNG / CSV export (the PNG includes legend and note); print-safe (SVG, no animation)"
    ],
    "samples": [
     {
@@ -9152,7 +9153,7 @@
    "interactions": [
     "Hover highlight + tooltip (value, rank, extra fields)",
     "Click a country to cross-filter (dims the others)",
-    "Zoom / pan (+/- buttons, Ctrl/Cmd + wheel or pinch; plain wheel after a click)",
+    "Ctrl/⌘ + wheel or pinch to zoom; drag to pan; +/− buttons (plain wheel scrolls the page until the map is clicked)",
     "Micro-states / territories without a polygon shown as coloured points (same scale, hover and click)",
     "Smooth colour transitions when filters change",
     "PNG export"
@@ -9410,6 +9411,7 @@
     "Click a cluster to zoom in; spiderfy at max zoom",
     "Hover a point for its formatted fields",
     "Click a point or legend category to cross-filter",
+    "Ctrl/⌘ + wheel or pinch to zoom; drag to pan; +/− buttons (plain wheel scrolls the page until the map is clicked)",
     "PNG export"
    ],
    "samples": [
@@ -9648,7 +9650,7 @@
     "Hover a country to isolate its inbound / outbound flows (tooltip: in, out, net)",
     "Click a flow or legend category to cross-filter",
     "Arcs draw in on render; travelling dots show the direction of hovered flows (motion only)",
-    "Zoom / pan",
+    "Ctrl/⌘ + wheel or pinch to zoom; drag to pan; +/− buttons (plain wheel scrolls the page until the map is clicked)",
     "PNG export"
    ],
    "samples": [
@@ -9804,7 +9806,7 @@
    "interactions": [
     "Toggle the points overlay",
     "Hover a point for its fields; click to cross-filter",
-    "Zoom / pan (density re-computed per zoom)",
+    "Ctrl/⌘ + wheel or pinch to zoom; drag to pan; +/− buttons (plain wheel scrolls the page until the map is clicked); density re-computed per zoom",
     "Updates with filters",
     "PNG export"
    ],
@@ -11398,7 +11400,7 @@
    "interactions": [
     "Tooltip with start / end dates, duration in days and weeks, owner and status vs. today",
     "Click a task or a workstream label to cross-filter by workstream (others dim)",
-    "Ctrl + wheel, pinch or slider zoom on the time axis (a plain wheel scrolls the page); header switches between weeks, months and quarters",
+    "Time-axis zoom: slider; Ctrl/⌘ + wheel or pinch to zoom; drag to pan (plain wheel scrolls the page); the header switches between weeks, months and quarters",
     "Legend toggles phases and milestones",
     "Staggered bar wipe-in and milestone pop on entry; smooth updates on filter changes",
     "PNG / CSV export"

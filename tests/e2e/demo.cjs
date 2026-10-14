@@ -40,7 +40,7 @@ const PDF = (isFile ? target.replace(/\.html?$/i, '') : target) + '.pdf';
 const NAME = path.basename(isFile ? path.dirname(target) : target);
 const OUT = path.resolve(ROOT, opt('out', 'tests/screens/' + (dirArg && NAME !== 'demo-pitchbook' ? NAME : 'demo')));
 if (!fs.existsSync(REPORT)) { console.error('report not found: ' + REPORT + ' (build it first, e.g. python3 py/examples/build_demo.py)'); process.exit(2); }
-const URL = 'file://' + REPORT;
+const REPORT_URL = 'file://' + REPORT;
 
 const PRINT_TOL = 2;   // CSS px of slack before content counts as overflowing (sub-pixel rounding, antialiasing)
 
@@ -55,7 +55,7 @@ function watch(page, errors, tag) {
   page.on('requestfailed', r => errors.push('requestfailed' + t + ': ' + r.url()));
 }
 async function open(page) {
-  await page.goto(URL, { waitUntil: 'load' });
+  await page.goto(REPORT_URL, { waitUntil: 'load' });
   await page.waitForFunction(() => window.RK && RK.runtime && RK.runtime.booted && RK.blocks().length > 0, null, { timeout: 20000 });
 }
 
@@ -455,6 +455,16 @@ function measurePrint(arg) {
       const count = (buf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
       check(count === n, `PDF ${path.relative(process.cwd(), PDF)} — ${count} pages for ${n} report pages, ${(buf.length / 1048576).toFixed(2)} MB`);
     }
+    // back to screen: blocks first rendered for print (a data-grid builds its live grid only now) render for the screen
+    await pp.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+    await pp.emulateMedia({ media: 'screen', reducedMotion: 'reduce' });
+    await pp.waitForTimeout(1200);
+    const after = await pp.evaluate(() => RK.blocks().filter(b => b.el.closest('.rk-page')).map(b => ({ id: b.id, c: b.component, state: b.state,
+      grid: b.component === 'data-grid' ? { print: !!b.el.querySelector('.rk-dgrid-print'), rows: b.el.querySelectorAll('.tabulator-row').length } : null })));
+    const badAfter = after.filter(b => (b.state !== 'rendered' && b.state !== 'empty') || (b.grid && (b.grid.print || !b.grid.rows)));
+    check(!badAfter.length && !(await pp.evaluate(() => document.documentElement.classList.contains('rk-printing'))),
+      `after print: ${after.length} blocks back on screen` + (after.some(b => b.grid) ? ' (data-grids rebuilt as live grids)' : '') +
+      (badAfter.length ? ' — ' + badAfter.map(b => `${b.id}=${b.state}${b.grid ? ' ' + JSON.stringify(b.grid) : ''}`).join(', ') : ''));
     await pp.close();
   }
 
