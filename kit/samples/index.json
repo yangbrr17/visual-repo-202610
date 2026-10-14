@@ -503,6 +503,50 @@
    ],
    "path": "datasets/yield_curve.json",
    "purpose": "Multi-line yield curve (tenor_years as numeric x)"
+  },
+  "credentials": {
+   "title": "Selected transaction credentials",
+   "rows": 12,
+   "fields": [
+    "date",
+    "target",
+    "acquirer",
+    "deal_value_bn",
+    "deal_type",
+    "role",
+    "sector",
+    "region",
+    "description"
+   ],
+   "path": "datasets/credentials.json",
+   "purpose": "Deal credentials / tombstone grid (deal type, parties, value, role), filterable by sector / region"
+  },
+  "sources_uses": {
+   "title": "Illustrative LBO sources & uses at $52.00 per share",
+   "rows": 11,
+   "fields": [
+    "side",
+    "item",
+    "amount",
+    "multiple_of_ebitda",
+    "pct",
+    "notes"
+   ],
+   "path": "datasets/sources_uses.json",
+   "purpose": "LBO sources & uses table (two balancing sides, % of total, x EBITDA, footnotes)"
+  },
+  "capital_structure": {
+   "title": "Pro forma capitalisation at close",
+   "rows": 5,
+   "fields": [
+    "instrument",
+    "amount",
+    "rate",
+    "maturity",
+    "multiple_cum"
+   ],
+   "path": "datasets/capital_structure.json",
+   "purpose": "Pro forma capitalisation table (tranches, rates, maturities, cumulative leverage)"
   }
  }
 }

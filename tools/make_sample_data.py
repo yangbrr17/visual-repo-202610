@@ -1388,6 +1388,99 @@ class _Gen:
         self.add(make_ds("yield_curve", "USD sovereign yield curve", fields, rows, source=SRC_MKT,
                          notes=["Illustrative curve; yields as decimals (0.0386 = 3.86%)."]))
 
+    # ------------------------------------------------- ib-pitch: credentials, sources & uses, capitalisation
+    def credentials(self):
+        """Tombstones of the (fictional) advisory bank; deals that are also rows of `precedents` share their EV."""
+        prec = {p["target"]: p for p in self.precedent_rows}
+
+        def bn(target):
+            return rnd(prec[target]["ev"] / 1000, 1)
+        deals = [
+            ("2026-09-08", "Tarrant Automation", "Kanemori Systems", 5.0, "Acquisition financing", "Joint lead arranger & bookrunner", IA, "Asia Pacific",
+             "Committed bridge and term-loan financing for Kanemori Systems' all-cash acquisition of Tarrant Automation."),
+            ("2026-08-24", "Tarrant Automation", "Kanemori Systems", bn("Tarrant Automation"), "Sell-side M&A", "Exclusive financial advisor", IA, "North America",
+             "Sale of US machine-vision and motion-control specialist Tarrant Automation; pending regulatory approvals."),
+            ("2026-05-11", "Upland Drives", "Norrvik Drives", bn("Upland Drives"), "Buy-side M&A", "Financial advisor", MPC, "Latin America",
+             "Acquisition of Brazilian industrial-drives maker Upland Drives, extending Norrvik's Latin American footprint."),
+            ("2026-03-20", "Sefton Industrial Software", "Bluefield Capital Partners", 1.6, "Acquisition financing", "Joint lead arranger", ISS, "Europe",
+             "Unitranche and term-loan package supporting Bluefield Capital Partners' take-private of Sefton."),
+            ("2026-03-02", "Sefton Industrial Software", "Bluefield Capital Partners", bn("Sefton Industrial Software"), "Sell-side M&A",
+             "Lead financial advisor", ISS, "Europe", "Recommended take-private of UK asset-performance software provider Sefton."),
+            ("2025-11-10", "Redmere Instruments", "Quintar Sensing", bn("Redmere Instruments"), "Sell-side M&A", "Joint financial advisor", ISS, "Europe",
+             "Sale of German process-instrumentation group Redmere Instruments for cash and shares."),
+            ("2025-10-21", "Lumora Sensing", None, 1.2, "IPO", "Joint global coordinator", ISS, "North America",
+             "US initial public offering of industrial sensing platform Lumora Sensing; priced at the top of the range."),
+            ("2025-07-15", "Brennick Robotics", "Helios Industrial", bn("Brennick Robotics"), "Buy-side M&A", "Exclusive financial advisor", IA, "North America",
+             "Acquisition of collaborative-robotics developer Brennick Robotics, adding cobot software to Helios' portfolio."),
+            ("2025-06-16", "Sierra Alta Castings", "Ashgrove Equity", 0.6, "Divestiture", "Exclusive financial advisor", MPC, "Latin America",
+             "Carve-out sale of Sierra Alta Industrial's precision-castings division."),
+            ("2025-02-03", "Queensbury Controls", "Valdris Controls", bn("Queensbury Controls"), "Buy-side M&A", "Lead financial advisor", IA, "Asia Pacific",
+             "Acquisition of Australian building- and process-controls group Queensbury Controls."),
+            ("2024-11-18", "Haldane Pumps", "Ostrava Fluid Systems", 4.6, "Merger", "Financial advisor", MPC, "Europe",
+             "All-share merger of equals creating a European flow-control group with $6bn of combined revenue."),
+            ("2024-04-08", "Oakhurst Motion", "Corvane Automation", bn("Oakhurst Motion"), "Buy-side M&A", "Joint financial advisor", MPC, "North America",
+             "Acquisition of US motion-control leader Oakhurst Motion, Corvane's largest transaction to date."),
+        ]
+        rows = [dict(date=d, target=t, acquirer=a, deal_value_bn=v, deal_type=k, role=ro, sector=s, region=rg, description=ds)
+                for d, t, a, v, k, ro, s, rg, ds in deals]
+        fields = [D("date", "Announced", "mmmm yyyy"), S("target", "Target / issuer"), S("acquirer", "Acquirer / borrower"),
+                  N("deal_value_bn", "Deal value", F_USDBN, "USD bn"), S("deal_type", "Deal type"), S("role", "Role"),
+                  S("sector", "Sector"), S("region", "Region"), S("description", "Description")]
+        self.add(make_ds("credentials", "Selected transaction credentials", fields, rows,
+                         source="Kingsgate Advisory deal records (synthetic)", unit="USD bn",
+                         notes=["Deal value: enterprise value at announcement (M&A), committed facilities (financing) or offering size (IPO).",
+                                "M&A rows that also appear in precedents share their enterprise value; region = target / issuer / borrower region."]))
+
+    def sources_uses(self):
+        """LBO of Helios at the $52.00 offer: 5.0x 2026E EBITDA of debt (LBO_LEVERAGE), fees = LBO_FEES of EV, equity plug."""
+        e26, offer = self.fin[2026]["ebitda"], 52.00
+        equity = rnd(offer * SHARES, 1)
+        debt = [("Term Loan B", 2990.0, "7-year senior secured term loan; SOFR + 325 bps, 99.5 OID, 1.0% annual amortisation."),
+                ("Senior secured notes", 995.0, None), ("Senior unsecured notes", 995.0, None)]
+        total_debt = sum(a for _, a, _ in debt)
+        fin_fees = rnd(0.02 * total_debt, 1)
+        txn_fees = rnd(LBO_FEES * (equity + NET_DEBT) - fin_fees, 1)
+        uses = [("Purchase of equity", equity, f"{SHARES:.1f}m diluted shares at the ${offer:.2f} offer price, a {offer / PRICE - 1:.1%} premium "
+                 f"to the 09-Oct-2026 close of ${PRICE:.2f}."),
+                ("Refinancing of existing debt", GROSS_DEBT, "Gross debt at 30-Sep-2026 (senior notes, term loan, RCF drawings and convertible)."),
+                ("Transaction fees & expenses", txn_fees, None),
+                ("Financing fees", fin_fees, "2.0% of funded debt; capitalised and amortised over the life of the facilities."),
+                ("Cash to balance sheet", 150.0, None)]
+        total_uses = rnd(sum(a for _, a, _ in uses), 1)
+        rollover = 250.0
+        sponsor = rnd(total_uses - total_debt - CASH - rollover, 1)
+        sources = debt + [("Existing cash on balance sheet", CASH, None), ("Management rollover equity", rollover, None),
+                          ("Sponsor equity", sponsor, "Balancing item: Granite Arch Partners Fund VII and co-investors (fictional).")]
+        rows = []
+        for side, items in (("Sources", sources), ("Uses", uses)):
+            tot = sum(a for _, a, _ in items)
+            rows += [dict(side=side, item=i, amount=a, multiple_of_ebitda=round(a / e26, 2), pct=round(a / tot, 4), notes=n)
+                     for i, a, n in items]
+        fields = [S("side", "Side"), S("item", "Item"), N("amount", "Amount", F_USDM1, "USD m"),
+                  N("multiple_of_ebitda", "x 2026E EBITDA", F_MULT), N("pct", "% of total", F_PCT), S("notes", "Notes")]
+        self.add(make_ds("sources_uses", "Illustrative LBO sources & uses at $52.00 per share", fields, rows, source=SRC_ANALYSIS,
+                         unit="USD m", notes=[f"Multiples of 2026E EBITDA of ${e26:,.1f}m; total sources equal total uses.",
+                                              "pct = amount / side total."]))
+
+    def capital_structure(self):
+        """Pro forma capitalisation at close of the sources_uses LBO; multiple_cum = cumulative amount / 2026E EBITDA."""
+        e26 = self.fin[2026]["ebitda"]
+        amt = {r["item"]: r["amount"] for r in self.out["sources_uses"]["data"]}
+        tranches = [("Revolving credit facility ($500m)", 0.0, 0.0758, "2031-10-31"),
+                    ("Term Loan B", amt["Term Loan B"], 0.0758, "2033-10-31"),
+                    ("Senior secured notes", amt["Senior secured notes"], 0.0725, "2034-10-15"),
+                    ("Senior unsecured notes", amt["Senior unsecured notes"], 0.0875, "2034-10-15"),
+                    ("Sponsor & rollover equity", rnd(amt["Sponsor equity"] + amt["Management rollover equity"], 1), None, None)]
+        rows, cum = [], 0.0
+        for name, a, rate, mat in tranches:
+            cum += a
+            rows.append(dict(instrument=name, amount=a, rate=rate, maturity=mat, multiple_cum=round(cum / e26, 2)))
+        fields = [S("instrument", "Instrument"), N("amount", "Amount", '$#,##0.0;($#,##0.0);"–"', "USD m"),
+                  N("rate", "Rate", F_PCT2), D("maturity", "Maturity", "mmm yyyy"), N("multiple_cum", "Cumulative x 2026E EBITDA", F_MULT)]
+        self.add(make_ds("capital_structure", "Pro forma capitalisation at close", fields, rows, source=SRC_ANALYSIS, unit="USD m",
+                         notes=["Floating rates at 3-month SOFR of 4.33% plus margin; RCF undrawn at close.",
+                                "Debt tranches equal the sources in sources_uses."]))
+
     # ------------------------------------------------------------- valuation
     def valuation_block(self):
         base = self.scen["Base"]
@@ -1502,6 +1595,7 @@ class _Gen:
                  self.ownership, self.deal_timeline, self.league_table, self.segments_tree, self.pnl_flow,
                  self.corr_matrix, self.peer_scores, self.kpis, self.org_structure, self.pipeline_funnel, self.scenarios,
                  self.monthly_returns, self.daily_activity, self.network, self.debt_maturity, self.yield_curve]
+        order += [self.credentials, self.sources_uses, self.capital_structure]   # ib-pitch (after precedents)
         for fn in order:
             fn()
         return {k: self.out[k] for k in DATASET_ORDER}
@@ -1521,6 +1615,7 @@ DATASET_ORDER = [
     "assets_locations", "deal_flows", "china_provinces", "market_share", "ownership", "deal_timeline", "league_table",
     "precedents", "segments_tree", "pnl_flow", "corr_matrix", "peer_scores", "kpis", "org_structure", "pipeline_funnel",
     "scenarios", "monthly_returns", "daily_activity", "network_nodes", "network_edges", "debt_maturity", "yield_curve",
+    "credentials", "sources_uses", "capital_structure",
 ]
 
 # id -> which chart types / components it is meant to feed (README + index.json)
@@ -1561,6 +1656,9 @@ PURPOSE = {
     "network_edges": "Force-directed network graph (edges)",
     "debt_maturity": "Stacked maturity-profile bars",
     "yield_curve": "Multi-line yield curve (tenor_years as numeric x)",
+    "credentials": "Deal credentials / tombstone grid (deal type, parties, value, role), filterable by sector / region",
+    "sources_uses": "LBO sources & uses table (two balancing sides, % of total, x EBITDA, footnotes)",
+    "capital_structure": "Pro forma capitalisation table (tranches, rates, maturities, cumulative leverage)",
 }
 
 
@@ -1823,6 +1921,17 @@ def check_consistency(ds: dict) -> list[str]:
     nid = {n["id"] for n in rows("network_nodes")}
     chk(all(e["source"] in nid and e["target"] in nid for e in rows("network_edges")), "network_edges: dangling node id")
     chk(abs(sum(r["amount"] for r in rows("debt_maturity")) - GROSS_DEBT) < 0.05, "debt_maturity: != gross debt")
+    # ib-pitch: sources & uses balance, capitalisation ties to the sources, credentials reuse precedent EVs
+    su = rows("sources_uses")
+    side = lambda s: sum(r["amount"] for r in su if r["side"] == s)  # noqa: E731
+    chk(abs(side("Sources") - side("Uses")) < 0.05, "sources_uses: sources != uses")
+    cap = rows("capital_structure")
+    chk(abs(sum(r["amount"] for r in cap) - (side("Sources") - CASH)) < 0.05, "capital_structure: != sources excl. cash")
+    chk(all(a["multiple_cum"] <= b["multiple_cum"] for a, b in zip(cap, cap[1:])), "capital_structure: multiple_cum not cumulative")
+    pev = {p["target"]: p["ev"] for p in rows("precedents")}
+    for c in rows("credentials"):
+        if c["deal_type"].endswith("M&A") and c["target"] in pev:
+            chk(abs(c["deal_value_bn"] - pev[c["target"]] / 1000) < 0.051, f"credentials {c['target']}: value != precedents EV")
     chk(abs(sum(r["pct"] for r in rows("ownership")) - 1) < 0.002, "ownership: pct != 100%")
     # sensitivities
     dcf = {(r["wacc"], r["tgr"]): r["value"] for r in rows("sensitivity_dcf")}

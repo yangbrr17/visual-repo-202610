@@ -1,0 +1,19 @@
+{
+ "id":"capital_structure",
+ "title":"Pro forma capitalisation at close",
+ "schema":{"fields":[
+  {"name":"instrument","type":"string","title":"Instrument"},
+  {"name":"amount","type":"number","title":"Amount","format":"$#,##0.0;($#,##0.0);\"–\"","unit":"USD m"},
+  {"name":"rate","type":"number","title":"Rate","format":"0.00%"},
+  {"name":"maturity","type":"date","title":"Maturity","format":"mmm yyyy"},
+  {"name":"multiple_cum","type":"number","title":"Cumulative x 2026E EBITDA","format":"0.0x"}
+ ]},
+ "data":[
+  {"instrument":"Revolving credit facility ($500m)","amount":0.0,"rate":0.0758,"maturity":"2031-10-31","multiple_cum":0.0},
+  {"instrument":"Term Loan B","amount":2990.0,"rate":0.0758,"maturity":"2033-10-31","multiple_cum":3.0},
+  {"instrument":"Senior secured notes","amount":995.0,"rate":0.0725,"maturity":"2034-10-15","multiple_cum":4.0},
+  {"instrument":"Senior unsecured notes","amount":995.0,"rate":0.0875,"maturity":"2034-10-15","multiple_cum":5.0},
+  {"instrument":"Sponsor & rollover equity","amount":5118.7,"rate":null,"maturity":null,"multiple_cum":10.13}
+ ],
+ "meta":{"source":"Project Atlas analysis (synthetic); Helios Industrial management plan","unit":"USD m","notes":["Floating rates at 3-month SOFR of 4.33% plus margin; RCF undrawn at close.","Debt tranches equal the sources in sources_uses.","Illustrative synthetic data (tools/make_sample_data.py, seed 2026); all companies, banks and investors are fictional."],"asOf":"2026-10-10"}
+}

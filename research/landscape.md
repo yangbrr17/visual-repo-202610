@@ -1,7 +1,7 @@
 # ReportKit 可视化技术版图调研报告（Landscape）
 
 > **日期** 2026-10-14 · **读者** 投行客户报告产品负责人 · **范围** 离线、数据分离、可交互、pitchbook 级（GS/JPM 质感）的报告套件
-> **依据** `research/raw/01–09-*.md`（细节笔记）与 `*.json`（结构化结论）、`research/catalog.json`（去重后 239 个库）、`vendor/vendor.json`、`kit/build.json`、`kit/components/*/manifest.json`（52 个组件）、`docs/architecture.md`。
+> **依据** `research/raw/01–09-*.md`（细节笔记）与 `*.json`（结构化结论）、`research/catalog.json`（去重后 239 个库）、`vendor/vendor.json`、`kit/build.json`、`kit/components/*/manifest.json`（53 个组件）、`docs/architecture.md`。
 > **约定**
 > - 版本、许可、star、体积都取自调研笔记。笔记的口径是：2026-10-14 实查 npm registry，看 jsDelivr 上的 dist 列表，自己跑 `gzip -9` 测体积，star 取自 ecosyste.ms 或 shields.io。本文不另行估算。
 > - `file://` 指双击 `index.html` 打开。符号含义：✓ 已实测可用；✗ 已实测失败；◐ 部分可用或有条件；— 未测或不适用。
@@ -11,14 +11,14 @@
 
 ## 0. 一页结论
 
-**一句话：** 我们以三个 permissive 许可的 classic-script 引擎为主，即 **Apache ECharts 6.1.0 + Leaflet 1.9.4 + Tabulator 6.6.1**，另加自研、零依赖的公式 / 查询 / 版式表格 / 动效层。产出是一个双击即开（`file://`）、数据与版式分离、打印为矢量的报告文件夹。52 个组件完整覆盖 FT Visual Vocabulary 72 种图型中的 49 种，另有 5 种部分覆盖（§3）。
+**一句话：** 我们以三个 permissive 许可的 classic-script 引擎为主，即 **Apache ECharts 6.1.0 + Leaflet 1.9.4 + Tabulator 6.6.1**，另加自研、零依赖的公式 / 查询 / 版式表格 / 动效层。产出是一个双击即开（`file://`）、数据与版式分离、打印为矢量的报告文件夹。53 个组件完整覆盖 FT Visual Vocabulary 72 种图型中的 50 种，另有 5 种部分覆盖（§3）。
 
 ### 0.1 推荐技术栈（与 `vendor/vendor.json` 逐项一致）
 
 | 角色 | 库（npm 包） | 版本 | 许可 | 为什么 |
 |---|---|---|---|---|
-| 主图表引擎（35/52 个组件） | Apache ECharts（`echarts`） | 6.1.0 | Apache-2.0（随附 NOTICE、LICENSE-d3） | 只有它同时满足四点：许可 permissive、由 ASF 治理、一个 classic script（full UMD，1095 KB min / 359 KB gz）就能覆盖几乎全部 IB 图型、SVG renderer 打印出来是矢量且文字可选中。v6 新增的 axis break、matrix 坐标系、chord、beeswarm 和运行时 `setTheme()` 都已在 `file://` 下验证（01 §0、§5.1） |
-| 交互地图（5 个 geo 组件） | Leaflet（`leaflet`） | 1.9.4 | BSD-2-Clause | 147.6 KB raw / 42.4 KB gz，SVG 输出打印为矢量。2.0 目前只有 `2.0.0-alpha.1`，且 1.x 插件在 2.0 上会失效（02 §3） |
+| 主图表引擎（36/53 个组件） | Apache ECharts（`echarts`） | 6.1.0 | Apache-2.0（随附 NOTICE、LICENSE-d3） | 只有它同时满足四点：许可 permissive、由 ASF 治理、一个 classic script（full UMD，1095 KB min / 359 KB gz）就能覆盖几乎全部 IB 图型、SVG renderer 打印出来是矢量且文字可选中。v6 新增的 axis break、matrix 坐标系、chord、beeswarm 和运行时 `setTheme()` 都已在 `file://` 下验证（01 §0、§5.1） |
+| 交互地图（5 个 Leaflet 组件；geo 类第 6 个组件 `china-tilemap` 用 ECharts） | Leaflet（`leaflet`） | 1.9.4 | BSD-2-Clause | 147.6 KB raw / 42.4 KB gz，SVG 输出打印为矢量。2.0 目前只有 `2.0.0-alpha.1`，且 1.x 插件在 2.0 上会失效（02 §3） |
 | 点聚合 | `leaflet.markercluster` | 1.5.3 | MIT | 密集点位的标准方案，8.7 KB gz。没有瓦片层时，必须给地图设 `maxZoom`（02 §4） |
 | 密度热力 | `leaflet.heat` | 0.2.0 | BSD-2-Clause（npm 的 license 字段缺失，以 LICENSE 文件为准） | 2.1 KB gz。强度按 `1/2^(maxZoom−zoom)` 缩放，kit 的 `geo-heat` 已处理（02 §7.5） |
 | TopoJSON 解码 | `topojson-client` | 3.1.0 | ISC | 2.6 KB gz，用来解码离线底图；`mesh()` 可以只画内部边界（02 §4） |
@@ -76,7 +76,7 @@
 | 4 | **Highcharts / amCharts / ZingChart 是商业或带品牌的许可** | Highcharts 13.1.1：给客户的报告需要 SaaS 许可，默认显示 credits 链接。amCharts 5.21.2：logo 和链接必须保留（linkware）。ZingChart 2.9.16-1：免费版有强制水印 | reference，只作设计参考 | [Highcharts license](https://shop.highcharts.com/license)，[amCharts LICENSE](https://unpkg.com/@amcharts/amcharts5@5.21.2/LICENSE)，01 §5.13 |
 | 5 | **TradingView Lightweight Charts 的署名条款** | 5.2.1 是 Apache-2.0，但**另外要求**在页面上放 NOTICE 署名和 tradingview.com 链接。NOTICE 文件只在 GitHub 仓库里，npm tarball 里没有 | reference。价量图用 ECharts candlestick + dataZoom。无署名条款的替代：KLineChart 10.0.4（Apache-2.0）；Vela 0.8.4 尚在 1.0 之前，持续观察 | [README](https://unpkg.com/lightweight-charts@5.2.1/README.md)，01 §5.14，07 §9 |
 | 6 | **SheetJS 的 npm 版本有 CVE** | npm 上的 `xlsx` 停在 0.18.5，存在 [CVE-2023-30533](https://cdn.sheetjs.com/advisories/CVE-2023-30533.html) 和 [CVE-2024-22363](https://advisories.gitlab.com/npm/xlsx/CVE-2024-22363/)。CE 0.20.3 只在 cdn.sheetjs.com 发布 | 永远不 `npm i xlsx`；需要读取客户 xlsx 时，从 cdn.sheetjs.com 拉 0.20.3（`vendor.py` 要支持 URL 来源） | 03 §4.17、§10.10 |
-| 7 | **中国地图的审图号合规** | 依据地图管理条例（2015）和地图审核管理规定（2017，2019 修订），公开展示的中国地图需要审图号。自然资源部的标准地图只能原样使用；放大、缩小、裁剪都要重新送审。DataV.GeoAtlas 的数据注明"仅供学习和交流使用"（数据来自高德）。GADM 禁止商用和再分发。微软已停止向中国 Excel 用户提供地图图表 | 面向中国境内受众的交付物：用经审定或授权的底图，或者用 tile-grid 省份方块图（不画边界，需包含台湾、香港、澳门）。在法务流程中签字确认；底图 manifest 标注 `prc_reviewed:false` | [中国日报](https://cn.chinadaily.com.cn/a/202308/28/WS64ec4ceba3109d7585e4b1e1.html)，[DataV](https://help.aliyun.com/zh/datav/datav-7-0/user-guide/datav-geoatlas-widgets/)，[GADM](https://gadm.org/license.html)，[Microsoft](https://support.microsoft.com/en-us/Support/known-issues/excel-2d-map-charts-and-3d-maps-are-suspended-for-china)，02 §6.3 |
+| 7 | **中国地图的审图号合规** | 依据地图管理条例（2015）和地图审核管理规定（2017，2019 修订），公开展示的中国地图需要审图号。自然资源部的标准地图只能原样使用；放大、缩小、裁剪都要重新送审。DataV.GeoAtlas 的数据注明"仅供学习和交流使用"（数据来自高德）。GADM 禁止商用和再分发。微软已停止向中国 Excel 用户提供地图图表 | 面向中国境内受众的交付物：用经审定或授权的底图，或者用 tile-grid 省份方块图（不画边界，需包含台湾、香港、澳门；kit 已有 `china-tilemap`，34 个省级方块含台港澳）。在法务流程中签字确认；底图 manifest 标注 `prc_reviewed:false`（**待实现**） | [中国日报](https://cn.chinadaily.com.cn/a/202308/28/WS64ec4ceba3109d7585e4b1e1.html)，[DataV](https://help.aliyun.com/zh/datav/datav-7-0/user-guide/datav-geoatlas-widgets/)，[GADM](https://gadm.org/license.html)，[Microsoft](https://support.microsoft.com/en-us/Support/known-issues/excel-2d-map-charts-and-3d-maps-are-suspended-for-china)，02 §6.3 |
 | 8 | **AntV L7 会主动外连** | L7 2.29.1 默认从 `gw.alipayobjects.com` 拉 logo。在拦截网络的离线测试里，它是唯一一个发出外部请求的引擎（1 次）。设 `logoVisible:false` 后为 0。它的中国底图（高德、腾讯、百度）还需要在线 key | avoid 或 reference。机密数据场景不能有任何外连 | 02 §2（p7），06 §14 |
 | 9 | **ESM/WASM 库在 `file://` 下跑不起来** | 实测失败的有：MapLibre GL JS 6.x（6.0.0 起 ESM-only，最后一个 UMD 是 5.24.0）、Perspective 5.6.0（ESM，经 `import.meta.url` 加载 WASM）、Vizzu 0.18.0、Web Awesome 3.14.0、dotlottie-web 0.81.0、Paged.js（用 `<link>` 引入 CSS 时）。另有 ESM-only、需要预打包成 IIFE 的：Unovis、TanStack Table v9、Flint。Leaflet 2.0 alpha 上 1.x 插件会坏 | 默认包只收 classic UMD/IIFE。确需 ESM 库时，在 vendor 阶段用 esbuild 打成 IIFE；WASM 只能走 base64 + `data:` URL 的配方（08 §5.5） | [MapLibre CHANGELOG](https://github.com/maplibre/maplibre-gl-js/blob/main/CHANGELOG.md)，01 §3，03 §3，05 §1，09 §0.8 |
 | 10 | **AntV npm 供应链投毒** | 2026-05-19，"Mini Shai-Hulud" 蠕虫劫持了账号 `atool`，在 317–324 个 `@antv/*` 包以及 `echarts-for-react`、`size-sensor`、`timeago.js` 下发布了 600 多个恶意版本。恶意版本号都高于真实最新版（例如 g2 5.5.8/5.6.8，而真实最新版是 5.4.8），任何 `^` 范围都会把它们拉进来。截至调研时这些版本已返回 404 | 只写精确版本，只用 `npm pack`；在 `vendor.json` 里记录 sha512/sha256 并由 `--check` 校验（**待实现**）；不在持有凭据的机器上 `npm install` AntV 包 | [Snyk](https://security.snyk.io/antv-supply-chain-compromise-may-2026)，[StepSecurity](https://www.stepsecurity.io/blog/shai-hulud-here-we-go-again-mass-npm-supply-chain-attack-hits-the-antv-ecosystem)，06 §2 |
@@ -89,9 +89,9 @@
 
 1. **页面尺寸。** kit 只有 16:9（`kit/styles/print.css` 中 `@page{size:13.333in 7.5in}`）。但 GS、Morgan Stanley、Evercore 在 EDGAR 上的实际页面都是 **US Letter 横向 11 × 8.5 in**，Rothschild 是 4:3，样本里没有一家用 16:9（04 §0.1）。建议把 Letter（1056 × 816 CSS px）和 A4 横向做成报告级选项。
 2. **底图缺少金融中心。** 运行时的反子午线条纹问题已修复。但 world-atlas 110m 里没有新加坡、香港、澳门、巴林、马耳他、开曼、百慕大（02 §6.2）。建议升级到 Natural Earth 5.1.2 10m 简化版（约 109 KB / 36 KB gz）。
-3. **引擎审计的补丁还没合入。** 运行 `node tests/js/engine-audit.test.js`，结果是 **0/128 通过**（`research/engine-audit.md`：36 个缺陷，其中 2 个高危）。对客户影响最大的是 F1：`RK.format` 走二进制 `toFixed` 取整，10.35 显示为 "10.3x"，而 Excel 显示 "10.4x"。示例数据里有 121 个单元格受影响。
+3. **引擎审计的补丁已合入（2026-10-14 复核）。** `research/engine-audit.md` 列出的 36 个缺陷（其中 2 个高危）已全部修复：`node tests/js/engine-audit.test.js` 现为 **164/164 通过**，36/36 个缺陷 ID 都有回归测试；`engine.test.js` 542/542、`core.test.js` 67/67、`formula-doc.test.js` 165/165。对客户影响最大的 F1 已修：`RK.format(10.35,'0.0x')` 现在输出 "10.4x"，与 Excel 一致。仍需跟进：Q9 的自引用检查还没移植到 `py/reportkit/validate.py`；组件和 `rk.geo.js` 里还有 31 处 `toFixed`，应改用 `RK.format.fixed`（见 engine-audit.md 的 Resolution 节）。
 4. **测试没有覆盖 `file://`。** `tools/smoke.cjs` 通过本地 http server 加载页面。09 要求 CI 直接测试 `file://`，并在 Firefox 中把 `security.fileuri.strict_origin_policy` 恢复为 `true`。
-5. **组件目录文件过期。** git 里的 `kit/catalog.json` 和 `docs/component-catalog.md` 只有 10 个组件，实际有 52 个 manifest。需要重新运行 `python3 tools/build_catalog.py`。
+5. **组件目录文件已同步（原"过期"问题已解决）。** git 里的 `kit/catalog.json` 和 `docs/component-catalog.md` 现在都是 53 个组件、12 类，与 53 个 manifest 一致；`tools/check.sh` 每次都会运行 `python3 tools/build_catalog.py --strict` 重新生成。
 6. **尚未实现的项：**
    - styled XLSX 导出（write-excel-file）；
    - 严格的 meta CSP；
@@ -120,7 +120,7 @@
 | 08 | 浏览器内查询 / AI 引擎 | `research/raw/08-query-ai.md` | 30 | 统一基准（10k / 100k / 1M 行）；严格 CSP 探针；DuckDB-WASM 在 `file://` 下的离线配方 |
 | 09 | 打包架构 | `research/raw/09-architecture.md` | 30 | 在 Chromium 156 + Firefox 157 测 `file://` 能力矩阵；40k 行数据加载基准；PDF 页面尺寸实测 |
 
-9 个方向合计 278 条记录，按库名去重后剩 **239 个库**：**44 adopt / 55 consider / 84 reference / 56 avoid**。合并由 `tools/build_research_catalog.py` 生成 `research/catalog.json`，`in_kit` 标记表示该库已 vendor。
+9 个方向合计 278 条记录，按库名去重后剩 **239 个库**：**44 adopt / 55 consider / 84 reference / 56 avoid**。合并由 `tools/build_research_catalog.py` 生成 `research/catalog.json`，`in_kit` 标记表示该库已 vendor。例外：两款已 vendor 的字体（Inter、Source Serif 4）在 catalog 里 `in_kit` 仍为 false，因为调研记录的包名是 `inter-ui` 和 `@fontsource-variable/source-serif-4`，而 vendor 的是静态的 `@fontsource/inter`、`@fontsource/source-serif-4`，名称对不上。
 
 ### 1.2 事实核验口径
 
@@ -248,10 +248,11 @@
 
 **中国地图（02 §6.3）：**
 - 面向全球受众：NE admin-1 中国 32 个要素，带 `name_zh`、`iso_3166_2`，简化到 5% 后为 25 KB。
-- 面向中国境内受众：用经审定的底图，或 tile-grid 方块图。
+- 面向中国境内受众：用经审定的底图，或 tile-grid 方块图（kit 的 `china-tilemap`）。
 
 **我们采用了什么：**
 - 5 个 Leaflet 组件：`choropleth`、`bubble-map`、`flow-map`、`cluster-map`、`geo-heat`。
+- 1 个 ECharts 组件 `china-tilemap`：34 个省级行政区（含台湾、香港、澳门）的等大方块 / 六边形 tile-grid，不画边界线。布局是自研的（按省份质心经纬度排布，压缩到 7 × 8），并与 geofacet 的 `china_prov_grid1`（MIT）交叉核对过。
 - 不用瓦片，用 world-atlas 2.0.2 的 110m 底图。
 - `RK.geo` 加载时自研切开反子午线（不依赖 d3），已消除俄罗斯、斐济、南极洲的条纹。
 - 滚轮规则：普通滚轮滚动报告，Ctrl/Cmd + 滚轮才缩放地图，与 02 建议的 gesture handling 一致。
@@ -264,7 +265,7 @@
    - 按 `ISO_A3_EH` 或 `ADM0_A3` join，因为 `ISO_A3` 对法国和挪威是 `-99`；
    - 另出一份中国视角（CHN-POV）的 worldview；
    - 附一张标注点表。
-2. 用 ECharts geo 新增组件：`pie-map`、`map-bar-morph`、`china-map`（需要 d3-geo）、`tile-grid-map`。
+2. 用 ECharts geo 新增组件：`pie-map`、`map-bar-morph`、`china-map`（需要 d3-geo）、`tile-grid-map`。中国版 tile-grid 已由 `china-tilemap` 实现，世界区域和美国州版本还没有。
 3. 增加 hexbin 密度图。
 4. 把 deck.gl 做成可选的懒加载大数据引擎。
 5. 底图 manifest 增加合规元数据：`worldview`、`licence`、`prc_reviewed`、`审图号`。

@@ -110,9 +110,9 @@
 
   /** UI strings (legend, tooltip) follow the report language, not the tile-label language. */
   var TXT = {
-    zh: { noData: '无数据', filtered: '不在当前筛选范围内', rank: '排名', rows: '行', values: '个值',
+    zh: { noData: '无数据', filtered: '不在当前筛选范围内', rank: '排名', rows: '行', values: '个值', sum: '合计', avg: '平均',
       note: '示意图，不代表实际边界' },
-    en: { noData: 'No data', filtered: 'Not in the current filter', rank: 'Rank', rows: 'rows', values: 'values',
+    en: { noData: 'No data', filtered: 'Not in the current filter', rank: 'Rank', rows: 'rows', values: 'values', sum: 'sum', avg: 'avg.',
       note: 'Schematic; no boundaries implied' }
   };
   function uiLang(o) {
@@ -188,7 +188,7 @@
     }
     function classOf(v) { var j = 0; while (j < breaks.length && v >= breaks[j]) j++; return j; }
     var classes = colors.map(function (c, j) {
-      var label = n === 1 ? 'All' : j === 0 ? '< ' + bf(breaks[0]) : j === n - 1 ? '≥ ' + bf(breaks[j - 1]) : bf(breaks[j - 1]) + ' – ' + bf(breaks[j]);
+      var label = n === 1 ? bf(ext[0]) : j === 0 ? '< ' + bf(breaks[0]) : j === n - 1 ? '≥ ' + bf(breaks[j - 1]) : bf(breaks[j - 1]) + ' – ' + bf(breaks[j]);
       return { j: j, color: c, label: label };
     }).reverse();
     return { type: div ? 'diverging' : 'sequential', color: function (v) { return colors[classOf(v)]; }, classOf: classOf, classes: classes, ramp: null };
@@ -285,6 +285,9 @@
     });
     return { type: 'group', id: 'rk-tile-legend', x: Math.round(x), y: Math.round(y), children: kids };
   }
+
+  /** Ratios, percentages and multiples average across rows instead of adding up. */
+  function ratioLike(f) { return /%|x$|bps|ratio|margin|growth|rate|pct|share|multiple/i.test(String(f.format || '') + ' ' + (f.name || '')); }
 
   function noDataFill(t) { return t.mapLand || t.surface2 || t.grid; }
   /** Provinces with data that the current filters exclude: a lighter tint of the no-data fill. */
@@ -414,28 +417,59 @@
    */
   function labelPlan(o, t, frame, valueTexts) {
     var lang = o.lang === 'en' ? 'en' : 'zh';
-    var inner = frame.tile * (frame.hex ? 0.84 : 0.9) - 4;
+    var inner = frame.tile * (frame.hex ? 0.84 : 0.9) - 4, tall = frame.tile * (frame.hex ? 0.78 : 0.82);
     var f = U.clamp(Math.round(frame.tile * (o.values === false ? 0.235 : 0.2) * 2) / 2, 8, o.values === false ? 14 : 13);
     var mode = o.labels === false ? 'none' : o.labels === 'abbr' || o.labels === 'code' ? 'abbr' : o.labels === 'name' ? 'name' : 'auto';
+    var withValues = o.values !== false;
     function names(m) { return PROV.map(function (p) { return lang === 'zh' ? (m === 'abbr' ? p.abbr : p.zh) : (m === 'abbr' ? p.code : p.en); }); }
-    function widest(list, size) { return Math.max.apply(null, list.map(function (s) { return C.measure(s, '600 ' + size + 'px ' + t.fontSans); })); }
-    var fName = f, use = mode;
+    function width(s, size) { return C.measure(s, '600 ' + size + 'px ' + t.fontSans); }
+    /** Names at a font size: multi-word names that are too wide wrap at the space nearest the middle. */
+    function setOf(list, size) {
+      var lines = 1, w = 0;
+      var texts = list.map(function (n) {
+        var nw = width(n, size);
+        if (nw > inner && n.indexOf(' ') > 0) {
+          var mid = n.length / 2, best = -1;
+          n.replace(/ /g, function (_, i) { if (best < 0 || Math.abs(i - mid) < Math.abs(best - mid)) best = i; return _; });
+          var a = n.slice(0, best), b = n.slice(best + 1);
+          nw = Math.max(width(a, size), width(b, size));
+          if (nw <= inner) { lines = 2; n = a + '\n' + b; }
+        }
+        w = Math.max(w, nw);
+        return n;
+      });
+      return { texts: texts, w: w, lines: lines };
+    }
+    // names first; an 'auto' value line is only added when there is room left (values: true reserves it)
+    function fits(set, size) { return set.w <= inner && set.lines * size * 1.18 + (o.values === true ? Math.max(7.5, size - 1.5) * 1.18 : 0) <= tall; }
+    var fName = f, use = mode, set = null;
     if (mode === 'auto' || mode === 'name') {
       var full = names('name'), size = f, minF = mode === 'name' ? 6.5 : lang === 'zh' ? 9 : 9.5;
-      while (size > minF && widest(full, size) > inner) size -= 0.5;
-      if (widest(full, size) <= inner || mode === 'name') { use = 'name'; fName = size; } else use = 'abbr';
+      set = setOf(full, size);
+      while (size > minF && !fits(set, size)) { size -= 0.5; set = setOf(full, size); }
+      if (set.w <= inner || mode === 'name') { use = 'name'; fName = size; } else { use = 'abbr'; set = null; }
     }
-    var plan = { mode: use, names: use === 'none' ? null : names(use), fName: fName, values: false, fValue: 0 };
-    if (o.values !== false && use !== 'none') {
+    if (use === 'abbr') set = setOf(names('abbr'), fName);
+    var plan = { mode: use, names: use === 'none' ? null : set.texts, lines: set ? set.lines : 1, fName: fName, values: false, fValue: 0 };
+    if (withValues && use !== 'none') {
       var fv = Math.max(7.5, fName - 1.5);
       var vw = Math.max.apply(null, valueTexts.map(function (s) { return s ? C.measure(s, '500 ' + fv + 'px ' + t.fontNum) : 0; }).concat([0]));
-      var tall = (fName + fv) * 1.18 + 2 <= frame.tile * (frame.hex ? 0.78 : 0.82);
+      var room = (fName * plan.lines + fv) * 1.18 + 2 <= tall;
       if (o.values === true) { while (fv > 6.5 && vw > inner) { fv -= 0.5; vw = vw * (fv / (fv + 0.5)); } plan.values = true; }
-      else plan.values = tall && vw <= inner && frame.tile >= 40;
+      else plan.values = room && vw <= inner && frame.tile >= 40;
       plan.fValue = fv;
+    }
+    if (!plan.values && plan.names) {
+      // no value line: let the names grow into the free space (one tile-wide rule for every tile)
+      var list = names(use), big = U.clamp(Math.round(frame.tile * (use === 'abbr' ? 0.3 : 0.24) * 2) / 2, 8, 15);
+      for (var z = big; z > plan.fName; z -= 0.5) {
+        var cand = setOf(list, z);
+        if (cand.w <= inner && cand.lines * z * 1.18 <= tall) { plan.fName = z; plan.names = cand.texts; plan.lines = cand.lines; break; }
+      }
     }
     return plan;
   }
+
 
   /* ---------------- component ---------------- */
   RK.component({
@@ -515,11 +549,9 @@
     var sel = ff ? ctx.selected(ff) : [];
     var hl = {};
     [].concat(o.highlight == null ? [] : o.highlight).forEach(function (k) { var p = resolve(k, 'auto'); if (p) hl[p.code] = true; });
-    var shown = [];
     var tiles = PROV.map(function (p) {
       var rows = cur.by[p.code] || null, v = valOf(rows);
       var keys = U.unique((rows || dom.by[p.code] || []).map(function (r) { return r[ff]; }).filter(function (x) { return x != null && x !== ''; }));
-      if (v != null) shown.push(v);
       return {
         p: p, rows: rows, v: v, has: v != null, inDomain: !!dom.by[p.code], keys: keys,
         cls: v != null ? scale.classOf(v) : dom.by[p.code] ? -3 : -1,
@@ -584,7 +616,8 @@
       var fill = dim ? RK.theme.mix(x.base, paper, x.has ? 0.72 : 0.45) : x.base;
       // near-paper fills (diverging midpoint, lightest class) get a hairline so the tile keeps its edge
       var faint = RK.theme.contrast(fill, paper) < 1.12;
-      var ring = x.sel ? t.ink : x.hl ? t.accent2 : null;
+      // selection ring in ink, or in the label colour where ink would vanish (dark tiles in light themes and vice versa)
+      var ring = x.sel ? (RK.theme.contrast(fill, t.ink) < 2.5 ? RK.theme.textOn(fill) : t.ink) : x.hl ? t.accent2 : null;
       var lw = x.sel ? 2 : 2.5;
       var on = RK.theme.textOn(fill);
       var ink = !x.has ? t.ink3 : dim ? RK.theme.mix(on, fill, 0.4) : on;
@@ -612,10 +645,12 @@
         }, enter)
       ];
       if (plan.names) {
-        var both = plan.values, hN = plan.fName * 1.18, hV = plan.fValue * 1.18, tot = both ? hN + hV : hN;
+        var nl = plan.names[i].indexOf('\n') > 0 ? 2 : 1;
+        var both = plan.values, hN = plan.fName * 1.18 * nl, hV = plan.fValue * 1.18, tot = both ? hN + hV : hN;
         kids.push(U.merge({
           type: 'text', silent: true, x: 0, y: -tot / 2 + hN / 2, transition: ['style', 'y'],
-          style: { text: plan.names[i], fill: ink, font: (x.hl || x.sel ? '700 ' : '600 ') + plan.fName + 'px ' + t.fontSans, align: 'center', verticalAlign: 'middle' }
+          style: { text: plan.names[i], fill: ink, font: (x.hl || x.sel ? '700 ' : '600 ') + plan.fName + 'px ' + t.fontSans,
+            lineHeight: Math.round(plan.fName * 1.18), align: 'center', verticalAlign: 'middle' }
         }, enter));
         kids.push(U.merge({
           type: 'text', silent: true, x: 0, y: tot / 2 - hV / 2, transition: ['style', 'y'],
@@ -631,7 +666,6 @@
 
     /* tooltip: names, value, rank, every other field */
     function tipFields() {
-      if (o.tooltip === false) return [];
       var fields = ctx.dataset ? ctx.dataset.fields : [];
       if (Array.isArray(o.tooltip)) return o.tooltip.map(function (n) { return ctx.field(n) || { name: n, title: n }; });
       return fields.filter(function (f) { return f.name !== vf; });
@@ -641,7 +675,7 @@
       var rows = x.rows || [];
       var vs = rows.map(function (r) { return r[f.name]; }).filter(function (v) { return v != null && v !== ''; });
       if (!vs.length) return null;
-      if (f.type === 'number' && vs.length > 1) return RK.format(aggFn(vs), f.format);
+      if (f.type === 'number' && vs.length > 1) return RK.format(ratioLike(f) ? RK.expr.agg.avg(vs) : RK.expr.agg.sum(vs), f.format);
       var u = U.unique(vs);
       return u.length > 3 ? u.length + ' ' + txt.values : u.map(function (v) { return RK.format(v, f.format); }).join(', ');
     }
@@ -649,14 +683,15 @@
       if (p.seriesId !== 'tiles' || p.dataIndex == null) return '';
       var x = tiles[p.dataIndex], pr = x.p;
       var title = lang === 'zh' ? pr.zh + '  ' + pr.en : pr.en + '  ' + pr.zh;
-      var rows = [{ color: x.has ? x.base : null, label: ctx.title(vf), value: x.has ? RK.format(x.v, fmt) : 'n.a.' }];
+      var aggLab = x.rows && x.rows.length > 1 ? ' (' + (!o.agg || o.agg === 'sum' ? txt.sum : /^(avg|mean|average)$/.test(o.agg) ? txt.avg : o.agg) + ')' : '';
+      var rows = [{ color: x.has ? x.base : null, label: ctx.title(vf) + aggLab, value: x.has ? RK.format(x.v, fmt) : 'n.a.' }];
       if (x.has) rows.push({ label: txt.rank, value: x.rank + ' / ' + ranked.length });
       if (x.rows && x.rows.length) {
         extra.forEach(function (f) {
           // skip identity columns (province name / code fields) already in the title
           if ((f.type === 'string' || !f.type) && x.rows.every(function (r) { return resolve(r[f.name], 'auto') === pr; })) return;
-          var v = cell(x, f);
-          if (v != null) rows.push({ label: f.title || f.name, value: v });
+          var v = cell(x, f), multi = f.type === 'number' && x.rows.length > 1;
+          if (v != null) rows.push({ label: (f.title || f.name) + (multi ? ' (' + (ratioLike(f) ? txt.avg : txt.sum) + ')' : ''), value: v });
         });
       }
       var foot = 'CN-' + pr.code + ' · ' + pr.adcode + (x.rows && x.rows.length > 1 ? ' · ' + x.rows.length + ' ' + txt.rows : '');
@@ -665,7 +700,7 @@
     }
 
     var opt = {
-      tooltip: { trigger: 'item', confine: true, formatter: tooltip },
+      tooltip: { show: o.tooltip !== false, trigger: 'item', confine: true, formatter: tooltip },
       series: [{
         id: 'tiles', type: 'custom', coordinateSystem: 'none', data: data, renderItem: renderItem,
         animationDurationUpdate: 650, animationEasingUpdate: 'cubicInOut', selectedMode: false,

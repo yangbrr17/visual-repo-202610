@@ -9,7 +9,7 @@
   ],
   "summary": "Compliance-safe China cartogram: the 34 provincial-level divisions as equal-size squares or hexagons on a geography-like grid, shaded by a metric — no boundaries, so no map-review (审图号) issue in client decks.",
   "summary_zh": "合规友好的中国省级方块地图：34 个省级行政区各占一个等大的方块（或六边形），按近似地理位置排布并按指标着色；不绘制任何边界线，客户材料中无需审图号。",
-  "description_zh": "用于在客户材料中展示按省汇总的指标（收入、增速、门店数、市场份额）。每个省级行政区（含台湾、香港、澳门）是一个同样大小的方块，按地理相对位置排成 7 × 8 网格：黑龙江在右上，新疆、西藏在左侧，长江沿线（西藏—四川—重庆—湖北—安徽—江苏—上海）占一整行，海南在底部，港澳在广东下方，台湾在福建东侧。因为不画边界、不涉及比例尺和领土轮廓，图表不属于需要送审的“地图”，也不会因边界画法引发合规问题；同时每个省面积相等，避免新疆、西藏等大省在视觉上压倒东部经济大省。数据可按 6 位行政区划代码（adcode，市/县级代码自动汇总到省）、中文或英文省名（带不带“省/市/自治区”均可）或 ISO 3166-2:CN 字母代码连接。方块颜色表示数值：顺序色阶或以中点为中心的发散色阶（如增速相对集团平均），默认按分位数分 5 档并取整为好看的分界值，图例显示每档省份数；也可用等距分档或连续色阶。方块上显示中文简称或英文名/代码，空间足够时第二行显示格式化数值；可用强调色描边突出重点省份。悬停显示全部字段和排名，点击方块交叉筛选其他图表，悬停图例高亮该档省份、点击图例按档筛选；筛选变化时颜色平滑过渡。",
+  "description_zh": "用于在客户材料中展示按省汇总的指标（收入、增速、门店数、市场份额）。每个省级行政区（含台湾、香港、澳门，共 34 个）是一个同样大小的方块（或六边形），按地理相对位置排成 7 × 8 网格：黑龙江在右上，新疆、西藏在左侧，长江沿线（西藏—四川—重庆—湖北—安徽—江苏—上海）占一整行，海南在底部，港澳在广东下方，台湾在福建东侧；70 条省际陆地边界中有 63 条保留为相邻方块。因为不画边界、不涉及比例尺和领土轮廓，图表是示意图而非需要送审的“地图”，不会因边界画法引发合规问题（可选在空白角落标注“示意图，不代表实际边界”）；同时每个省面积相等，避免新疆、西藏、内蒙古等大省在视觉上压倒东部经济大省。数据可按 6 位行政区划代码（adcode，市/县级代码自动汇总到省）、中文或英文省名（带不带“省/市/自治区”均可，含 Inner Mongolia / Xizang / Macau 等常见写法）或 ISO 3166-2:CN 字母代码连接。方块颜色表示数值：顺序色阶或以中点为中心的发散色阶（如增速相对集团平均），默认按分位数分 5 档并取整为好看的分界值，图例显示每档省份数；也可用等距分档、自定义分界或连续色阶。方块上显示中文简称（空间不足时用一字简称）或英文名（空间不足时用 ISO 代码，长名自动换行），空间足够时第二行显示格式化数值；可用强调色描边突出重点省份。图例默认放在网格左上角的空白处（放不下时自动换行，或移到网格旁边/下方）。悬停显示全部字段、排名（多行汇总时注明合计/平均）；点击方块交叉筛选其他图表；悬停图例高亮该档省份，点击图例按档筛选；被其他图表筛掉的省份变为浅色“幽灵”方块，颜色变化平滑过渡，布局保持不变。",
   "best_for": [
     "Revenue / stores / headcount by province for China-client decks (no 审图号 needed)",
     "Growth vs. a group average by province (diverging around the average)",
@@ -49,12 +49,12 @@
     "labels": {
       "type": "string|boolean",
       "default": "auto",
-      "desc": "auto (short name when it fits every tile, else 简称 / ISO code) | name | abbr | false"
+      "desc": "auto (short name when it fits every tile — multi-word English names wrap onto two lines — else 简称 / ISO code) | name | abbr | false"
     },
     "values": {
       "type": "string|boolean",
       "default": "auto",
-      "desc": "Second line with the formatted value: auto (when tiles are large enough) | true | false"
+      "desc": "Second line with the formatted value: auto (when every tile has room) | true | false. Without a value line the names grow into the free space"
     },
     "shape": {
       "type": "string",
@@ -109,12 +109,12 @@
     "tooltip": {
       "type": "string|string[]|boolean",
       "default": "all",
-      "desc": "'all' lists every field of the row (province name / code columns go to the title), or an array of fields, or false"
+      "desc": "'all' lists every field of the row (province name / code columns go to the title; with several rows per province numbers are summed, ratios averaged), an array of fields, or false (no tooltip)"
     },
     "legend": {
       "type": "boolean",
       "default": true,
-      "desc": "Colour legend with province counts per class; hover a class to focus its tiles, click it to cross-filter them"
+      "desc": "Colour legend with province counts per class (rows depend only on the unfiltered data, so the layout never jumps when filters change); hover a class to focus its tiles, click it to cross-filter them"
     },
     "legendTitle": {
       "type": "string",
@@ -124,7 +124,7 @@
     "legendPosition": {
       "type": "string",
       "default": "auto",
-      "desc": "auto (the empty top-left corner of the grid when it fits, else beside or below) | corner | left | right | bottom"
+      "desc": "auto (the empty top-left corner of the grid — wrapped onto several lines if needed — else beside or below the grid) | corner | left | right | bottom"
     },
     "filterField": {
       "type": "string",
@@ -158,11 +158,11 @@
     }
   },
   "interactions": [
-    "Hover a tile: tooltip with names, value, rank and every other field",
-    "Click a tile to cross-filter (others dim; shared dimensions such as province filter the report, other fields this dataset only)",
+    "Hover a tile: tooltip with Chinese / English names, value, rank, every other field and the ISO code / adcode",
+    "Click a tile to cross-filter (others dim; shared dimensions such as province filter the report, other fields such as adcode this dataset only)",
     "Hover a legend class to focus its tiles; click it to cross-filter the whole class",
-    "Animated colour transitions when filters change; staggered west-to-east entrance",
-    "PNG / SVG export including the legend; print-safe (no animation, SVG)"
+    "Provinces excluded by other filters fade to pale ghost tiles with animated colour transitions; staggered west-to-east entrance",
+    "PNG / SVG export including legend and note; print-safe (SVG, no animation)"
   ],
   "samples": [
     {
@@ -188,7 +188,7 @@
     {
       "title": "Revenue growth vs. 7.0% group average",
       "data": "china_provinces",
-      "height": 440,
+      "height": 480,
       "span": 6,
       "options": {
         "encode": {
@@ -211,7 +211,7 @@
     {
       "title": "服务网点数量（连续色阶）",
       "data": "china_provinces",
-      "height": 400,
+      "height": 460,
       "span": 6,
       "options": {
         "encode": {
