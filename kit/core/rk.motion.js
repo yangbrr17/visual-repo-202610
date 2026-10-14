@@ -114,7 +114,7 @@
     /** Generic tween: tween(600, t => ..., 'outCubic') */
     tween: function (duration, onFrame, ease) {
       var e = easing[ease || 'outCubic'], start = null;
-      if (!motion.enabled) { onFrame(1); return; }
+      if (!motion.enabled || !(duration > 0)) { onFrame(1); return; }   // 0 / negative duration: jump to the end (no 0/0)
       function frame(ts) {
         if (start === null) start = ts;
         var t = Math.min(1, (ts - start) / duration);

@@ -169,6 +169,7 @@
   --rk-ord-2: #6b4a26;
   --rk-ord-3: #9a6b35;
   --rk-ord-4: #c49a60;
+  --rk-ord-5: initial;   /* 4-step ramp: the light 5th step fails 2:1 contrast; unset so navy (:root) does not leak in */
   --rk-ref: #b3261e;
 }
 
@@ -226,6 +227,7 @@
   --rk-ord-2: #33475f;
   --rk-ord-3: #52698a;
   --rk-ord-4: #7c93b3;
+  --rk-ord-5: initial;   /* 4-step ramp: the light 5th step fails 2:1 contrast; unset so navy (:root) does not leak in */
   --rk-ref: #c0392b;
 }
 
@@ -701,15 +703,18 @@ textarea.rk-input { height: auto; padding: 8px 10px; line-height: 1.45; resize: 
   }
   .rk-topbar, .rk-nav, .rk-progress, .rk-block__tools, .rk-modal, .rk-noprint { display: none !important; }
   .rk-deck { margin: 0 !important; padding: 0 !important; }
+  /* Every page is laid out at the canonical screen size (1135 x 638 px, the 16:9 page in a 1440px window)
+     and zoomed to fill the sheet, so print = exactly the layout you designed on screen (vector charts stay crisp). */
   .rk-page {
-    width: 13.333in; height: 7.5in; max-width: none; aspect-ratio: auto;
+    width: 1135px; height: 638.4px; zoom: 1.1278;   /* 1135px x 1.1278 = 1280px = 13.333in */
+    max-width: none; aspect-ratio: auto;
     margin: 0; box-shadow: none; border-radius: 0;
     break-after: page; page-break-after: always; break-inside: avoid;
     overflow: hidden;
   }
   .rk-page:last-child { break-after: auto; page-break-after: auto; }
-  [data-rk-page-size="letter"] .rk-page { width: 11in; height: 8.5in; }
-  [data-rk-page-size="a4"] .rk-page { width: 297mm; height: 210mm; }
+  [data-rk-page-size="letter"] .rk-page { width: 1135px; height: 877px; zoom: 0.9304; }    /* 11in x 8.5in */
+  [data-rk-page-size="a4"] .rk-page { width: 1135px; height: 802.6px; zoom: 0.989; }      /* 297mm x 210mm */
   .rk-js .rk-reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
   .rk-block { break-inside: avoid; }
   a { color: inherit; text-decoration: none; }

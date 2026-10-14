@@ -1614,6 +1614,17 @@
 
       params: function () { return params; },
       param: function (name) { return get(params, name); },
+      /** '@wacc' -> current value of param wacc (manifest default, then fallbacks[name]); other values pass through. */
+      resolve: function (v, fallbacks) {
+        var m = typeof v === 'string' ? /^@([A-Za-z_]\w*)$/.exec(v) : null;
+        if (!m) return v;
+        var x = get(params, m[1]);
+        if (x === undefined) {
+          var d = get((RK.data && RK.data.manifest && RK.data.manifest.params) || {}, m[1]);
+          x = d && d.value != null ? d.value : get(fallbacks || {}, m[1]);
+        }
+        return x;
+      },
       setParam: function (name, value) {
         if (has(params, name) && params[name] === value) return;
         params[name] = value;
@@ -2281,7 +2292,7 @@
       logAxis: valueAxis,
       line: { symbol: 'circle', symbolSize: 5, showSymbol: false, lineStyle: { width: 2 }, emphasis: { lineStyle: { width: 2.5 } } },
       bar: { barMaxWidth: 36, itemStyle: { borderRadius: 0 } },
-      scatter: { symbolSize: 8, itemStyle: { opacity: 0.9 } },
+      scatter: { symbolSize: 8 },
       candlestick: { itemStyle: { color: t.pos, color0: t.neg, borderColor: t.pos, borderColor0: t.neg } },
       markLine: { lineStyle: { color: t.ink3, type: 'dashed' }, label: { color: t.ink2, fontSize: 11 }, symbol: ['none', 'none'] },
       dataZoom: {
@@ -3409,16 +3420,16 @@
       }
       if (!motion.enabled) { rebuild(); return; }
       var before = new Map();
-      rows().forEach(function (el) { before.set(el.dataset.key, el.getBoundingClientRect().top); });
+      rows().forEach(function (el) { before.set(el.dataset.key, el.getBoundingClientRect()); });
       rebuild();
       var moved = [];
       rows().forEach(function (el) {
-        var y0 = before.get(el.dataset.key);
-        if (y0 == null) { el.classList.add('is-enter'); return; }
-        var dy = y0 - el.getBoundingClientRect().top;
-        if (Math.abs(dy) < 0.5) return;
+        var b = before.get(el.dataset.key);
+        if (b == null) { el.classList.add('is-enter'); return; }
+        var r = el.getBoundingClientRect(), dx = b.left - r.left, dy = b.top - r.top;   // rows and grids (2-D)
+        if (Math.abs(dy) < 0.5 && Math.abs(dx) < 0.5) return;
         el.style.transition = 'none';
-        el.style.transform = 'translateY(' + dy + 'px)';
+        el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
         moved.push(el);
       });
       if (!moved.length) return;
@@ -3429,7 +3440,7 @@
     /** Generic tween: tween(600, t => ..., 'outCubic') */
     tween: function (duration, onFrame, ease) {
       var e = easing[ease || 'outCubic'], start = null;
-      if (!motion.enabled) { onFrame(1); return; }
+      if (!motion.enabled || !(duration > 0)) { onFrame(1); return; }   // 0 / negative duration: jump to the end (no 0/0)
       function frame(ts) {
         if (start === null) start = ts;
         var t = Math.min(1, (ts - start) / duration);
@@ -3512,12 +3523,14 @@
      *   tip.show(RK.chart.tip(title, rows, foot), cellEl);   // centred above the anchor (below if no room)
      *   tip.hide(); tip.destroy();
      */
-    tip: function () {
+    tip: function (topts) {
+      topts = topts || {};
       var el = h('div.rk-uitip.rk-noprint', {
         'aria-hidden': 'true',
         style: {
           position: 'fixed', left: '0', top: '0', 'z-index': '90', 'pointer-events': 'none', opacity: '0',
-          padding: '8px 10px', border: '1px solid var(--rk-rule)', 'border-radius': '6px', 'white-space': 'nowrap',
+          padding: '8px 10px', border: '1px solid var(--rk-rule)', 'border-radius': '6px',
+          'white-space': topts.wrap ? 'normal' : 'nowrap', 'max-width': topts.wrap ? (topts.maxWidth || 320) + 'px' : 'none',
           background: 'var(--rk-tooltip-bg)', color: 'var(--rk-tooltip-ink)', 'font-family': 'var(--rk-font-sans)',
           'box-shadow': '0 8px 24px rgba(15, 23, 42, .14)', transition: 'opacity 120ms, transform 160ms var(--rk-ease)'
         }
@@ -3539,6 +3552,50 @@
         hide: hide,
         destroy: function () { global.removeEventListener('scroll', hide, { capture: true }); el.remove(); }
       };
+    },
+
+    /**
+     * Rasterise a DOM subtree to a PNG data URL (SVG foreignObject + inlined computed styles).
+     * Used for DOM components without their own exportImage. Web fonts fall back to system fonts.
+     */
+    exportDOM: function (el, opts) {
+      opts = opts || {};
+      var scale = opts.scale || 2, rect = el.getBoundingClientRect();
+      var w = Math.ceil(el.scrollWidth || rect.width), hgt = Math.ceil(el.scrollHeight || rect.height);
+      var clone = el.cloneNode(true);
+      var src = [el].concat([].slice.call(el.querySelectorAll('*')));
+      var dst = [clone].concat([].slice.call(clone.querySelectorAll('*')));
+      src.forEach(function (s, i) {
+        var cs = getComputedStyle(s), d = dst[i], css = '';
+        for (var k = 0; k < cs.length; k++) { var p = cs[k]; css += p + ':' + cs.getPropertyValue(p) + ';'; }
+        css = css.replace(/font-family:[^;]*;/, 'font-family:Helvetica,Arial,sans-serif;');
+        // export the whole content, not the scrolled viewport: unroll scroll containers, drop sticky offsets
+        if (/(auto|scroll|hidden)/.test(cs.overflowX + cs.overflowY) && (s.scrollWidth > s.clientWidth + 1 || s.scrollHeight > s.clientHeight + 1)) {
+          w = Math.max(w, Math.ceil(s.scrollWidth + (s.getBoundingClientRect().left - rect.left)));
+          hgt += Math.max(0, s.scrollHeight - s.clientHeight);
+          css += 'overflow:visible;max-height:none;height:auto;width:' + s.scrollWidth + 'px;';
+        }
+        if (cs.position === 'sticky') css += 'position:static;';
+        d.setAttribute('style', css);
+      });
+      [].slice.call(clone.querySelectorAll('canvas,script')).forEach(function (n) { n.remove(); });
+      clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+      var bg = RK.theme.tokens().paper || '#ffffff';
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + hgt + '"><foreignObject x="0" y="0" width="100%" height="100%">' +
+        new XMLSerializer().serializeToString(clone) + '</foreignObject></svg>';
+      return new Promise(function (resolve, reject) {
+        var img = new Image();
+        img.onload = function () {
+          var c = document.createElement('canvas');
+          c.width = w * scale; c.height = hgt * scale;
+          var g = c.getContext('2d');
+          g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
+          g.scale(scale, scale); g.drawImage(img, 0, 0);
+          try { resolve(c.toDataURL('image/png')); } catch (e) { reject(e); }
+        };
+        img.onerror = reject;
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+      });
     },
 
     /** Plain formatted HTML table for a set of rows/fields (used by "view data"). */
@@ -3686,6 +3743,7 @@
 
   Block.prototype.setOptions = function (opts, replace) {
     this.userOptions = replace ? opts : util.merge({}, this.userOptions, opts);
+    this._optsJson = null;
     this.rerender();
   };
 
@@ -3746,8 +3804,10 @@
       });
     }
     btn('image', 'Download PNG', function () {
-      if (!self.instance || !self.instance.exportImage) return;
-      Promise.resolve(self.instance.exportImage()).then(function (url) {
+      if (!self.instance) return;
+      // charts export themselves; DOM components (tables, cards, KPI tiles) are rasterised via SVG foreignObject
+      var job = self.instance.exportImage ? self.instance.exportImage() : ui.exportDOM(self.body);
+      Promise.resolve(job).then(function (url) {
         if (!url) return;
         var a = document.createElement('a');
         a.href = url; a.download = (self.id || 'chart') + '.png';
@@ -3829,8 +3889,11 @@
       });
       // a block whose own selection changed must re-render to update highlighting
       var own = changes.some(function (c) { return c.type === 'filter' && c.key.indexOf(b.id + ':') === 0; });
+      // options that reference a parameter ("@wacc") follow it
+      var optsJson = b._optsJson || (b._optsJson = JSON.stringify(b.userOptions || {}));
+      var paramHit = changes.some(function (c) { return c.type === 'param' && optsJson.indexOf('"@' + c.key + '"') >= 0; });
       var stateHit = changes.some(function (c) { return c.type === 'state' && b.def.listens && b.def.listens.indexOf(c.key) >= 0; });
-      if (hit || own || stateHit) b.refresh();
+      if (hit || own || stateHit || paramHit) b.refresh();
     });
   });
 
