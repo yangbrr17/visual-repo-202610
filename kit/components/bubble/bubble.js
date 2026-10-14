@@ -356,13 +356,13 @@
 
     /* reference lines */
     var lines = [];
-    var refStyle = { color: t.ink3, type: [4, 3], width: 1 };
     if (o.xScale !== 'log' && xe.min < 0 && xe.max > 0) lines.push({ xAxis: 0, lineStyle: { color: t.axis, type: 'solid' }, label: { show: false } });
     if (o.yScale !== 'log' && ye.min < 0 && ye.max > 0) lines.push({ yAxis: 0, lineStyle: { color: t.axis, type: 'solid' }, label: { show: false } });
     (o.refLines || []).forEach(function (r) {
-      var isX = r.axis === 'x', d = { lineStyle: util.merge({}, refStyle, r.color ? { color: r.color } : {}) };
+      // house style: reference lines in t.ref, dashed, label in the line colour
+      var isX = r.axis === 'x', col = r.color || t.ref, d = { lineStyle: { color: col, type: [4, 3], width: 1.25 } };
       d[isX ? 'xAxis' : 'yAxis'] = r.value;
-      d.label = { show: true, position: isX ? 'end' : 'insideEndTop', color: r.color || t.ink3, fontSize: 10, distance: 3,
+      d.label = { show: true, position: isX ? 'end' : 'insideEndTop', color: col, fontSize: 10, distance: 3,
         formatter: (r.label ? r.label + ' ' : '') + RK.format(r.value, isX ? xFmt : yFmt) };
       lines.push(d);
     });
@@ -375,14 +375,15 @@
     /* size key (nested circles, bottom-aligned) in the right gutter */
     var showKey = o.sizeLegend !== false && !!sizeF && sMax > 0;
     var keyVals = showKey ? util.unique([niceBelow(sMax), niceBelow(sMax / 4), niceBelow(sMax / 16)]).filter(function (v) { return v > 0; }) : [];
-    var keyLabW = Math.max.apply(null, [24].concat(keyVals.map(function (v) { return textW(axisFmt(sFmt, true)(v), 10); })));
-    var gutter = showKey ? Math.max(Math.round(dMax + 14 + keyLabW), textW(ctx.title(sizeF), 10) * 0.6) : 0;
+    var keyFmt = ticks(sFmt, null, true), keyFont = '10px ' + t.fontNum, titleFont = '600 10px ' + t.fontSans;
+    var keyLabW = Math.max.apply(null, [24].concat(keyVals.map(function (v) { return C.measure(keyFmt(v), keyFont); })));
+    var gutter = showKey ? Math.max(Math.round(dMax + 14 + keyLabW), C.measure(ctx.title(sizeF), titleFont) * 0.6) : 0;
     var graphic = [];
     var top0 = 34;
     if (showKey) {
       var sTitle = o.sizeTitle || ctx.title(sizeF);
-      var lines = Math.max(1, Math.ceil(textW(sTitle, 10) / gutter));
-      var kids = [{ type: 'text', x: 0, y: 0, style: { text: sTitle, fill: t.ink3, font: '600 10px ' + t.fontSans, width: gutter, overflow: 'break', lineHeight: 12 } }];
+      var lines = Math.max(1, Math.ceil(C.measure(sTitle, titleFont) / gutter));
+      var kids = [{ type: 'text', x: 0, y: 0, style: { text: sTitle, fill: t.ink3, font: titleFont, width: gutter, overflow: 'break', lineHeight: 12 } }];
       var base = 6 + 12 * lines + dMax;
       keyVals.forEach(function (v) {
         var r = diam(v) / 2, ty = base - 2 * r;

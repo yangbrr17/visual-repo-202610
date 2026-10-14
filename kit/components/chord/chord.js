@@ -285,12 +285,9 @@
     });
     var lo = g.top + g.lineH / 2, hi = g.H - g.lineH / 2;
     [true, false].forEach(function (right) {
-      var side = items.filter(function (it) { return it.right === right; }).sort(function (a, b) { return a.y0 - b.y0; });
-      side.forEach(function (it, i) { it.y = Math.max(it.y0, lo, i ? side[i - 1].y + g.lineH : -Infinity); });
-      for (var i = side.length - 1; i >= 0; i--) {
-        var cap = i === side.length - 1 ? hi : side[i + 1].y - g.lineH;
-        if (side[i].y > cap) side[i].y = Math.max(lo, cap);
-      }
+      var side = items.filter(function (it) { return it.right === right; });
+      var ys = C.spreadLabels(side.map(function (it) { return it.y0; }), g.lineH, lo, hi);
+      side.forEach(function (it, i) { it.y = ys[i]; });
     });
     var out = [];
     items.forEach(function (it) {

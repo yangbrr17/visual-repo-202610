@@ -34,7 +34,8 @@
     "colorKey": {"type": "boolean", "default": true, "desc": "Small reading key, top-left ('Ribbon colour = …' or the spotlighted entity)"},
     "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field's format"},
     "crossFilter": {"type": "boolean", "default": true, "desc": "Click an arc to focus its flows and filter other blocks on the source field"},
-    "filterScope": {"type": "string", "default": "dataset", "desc": "dataset: selection only filters blocks bound to the same dataset | global"}
+    "crossFilterScope": {"type": "string", "default": "dataset", "desc": "dataset: the selection only filters blocks bound to the same dataset | global"},
+    "filterScope": {"type": "string", "default": null, "desc": "Deprecated alias of crossFilterScope (still honoured when set)"}
   },
   "interactions": ["Hover an arc: adjacency emphasis + outbound / inbound / net tooltip", "Hover a ribbon: flow value, count and reverse flow", "Click an arc to focus and cross-filter (click again to clear)", "Re-lays out on resize and filter changes", "PNG / CSV export"],
   "samples": [

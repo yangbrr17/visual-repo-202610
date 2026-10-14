@@ -66,39 +66,49 @@
     "refLines": {
       "type": "array",
       "default": [],
-      "desc": "[{value, label}] reference lines"
+      "desc": "[{value, label, color}] reference lines (offer / current price), dashed in the theme's reference colour"
     },
     "avgLine": {
       "type": "boolean",
       "default": false,
-      "desc": "Dashed average line"
+      "desc": "Dashed average line (single series; ink-3)"
     },
     "colorBy": {
       "type": "string",
       "default": "series",
-      "desc": "series | category"
+      "desc": "series | category (categorical colours kept distinct from the accent2 highlight)"
     },
     "palette": {
       "type": "string",
       "default": "auto",
-      "desc": "auto (ordinal navy ramp for stacks, categorical otherwise) | cat | ord"
+      "desc": "auto (ordinal ramp for stacks, categorical otherwise) | cat | ord"
+    },
+    "showTotal": {
+      "type": "boolean",
+      "default": true,
+      "desc": "Total label on top of stacked bars (stack: true)"
     },
     "format": {
       "type": "string",
       "default": null,
       "desc": "Value format code; defaults to the y field format"
     },
+    "legend": {
+      "type": "boolean",
+      "default": true,
+      "desc": "Top-left legend (shown with more than one series)"
+    },
     "zoom": {
       "type": "boolean",
       "default": false,
-      "desc": "Enable dataZoom (wheel + slider)"
+      "desc": "Enable dataZoom on the category axis: slider + drag; Ctrl/Cmd + wheel or pinch zooms (options.wheelZoom: true for the plain wheel)"
     }
   },
   "interactions": [
     "Axis tooltip with totals",
-    "Click a bar to cross-filter",
+    "Click a bar to cross-filter (generic fields such as type / kind filter this dataset only)",
     "Legend toggle",
-    "Optional zoom",
+    "Optional zoom (slider, drag, Ctrl/Cmd + wheel or pinch)",
     "PNG / CSV export"
   ],
   "samples": [
