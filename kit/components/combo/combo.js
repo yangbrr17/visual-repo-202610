@@ -7,8 +7,6 @@
 (function () {
   'use strict';
   var C = RK.chart, U = RK.util;
-  // house rule: generic fields cross-filter only this block's dataset; business dimensions filter globally
-  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|series|category|group|label|name|key|id|status|variable)$/i;
   // legend glyph for line series: a rule with a dot; the two empty sub-paths keep the 14x14 box square
   var LINE_ICON = 'path://M7,0L7,0Z M7,14L7,14Z M0,6.4L14,6.4L14,7.6L0,7.6Z M9.4,6L9.4,8L8,9.4L6,9.4L4.6,8L4.6,6L6,4.6L8,4.6Z';
 
@@ -42,7 +40,8 @@
       var band = o.layout !== 'overlay';
       // primary line in accent2; bars and further lines from the palette, kept clear of it
       var pal = RK.theme.palette({ n: bars.length + lines.length });
-      var barColor = function (i) { return bars.length === 1 ? t.accent : pal[i]; };
+      var ord = o.barStack && bars.length > 1 && bars.length <= t.ord.length;   // stacked bars: parts of a whole
+      var barColor = function (i) { return bars.length === 1 ? t.accent : ord ? t.ord[i] : pal[i]; };
       var lineColor = function (i) { return i === 0 ? t.accent2 : i === 1 ? t.ink3 : pal[bars.length + i - 2]; };
 
       // per-category bar tops (stack totals or tallest bar) — used for scales, labels and CAGR legs
@@ -151,6 +150,7 @@
           stack: o.barStack ? 'bars' : null,
           barGap: '14%', barCategoryGap: groups > 1 ? '30%' : '36%',
           z: 2,
+          itemStyle: { color: base },          // series colour also drives the legend icon
           label: showBarLabels ? C.label(ctx, bfmt, o.barStack ? {
             position: 'inside', fontSize: 10.5, color: RK.theme.textOn(base),
             formatter: function (p) { return U.isNum(p.value) && Math.abs(p.value) >= (hi - lo) * 0.07 ? RK.format(p.value, bfmt) : ''; }
@@ -307,12 +307,7 @@
       };
     }, {
       rebuildOnResize: true,     // label density and the band split depend on the plot size
-      select: function (p, ctx) {
-        if (!/^b-\d+$/.test(p.seriesId) || ctx.options.crossFilter === false) return null;
-        var f = ctx.enc.x;
-        ctx.select(f, p.name, GENERIC.test(f) && !ctx.options.crossFilterScope ? { scope: 'dataset' } : null);
-        return null;
-      }
+      select: function (p, ctx) { return /^b-\d+$/.test(p.seriesId) ? { field: ctx.enc.x, value: p.name } : null; }
     })
   });
 

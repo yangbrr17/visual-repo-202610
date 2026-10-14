@@ -7,8 +7,6 @@
 (function () {
   'use strict';
   var C = RK.chart, U = RK.util;
-  // house rule: generic fields cross-filter only this block's dataset; business dimensions filter globally
-  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|series|category|group|label|name|key|id|status|variable)$/i;
 
   RK.component({
     id: 'small-multiples',
@@ -34,10 +32,8 @@
         rebuildOnResize: true,                                      // panel geometry is in pixels
         select: function (p, c, chart) {
           var sm = chart.getModel().getSeriesByIndex(p.seriesIndex);   // line-body clicks carry no seriesId
-          var m = /^f-(\d+)$/.exec(sm ? sm.id : ''), f = c.enc.facet;
-          if (!m || c.options.crossFilter === false) return null;
-          c.select(f, state.facets[+m[1]], GENERIC.test(f) && !c.options.crossFilterScope ? { scope: 'dataset' } : null);
-          return null;
+          var m = /^f-(\d+)$/.exec(sm ? sm.id : '');
+          return m ? { field: c.enc.facet, value: state.facets[+m[1]] } : null;
         }
       })(ctx);
     }

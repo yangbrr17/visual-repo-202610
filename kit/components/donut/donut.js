@@ -7,9 +7,6 @@
   'use strict';
   var C = RK.chart;
 
-  /** Generic label fields ('type', 'category' …) cross-filter only this block's dataset; business dimensions stay global. */
-  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
-  function scoped(ctx, f) { return GENERIC.test(f) ? { scope: ctx.options.crossFilterScope || 'dataset' } : null; }
   function truncate(s, w, font) {
     var ef = window.echarts && window.echarts.format;
     return ef && ef.truncateText ? ef.truncateText(String(s), w, font, '…') : String(s);
@@ -241,13 +238,13 @@
   /** Toggle the cross-filter for a slice ("Others" toggles all of its members). */
   function pick(ctx, d) {
     if (!d || ctx.options.crossFilter === false) return;
-    var f = ctx.enc.label, sc = scoped(ctx, f);
-    if (!d.others) { ctx.select(f, d.name, sc); return; }
+    var f = ctx.enc.label;   // generic label fields ('type' …) stay within this dataset (core scoping)
+    if (!d.others) { ctx.select(f, d.name); return; }
     var sel = ctx.selected(f);
     var all = d.members.every(function (x) { return sel.indexOf(x.name) >= 0; });
     // all members selected -> drop them, else add the missing ones (one store write)
     ctx.setSelection(f, all ? sel.filter(function (n) { return !d.members.some(function (x) { return x.name === n; }); })
-      : sel.concat(d.members.map(function (x) { return x.name; }).filter(function (n) { return sel.indexOf(n) < 0; })), sc);
+      : sel.concat(d.members.map(function (x) { return x.name; }).filter(function (n) { return sel.indexOf(n) < 0; })));
   }
 
   RK.component({

@@ -43,9 +43,6 @@
       return st && !/\.\d*[1-9]/.test(RK.format(st, fmt)) ? s.replace(/\.0+(?=\D*$)/, '') : s;
     };
   }
-  /** Generic field names (group, type …) cross-filter only this block's dataset; business dimensions stay global. */
-  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
-  function scoped(ctx, f) { return GENERIC.test(f) ? { scope: ctx.options.crossFilterScope || 'dataset' } : null; }
 
   RK.component({
     id: 'boxplot',
@@ -294,13 +291,10 @@
       };
     }, {
       rebuildOnResize: true,   // box width, beeswarm jitter and label wrapping follow the band width
-      on: {
-        // click a box or an observation -> cross-filter by its group
-        click: function (p, ctx) {
-          var f = ctx.enc.group, g = p.seriesId === 'box' ? p.data && p.data.key : p.data && p.data.row ? p.data.group : null;
-          if (g == null || ctx.options.crossFilter === false) return;
-          ctx.select(f, g, scoped(ctx, f));
-        }
+      select: function (p, ctx) {
+        if (p.seriesId === 'box') return { field: ctx.enc.group, value: p.data && p.data.key };
+        if (p.data && p.data.row) return { field: ctx.enc.group, value: p.data.group };
+        return null;
       }
     })
   });

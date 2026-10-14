@@ -8,8 +8,6 @@
 (function () {
   'use strict';
   var C = RK.chart, util = RK.util;
-  // house rule: generic fields cross-filter only this block's dataset; business dimensions filter globally
-  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|series|category|group|label|name|key|id|status|variable)$/i;
   var FORECAST_RE = /\d\s*[EFBP]$/i;      // "2026E", "FY27F", "2025B", "2028P"
   var DELTA = '+0.0%;-0.0%;0.0%';
 
@@ -44,12 +42,10 @@
       var api = C(function (c, inst) { return build(c, inst, state); }, {
         rebuildOnResize: true,     // date-tick density and the end-label margin depend on the plot size
         select: function (p, c, chart) {
-          // clicks on the line body carry seriesIndex but no seriesId
+          // clicks on the line body carry seriesIndex but no seriesId; generic series fields are scoped by core
           var sm = chart.getModel().getSeriesByIndex(p.seriesIndex);
-          var f = c.enc.series, s = state.model && sm && state.model.byId[sm.id];
-          if (!f || !s || Array.isArray(c.enc.y) || p.seriesType !== 'line' || c.options.crossFilter === false) return null;
-          c.select(f, s.name, GENERIC.test(f) && !c.options.crossFilterScope ? { scope: 'dataset' } : null);
-          return null;
+          var s = state.model && sm && state.model.byId[sm.id];
+          return s && c.enc.series && !Array.isArray(c.enc.y) && p.seriesType === 'line' ? { field: c.enc.series, value: s.name } : null;
         }
       })(ctx);
       var inst = api.chart;
@@ -116,7 +112,8 @@
     var fmt = o.format || (o.rebase != null ? '#,##0.0' : data.yFormat) || 'auto';
     var hl = o.highlight;
     var stacked = o.area === 'stacked';
-    var pal = RK.theme.palette({ n: data.series.length });     // peers stay clear of the accent2 highlight
+    // stacked areas are parts of a whole -> ordinal ramp; otherwise peers stay clear of the accent2 highlight
+    var pal = stacked && data.series.length <= t.ord.length ? t.ord : RK.theme.palette({ n: data.series.length });
     var sel = enc.series && !Array.isArray(enc.y) ? ctx.selected(enc.series) : [];
 
     var pi = 0;
@@ -460,11 +457,12 @@
   function markSeries(ctx, model, fmt) {
     var o = ctx.options, t = ctx.theme;
     var lines = (o.refLines || []).map(function (r) {
+      var col = RK.theme.resolve(r.color) || t.ref;          // token names ('pos', 'accent2') or literal colours
       return {
         yAxis: r.value, name: r.label || '',
-        lineStyle: { color: r.color || t.ref, type: r.type || 'dashed', width: 1.25 },
+        lineStyle: { color: col, type: r.type || 'dashed', width: 1.25 },
         // label on a paper chip so it stays legible where it crosses the lines
-        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: r.color || t.ref, fontWeight: 600, fontSize: 10.5,
+        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: col, fontWeight: 600, fontSize: 10.5,
           backgroundColor: RK.theme.alpha(t.paper, 0.85), padding: [1, 4], borderRadius: 2 }
       };
     });

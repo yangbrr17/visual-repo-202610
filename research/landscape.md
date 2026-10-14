@@ -43,7 +43,7 @@
 ### 0.2 关键决策
 
 1. **只用一个主引擎：ECharts 6.1.0。** AntV G2 5.4.8（320 KB gz）和 VisActor VChart 2.1.7（617 KB gz）都是 MIT 许可的强力备选，但它们 canvas 优先、文档以中文为主、由企业治理，而且都和 ECharts 功能重叠，所以"借思路，不切换"（01 §0.5、06 §0.1）。
-2. **`file://` 是硬墙，按硬墙设计。** fetch/XHR、ES module（包括动态 `import()`）、基于文件的 Worker 都被拦截；classic `<script src>`、子目录字体、Blob/data: worker 可用。Chromium 141/156 和 Firefox 157 实测结果一致（09 §1）。因此：
+2. **`file://` 是硬墙，按硬墙设计。** fetch/XHR、ES module（包括动态 `import()`）、基于文件的 Worker 都被拦截；classic `<script src>`、子目录字体、Blob/data: worker 可用。09 在 Chromium 156 和 Firefox 157 上实测了这些规则，01、03、05、08 在 Chromium 141 上得到相同结论（09 §1）。因此：
    - 数据走 `data/bundle.js` 里的 `RK.data.preload(…)`。超过 1,000,000 字符时改用 `JSON.parse("…")` 形式，Chromium 下加载快约 2.8 倍（09 §1.1）。
    - 默认包里不放任何 ESM/WASM 库。
 3. **打印优先。**
@@ -127,7 +127,7 @@
 - **版本、许可、发布日期：** 2026-10-14 在 npm registry 上实时执行 `npm view <pkg> version license time dist-tags`。ApexCharts 的许可变化逐个版本二分确认（01 §5.12）。
 - **dist 文件与体积：** 用 jsDelivr data API 列出文件；下载真实的 dist 文件，自己跑 `gzip -9 | wc -c`，不用官网宣传的数字。
 - **Stars：** GitHub API 在本环境被网关拦截，改用 repos.ecosyste.ms、shields.io 或 ungh.cc，数值为近似值。
-- **`file://` smoke 测试：** 01、02、03、05、08 用 headless **Chromium 141.0.7390.37**（Playwright 1.56.1）。09 用 **Chromium 156.0.8078.4 + Firefox 157.0**（Playwright 1.64）。Playwright 自带的 Firefox 把 `security.fileuri.strict_origin_policy` 设成了 `false`，会掩盖拦截，所以 Firefox 结果都在恢复为 `true` 后重跑过（09 §0）。
+- **`file://` smoke 测试：** 01、03、05、08 用 headless **Chromium 141.0.7390.37**（Playwright 1.56.1）；02 用 Playwright 自带的 `chromium-1194`（SwiftShader WebGL2），并拦截了全部外部请求。09 用 **Chromium 156.0.8078.4 + Firefox 157.0**（Playwright 1.64）。Playwright 自带的 Firefox 把 `security.fileuri.strict_origin_policy` 设成了 `false`，会掩盖拦截，所以 Firefox 结果都在恢复为 `true` 后重跑过（09 §0）。
 - **已知局限：**
   - 05 没有实测 Firefox 和 Safari，相关结论来自文献；
   - Ollama 的 CORS 行为来自阅读源码，没有对真实进程实测（08 §8.2）；
@@ -533,7 +533,7 @@
 | AlaSQL | 4.20.0 | MIT | 111 KB | ✓ | 28–40 / 97–185 / 101–148 ms | **avoid**（可执行任意 JS，严格 CSP 下失效） |
 | Arquero | 8.0.3 | BSD-3-Clause | 74 KB | ✓（CSP ✗） | 1M 行时转换就要 272–718 ms | consider |
 | crossfilter2 / Mosaic | 1.5.4 / 0.33.0 | Apache-2.0 / BSD-3 | 6 KB / 只有源码 | ✓ / ✗ | 不比手写 JS 循环快 / 需要 DuckDB | reference（交叉筛选架构参考） |
-| Perspective / PRQL / danfo.js | 5.6.0 / 0.13.14 / 1.2.0 | Apache-2.0 / Apache-2.0 / MIT | MB 级 WASM / 5.5 MB wasm / 6.8 MB | ✗ / ✗ / ✓ | — | reference / avoid / avoid |
+| Perspective / PRQL / danfo.js | 5.6.0 / 0.13.14 / 1.2.0 | Apache-2.0 / Apache-2.0 / MIT | MB 级 WASM / 5.5 MB wasm / 6.8 MB（含 TF.js） | ✗ / ✗ / — | — | reference / avoid / avoid |
 
 **DuckDB-WASM 的 `file://` 离线配方（08 §0.4，已验证）：**
 1. ESM 主模块以字符串形式内嵌，用 `import(blobURL)` 加载；其中的 `apache-arrow` 裸导入改写为 Arrow 17 的 UMD 全局对象。
@@ -724,7 +724,7 @@
 
 ### 3.3 FT 词表之外的组件
 
-这些组件是投行特有或报告骨架类的，FT 没有对应图型，共 19 个，占组件总数的 37%：
+52 个组件中，36 个已出现在上表里（`timeline`、`cluster-map` 只算部分覆盖）。另外 16 个（31%）是投行特有或报告骨架类组件，FT 词表里没有对应图型。04 §11 也指出，football field、sensitivity grid、AVP、league table 是 FT 没有单独命名的 IB 图型。
 
 | kit 类别 | 组件 |
 |---|---|
@@ -732,7 +732,6 @@
 | 时间趋势（IB 专用） | `multiple-history`、`small-multiples` |
 | 表格 | `comps-table`、`sensitivity-table`、`pivot-table`、`league-table`、`data-grid` |
 | 流向与关系 | `tree`（股权 / 法人结构）、`funnel` |
-| 流程与时间线 | `timeline`（`gantt` 已在上表计入） |
 | 版式与叙事 | `kpi-tiles`、`text-block` |
 | 控件与查询 | `filter-bar`、`param-slider`、`scenario-switch`、`query-console` |
 

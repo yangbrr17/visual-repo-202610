@@ -6,8 +6,6 @@
 (function () {
   'use strict';
   var C = RK.chart, U = RK.util;
-  // house rule: generic fields cross-filter only this block's dataset; business dimensions filter globally
-  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|series|category|group|label|name|key|id|status|variable)$/i;
   var MAX_SLOPE_W = 460;   // the slope area is capped and centred: steep angles read better than flat ones
 
   RK.component({
@@ -199,10 +197,7 @@
     }, {
       rebuildOnResize: true,     // label columns and truncation depend on the width
       select: function (p, ctx) {
-        if (p.seriesId !== 'slope' || !p.name || p.name === 'Median' || ctx.options.crossFilter === false) return null;
-        var f = ctx.enc.label;
-        ctx.select(f, p.name, GENERIC.test(f) && !ctx.options.crossFilterScope ? { scope: 'dataset' } : null);
-        return null;
+        return p.seriesId === 'slope' && p.name && p.name !== 'Median' ? { field: ctx.enc.label, value: p.name } : null;
       }
     })
   });

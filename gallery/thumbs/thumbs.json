@@ -1,0 +1,87 @@
+{
+ "generated": "2026-10-14",
+ "report": "examples/demo-pitchbook/index.html",
+ "pages": 24,
+ "thumbs": [
+  {
+   "kind": "demo",
+   "page": "summary",
+   "file": "demo-summary.jpg",
+   "kicker": "Executive summary",
+   "title": "Helios trades 1.5x below peers; our analyses support $45–55 per share",
+   "hero": true,
+   "w": 681,
+   "h": 383
+  },
+  {
+   "kind": "demo",
+   "page": "valuation",
+   "file": "demo-valuation.jpg",
+   "kicker": "Valuation summary",
+   "title": "Fundamental analyses support $45–55 per share, a 6–29% premium to the current $42.50",
+   "hero": false,
+   "w": 681,
+   "h": 383
+  },
+  {
+   "kind": "demo",
+   "page": "comps",
+   "file": "demo-comps.jpg",
+   "kicker": "Trading comparables",
+   "title": "Core peers trade at a median 9.9x 2025E EBITDA vs. 9.2x for Helios",
+   "hero": false,
+   "w": 681,
+   "h": 383
+  },
+  {
+   "kind": "demo",
+   "page": "financials",
+   "file": "demo-financials.jpg",
+   "kicker": "Financial overview",
+   "title": "Revenue has compounded at 6% since 2019 with a 270bp margin uplift; the plan adds 7% a year",
+   "hero": false,
+   "w": 681,
+   "h": 383
+  },
+  {
+   "kind": "demo",
+   "page": "footprint",
+   "file": "demo-footprint.jpg",
+   "kicker": "Global footprint",
+   "title": "60% of revenue is earned outside North America, served from 47 sites in 24 countries",
+   "hero": false,
+   "w": 681,
+   "h": 383
+  },
+  {
+   "kind": "demo",
+   "page": "what-if",
+   "file": "demo-what-if.jpg",
+   "kicker": "Valuation · what-if",
+   "title": "Each 50bp of WACC moves DCF value by c.$5 per share; the base case implies $50.88",
+   "hero": false,
+   "w": 681,
+   "h": 383
+  },
+  {
+   "kind": "demo",
+   "page": "precedents",
+   "file": "demo-precedents.jpg",
+   "kicker": "Precedent transactions",
+   "title": "Precedent deals were struck at a median 10.3x LTM EBITDA and a 37% premium to the 30-day VWAP",
+   "hero": false,
+   "w": 681,
+   "h": 383
+  },
+  {
+   "kind": "demo",
+   "page": "timetable",
+   "file": "demo-timetable.jpg",
+   "kicker": "Next steps · indicative timetable",
+   "title": "A two-stage auction can deliver signing by end-March 2027 and closing in July",
+   "hero": false,
+   "w": 681,
+   "h": 383
+  }
+ ]
+}

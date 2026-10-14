@@ -230,24 +230,54 @@
 
   /**
    * Spread 1-D label positions so neighbours are at least `gap` apart, staying within [lo, hi].
-   * items: array of desired positions; returns adjusted positions in the same order.
+   * Exact cluster-merge: overlapping labels form clusters centred on the mean of their desired
+   * positions; clusters merge until none overlap. Returns adjusted positions in input order.
    */
   chart.spreadLabels = function (items, gap, lo, hi) {
-    var idx = items.map(function (y, i) { return i; }).sort(function (a, b) { return items[a] - items[b]; });
-    var pos = idx.map(function (i) { return items[i]; });
-    for (var iter = 0; iter < 50; iter++) {
-      var moved = false;
-      for (var k = 1; k < pos.length; k++) {
-        var d = pos[k] - pos[k - 1];
-        if (d < gap) { var shift = (gap - d) / 2; pos[k - 1] -= shift; pos[k] += shift; moved = true; }
+    var order = items.map(function (y, i) { return i; }).sort(function (a, b) { return items[a] - items[b]; });
+    var clusters = [];
+    order.forEach(function (i) {
+      clusters.push({ ids: [i], sum: items[i], start: items[i] });
+      // merge backwards while the new cluster overlaps its predecessor
+      while (clusters.length > 1) {
+        var b = clusters[clusters.length - 1], a = clusters[clusters.length - 2];
+        if (a.start + (a.ids.length - 1) * gap + gap <= b.start + 1e-9) break;
+        var ids = a.ids.concat(b.ids), sum = a.sum + b.sum;
+        clusters.splice(-2, 2, { ids: ids, sum: sum, start: sum / ids.length - (ids.length - 1) * gap / 2 });
       }
-      if (lo != null && pos.length && pos[0] < lo) { var dl = lo - pos[0]; pos = pos.map(function (p) { return p + dl; }); }
-      if (hi != null && pos.length && pos[pos.length - 1] > hi) { var dh = pos[pos.length - 1] - hi; pos = pos.map(function (p) { return p - dh; }); }
-      if (!moved) break;
+    });
+    // clamp to the band, shifting whole clusters (and re-merging if clamping causes overlap)
+    var out = new Array(items.length), cursor = lo != null ? lo : -Infinity;
+    clusters.forEach(function (c) {
+      var start = Math.max(c.start, cursor);
+      c.ids.forEach(function (id, k) { out[id] = start + k * gap; });
+      cursor = start + c.ids.length * gap;
+    });
+    if (hi != null) {
+      var limit = hi;
+      for (var ci = clusters.length - 1; ci >= 0; ci--) {
+        var c = clusters[ci], first = out[c.ids[0]], last = first + (c.ids.length - 1) * gap;
+        if (last > limit) { var d = last - limit; c.ids.forEach(function (id) { out[id] -= d; }); }
+        limit = out[c.ids[0]] - gap;
+      }
     }
-    var out = new Array(items.length);
-    idx.forEach(function (i, k) { out[i] = pos[k]; });
     return out;
+  };
+
+  /**
+   * Axis tick formatter that drops decimals when every tick (or the step) is whole:
+   * "$6,000" not "$6,000.0", "5x" not "5.0x". step: number, array of tick values, or a function.
+   */
+  chart.tickFmt = function (code, step) {
+    code = String(RK.format.presets[code] || code || 'auto');
+    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
+    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
+    function whole(v) { return num(v, code) === num(v, trimmed); }
+    return function (v) {
+      var s = typeof step === 'function' ? step() : step;
+      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
+      return RK.format(v, ok ? trimmed : code);
+    };
   };
 
   RK.chart = chart;

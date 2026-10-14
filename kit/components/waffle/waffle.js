@@ -15,8 +15,6 @@
     if (parent) parent.appendChild(el);
     return el;
   }
-  /** Generic label fields ('type', 'category' …) cross-filter only this block's dataset; business dimensions stay global. */
-  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
 
   /** Largest-remainder rounding: integer cell counts that add up exactly to `cells`. */
   function allocate(values, cells) {
@@ -202,12 +200,12 @@
       function onClick(e) {
         var cat = catAt(e), c = state.ctx;
         if (!cat || c.options.crossFilter === false) return;
-        var f = c.enc.label, sc = GENERIC.test(f) ? { scope: c.options.crossFilterScope || 'dataset' } : null;
-        if (cat !== c.options.othersLabel || !state.m.members.length) { c.select(f, cat, sc); return; }
+        var f = c.enc.label;   // generic label fields ('type' …) stay within this dataset (core scoping)
+        if (cat !== c.options.othersLabel || !state.m.members.length) { c.select(f, cat); return; }
         // "Others": all members selected -> drop them, else add the missing ones (one store write)
         var sel = c.selected(f), mem = state.m.members;
         var all = mem.every(function (x) { return sel.indexOf(x) >= 0; });
-        c.setSelection(f, all ? sel.filter(function (x) { return mem.indexOf(x) < 0; }) : sel.concat(mem.filter(function (x) { return sel.indexOf(x) < 0; })), sc);
+        c.setSelection(f, all ? sel.filter(function (x) { return mem.indexOf(x) < 0; }) : sel.concat(mem.filter(function (x) { return sel.indexOf(x) < 0; })));
       }
       wrap.addEventListener('mousemove', onMove);
       wrap.addEventListener('mouseleave', onLeave);

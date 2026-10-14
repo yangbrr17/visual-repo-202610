@@ -16,7 +16,7 @@
     "series": {"type": "string", "required": false, "desc": "Long-format series field (one line per distinct value)"}
   },
   "options": {
-    "area": {"type": "boolean|string", "default": false, "desc": "false | true (light fill under each line, zero-based axis) | 'stacked'"},
+    "area": {"type": "boolean|string", "default": false, "desc": "false | true (light fill under each line, zero-based axis) | 'stacked' (parts of a whole, ordinal colour ramp)"},
     "rebase": {"type": "number", "default": null, "desc": "Rebase each series to its first non-null value = this number (e.g. 100); tooltip adds % change"},
     "endLabels": {"type": "boolean|string", "default": true, "desc": "Collision-free labels at the line ends: true (value tag + name) | 'value' | 'name' | false"},
     "smooth": {"type": "boolean", "default": false, "desc": "Smoothed (monotone) lines"},

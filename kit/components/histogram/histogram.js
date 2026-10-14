@@ -54,8 +54,6 @@
   };
 
   function filterKey(ctx) { return ctx.id + ':' + ctx.enc.value; }
-  /** Generic value fields ('value', 'x' …) filter only this block's dataset; named metrics stay global. */
-  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
 
   RK.component({
     id: 'histogram',
@@ -257,7 +255,7 @@
           // [x0, x1): nudge the inclusive "between" max just below the next edge (last bin stays closed)
           var max = p.data.last ? b.x1 : b.x1 - Math.abs(b.x1 - b.x0) * 1e-9;
           var spec = { field: f, op: 'between', min: b.x0, max: max, source: ctx.id };
-          var scope = ctx.options.crossFilterScope || (GENERIC.test(f) ? 'dataset' : 'global');
+          var scope = ctx.options.crossFilterScope || (RK.data.isGenericField(f) ? 'dataset' : 'global');   // as ctx.select
           if (scope === 'dataset' && ctx.dataset) spec.datasets = [ctx.dataset.id];
           RK.store.setFilter(key, spec);   // ctx.select covers 'in' lists only; ranges go to the store directly
         }

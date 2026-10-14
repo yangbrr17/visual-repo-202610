@@ -320,8 +320,9 @@
     var o = ctx.options, t = ctx.theme, fmt = m.fmt;
     var chip = RK.theme.alpha(t.paper, 0.85);       // label background: legible where it crosses the candles
     var lines = (o.refLines || []).map(function (r) {
-      return { yAxis: r.value, lineStyle: { color: r.color || t.ref, type: r.type || 'dashed', width: 1.25 },
-        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: r.color || t.ref, fontWeight: 600, fontSize: 10.5, backgroundColor: chip, padding: [1, 4], borderRadius: 2 } };
+      var col = RK.theme.resolve(r.color) || t.ref;          // token names ('pos', 'accent2') or literal colours
+      return { yAxis: r.value, lineStyle: { color: col, type: r.type || 'dashed', width: 1.25 },
+        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: col, fontWeight: 600, fontSize: 10.5, backgroundColor: chip, padding: [1, 4], borderRadius: 2 } };
     });
     if (o.lastPrice) {
       var i = m.n - 1, c = m.C[i];

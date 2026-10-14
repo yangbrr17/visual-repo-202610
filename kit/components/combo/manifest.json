@@ -19,7 +19,7 @@
   },
   "options": {
     "layout": {"type": "string", "default": "band", "desc": "band = line in its own band above the bars (no label collisions) | overlay = classic dual axes with aligned ticks"},
-    "barStack": {"type": "boolean", "default": false, "desc": "Stack the bar series (totals labelled on top)"},
+    "barStack": {"type": "boolean", "default": false, "desc": "Stack the bar series (parts of a whole: ordinal colour ramp; totals labelled on top)"},
     "labels": {"type": "boolean|string", "default": "auto", "desc": "Value labels: true | false | 'auto' (on when bars are wide enough) | 'bars' | 'line'"},
     "format": {"type": "string", "default": null, "desc": "Bar value format; defaults to the first bar field's format"},
     "lineFormat": {"type": "string", "default": null, "desc": "Line value format; defaults to the first line field's format (else 0.0%)"},

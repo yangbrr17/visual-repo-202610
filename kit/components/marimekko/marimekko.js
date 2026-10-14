@@ -9,8 +9,6 @@
   var C = RK.chart;
   var OTHERS = /^(others?|other .+|rest of .+|all other.*)$/i;
 
-  /** Generic fields ('type', 'category' …) cross-filter only this block's dataset; business dimensions stay global. */
-  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
 
   /** Segments (columns) and players (stacks) with cumulative geometry in [0, 1] x [0, 1]. */
   function model(ctx) {
@@ -91,15 +89,12 @@
       var state = { m: null };
       return C(function (c, inst) { return build(c, inst, state); }, {
         rebuildOnResize: true,   // header placement and cell labels are computed in pixels
-        on: {
-          // click a cell -> cross-filter by its column (selectBy 'x') or player ('series'); a header -> by column
-          click: function (p, c) {
-            var bySeries = p.seriesId !== 'hdr' && c.options.selectBy === 'series';
-            if (c.options.crossFilter === false || (p.seriesId !== 'hdr' && !/^p-/.test(p.seriesId || ''))) return;
-            if (bySeries && p.seriesName === state.m.othersName) return;
-            var f = bySeries ? c.enc.series : c.enc.x;
-            c.select(f, bySeries ? p.seriesName : p.name, GENERIC.test(f) ? { scope: c.options.crossFilterScope || 'dataset' } : null);
-          }
+        // click a cell -> cross-filter by its column (selectBy 'x') or player ('series'); a header -> by column
+        select: function (p, c) {
+          if (p.seriesId === 'hdr') return { field: c.enc.x, value: p.name };
+          if (!/^p-/.test(p.seriesId || '')) return null;
+          if (c.options.selectBy === 'series') return p.seriesName === state.m.othersName ? null : { field: c.enc.series, value: p.seriesName };
+          return { field: c.enc.x, value: p.name };
         }
       })(ctx);
     }

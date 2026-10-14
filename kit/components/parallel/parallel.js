@@ -65,7 +65,7 @@
       var inst = handle.chart, cur = ctx;
 
       function sig(c) {
-        return c.rows.length + '|' + c.rows.map(function (r) { return r[lf]; }).join('\u0001') + '|' + RK.theme.tokens().name;
+        return c.rows.length + '|' + c.rows.map(function (r) { return r[lf]; }).join('\u0001') + '|' + RK.theme.tokens().name + (c.print ? '|print' : '');   // print rebuilds without animation
       }
       function active() { return Object.keys(intervals).filter(function (k) { return intervals[k] && intervals[k].length; }); }
 

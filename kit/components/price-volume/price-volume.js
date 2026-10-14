@@ -369,8 +369,9 @@
     var chip = RK.theme.alpha(t.paper, 0.85);       // label background: legible where it crosses the line
     var lines = [], area = null;
     (o.refLines || []).forEach(function (r) {
-      lines.push({ yAxis: r.value, lineStyle: { color: r.color || t.ref, type: r.type || 'dashed', width: 1.25 },
-        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: r.color || t.ref, fontWeight: 600, fontSize: 10.5, backgroundColor: chip, padding: [1, 4], borderRadius: 2 } });
+      var col = RK.theme.resolve(r.color) || t.ref;          // token names ('pos', 'accent2') or literal colours
+      lines.push({ yAxis: r.value, lineStyle: { color: col, type: r.type || 'dashed', width: 1.25 },
+        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: col, fontWeight: 600, fontSize: 10.5, backgroundColor: chip, padding: [1, 4], borderRadius: 2 } });
     });
     if (m.r52 && o.range52w === 'band') {
       area = { silent: true, itemStyle: { color: RK.theme.alpha(t.accent3 || t.accent, t.dark ? 0.12 : 0.07) },

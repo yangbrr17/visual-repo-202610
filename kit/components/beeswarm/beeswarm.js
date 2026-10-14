@@ -10,8 +10,6 @@
 
   /* ---------- helpers ---------- */
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
-  /** Generic column names (deal 'target', link 'source', long-format 'metric' ...) never key other datasets. */
-  var GENERIC = /^(type|kind|source|target|step|stage|metric|category|group|label|name|series)$/i;
 
   /** Axis tick format: the value format with no more decimals than the tick step needs (10x not 10.0x). */
   function tickFmt(fmt, step) {
@@ -433,11 +431,10 @@
         series: series
       };
     }, {
+      // generic column names (e.g. a deal's 'target') stay within this dataset: ctx.select scopes them (RK.data.isGenericField)
       select: function (p, ctx) {
-        var f = p.seriesId === 'band' ? ctx.enc.group : /^pts-/.test(p.seriesId) ? ctx.enc.label : null;
-        if (!f || ctx.options.crossFilter === false) return null;
-        // generic columns (e.g. a deal's 'target') are scoped to this dataset; names / sectors filter globally
-        ctx.select(f, String(p.name).split('\u0001')[0], { scope: ctx.options.crossFilterScope || (GENERIC.test(f) ? 'dataset' : 'global') });
+        if (p.seriesId === 'band') return ctx.enc.group ? { field: ctx.enc.group, value: String(p.name) } : null;
+        if (/^pts-/.test(p.seriesId)) return { field: ctx.enc.label, value: String(p.name).split('\u0001')[0] };
         return null;
       }
     })

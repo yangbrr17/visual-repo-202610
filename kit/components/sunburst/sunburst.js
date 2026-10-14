@@ -88,8 +88,6 @@
   function longestWord(s, font) {
     return Math.max.apply(null, String(s).split(/\s+/).map(function (w) { return C.measure(w, font); }));
   }
-  /** Generic node fields ('name', 'category' …) cross-filter only this block's dataset; business dimensions stay global. */
-  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
 
   function chainOf(list, id) {
     var out = [];
@@ -178,9 +176,7 @@
     if (p.seriesId !== 'sb' || !p.data || p.data.id == null) return;
     var node = p.data;
     if (ctx.options.drill !== false && node.children && node.children.length) { zoom(state, node.id); return; }
-    if (ctx.options.crossFilter !== false && node.field) {
-      ctx.select(node.field, node.name, GENERIC.test(node.field) ? { scope: ctx.options.crossFilterScope || 'dataset' } : null);
-    }
+    if (ctx.options.crossFilter !== false && node.field) ctx.select(node.field, node.name);   // 'name' etc. stay in this dataset (core)
   }
 
   function build(ctx, inst, state) {

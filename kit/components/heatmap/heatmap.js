@@ -14,9 +14,6 @@
     mean: { label: 'Average', fn: mean },
     compound: { label: 'Year', fn: function (a) { return a.reduce(function (s, v) { return s * (1 + v); }, 1) - 1; } }
   };
-  /** Generic field names (x, y, metric …) cross-filter only this block's dataset; business dimensions stay global. */
-  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
-  function scoped(ctx, f) { return GENERIC.test(f) ? { scope: ctx.options.crossFilterScope || 'dataset' } : null; }
 
   /** Category label mapping: 'months' (1-12 -> Jan..Dec) or a {value: label} object. */
   function labeller(spec, fmt) {
@@ -222,13 +219,10 @@
       };
     }, {
       rebuildOnResize: true,   // label visibility / size follow the cell size
-      on: {
-        // click a cell -> cross-filter its column (select: 'x') or row (select: 'y')
-        click: function (p, ctx) {
-          var o = ctx.options, f = o.select === 'x' ? ctx.enc.x : o.select === 'y' ? ctx.enc.y : null;
-          if (!f || o.crossFilter === false || p.seriesId !== 'cells' || !p.data || !p.data.raw) return;
-          ctx.select(f, p.data.raw[o.select === 'x' ? 0 : 1], scoped(ctx, f));
-        }
+      select: function (p, ctx) {
+        var o = ctx.options;
+        if (!o.select || p.seriesId !== 'cells' || !p.data || !p.data.raw) return null;
+        return o.select === 'x' ? { field: ctx.enc.x, value: p.data.raw[0] } : { field: ctx.enc.y, value: p.data.raw[1] };
       }
     })
   });
