@@ -70,7 +70,7 @@
     /* ---------------- pixel layout ---------------- */
     var fTick = '10px ' + t.fontNum, fLast = '600 10.5px ' + t.fontNum;
     var yLabW = Math.max.apply(null, scales.map(function (s) {
-      var w = 0, f = tickFmt(fmt, s.step);
+      var w = 0, f = C.tickFmt(fmt, s.step);
       for (var v = s.min; v <= s.max + 1e-9; v += s.step) w = Math.max(w, measure(f(v), fTick));
       return w;
     })) + 8;
@@ -113,7 +113,7 @@
         : { type: 'category', data: xs, boundaryGap: type === 'bar', axisLabel: { interval: 'auto' } }));
       yAxes.push({
         gridIndex: i, type: 'value', min: s.min, max: s.max, interval: s.step,
-        axisLabel: { show: showY, fontSize: 10, formatter: tickFmt(fmt, s.step) },
+        axisLabel: { show: showY, fontSize: 10, formatter: C.tickFmt(fmt, s.step) },
         splitLine: { show: true, lineStyle: { color: t.grid } },
         axisPointer: { show: false }
       });
@@ -255,21 +255,4 @@
   }
 
   function measure(text, font) { return Math.ceil(C.measure(text, font)); }
-
-  /**
-   * Axis tick formatter (house style: no decimals when the tick step is whole at display precision,
-   * "$6,000" not "$6,000.0", "20%" not "20.0%"). step: number, function returning the live step,
-   * or an array of tick values; null decides per value.
-   */
-  function tickFmt(code, step) {
-    code = String(RK.format.presets[code] || code || 'auto');
-    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
-    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
-    function whole(v) { return num(v, code) === num(v, trimmed); }
-    return function (v) {
-      var s = typeof step === 'function' ? step() : step;
-      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
-      return RK.format(v, ok ? trimmed : code);
-    };
-  }
 })();

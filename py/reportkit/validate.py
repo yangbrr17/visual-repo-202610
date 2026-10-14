@@ -113,6 +113,10 @@ def check(report: "Report", kit: Any = None) -> tuple[list[str], list[str]]:
                 if pname not in report.params:
                     errors.append(f"{where}: formula uses @{pname} but no param '{pname}' is defined "
                                   f"(add r.param('{pname}', value)){_suggest(pname, list(report.params))}")
+            if any(norm_name(ref) == norm_name(cname) for ref in refs):
+                errors.append(f"{where}: formula {formula!r} references its own name — computed fields cannot be "
+                              f"self-referential (e.g. 'ev = ev * 1.1'); give the derived field a new name")
+                continue
             for ref in refs:
                 if norm_name(ref) not in avail:
                     errors.append(f"{where}: formula references unknown field '{ref}'"

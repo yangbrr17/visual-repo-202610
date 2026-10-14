@@ -195,7 +195,7 @@
   }
 
   /* ---------------- legend ---------------- */
-  var LEG = { title: 15, gap: 5, row: 16, sw: 10, bar: 150, barH: 8 };
+  var LEG = { title: 15, gap: 5, row: 16, sw: 10, bar: 120, barH: 8 };
 
   /** Legend model + measured sizes for the vertical (w, h) and horizontal (hw, hh) arrangements. */
   function legendModel(ctx, scale, tiles, txt) {
@@ -209,7 +209,9 @@
         items.push({ cls: c.j, color: c.color, label: c.label, note: String(n) });
       });
     }
-    var missing = tiles.filter(function (x) { return !x.has; }).length;
+    // rows depend only on the unfiltered domain, so the legend (and the grid layout) never jumps when filters change;
+    // provinces the filters exclude are drawn as pale "ghost" tiles and explained in their tooltip
+    var missing = tiles.filter(function (x) { return !x.inDomain; }).length;
     if (missing) items.push({ cls: -1, color: noDataFill(t), label: txt.noData, note: String(missing), muted: true });
     if (o.highlightLabel && tiles.some(function (x) { return x.hl; })) items.push({ cls: -2, ring: t.accent2, label: o.highlightLabel });
     var labW = Math.max.apply(null, items.map(function (it) { return C.measure(it.label, fItem); }).concat([0]));
@@ -259,7 +261,7 @@
         { type: 'text', silent: true, x: LEG.sw + 6, y: rowY + LEG.sw / 2, style: { text: it.label, fill: it.muted ? t.ink3 : t.ink2, font: fItem, verticalAlign: 'middle' } }
       ];
       if (!horiz && it.note) row.push({ type: 'text', silent: true, x: m.w, y: rowY + LEG.sw / 2, style: { text: it.note, fill: t.ink3, font: fNote, align: 'right', verticalAlign: 'middle' } });
-      var interactive = it.cls >= -1 && on;
+      var interactive = it.cls !== -2 && on;
       kids.push({
         type: 'group', x: horiz ? xx : 0, y: 0, children: row, cursor: interactive && it.cls >= 0 && ctx.options.crossFilter !== false ? 'pointer' : 'default',
         onmouseover: interactive ? function () { on.focus(it.cls); } : null,
@@ -272,6 +274,32 @@
   }
 
   function noDataFill(t) { return t.mapLand || t.surface2 || t.grid; }
+  /** Provinces with data that the current filters exclude: a lighter tint of the no-data fill. */
+  function filteredFill(t) { return RK.theme.mix(noDataFill(t), t.paper, 0.5); }
+
+  /**
+   * Schematic note in a free corner of the grid: bottom-right, then bottom-left (one line, or two lines split at
+   * the first punctuation mark), else under the grid when there is room; null when nothing fits.
+   */
+  function noteGraphic(t, F, note) {
+    var font = '9.5px ' + t.fontSans, lh = 12;
+    var cut = note.search(/[，,;；:：]\s*/);
+    var variants = [[note]];
+    if (cut > 0) variants.push([note.slice(0, cut).trim(), note.slice(cut + 1).trim()]);
+    function el(lines, x, y, align) {
+      return { type: 'text', id: 'rk-tile-note', silent: true, x: Math.round(x), y: Math.round(y),
+        style: { text: lines.join('\n'), fill: t.ink3, font: font, align: align, verticalAlign: 'bottom', lineHeight: lh } };
+    }
+    for (var c = 0; c < 2; c++) {
+      for (var v = 0; v < variants.length; v++) {
+        var lines = variants[v], w = Math.ceil(Math.max.apply(null, lines.map(function (l) { return C.measure(l, font); }))), h = lines.length * lh;
+        if (c === 0 && F.clear(F.gw - w, F.gh - h, w, h)) return el(lines, F.ox + F.gw, F.oy + F.gh, 'right');
+        if (c === 1 && F.clear(0, F.gh - h, w, h)) return el(lines, F.ox, F.oy + F.gh, 'left');
+      }
+    }
+    if (F.oy + F.gh + lh + 2 <= F.H && F.legend !== 'bottom') return el([note], F.ox + F.gw, F.oy + F.gh + lh + 1, 'right');
+    return null;
+  }
 
   /* ---------------- geometry ---------------- */
 
@@ -473,7 +501,8 @@
       if (v != null) shown.push(v);
       return {
         p: p, rows: rows, v: v, has: v != null, inDomain: !!dom.by[p.code], keys: keys,
-        cls: v != null ? scale.classOf(v) : -1, base: v != null ? scale.color(v) : noDataFill(t),
+        cls: v != null ? scale.classOf(v) : dom.by[p.code] ? -3 : -1,
+        base: v != null ? scale.color(v) : dom.by[p.code] ? filteredFill(t) : noDataFill(t),
         sel: sel.length > 0 && keys.some(function (k) { return sel.indexOf(k) >= 0; }), hl: !!hl[p.code]
       };
     });
@@ -501,6 +530,7 @@
     function refocus(cls) {
       if (state.focus === cls) return;
       state.focus = cls;
+      inst.dispatchAction({ type: 'downplay', seriesId: 'tiles' });   // drop any hover state before restyling
       inst.setOption({ series: [{ id: 'tiles', data: data }] });
     }
     function pick(indices) {
@@ -552,7 +582,8 @@
         U.merge(shape, {
           style: { fill: fill, stroke: faint ? RK.theme.mix(fill, t.ink, 0.16) : fill, lineWidth: faint ? 0.8 : 0 },
           cursor: pointer ? 'pointer' : 'default', transition: ['shape', 'style'],
-          emphasis: { style: { stroke: t.ink, lineWidth: 1.5 } }
+          // hover: crisp ink outline, same fill (no ECharts colour lift)
+          emphasis: { style: { fill: fill, stroke: t.ink, lineWidth: 1.5 } }
         }, enter),
         U.merge(ringShape, {
           silent: true, transition: ['shape', 'style'],
@@ -616,7 +647,9 @@
       tooltip: { trigger: 'item', confine: true, formatter: tooltip },
       series: [{
         id: 'tiles', type: 'custom', coordinateSystem: 'none', data: data, renderItem: renderItem,
-        animationDurationUpdate: 650, animationEasingUpdate: 'cubicInOut', selectedMode: false
+        animationDurationUpdate: 650, animationEasingUpdate: 'cubicInOut', selectedMode: false,
+        // instant hover states: an animated state-leave would land after a legend-focus restyle and restore a stale fill
+        stateAnimation: { duration: 0 }
       }],
       graphic: { elements: [] }
     };
@@ -624,16 +657,8 @@
       opt.graphic.elements.push(legendGraphic(ctx, lm, F.lx, F.ly, F.legend === 'bottom', legendOn));
     }
     var note = o.note === true ? txt.note : typeof o.note === 'string' && o.note ? o.note : null;
-    if (note) {
-      // bottom-right of the grid when that corner is free (the default layout leaves it empty), else below the grid
-      var nf = '9.5px ' + t.fontSans, nw = Math.ceil(C.measure(note, nf)), nx, ny;
-      if (F.clear(F.gw - nw, F.gh - 12, nw, 12)) { nx = F.ox + F.gw; ny = F.oy + F.gh; }
-      else if (F.oy + F.gh + 14 <= F.H && F.legend !== 'bottom') { nx = F.ox + F.gw; ny = F.oy + F.gh + 13; }
-      if (nx != null) {
-        opt.graphic.elements.push({ type: 'text', id: 'rk-tile-note', silent: true, x: Math.round(Math.min(nx, F.W - 2)), y: Math.round(ny),
-          style: { text: note, fill: t.ink3, font: nf, align: 'right', verticalAlign: 'bottom' } });
-      }
-    }
+    var noteEl = note ? noteGraphic(t, F, note) : null;
+    if (noteEl) opt.graphic.elements.push(noteEl);
     return opt;
   }
 

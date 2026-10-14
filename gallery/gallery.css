@@ -294,4 +294,6 @@
   .g-stage__tools { margin-left: 0; }
   .g-card { padding: 14px; }
   .g-film { grid-auto-columns: 72%; }
+  /* wide tables (league / comps / pivot) scroll inside their card instead of widening the page */
+  .g-compcard__stage, .g-featcard__stage, .g-stage__page .rk-page__body { overflow-x: auto; }
 }

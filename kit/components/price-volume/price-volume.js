@@ -261,7 +261,7 @@
 
     var ax = state.axes = axesFor(ctx, state);
     // fixed left margin so both panels share one x scale
-    var pAxisFmt = tickFmt(fmt, function () { return state.axes && state.axes.p.interval; });
+    var pAxisFmt = C.tickFmt(fmt, function () { return state.axes && state.axes.p.interval; });
     var font = '11px ' + t.fontNum;
     var left = Math.ceil(Math.max(
       C.measure(pAxisFmt(ax.p.max), font), C.measure(pAxisFmt(ax.p.min), font),
@@ -515,23 +515,6 @@
   /* ------------------------------------------------------------------ *
    * Small helpers
    * ------------------------------------------------------------------ */
-  /**
-   * Axis tick formatter (house style: no decimals when the tick step is whole at display precision,
-   * "$6,000" not "$6,000.0", "20%" not "20.0%"). step: number, function returning the live step,
-   * or an array of tick values; null decides per value.
-   */
-  function tickFmt(code, step) {
-    code = String(RK.format.presets[code] || code || 'auto');
-    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
-    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
-    function whole(v) { return num(v, code) === num(v, trimmed); }
-    return function (v) {
-      var s = typeof step === 'function' ? step() : step;
-      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
-      return RK.format(v, ok ? trimmed : code);
-    };
-  }
-
   /**
    * Pitchbook date ticks for a window [a, b] (ms): month multiples aligned to quarters / halves / years
    * ("Jan-25", "Apr-25"), weeks or days ("5 Aug"), about one label per 80px.

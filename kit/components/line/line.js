@@ -363,7 +363,7 @@
       splitLine: { show: false },
       axisLine: { show: true, lineStyle: { color: t.axis } },
       axisTick: model.isTime ? { show: true, length: 3, lineStyle: { color: t.axis }, customValues: tk.values } : { show: true },
-      axisLabel: model.isTime ? tickLabel(tk) : { formatter: tickFmt(o.xFormat || ctx.fmtOf(ctx.enc.x) || 'auto') },
+      axisLabel: model.isTime ? tickLabel(tk) : { formatter: C.tickFmt(o.xFormat || ctx.fmtOf(ctx.enc.x) || 'auto') },
       axisPointer: { show: true, type: 'line', label: { show: false } }
     };
 
@@ -386,7 +386,7 @@
       xAxis: xAxis,
       yAxis: {
         id: 'y', type: 'value', min: y ? y.min : null, max: y ? y.max : null, interval: y ? y.interval : null,
-        axisLabel: { formatter: tickFmt(fmt, function () { return state.yAxis && state.yAxis.interval; }) }
+        axisLabel: { formatter: C.tickFmt(fmt, function () { return state.yAxis && state.yAxis.interval; }) }
       },
       dataZoom: dz,
       series: series
@@ -400,23 +400,6 @@
     var below = 0, total = 0;
     a.values.forEach(function (v, i) { if (v != null && b.values[i] != null) { total++; if (v < b.values[i]) below++; } });
     return total && below / total > 0.5;
-  }
-
-  /**
-   * Axis tick formatter (house style: no decimals when the tick step is whole at display precision,
-   * "$6,000" not "$6,000.0", "20%" not "20.0%"). step: number, function returning the live step,
-   * or an array of tick values; null decides per value.
-   */
-  function tickFmt(code, step) {
-    code = String(RK.format.presets[code] || code || 'auto');
-    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
-    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
-    function whole(v) { return num(v, code) === num(v, trimmed); }
-    return function (v) {
-      var s = typeof step === 'function' ? step() : step;
-      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
-      return RK.format(v, ok ? trimmed : code);
-    };
   }
 
   /**

@@ -173,10 +173,12 @@
   function decimal(v) {
     var s = Math.abs(v).toPrecision(15), k = s.indexOf('e'), x = 0;
     if (k >= 0) { x = +s.slice(k + 1); s = s.slice(0, k); }
-    var dot = s.indexOf('.'), p = (dot < 0 ? s.length : dot) + x;
-    var ds = s.replace('.', ''), z = 0;
-    while (z < ds.length && ds[z] === '0') z++;
-    return { ds: ds.slice(z).replace(/0+$/, ''), p: p - z };
+    var dot = s.indexOf('.'), p = dot < 0 ? s.length : dot;
+    if (dot >= 0) s = s.slice(0, dot) + s.slice(dot + 1);
+    var a = 0, b = s.length;
+    while (a < b && s.charCodeAt(a) === 48) a++;       // leading zeros of 0.0705
+    while (b > a && s.charCodeAt(b - 1) === 48) b--;   // trailing zeros carry no information
+    return { ds: s.slice(a, b), p: p + x - a };
   }
 
   /** "129" -> "130", "999" -> "1000", "" -> "1" */
@@ -219,20 +221,22 @@
     return y === 0 ? 0 : (x < 0 ? -y : y);                     // never -0
   }
 
-  /** Decimal-point shift of a numeric section: +2 per %, -3 per trailing comma. */
-  function shiftOf(t) { return 2 * t.percent - 3 * t.scale; }
+  /** Rounded digits of |v| for a numeric section: round(|v| x 10^(maxDec + 2 per % - 3 per trailing comma)). */
+  function digitsOf(abs, t) { return scaledDigits(abs, t.maxDec, 2 * t.percent - 3 * t.scale); }
 
-  function renderNum(abs, t) {
-    var s = fixed(abs, t.maxDec, shiftOf(t));
-    var parts = s.split('.');
-    var ip = parts[0], dp = parts[1] || '';
+  /** Lay out rounded digits (from digitsOf) with a section template: decimal point, optional #, grouping, literals. */
+  function renderDigits(s, t) {
+    var d = t.maxDec;
+    if (s.length <= d) s = zeros(d + 1 - s.length) + s;
+    var ip = s.slice(0, s.length - d), dp = s.slice(s.length - d);
     // trim optional decimals (#)
-    while (dp.length > t.minDec && dp[dp.length - 1] === '0') dp = dp.slice(0, -1);
+    while (dp.length > t.minDec && dp.charCodeAt(dp.length - 1) === 48) dp = dp.slice(0, -1);
     if (ip === '0' && t.minInt === 0) ip = '';
     while (ip.length < t.minInt) ip = '0' + ip;
     if (t.group) ip = groupDigits(ip);
     return t.prefix + ip + (dp ? config.decimal + dp : '') + t.suffix;
   }
+  function renderNum(abs, t) { return renderDigits(digitsOf(abs, t), t); }
 
   function compileNumeric(code) {
     var secs = splitSections(code);
@@ -240,16 +244,13 @@
     var neg = secs[1] != null && secs[1] !== '' ? parseNumSection(secs[1]) : null;
     var zero = secs[2] != null && secs[2] !== '' ? parseNumSection(secs[2]) : null;
     var hideZero = secs.length > 2 && secs[2] === '';      // Excel "#,##0;(#,##0);" idiom: blank for zero
-    // value that shows as zero at the section's precision (-0.0004 with "0.0%")
-    function roundsToZero(abs, t) { return scaledDigits(abs, t.maxDec, shiftOf(t)) === '0'; }
     return function (v) {
-      if (v === 0 && hideZero) return '';
-      if (v === 0 && zero) return renderNum(0, zero);
-      // never "-0.0", "(0.0)" or "+0.0%": a value that rounds to zero is shown as zero (zero section, else the unsigned
-      // positive section; blank with an empty zero section)
-      if (v !== 0 && roundsToZero(Math.abs(v), v < 0 && neg ? neg : pos)) return hideZero ? '' : renderNum(0, zero || pos);
-      if (v < 0) return neg ? renderNum(-v, neg) : config.minus + renderNum(-v, pos);
-      return renderNum(v, pos);
+      if (v === 0) return hideZero ? '' : renderNum(0, zero || pos);
+      var t = v < 0 && neg ? neg : pos, s = digitsOf(Math.abs(v), t);
+      // never "-0.0", "(0.0)" or "+0.0%": a value that rounds to zero at the section's precision (-0.0004 with "0.0%")
+      // is shown as zero: zero section, else the unsigned positive section; blank with an empty zero section
+      if (s === '0') return hideZero ? '' : renderNum(0, zero || pos);
+      return v < 0 && !neg ? config.minus + renderDigits(s, pos) : renderDigits(s, t);
     };
   }
 

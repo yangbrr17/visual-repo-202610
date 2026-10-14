@@ -228,7 +228,7 @@
     var priceH = state.priceH = hasVol ? avail - volH : avail + gap;
 
     var ax = state.axes = axesFor(ctx, state);
-    var pAxisFmt = tickFmt(fmt, function () { return state.axes && state.axes.p.interval; });
+    var pAxisFmt = C.tickFmt(fmt, function () { return state.axes && state.axes.p.interval; });
     var font = '11px ' + t.fontNum;
     var left = Math.ceil(Math.max(C.measure(pAxisFmt(ax.p.max), font), C.measure(pAxisFmt(ax.p.min), font),
       C.measure(RK.format(m.C[m.n - 1], fmt), font), hasVol ? C.measure(RK.format(ax.v.max, 'auto'), font) : 0)) + 14;
@@ -458,25 +458,8 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Helpers: axis labels, date ticks on a category axis
+   * Helpers: date ticks on a category axis
    * ------------------------------------------------------------------ */
-  /**
-   * Axis tick formatter (house style: no decimals when the tick step is whole at display precision,
-   * "$6,000" not "$6,000.0", "20%" not "20.0%"). step: number, function returning the live step,
-   * or an array of tick values; null decides per value.
-   */
-  function tickFmt(code, step) {
-    code = String(RK.format.presets[code] || code || 'auto');
-    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
-    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
-    function whole(v) { return num(v, code) === num(v, trimmed); }
-    return function (v) {
-      var s = typeof step === 'function' ? step() : step;
-      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
-      return RK.format(v, ok ? trimmed : code);
-    };
-  }
-
   var STEPS = [[1, 'd'], [2, 'd'], [7, 'w'], [14, 'w'], [1, 'm'], [2, 'm'], [3, 'm'], [6, 'm'], [12, 'm'], [24, 'm'], [60, 'm']];
   /** Calendar ticks (months aligned to quarters / halves / years, Mondays, days) mapped to trading-day indices. */
   function catTicks(m, win, width) {

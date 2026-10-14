@@ -113,7 +113,7 @@
     if (scale === 'linear') {
       return U.merge(common, {
         type: 'continuous', min: lo, max: hi, calculable: true, realtime: true,
-        itemWidth: 10, itemHeight: 130, formatter: tickFmt(fmt),     // per value: whole bounds drop decimals, dragged handles keep them
+        itemWidth: 10, itemHeight: 130, formatter: C.tickFmt(fmt),     // per value: whole bounds drop decimals, dragged handles keep them
         inRange: { color: [0.18, 0.4, 0.62, 0.82, 1].map(ramp) },
         outOfRange: { color: t.surface2 || t.surface },
         handleStyle: { borderColor: t.ink3 }, indicatorStyle: { borderColor: t.paper }
@@ -121,7 +121,7 @@
     }
     var cuts = U.unique([0.2, 0.4, 0.6, 0.8].map(function (p) { return roundSig(q(p), 2); })).filter(function (v) { return v > lo && v < hi; });
     var cols = [0.18, 0.38, 0.58, 0.78, 1].map(ramp);
-    var cut = tickFmt(fmt, cuts);         // bucket bounds read like axis ticks: "74–85", not "74.0–85.0"
+    var cut = C.tickFmt(fmt, cuts);         // bucket bounds read like axis ticks: "74–85", not "74.0–85.0"
     var pieces = [];
     for (var i = 0; i <= cuts.length; i++) {
       var p = { color: cols[Math.round(i * (cols.length - 1) / Math.max(1, cuts.length))] };
@@ -245,7 +245,7 @@
         textStyle: { color: t.ink2, fontSize: 11, fontFamily: t.fontNum },
         inRange: { color: t.div.slice() },
         outOfRange: { color: t.surface2 || t.surface },
-        formatter: tickFmt(fmt)
+        formatter: C.tickFmt(fmt)
       },
       xAxis: {
         type: 'category', data: xCats, position: 'top',
@@ -300,22 +300,5 @@
     var steps = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
     for (var i = 0; i < steps.length; i++) if (steps[i] * mag >= v - 1e-12) return steps[i] * mag;
     return 10 * mag;
-  }
-
-  /**
-   * Axis tick formatter (house style: no decimals when the tick step is whole at display precision,
-   * "$6,000" not "$6,000.0", "20%" not "20.0%"). step: number, function returning the live step,
-   * or an array of tick values; null decides per value.
-   */
-  function tickFmt(code, step) {
-    code = String(RK.format.presets[code] || code || 'auto');
-    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
-    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
-    function whole(v) { return num(v, code) === num(v, trimmed); }
-    return function (v) {
-      var s = typeof step === 'function' ? step() : step;
-      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
-      return RK.format(v, ok ? trimmed : code);
-    };
   }
 })();

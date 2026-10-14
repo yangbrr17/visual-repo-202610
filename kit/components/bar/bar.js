@@ -99,7 +99,7 @@
       }
 
       var catAxis = { type: 'category', data: cats, axisLabel: { interval: 0, hideOverlap: true, width: horiz ? 140 : 90, overflow: 'truncate' }, inverse: horiz };
-      var scale = valueScale(o, data, cats), tick = tickFmt(fmt, scale.step);
+      var scale = valueScale(o, data, cats), tick = C.tickFmt(fmt, scale.step);
       var valAxis = { type: 'value', min: scale.min, max: scale.max, interval: scale.step, axisLabel: { formatter: tick } };
       // horizontal: the last tick label is centred on the plot's right edge, keep room for its right half
       var right = horiz ? Math.max(12, Math.ceil(C.measure(tick(scale.max), '11px ' + t.fontNum) / 2) + 4) : 12;
@@ -170,22 +170,5 @@
     }
     if (!lines.length) return undefined;
     return { silent: true, symbol: ['none', 'none'], label: { position: horiz ? 'start' : 'insideEndTop', fontSize: 10.5 }, data: lines };
-  }
-
-  /**
-   * Axis tick formatter (house style: no decimals when the tick step is whole at display precision,
-   * "$6,000" not "$6,000.0", "20%" not "20.0%"). step: number, function returning the live step,
-   * or an array of tick values; null decides per value.
-   */
-  function tickFmt(code, step) {
-    code = String(RK.format.presets[code] || code || 'auto');
-    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
-    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
-    function whole(v) { return num(v, code) === num(v, trimmed); }
-    return function (v) {
-      var s = typeof step === 'function' ? step() : step;
-      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
-      return RK.format(v, ok ? trimmed : code);
-    };
   }
 })();

@@ -1618,3 +1618,78 @@ index 758fe3e..91e7a1a 100644
        if (/^\d+$/.test(s.key)) col = cols[parseInt(s.key, 10) - 1];
 ```
 
+
+---
+
+## Resolution
+
+*2026-10-14 · merged into `kit/core/rk.expr.js`, `rk.format.js` and `rk.data.js`. All 36 findings are **fixed**; none
+is "won't fix". Every patch above was applied on top of `88a4097`, including its allowEmpty filters,
+setValues/toggleValue `extra`, removal carrying `prev`, the chained-computed `dirty` set, query `exclude`/`ignore` and
+`RK.data.applies`. Where the merged code differs from the proposed diff, the difference is noted below. The diffs above
+are kept as the audit record. They no longer apply to the current tree.*
+
+| Suite | Before | After |
+|---|---|---|
+| `node tests/js/core.test.js` | 57/57 | **67/67** (+10 headline checks for F1, F2, E4, E1, E10, E7, Q1, Q4, Q5, Q9) |
+| `node tests/js/engine.test.js` | 378/378 | **542/542** (378 + the 128 audit tests moved in + 36 new ID-tagged tests) |
+| `node tests/js/engine-audit.test.js` | 0/128 | **164/164**, and all 36 finding IDs are covered. It is now a regression runner: it runs the ID-tagged tests of `engine.test.js` and fails if a finding has none |
+| `node tests/js/formula-doc.test.js` | 138/138 | **165/165** (8 formulas, 13 format codes and 6 error messages added to the doc) |
+| `node tools/smoke.cjs --all` | 52/52 | **53/53**: the original 52 plus china-tilemap, which was added while this was merged |
+
+| ID | Status | Notes on the merged fix |
+|---|---|---|
+| F1 | fixed | Rewritten rather than taken from the patch. The patch multiplied first (`(v * 10^d).toPrecision(15)`). The merged code takes the value's 15-significant-digit decimal string (`toPrecision(15)`, an exact conversion of the binary value) and rounds half away from zero on that digit string. `%` and trailing-comma scaling move the decimal point in the string and never multiply. Any number of decimals works, so there is no 0–20 clamp. `RK.format.round(x, d)` (Excel ROUND) and `RK.format.fixed(v, d)` (an Excel-rounded `toFixed`) are exported, so components can stop using `toFixed`; 31 `toFixed` calls remain in components and `rk.geo.js`, which this change does not own. A differential fuzz against a BigInt reference found 0 mismatches in 400,000 cases. 40 of 9,642 sample-dataset cells, each rendered with its field's format, change (all .x5 ties). |
+| Q4 | fixed | Generalised from the patch into recursive inference. Same-unit functions inherit the format of their first argument at any depth (`round(avg(x), 1)`). `-x`, `x - y` / `x + y` with equal formats, `if()` / `?:` with agreeing branches and `sum(if(c, x, 0))` keep `x`'s format; number literals and `null` count as neutral. `RESULT_FORMAT` is as in the patch. Ratios, products and other functions get General. The compiler now records each field node's schema name (`node.resolved`), so titles and case variants resolve. |
+| E1 | fixed | As proposed, but text ordering uses one shared `Intl.Collator({sensitivity: 'accent'})`. `localeCompare(b, undefined, opts)` builds a collator per call and was 80x slower on a 250k-row filter. |
+| E2 | fixed | As proposed. |
+| E3 | fixed | As proposed. |
+| E4 | fixed | `round()` calls `RK.format.round`, the decimal-string rounding of F1, so a rounded value and its display always agree. The patch's `toPrecision` version remains as a fallback when `rk.format.js` is not loaded. `d` is clamped to ±400. |
+| E5 | fixed | As proposed. |
+| E6 | fixed | As proposed. The scalar `min(a, b, …)` / `max(a, b, …)` also loop instead of using `Math.min.apply`, which hit the argument limit at 200k arguments. |
+| E7 | fixed | All lookup tables were fixed together. `KEYWORDS`, `CMP`, `SCALAR`, `LAZY`, `AGG`, `AGG_EXTRA` and `AGG_ARITY` in `rk.expr.js` are `Object.create(null)` tables read with `has()`. So are `presets` in `rk.format.js` and the store's `filters` / `params` / `state` plus every internal table in `rk.data.js`. Field reads (`has(row, name)`) and param reads are own-property only. `RK.expr.agg` and `RK.format.presets` therefore no longer expose `constructor`, which also hardens components that do `RK.expr.agg[o.agg] \|\| …` and `RK.format.presets[fmt] \|\| fmt`. |
+| E8 | fixed | As proposed. |
+| E9 | fixed | As proposed. |
+| E10 | fixed | Explicit bounds were added in front of the patch's RangeError conversion, which stays as a backstop. Parser recursion (parentheses, calls, lists, unary `-`, `not`, `^`, `?:`) is capped at 256 levels and AST depth at 1,024 (long `1+1+…` chains), giving a deterministic `ExprError` on every engine. 250 nested parentheses, 200 nested `if()` and a 1,000-term sum still compile. Three other super-linear paths were fixed: the `[` look-ahead in the tokenizer (one scan instead of one per `[`, so 1M `[` fail in under 1 s), field/param de-duplication in the compiler (`indexOf` per reference became an O(1) set) and scalar `max()` with many arguments. |
+| E11 | fixed | As proposed. |
+| E12 | fixed | As proposed. The formula echoed in the message is truncated to 80 characters. |
+| F2 | fixed | As proposed, on the decimal path. Values below 1e-8 use an exponent (`1.23e-9`) instead of a 300-digit string. |
+| F3 | fixed | Subsumed by F1: the digit-string path prints 15 significant digits followed by zeros at any magnitude. |
+| F4 | fixed | As proposed. Promotion uses the ratio between units (`+s * unit >= nextUnit`), so custom units such as 万 / 亿 work, and power-of-ten units shift the decimal point exactly. |
+| F5 | fixed | As proposed. |
+| F6 | fixed | As proposed, plus a null-prototype `presets` table (E7). Compiled number formats called directly (`RK.format.compile(code)(NaN)`) and `RK.format.compact(NaN)` return `n.m.` instead of garbage. |
+| F7 | fixed | As proposed. |
+| F8 | fixed | As proposed, with one deliberate difference. A value that rounds to zero under an empty zero section (`#,##0;(#,##0);`, `-0.4`) is blank like an exact zero; the patch printed "0". Documented in docs §12. |
+| F9 | fixed | As proposed. `[...]` tags are also ignored when deciding whether a bare code is a date. |
+| F10 | fixed | As proposed. |
+| Q1 | fixed | The clause finder is a sticky regex (`/(group\s+by\|order\s+by\|sort\s+by\|from\|by\|where\|sort\|top\|limit)(?=\s\|$)/iy`), so `sort  by`, `sort⏎by` and `group   by` with any blanks also work. Before, they hit the same trap. |
+| Q2 | fixed | As proposed. |
+| Q3 | fixed | As proposed. |
+| Q5 | fixed | As proposed. In the spec-object API a non-positive `limit` means no limit; it used to drop rows from the end. |
+| Q6 | fixed | As proposed. |
+| Q7 | fixed | As proposed. |
+| Q8 | fixed | As proposed. |
+| Q9 | fixed | Merged with `88a4097`'s `dirty` propagation. Dependants recompute in definition order: a redefinition keeps its slot, and the `dirty` set is null-prototype and read with `has()`. Self-reference is rejected with an `ExprError` in `addComputed`, including through a title (`[My metric]`). Beyond the patch, a redefinition may read a computed field defined *after* it, in which case it is evaluated after that field (stable dependency order), and a loop (`a -> b -> a`) is rejected before any state changes. **Follow-up, not done here:** porting the check to `py/reportkit/validate.py`, which is outside the files this change owns. The Python validator already rejects `x = x * …` for a *new* name, because a field's own name is not yet available when its formula is checked. Only re-using an existing field name (`ev = ev * 1.1`) passes the build and then fails at load. |
+| Q10 | fixed | As proposed. |
+| Q11 | fixed | As proposed, with compilation memoised per (filter spec, dataset, schema revision) in a `WeakMap`. `Dataset._rev` is bumped by `addComputed` / `removeComputed`, so an `expr` filter starts to apply once the dataset gains the field it needs. |
+| Q12 | fixed | As proposed. |
+| Q13 | fixed | As proposed. `put()` is used for every record write, `get()` for every record read by field name (filters, group keys, `values()`, `toCSV()`, `inferType()`). Params named `__proto__` are stored as data. |
+| Q14 | fixed | As proposed. |
+
+Observations without a patch:
+- The unbounded `RK.expr.compile` cache is now **fixed**: it is an LRU of 500 entries.
+- The Excel differences (`-2^2`, `2^3^2`), two-valued null logic, first-row values in grouped queries, group-key collisions,
+  `sort` defaulting to desc, escapes, the `[2025 Sales]` heuristic, minor numeric coercions and the `between` / `eq`
+  filter ops are **unchanged**. They are design decisions documented in `docs/formula-language.md`.
+
+Performance (V8, 250k rows or values, before → after): numeric filters are unchanged (13–21 ms). Text comparison is
+unchanged with the shared collator (63 → 65 ms). The data layer is unchanged (computed recompute 30 → 29 ms; `in` +
+`expr` filters 21 → 22 ms; group-by 167 → 229 ms; sorted query 228 → 188 ms, all within run-to-run noise). One
+`RK.format` call costs about 0.6–1.1 µs instead of 0.3–0.5 µs, because the digit-string rounding is the price of
+Excel-exact output.
+
+Visible changes: a back-to-back render of baseline and new core shows 9 components whose output changes. Each change
+is a one-digit .x5 tie, e.g. comps-table Corvane growth 7.0% → 7.1%, pivot-table 433 → 434 and calendar-heatmap
+-3.1% → -3.2%. The 9 are bullet, calendar-heatmap, comps-table, data-grid, diverging-bar, heatmap, league-table,
+pivot-table and sensitivity-table. Re-shoot the gallery screenshots (step 5 of "How to apply"). `docs/formula-language.md`
+§15 "Known issues" is now empty, and the changed behaviour is documented in §2, §6–§10 and §12–§14.

@@ -843,3 +843,13 @@ class DataSourceAndAutoHeightTests(unittest.TestCase):
             self.assertNotIn('src="data/bundle.js"', html2)
             self.assertIn('<meta name="rk:data-source" content="api">', html2)
             self.assertIn('<meta name="rk:api" content="https://example.test/api/r/1/">', html2)
+
+
+class SelfReferenceTests(unittest.TestCase):
+    def test_self_referencing_computed_field_is_rejected(self):
+        from reportkit import Report
+        r = Report("T")
+        r.dataset("d", [{"ev": 1.0}], computed=[{"name": "ev", "formula": "ev * 1.1"}])
+        r.page("P").block("bar", data="d", options={"encode": {"x": "ev", "y": "ev"}})
+        errors, _ = r.check()
+        self.assertTrue(any("self-referential" in e for e in errors), errors)
