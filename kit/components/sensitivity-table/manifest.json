@@ -1,0 +1,48 @@
+{
+  "id": "sensitivity-table",
+  "name": "Sensitivity Table",
+  "name_zh": "敏感性分析表",
+  "category": "table",
+  "engine": "dom",
+  "deps": [],
+  "summary": "Two-way sensitivity grid (e.g. DCF value vs WACC × terminal growth, LBO IRR vs entry × exit multiple) with diverging heat around the base case.",
+  "summary_zh": "双变量敏感性分析表（如 DCF 股价对 WACC × 永续增长率、LBO IRR 对进入 × 退出倍数），以基准情形为中点的发散色热力。",
+  "description_zh": "估值与 LBO 页的标准表格：长表数据（row、col、value 三列）自动转成二维网格，行列表头按字段格式显示（如 7.5% / 2.0%、8.0x），基准单元格加框，颜色按与基准（或 mid 指定的门槛，如 20% IRR）的偏离深浅着色。悬停出现行列十字高亮和含“较基准变化”的提示框，可切换显示绝对值 / 与基准差值 / 百分比变化；点击单元格可把它设为新的基准，若 base 绑定 @参数（如 @wacc）则同步更新全局参数。",
+  "best_for": ["DCF implied share price vs WACC × terminal growth", "LBO IRR / MoM vs entry × exit multiple", "Accretion / dilution vs offer price × stock mix"],
+  "avoid_when": ["One-dimensional sensitivities (use a tornado / bar chart)", "Grids larger than ~10 × 10"],
+  "channels": {
+    "row": {"type": "number|string", "required": true, "desc": "Row driver (e.g. WACC)", "default": "wacc"},
+    "col": {"type": "number|string", "required": true, "desc": "Column driver (e.g. terminal growth)", "default": "tgr"},
+    "value": {"type": "number", "required": true, "desc": "Output for each row × column pair", "default": "value"}
+  },
+  "options": {
+    "base": {"type": "object", "default": null, "desc": "{row, col} base-case driver values, or '@param' names (e.g. {\"row\": \"@wacc\", \"col\": \"@tgr\"}); null = middle cell"},
+    "rowTitle": {"type": "string", "default": null, "desc": "Row axis title (defaults to the row field title)"},
+    "colTitle": {"type": "string", "default": null, "desc": "Column axis title (defaults to the col field title)"},
+    "rowFormat": {"type": "string", "default": null, "desc": "Row header format (defaults to the row field format, e.g. 0.0%)"},
+    "colFormat": {"type": "string", "default": null, "desc": "Column header format (defaults to the col field format)"},
+    "format": {"type": "string", "default": null, "desc": "Cell format (defaults to the value field format)"},
+    "deltaFormat": {"type": "string", "default": null, "desc": "Format in Δ mode (defaults to '+fmt;-fmt;fmt' of the cell format)"},
+    "heat": {"type": "string|boolean", "default": "div", "desc": "div (diverging around mid) | seq | false"},
+    "mid": {"type": "number", "default": null, "desc": "Midpoint of the diverging scale; defaults to the base value (e.g. 0.20 for an IRR hurdle)"},
+    "reverse": {"type": "boolean", "default": false, "desc": "Flip colours when lower values are better"},
+    "heatIntensity": {"type": "number", "default": 0.55, "desc": "0–1 strength of the heat tints"},
+    "mode": {"type": "string", "default": "value", "desc": "value | delta | pct — initial display mode"},
+    "toggle": {"type": "boolean", "default": true, "desc": "Show the Value / Δ vs base / % vs base switch"},
+    "caption": {"type": "boolean", "default": true, "desc": "Show the 'Base case: … = …' line above the grid"},
+    "crosshair": {"type": "boolean", "default": true, "desc": "Highlight the hovered row and column"},
+    "tooltip": {"type": "boolean", "default": true, "desc": "Hover tooltip with value and change vs base"},
+    "rebase": {"type": "boolean", "default": true, "desc": "Click a cell to make it the base case (sets the bound @params)"},
+    "rowOrder": {"type": "string", "default": "asc", "desc": "asc | desc order of row drivers"},
+    "colOrder": {"type": "string", "default": "asc", "desc": "asc | desc order of column drivers"}
+  },
+  "interactions": ["Row + column crosshair on hover", "Tooltip with change vs base", "Value / Δ / % toggle", "Click a cell to re-base (drives @params when bound)", "Numbers tween on update"],
+  "samples": [
+    {"title": "DCF — implied share price (USD)", "data": "sensitivity_dcf", "height": 300, "span": 6,
+     "options": {"encode": {"row": "wacc", "col": "tgr", "value": "value"}, "colTitle": "Terminal growth rate", "base": {"row": "@wacc", "col": "@tgr"}}},
+    {"title": "LBO — sponsor IRR vs entry / exit multiple", "data": "sensitivity_lbo", "height": 300, "span": 6,
+     "options": {"encode": {"row": "entry_multiple", "col": "exit_multiple", "value": "irr"}, "rowTitle": "Entry multiple", "colTitle": "Exit multiple", "mid": 0.2, "base": {"row": 10, "col": 10}}},
+    {"title": "DCF — change vs base case", "data": "sensitivity_dcf", "height": 300, "span": 6,
+     "options": {"mode": "delta", "heat": "seq", "toggle": false, "rowOrder": "desc", "colTitle": "Terminal growth rate"}}
+  ]
+}

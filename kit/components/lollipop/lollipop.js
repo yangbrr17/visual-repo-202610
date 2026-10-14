@@ -15,6 +15,11 @@
     var m = a.length >> 1;
     return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
   }
+  /** Colours too close to the highlight accent are skipped for group colouring. */
+  function near(a, b) {
+    var x = RK.theme.parseColor(a), y = RK.theme.parseColor(b);
+    return Math.sqrt(Math.pow(x[0] - y[0], 2) + Math.pow(x[1] - y[1], 2) + Math.pow(x[2] - y[2], 2)) < 64;
+  }
   function mean(a) { a = a.filter(isNum); return a.length ? a.reduce(function (s, v) { return s + v; }, 0) / a.length : null; }
 
   /** Is row r highlighted (boolean field such as is_target, or label listed in options.highlight)? */
@@ -66,7 +71,7 @@
 
     // ---- colours ----
     var groups = enc.group ? util.unique(rows.map(function (r) { return r[enc.group]; }).filter(function (g) { return g != null; })) : [];
-    var groupPal = t.cat.filter(function (c) { return c !== t.accent2; });
+    var groupPal = t.cat.filter(function (c) { return !near(c, t.accent2) && !near(c, t.paper); });
     function baseColor(r, i) {
       if (hi[i]) return t.accent2;
       if (groups.length) return groupPal[groups.indexOf(r[enc.group]) % groupPal.length] || t.neutral;
@@ -82,9 +87,12 @@
     // ---- value axis bounds with room for end labels ----
     var ext = util.extent(v1.concat(v2, [0, ref], (o.refLines || []).map(function (r) { return r.value; })));
     var span = (ext[1] - ext[0]) || Math.abs(ext[1]) || 1;
-    var step = util.niceStep(span * 1.12, horiz ? 6 : 5);
-    var axMax = ext[1] > 0 ? Math.ceil((ext[1] + span * (o.labels ? 0.09 : 0.03)) / step) * step : 0;
-    var axMin = ext[0] < 0 ? Math.floor((ext[0] - span * (o.labels ? 0.09 : 0.03)) / step) * step : 0;
+    // room for end labels: approximate label width in px as a share of the plot length
+    var plotPx = Math.max(160, horiz ? inst.getWidth() - 190 : inst.getHeight() - 70);
+    var padFrac = o.labels === false ? 0.03 : Math.min(0.45, (horiz ? (has2 ? 92 : 46) : 22) / plotPx * 1.15);
+    var step = util.niceStep(span * (1 + padFrac), horiz ? 6 : 5);
+    var axMax = ext[1] > 0 ? Math.ceil((ext[1] + span * padFrac) / step) * step : 0;
+    var axMin = ext[0] < 0 ? Math.floor((ext[0] - span * padFrac) / step) * step : 0;
 
     var size = o.dotSize || 9;
     var stagger = Math.min(45, 700 / Math.max(1, rows.length));
@@ -96,7 +104,7 @@
 
     // stems: thin bars from zero to the primary value
     series.push({
-      id: 'stem', name: ctx.title(enc.value), type: 'bar', barWidth: 1.6, z: 2,
+      id: 'stem', name: '_stem', type: 'bar', barWidth: 1.6, z: 2,
       animationDelay: delay, emphasis: { disabled: true }, tooltip: { show: false }, silent: true,
       data: v1.map(function (v, i) { return { value: v, itemStyle: { color: RK.theme.alpha(colors[i], hi[i] ? 0.95 : 0.7) } }; })
     });
@@ -183,7 +191,13 @@
       series.push({ id: 'lg-' + k, name: g, type: 'scatter', data: [], symbol: 'circle', itemStyle: { color: groupPal[k % groupPal.length] } });
     });
     var legendData = groups.slice();
-    if (has2) legendData = [{ name: ctx.title(enc.value), icon: 'circle' }, { name: ctx.title(enc.value2), icon: 'emptyCircle' }].concat(legendData);
+    if (has2) {
+      var lc = groups.length ? t.ink3 : t.accent;
+      legendData = [
+        { name: ctx.title(enc.value), icon: 'circle', itemStyle: { color: lc, borderWidth: 0 } },
+        { name: ctx.title(enc.value2), icon: 'circle', itemStyle: { color: t.paper, borderColor: lc, borderWidth: 1.5 } }
+      ].concat(legendData);
+    }
     var showLegend = o.legend !== false && legendData.length > 0;
     var hasTopRef = ref != null || (o.refLines || []).length;
 
@@ -208,7 +222,7 @@
 
     return {
       legend: C.legend(ctx, { show: showLegend, data: legendData, selectedMode: groups.length ? true : false }),
-      grid: C.grid(ctx, { top: top, left: 4, right: (o.zoom && horiz ? 22 : 12), bottom: o.zoom && !horiz ? 30 : 4 }),
+      grid: C.grid(ctx, { top: top, left: 4, right: (o.zoom && horiz ? 30 : 20), bottom: o.zoom && !horiz ? 30 : 4 }),
       tooltip: {
         trigger: 'item',
         formatter: function (p) {
