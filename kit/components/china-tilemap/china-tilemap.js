@@ -197,11 +197,14 @@
   /* ---------------- legend ---------------- */
   var LEG = { title: 15, gap: 5, row: 16, sw: 10, bar: 120, barH: 8 };
 
-  /** Legend model + measured sizes for the vertical (w, h) and horizontal (hw, hh) arrangements. */
+  /**
+   * Legend model: rows + measured sizes. Vertical arrangement: m.w x m.h (counts right-aligned);
+   * horizontal arrangement: m.flow(maxW) wraps the rows into lines no wider than maxW.
+   */
   function legendModel(ctx, scale, tiles, txt) {
     var o = ctx.options, t = ctx.theme;
     var title = o.legendTitle || G.fieldTitle(ctx, ctx.enc.value);
-    var fTitle = '600 11px ' + t.fontSans, fItem = '11px ' + t.fontNum, fNote = '10px ' + t.fontNum;
+    var F = legendFonts(t);
     var items = [];
     if (scale.classes) {
       scale.classes.forEach(function (c) {
@@ -214,28 +217,40 @@
     var missing = tiles.filter(function (x) { return !x.inDomain; }).length;
     if (missing) items.push({ cls: -1, color: noDataFill(t), label: txt.noData, note: String(missing), muted: true });
     if (o.highlightLabel && tiles.some(function (x) { return x.hl; })) items.push({ cls: -2, ring: t.accent2, label: o.highlightLabel });
-    var labW = Math.max.apply(null, items.map(function (it) { return C.measure(it.label, fItem); }).concat([0]));
-    var noteW = Math.max.apply(null, items.map(function (it) { return it.note ? C.measure(it.note, fNote) : 0; }).concat([0]));
-    var titleW = C.measure(title, fTitle);
-    var rampH = scale.ramp ? LEG.barH + 4 + 12 + 4 : 0;
     var rows = items.filter(function (it) { return !scale.ramp || it.cls < 0; });
+    rows.forEach(function (it) { it.lw = C.measure(it.label, F.item); });
+    var labW = Math.max.apply(null, rows.map(function (it) { return it.lw; }).concat([0]));
+    var noteW = Math.max.apply(null, rows.map(function (it) { return it.note ? C.measure(it.note, F.note) : 0; }).concat([0]));
+    var titleW = C.measure(title, F.title);
+    var rampH = scale.ramp ? LEG.barH + 4 + 12 + 4 : 0;
     var m = {
-      title: title, items: items, ramp: scale.ramp, labW: labW, noteW: noteW,
+      title: title, rows: rows, ramp: scale.ramp,
       w: Math.ceil(Math.max(titleW, scale.ramp ? LEG.bar : 0, rows.length ? LEG.sw + 6 + labW + 12 + noteW : 0)) + 2,
       h: LEG.title + LEG.gap + rampH + rows.length * LEG.row
     };
-    var rowW = (scale.ramp ? LEG.bar + 16 : 0) + rows.reduce(function (s, it) { return s + LEG.sw + 5 + C.measure(it.label, fItem) + 14; }, 0);
-    m.hw = Math.ceil(Math.max(titleW, rowW));
-    m.hh = LEG.title + LEG.gap + Math.max(scale.ramp ? LEG.barH + 4 + 12 : 0, rows.length ? 12 : 0);
+    /** Horizontal flow: ramp (if any) then swatch rows, wrapped at maxW. Returns {w, h, at: [[x, y]...] per row}. */
+    m.flow = function (maxW) {
+      var x = 0, y = LEG.title + LEG.gap, w = titleW, at = [], lineH = LEG.row;
+      if (scale.ramp) { x = LEG.bar + 16; w = Math.max(w, LEG.bar); lineH = LEG.barH + 4 + 12 + 2; }
+      rows.forEach(function (it) {
+        var iw = LEG.sw + 6 + it.lw;
+        if (x > 0 && x + iw > maxW) { x = 0; y += lineH; lineH = LEG.row; }
+        at.push([x, y]);
+        w = Math.max(w, x + iw);
+        x += iw + 14;
+      });
+      return { w: Math.ceil(w), h: Math.ceil(y + (rows.length || scale.ramp ? lineH - 4 : 0)), at: at };
+    };
     return m;
   }
 
-  /** ECharts graphic group for the legend (exported with the chart). */
-  function legendGraphic(ctx, m, x, y, horiz, on) {
-    var t = ctx.theme, kids = [];
-    var fTitle = '600 11px ' + t.fontSans, fItem = '11px ' + t.fontNum, fNote = '10px ' + t.fontNum;
-    kids.push({ type: 'text', x: 0, y: 0, silent: true, style: { text: m.title, fill: t.ink, font: fTitle, verticalAlign: 'top' } });
-    var yy = LEG.title + LEG.gap, xx = 0;
+  function legendFonts(t) { return { title: '600 11px ' + t.fontSans, item: '11px ' + t.fontNum, note: '10px ' + t.fontNum }; }
+
+  /** ECharts graphic group for the legend (exported with the chart). flow: null (vertical) | m.flow(...) result. */
+  function legendGraphic(ctx, m, x, y, flow, on) {
+    var t = ctx.theme, kids = [], F = legendFonts(t);
+    kids.push({ type: 'text', x: 0, y: 0, silent: true, style: { text: m.title, fill: t.ink, font: F.title, verticalAlign: 'top' } });
+    var yy = LEG.title + LEG.gap;
     if (m.ramp) {
       var st = m.ramp.stops;
       kids.push({ type: 'rect', silent: true, shape: { x: 0, y: yy, width: LEG.bar, height: LEG.barH, r: 1 },
@@ -243,32 +258,30 @@
       m.ramp.labels.forEach(function (l, i, a) {
         var pos = a.length === 1 ? 0 : i / (a.length - 1);
         kids.push({ type: 'text', silent: true, x: pos * LEG.bar, y: yy + LEG.barH + 4,
-          style: { text: l, fill: t.ink2, font: fNote, verticalAlign: 'top', align: i === 0 ? 'left' : i === a.length - 1 ? 'right' : 'center' } });
+          style: { text: l, fill: t.ink2, font: F.note, verticalAlign: 'top', align: i === 0 ? 'left' : i === a.length - 1 ? 'right' : 'center' } });
       });
-      if (horiz) xx = LEG.bar + 16; else yy += LEG.barH + 4 + 12 + 4;
+      if (!flow) yy += LEG.barH + 4 + 12 + 4;
     }
-    m.items.forEach(function (it) {
-      if (m.ramp && it.cls >= 0) return;
-      var rowY = horiz ? LEG.title + LEG.gap : yy;
-      var lw = C.measure(it.label, fItem);
-      var rowW = horiz ? LEG.sw + 5 + lw : m.w;
+    m.rows.forEach(function (it, k) {
+      var rx = flow ? flow.at[k][0] : 0, ry = flow ? flow.at[k][1] : yy;
+      var rowW = flow ? LEG.sw + 6 + it.lw : m.w;
       var sw = it.ring
-        ? { type: 'rect', silent: true, shape: { x: 1, y: rowY + 1, width: LEG.sw - 2, height: LEG.sw - 2, r: 1.5 }, style: { fill: 'none', stroke: it.ring, lineWidth: 2 } }
-        : { type: 'rect', silent: true, shape: { x: 0, y: rowY, width: LEG.sw, height: LEG.sw, r: 2 }, style: { fill: it.color } };
+        ? { type: 'rect', silent: true, shape: { x: 1, y: ry + 1, width: LEG.sw - 2, height: LEG.sw - 2, r: 1.5 }, style: { fill: 'none', stroke: it.ring, lineWidth: 2 } }
+        : { type: 'rect', silent: true, shape: { x: 0, y: ry, width: LEG.sw, height: LEG.sw, r: 2 }, style: { fill: it.color } };
       var row = [
-        { type: 'rect', shape: { x: -3, y: rowY - 3, width: rowW + 6, height: LEG.sw + 6, r: 3 }, style: { fill: 'rgba(0,0,0,0)' } },
+        { type: 'rect', shape: { x: -3, y: ry - 3, width: rowW + 6, height: LEG.sw + 6, r: 3 }, style: { fill: 'rgba(0,0,0,0)' } },
         sw,
-        { type: 'text', silent: true, x: LEG.sw + 6, y: rowY + LEG.sw / 2, style: { text: it.label, fill: it.muted ? t.ink3 : t.ink2, font: fItem, verticalAlign: 'middle' } }
+        { type: 'text', silent: true, x: LEG.sw + 6, y: ry + LEG.sw / 2, style: { text: it.label, fill: it.muted ? t.ink3 : t.ink2, font: F.item, verticalAlign: 'middle' } }
       ];
-      if (!horiz && it.note) row.push({ type: 'text', silent: true, x: m.w, y: rowY + LEG.sw / 2, style: { text: it.note, fill: t.ink3, font: fNote, align: 'right', verticalAlign: 'middle' } });
+      if (!flow && it.note) row.push({ type: 'text', silent: true, x: m.w, y: ry + LEG.sw / 2, style: { text: it.note, fill: t.ink3, font: F.note, align: 'right', verticalAlign: 'middle' } });
       var interactive = it.cls !== -2 && on;
       kids.push({
-        type: 'group', x: horiz ? xx : 0, y: 0, children: row, cursor: interactive && it.cls >= 0 && ctx.options.crossFilter !== false ? 'pointer' : 'default',
+        type: 'group', x: rx, y: 0, children: row, cursor: interactive && it.cls >= 0 && ctx.options.crossFilter !== false ? 'pointer' : 'default',
         onmouseover: interactive ? function () { on.focus(it.cls); } : null,
         onmouseout: interactive ? function () { on.focus(null); } : null,
         onclick: interactive && it.cls >= 0 ? function () { on.pick(it.cls); } : null
       });
-      if (horiz) xx += rowW + 14; else yy += LEG.row;
+      if (!flow) yy += LEG.row;
     });
     return { type: 'group', id: 'rk-tile-legend', x: Math.round(x), y: Math.round(y), children: kids };
   }
@@ -343,21 +356,33 @@
         return hex ? [(xu[i] + 0.5) * s, r * s * SQRT3 / 2 + s / SQRT3] : [(xu[i] + 0.5) * s, (r + 0.5) * s];
       });
     }
-    function cornerFits(s) {
-      var cs = centres(s), tw = s - gapOf(s), hw = tw / 2, hh = hex ? tw / SQRT3 : tw / 2, m = 6;
-      if (lm.w > size(s).w * 0.6) return false;
-      return cs.every(function (c) { return c[0] - hw >= lm.w + m || c[1] - hh >= lm.h + m; });
+    /** Is the rectangle (grid coordinates) clear of every tile at cell size s? */
+    function clearAt(s, x, y, w, h) {
+      var cs = centres(s), tw = s - gapOf(s), hw = tw / 2 + 3, hh = (hex ? tw / SQRT3 : tw / 2) + 3;
+      return cs.every(function (c) { return c[0] + hw <= x || c[0] - hw >= x + w || c[1] + hh <= y || c[1] - hh >= y + h; });
     }
     var want = !lm ? 'none' : o.legendPosition || 'auto';
-    var aw = W - 2 * pad, ah = H - 2 * pad, s = fit(aw, ah), place = 'none';
-    if (want === 'auto' || want === 'corner') place = cornerFits(s) ? 'corner' : 'auto';
-    else place = want;
+    var aw = W - 2 * pad, ah = H - 2 * pad, s = fit(aw, ah), place = 'none', flow = null;
+    if (want === 'auto' || want === 'corner') {
+      // the empty top-left corner of the grid: the vertical legend, else the same rows wrapped into lines
+      var gsz = size(s);
+      if (lm.w <= gsz.w * 0.6 && clearAt(s, 0, 0, lm.w, lm.h)) place = 'corner';
+      else {
+        [0.85, 0.7, 0.55, 0.4].some(function (k) {
+          var f = lm.flow(gsz.w * k);
+          if (f.w <= gsz.w * k + 1 && clearAt(s, 0, 0, f.w, f.h)) { place = 'corner'; flow = f; return true; }
+          return false;
+        });
+      }
+      if (place === 'none') place = 'auto';
+    } else place = want;
     if (place === 'auto') {
-      var sSide = fit(aw - lm.w - 20, ah), sBottom = fit(aw, ah - lm.hh - 14);
+      var sSide = fit(aw - lm.w - 20, ah), sBottom = fit(aw, ah - lm.flow(aw).h - 14);
       place = sSide >= sBottom ? 'left' : 'bottom';
     }
+    if (place === 'bottom') flow = lm.flow(aw);
     if (place === 'left' || place === 'right') s = fit(aw - lm.w - 20, ah);
-    else if (place === 'bottom') s = fit(aw, ah - lm.hh - 14);
+    else if (place === 'bottom') s = fit(aw, ah - flow.h - 14);
     var g = size(s), ox, oy, lx = 0, ly = 0;
     if (place === 'left' || place === 'right') {
       var gw = lm.w + 20 + g.w, gx = Math.max(pad, (W - gw) / 2);
@@ -366,19 +391,15 @@
       ly = oy;
     } else if (place === 'bottom') {
       ox = Math.max(pad, (W - g.w) / 2);
-      oy = Math.max(pad, (H - g.h - 14 - lm.hh) / 2);
-      lx = Math.max(pad, (W - lm.hw) / 2); ly = oy + g.h + 14;
+      oy = Math.max(pad, (H - g.h - 14 - flow.h) / 2);
+      lx = Math.max(pad, (W - flow.w) / 2); ly = oy + g.h + 14;
     } else {
       ox = Math.max(pad, (W - g.w) / 2); oy = Math.max(pad, (H - g.h) / 2);
       lx = ox + 2; ly = oy + 2;
     }
     var tile = s - gapOf(s), cs = centres(s);
-    var fr = { W: W, H: H, hex: hex, s: s, tile: tile, ox: ox, oy: oy, gw: g.w, gh: g.h, centres: cs, legend: place, lx: lx, ly: ly };
-    /** Is the rectangle (grid coordinates) clear of every tile? */
-    fr.clear = function (x, y, w, h) {
-      var hw = tile / 2 + 3, hh = (hex ? tile / SQRT3 : tile / 2) + 3;
-      return cs.every(function (c) { return c[0] + hw <= x || c[0] - hw >= x + w || c[1] + hh <= y || c[1] - hh >= y + h; });
-    };
+    var fr = { W: W, H: H, hex: hex, s: s, tile: tile, ox: ox, oy: oy, gw: g.w, gh: g.h, centres: cs, legend: place, flow: flow, lx: lx, ly: ly };
+    fr.clear = function (x, y, w, h) { return clearAt(s, x, y, w, h); };
     return fr;
   }
 
@@ -654,7 +675,7 @@
       graphic: { elements: [] }
     };
     if (lm && F.legend !== 'none') {
-      opt.graphic.elements.push(legendGraphic(ctx, lm, F.lx, F.ly, F.legend === 'bottom', legendOn));
+      opt.graphic.elements.push(legendGraphic(ctx, lm, F.lx, F.ly, F.flow, legendOn));
     }
     var note = o.note === true ? txt.note : typeof o.note === 'string' && o.note ? o.note : null;
     var noteEl = note ? noteGraphic(t, F, note) : null;
