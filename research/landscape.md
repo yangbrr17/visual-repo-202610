@@ -268,7 +268,7 @@
 3. 增加 hexbin 密度图。
 4. 把 deck.gl 做成可选的懒加载大数据引擎。
 5. 底图 manifest 增加合规元数据：`worldview`、`licence`、`prc_reviewed`、`审图号`。
-6. Leaflet 2.0 发布稳定版后，再评估换成 `leaflet-global.js` 加 polyfill。
+6. 为 Leaflet 2.0 做准备。现在 `rk.geo.js` 和 5 个地图组件用的是 factory 写法（`L.map`、`L.circleMarker`），可以先在 1.9.4 上改成构造函数（1.9 两种都支持），等 2.0 稳定后再评估换成 `leaflet-global.js` + polyfill。
 
 ### 2.3 表格、网格与透视表（03）
 
@@ -390,7 +390,7 @@
 | 库 | 版本 | 许可 | 体积（gz） | Verdict | 现状 / 说明 |
 |---|---|---|---|---|---|
 | Tom Select | 2.6.2 | Apache-2.0 | 17.6 KB | adopt | **未 vendor**；`filter-bar` 用自研的多选下拉 |
-| noUiSlider | 15.8.1 | MIT | 9.4 KB | adopt | **未 vendor**；`filter-bar` 和 `param-slider` 自研了双滑块 |
+| noUiSlider | 15.8.1 | MIT | 9.4 KB | adopt | **未 vendor**；`filter-bar` 自研了双滑块区间，`param-slider` 自研了参数滑块 |
 | Floating UI | 1.8.0 | MIT | 8.4 KB（core + dom） | adopt | **未 vendor**；CSS anchor positioning 于 2026-01 进入 Baseline，可作渐进增强 |
 | Air Datepicker | 3.6.0 | MIT | 13.6 KB | consider | 金融场景优先用期间预设（MTD/QTD/YTD/1Y）加原生 `<input type=date/month>` |
 | flatpickr / Tippy / Shoelace / Pico / Web Awesome | 4.6.13 / 6.3.7 / 2.20.1 / 2.1.1 / 3.14.0 | MIT | — | avoid / reference | 2022 年起不再发版 / 2024-11 归档 / 已归档 / 2026-10-04 归档 / ESM-only |
@@ -519,9 +519,9 @@
 | **`RK.expr`（自研）** | — | 内部 | — | ✓ | **14 ms** | **adopt（已构建）** | 有 `20%` 字面量、`@param`、`` `EV/EBITDA 2025E` `` 引号名、聚合函数，以及 n.m. / n.a. 语义 |
 | Formula.js | 4.6.1 | MIT | 45 KB | ✓ | — | adopt（未 vendor） | 通过函数注册表接入：IRR、XNPV、PMT 已验证 |
 | math.js | 15.2.0 | Apache-2.0 | 175 KB | ✓ | ~70 ms | reference | 能力过剩（矩阵、单位） |
-| expr-eval-fork / jsep | 3.0.3 / 1.6.0 | MIT | 8 / 3.5 KB | ✓ | 45–72 ms | consider / reference | 没有 IB 专用语法 |
+| expr-eval-fork / jsep | 3.0.3 / 1.6.0 | MIT | 8 / 3.5 KB | ✓ | expr-eval-fork 在 45–72 ms 区间内（与 math.js、filtrex 同组）；jsep 只是解析器 | consider / reference | 没有 IB 专用语法 |
 | expr-eval | 2.0.2 | MIT | 8 KB | — | — | **avoid** | CVE-2025-12735，RCE，CVSS 9.8 |
-| filtrex | 3.1.0 | MIT | 12 KB | ✗（`new Function`） | — | avoid | 用了 `new Function`，严格 CSP 下失效 |
+| filtrex | 3.1.0 | MIT | 12 KB | ✗（`new Function`） | 在 45–72 ms 区间内 | avoid | 用了 `new Function`，严格 CSP 下失效 |
 
 **查询 / SQL 引擎（统一基准：40 组 group-by；08 §5.1）：**
 
@@ -813,7 +813,7 @@ Step 2 指本地部署的 LLM、可导入的 skills、客户自定义指标与�
 | 对象 | 当前 | 触发条件 | 动作 |
 |---|---|---|---|
 | ECharts | 6.1.0（2026-05-19） | 发布 6.2 | 跑截图对比；查看 RELEASE_NOTE 里的行为变化 |
-| Leaflet | 1.9.4；2.0 仍是 alpha.1（2025-08-16） | 2.0 发布稳定版，且 Leaflet 插件库开始出现 `compatible-v2` 标记 | 评估换成 `leaflet-global.js` + V1 polyfill。kit 已按 2.0-ready 的写法使用构造函数 |
+| Leaflet | 1.9.4；2.0 仍是 alpha.1（2025-08-16） | 2.0 发布稳定版，且 Leaflet 插件库开始出现 `compatible-v2` 标记 | 评估换成 `leaflet-global.js` + V1 polyfill。⚠ kit 目前用的是 factory 写法（`L.map`、`L.circleMarker`、`L.geoJSON`），2.0 已删除 factory，迁移前要改成构造函数（02 §3.2） |
 | world-atlas | 2.0.2（已归档，NE 4.1.0） | 现在 | 改为由 builder 从 NE 5.1.2 构建底图 |
 | Tabulator | 6.6.1 | 新的 minor 版本 | 仓库已迁到 `tabulator-tables` 组织；git 里已无 `dist/`，只认 npm |
 | MapLibre | 6.14.0（最后一个 UMD 是 5.24.0） | 需要矢量底图时 | 只在 served mode 使用 |
