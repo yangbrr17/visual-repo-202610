@@ -1,6 +1,6 @@
 # 组件目录 Component catalogue
 
-由 `tools/build_catalog.py` 自动生成 · 55 components · 12 categories
+由 `tools/build_catalog.py` 自动生成 · 57 components · 12 categories
 
 ## 版式与叙事 · Layout & narrative
 
@@ -29,6 +29,7 @@
 
 | id | 名称 | 引擎 | 能展示什么 | 数据通道 |
 |---|---|---|---|---|
+| `avp-table` | 不同报价下的估值分析表（AVP） / Analysis at Various Prices | dom | 并购项目书的核心表格：列为不同报价，行为相对参考价的溢价、隐含股权价值、企业价值与隐含估值倍数，全部实时计算，突出当前股价列与建议报价列。 | `price`, `label`, `kind` |
 | `football-field` | 估值足球场图 / Football Field | echarts | 按估值方法展示估值区间的横向浮动条形图，叠加当前股价 / 报价参考线。 | `label`*, `low`*, `high`*, `group`, `note`, `order` |
 | `sotp` | 分部加总估值（SOTP） / Sum-of-the-Parts | echarts | 分部加总估值累加图：各业务板块“指标 × 倍数区间”逐段累加成企业价值区间，再扣除净负债等调整项得到隐含股权价值与每股价值区间。 | `label`*, `metric`*, `metricName`, `low`*, `high`*, `method`, `note` |
 
@@ -131,6 +132,7 @@
 | `league-table` | 排行榜（League Table） / League Table | dom | 财务顾问 / 收购方 / 投资人排名表：名次变化箭头、行内数值条、市场份额与交易数量，可高亮自家机构。 | `rank`, `name`*, `value`*, `share`, `count`, `prior` |
 | `pivot-table` | 数据透视表 / Pivot Table | dom | 轻量数据透视表：可折叠的多级行分组 × 一个列维度，任意聚合函数，合计行 / 列、CAGR、行 / 列占比与热力着色。 | `rows`*, `cols`, `value` |
 | `sensitivity-table` | 敏感性分析表 / Sensitivity Table | dom | 双变量敏感性分析表（如 DCF 股价对 WACC × 永续增长率、LBO IRR 对进入 × 退出倍数），以基准情形为中点的发散色热力。 | `row`*, `col`*, `value`* |
+| `sources-uses` | 资金来源与运用表 / Sources & Uses | dom | 杠杆收购 / 收购融资的资金来源与运用表：左右两张必须平衡的投行表格，含占比、EBITDA 倍数、构成条和脚注；capitalization 模式展示交割后资本结构与累计杠杆倍数。 | `side`*, `item`*, `amount`*, `multiple`, `pct`, `notes`, `rate`, `maturity` |
 
 ## 流程与时间线 · Process & timeline
 

@@ -157,7 +157,7 @@
       logAxis: valueAxis,
       line: { symbol: 'circle', symbolSize: 5, showSymbol: false, lineStyle: { width: 2 }, emphasis: { lineStyle: { width: 2.5 } } },
       bar: { barMaxWidth: 36, itemStyle: { borderRadius: 0 } },
-      scatter: { symbolSize: 8, itemStyle: { opacity: 0.9 } },
+      scatter: { symbolSize: 8 },
       candlestick: { itemStyle: { color: t.pos, color0: t.neg, borderColor: t.pos, borderColor0: t.neg } },
       markLine: { lineStyle: { color: t.ink3, type: 'dashed' }, label: { color: t.ink2, fontSize: 11 }, symbol: ['none', 'none'] },
       dataZoom: {

@@ -276,11 +276,11 @@
         var r = el._rkRow, c = cur, enc = c.enc, d = describe(r, c);
         var vf = c.options.format || c.fmtOf(enc.value) || '$#,##0.0"bn"';
         var rows = [
-          { label: c.title(enc.type), value: r[enc.type] || RK.format(null) },
           { label: c.title(enc.value), value: (r[enc.value] == null && c.options.missingValue != null) ? c.options.missingValue : RK.format(r[enc.value], vf) },
           { label: c.title(enc.date), value: RK.format(r[enc.date], 'dd mmm yyyy') }
         ];
         [enc.sector, enc.region, enc.role].forEach(function (f) { if (f && c.dataset.has(f) && r[f] != null) rows.push({ label: c.title(f), value: r[f] }); });
+        // the deal type is the card's kicker; the tooltip leads with the parties
         var title = d.party ? d.lead + ' / ' + d.party : d.lead;
         return RK.chart.tip(title, rows, enc.description ? r[enc.description] : null);
       }

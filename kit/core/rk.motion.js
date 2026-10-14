@@ -94,16 +94,16 @@
       }
       if (!motion.enabled) { rebuild(); return; }
       var before = new Map();
-      rows().forEach(function (el) { before.set(el.dataset.key, el.getBoundingClientRect().top); });
+      rows().forEach(function (el) { before.set(el.dataset.key, el.getBoundingClientRect()); });
       rebuild();
       var moved = [];
       rows().forEach(function (el) {
-        var y0 = before.get(el.dataset.key);
-        if (y0 == null) { el.classList.add('is-enter'); return; }
-        var dy = y0 - el.getBoundingClientRect().top;
-        if (Math.abs(dy) < 0.5) return;
+        var b = before.get(el.dataset.key);
+        if (b == null) { el.classList.add('is-enter'); return; }
+        var r = el.getBoundingClientRect(), dx = b.left - r.left, dy = b.top - r.top;   // rows and grids (2-D)
+        if (Math.abs(dy) < 0.5 && Math.abs(dx) < 0.5) return;
         el.style.transition = 'none';
-        el.style.transform = 'translateY(' + dy + 'px)';
+        el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
         moved.push(el);
       });
       if (!moved.length) return;

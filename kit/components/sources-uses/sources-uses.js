@@ -5,7 +5,7 @@
  * (swatches double as its key), row footnotes collected under the panels, currency symbol on the
  * first row and totals only. mode: 'capitalization' turns one dataset of tranches into a pro forma
  * capitalisation table (rate, maturity, cumulative leverage, subtotals) with a leverage ladder.
- * Pure DOM; hover links rows and bar segments, click a row to cross-filter (others dim).
+ * Pure DOM; hover links rows and bar segments; optional click-to-cross-filter on rows (others dim).
  */
 (function () {
   'use strict';
@@ -41,7 +41,7 @@
       format: null,              // amount format (defaults to the amount field format)
       pctFormat: null,           // defaults to the pct field format, else 0.0%
       multipleFormat: null,      // defaults to the multiple field format, else 0.0x
-      ebitda: null,              // EBITDA for x EBITDA when the dataset has no multiple field (or to override the implied one)
+      ebitda: null,              // EBITDA for x EBITDA = amount / ebitda (overrides the multiple field, e.g. to switch to LTM)
       currency: 'first',         // first: currency symbol on the first row and totals only (pitchbook style) | all
       mixBar: true,              // mini stacked bar per side (capitalization: leverage ladder)
       alignTotals: true,         // pad the shorter side so both total rows sit on one line
@@ -49,7 +49,7 @@
       highlight: null,           // item(s) drawn in accent2 (e.g. 'Sponsor equity')
       subtotals: [],             // capitalization: [{after: '<item>', label: 'Total debt'}]
       footnotes: [],             // extra footnotes (strings) after the row notes
-      crossFilter: true,
+      crossFilter: false,        // click a row to cross-filter (off by default: filtering a balancing table rarely makes sense)
       crossFilterScope: 'dataset'   // 'item' is a field of this table only
     },
     render: function (ctx) {
@@ -82,32 +82,31 @@
           afBare: o.currency === 'all' ? amountFmt : bare(amountFmt),
           pf: o.pctFormat || (F.pct && c.fmtOf(F.pct)) || '0.0%',
           mf: o.multipleFormat || (F.multiple && c.fmtOf(F.multiple)) || '0.0x',
-          cumulative: cap && !!F.multiple && /cum/i.test(F.multiple),
+          cumulative: cap && !o.ebitda && !!F.multiple && /cum/i.test(F.multiple),
           panels: []
         };
-        // implied EBITDA (amount / multiple over the rows that have both; the last point of a cumulative column)
-        // gives the total multiple without the drift of adding up rounded per-row multiples
-        var implied = o.ebitda || null;
-        if (!implied && F.multiple) {
-          var run = 0, num = 0, den = 0;
-          c.rows.forEach(function (r) {
-            var a = r[F.amount], x = r[F.multiple];
-            if (util.isNum(a)) run += a;
-            if (!util.isNum(x) || x === 0) return;
-            if (m.cumulative) { num = run; den = x; } else if (util.isNum(a)) { num += a; den += x; }
-          });
-          implied = den ? num / den : null;
-        }
-        m.ebitda = util.isNum(implied) && implied > 0 ? implied : null;
         m.hasMultiple = !!(F.multiple || o.ebitda);
+        // one EBITDA for every side: options.ebitda, else implied by the multiple column (sum of amounts / sum of
+        // multiples, so rounding errors average out) -> balanced sides always show the same total multiple
+        m.ebitda = o.ebitda || null;
+        if (!m.ebitda && F.multiple && !m.cumulative) {
+          var num = 0, den = 0;
+          c.rows.forEach(function (r) { if (util.isNum(r[F.amount]) && util.isNum(r[F.multiple])) { num += r[F.amount]; den += r[F.multiple]; } });
+          m.ebitda = den > 0 && num > 0 ? num / den : null;
+        }
 
+        /**
+         * Rows: multiple from options.ebitda or the field; capitalization shows them cumulatively (a cumulative
+         * field as is, a per-tranche one as a running sum). Totals: total amount / EBITDA (else the column sum).
+         */
         function itemsOf(rows) {
-          var total = sum(rows.map(function (r) { return r[F.amount]; })), run = 0;
+          var total = sum(rows.map(function (r) { return r[F.amount]; })), run = 0, runMult = 0, anyMult = false;
           var items = rows.map(function (r) {
             var a = r[F.amount];
             run += util.isNum(a) ? a : 0;
-            var mult = F.multiple ? r[F.multiple] : (o.ebitda ? (cap ? run : a) / o.ebitda : null);
-            if (cap && F.multiple && !m.cumulative && m.ebitda) mult = run / m.ebitda;   // per-tranche field -> cumulative
+            var mult = o.ebitda ? (util.isNum(a) ? a / o.ebitda : null) : F.multiple ? r[F.multiple] : null;
+            if (util.isNum(mult)) { anyMult = true; if (!m.cumulative) runMult += mult; }
+            if (cap && !m.cumulative) mult = util.isNum(mult) || runMult ? runMult : null;
             return {
               r: r, key: String(r[F.item]), name: r[F.item] == null ? RK.format(null) : String(r[F.item]), amount: a, run: run,
               pct: F.pct ? r[F.pct] : (util.isNum(a) ? a / total : null),
@@ -119,7 +118,8 @@
           });
           var colors = ordinal(c.theme, items.length);
           items.forEach(function (it, i) { it.color = it.hl ? c.theme.accent2 : colors[i]; });
-          return { items: items, total: total, mult: m.ebitda ? total / m.ebitda : (cap && items.length ? items[items.length - 1].mult : null) };
+          var last = items.length ? items[items.length - 1].mult : null;
+          return { items: items, total: total, mult: !anyMult ? null : cap ? last : m.ebitda ? total / m.ebitda : runMult };
         }
 
         if (cap) {
@@ -143,18 +143,22 @@
             m.panels.push(p);
           });
         }
-        // footnotes in reading order; identical notes share a number
+        // footnotes numbered in reading order (identical notes share a number), listed under the panel that
+        // first cites them; options.footnotes follow under the panels
         var notes = [];
         m.panels.forEach(function (p) {
+          p.notes = [];
           p.items.forEach(function (it) {
             if (!it.note) return;
             var i = notes.indexOf(it.note);
-            if (i < 0) { notes.push(it.note); i = notes.length - 1; }
+            if (i < 0) { notes.push(it.note); i = notes.length - 1; p.notes.push({ n: i + 1, text: it.note }); }
             it.fn = i + 1;
           });
         });
-        [].concat(o.footnotes || []).forEach(function (n) { if (n && notes.indexOf(String(n)) < 0) notes.push(String(n)); });
-        m.notes = notes;
+        m.extraNotes = [];
+        [].concat(o.footnotes || []).forEach(function (n) {
+          if (n && notes.indexOf(String(n)) < 0) { notes.push(String(n)); m.extraNotes.push({ n: notes.length, text: String(n) }); }
+        });
         // balance check: first two panels (sources vs uses)
         if (!cap && m.panels.length >= 2) {
           var a = m.panels[0], b = m.panels[1], diff = a.total - b.total;
@@ -196,8 +200,8 @@
       function itemRow(it, i, p, m, c, cols) {
         var sel = c.selected(m.F.item), dim = sel.length && sel.indexOf(it.r[m.F.item]) < 0;
         var tr = h('tr.rk-su__row', {
-          class: (it.hl ? 'is-target' : '') + (dim ? ' is-dim' : '') + (c.options.crossFilter !== false ? ' is-clickable' : ''),
-          tabindex: c.options.crossFilter !== false ? '0' : null,
+          class: (it.hl ? 'is-target' : '') + (dim ? ' is-dim' : '') + (c.options.crossFilter ? ' is-clickable' : ''),
+          tabindex: c.options.crossFilter ? '0' : null,
           style: { '--rk-i': Math.min(i, 20) }
         },
           h('td.rk-su__item', { title: it.name + (it.note ? ' — ' + it.note : '') },
@@ -244,6 +248,10 @@
         var gap = Math.max.apply(null, widths.concat([0])) + 10;
         var xs = marks.map(function (it) { return it.runPct * W; });
         var pos = RK.chart.spreadLabels(xs, gap, gap / 2, W - gap / 2);
+        // caption at the left end when the first label leaves room for it
+        var caption = (cur.options.titles || {}).ladder || 'Cumulative leverage';
+        var capW = RK.chart.measure(caption, '10px ' + cur.theme.fontSans);
+        if (pos.length && pos[0] - widths[0] / 2 > capW + 14) L.el.appendChild(h('span.rk-su__lcap', caption));
         marks.forEach(function (it, i) {
           L.el.appendChild(h('span.rk-su__tick', { style: { left: (xs[i] / W * 100) + '%' } }));
           L.el.appendChild(h('span.rk-su__lev.rk-num', { style: { left: pos[i] + 'px' } }, texts[i]));
@@ -254,14 +262,14 @@
         var cols = columnsOf(c, m), T = c.options.titles || {};
         var head = h('tr.rk-su__head',
           h('th.rk-su__side', { scope: 'col' }, m.cap ? (T.item || p.title) : p.title),
-          cols.map(function (col) { return h('th.is-num', { scope: 'col' }, col.title); }));
+          cols.map(function (col) { return h('th.is-num', { scope: 'col', class: 'rk-su__c-' + col.key }, col.title); }));
         var thead = h('thead', head, c.options.mixBar !== false && p.items.length ? mixBar(p, m, c, cols) : null);
         var tbody = h('tbody');
         var subs = m.cap ? [].concat(c.options.subtotals || []) : [];
         p.items.forEach(function (it, i) {
           tbody.appendChild(itemRow(it, i, p, m, c, cols));
           subs.filter(function (s) { return s && String(s.after) === it.key; }).forEach(function (s) {
-            var sub = { amount: it.run, pct: it.runPct, mult: m.cumulative || !m.F.multiple ? it.mult : (m.ebitda ? it.run / m.ebitda : null), r: {} };
+            var sub = { amount: it.run, pct: it.runPct, mult: it.mult, r: {} };
             tbody.appendChild(h('tr.rk-su__sub', h('td', s.label || 'Subtotal'), cols.map(function (col) {
               if (col.key === 'rate' || col.key === 'maturity') return h('td');
               return cell(col, sub, m, c, true);
@@ -278,7 +286,13 @@
             return cell(col, tot, m, c, true);
           })));
         return h('section.rk-su__panel', { 'aria-label': p.title },
-          h('table.rk-table.rk-su__table', h('caption.rk-sr-only', p.title), thead, tbody, tfoot));
+          h('table.rk-table.rk-su__table', h('caption.rk-sr-only', p.title), thead, tbody, tfoot),
+          notesList(p.notes));
+      }
+
+      function notesList(list) {
+        if (!list || !list.length) return null;
+        return h('ol.rk-su__notes', list.map(function (n) { return h('li', h('span.rk-su__fnum', '(' + n.n + ')'), n.text); }));
       }
 
       function draw(c) {
@@ -301,11 +315,8 @@
           wrap.appendChild(panel(p, m, c, o.alignTotals !== false && !m.cap ? maxRows - p.items.length : 0));
         });
         root.appendChild(wrap);
-        if (m.notes.length) {
-          root.appendChild(h('ol.rk-su__notes', m.notes.map(function (n, i) {
-            return h('li', h('span.rk-su__fnum', '(' + (i + 1) + ')'), ' ', n);
-          })));
-        }
+        var extra = notesList(m.extraNotes);
+        if (extra) root.appendChild(extra);
         // bars: grow from 0 on first paint, glide from their previous width on updates
         var segs = root.querySelectorAll('.rk-su__seg');
         Array.prototype.forEach.call(segs, function (s) { next.set(s.dataset.key, s._w); });
@@ -351,8 +362,8 @@
         if (tip) tip.hide();
       }
       function pick(tr) {
-        if (!tr || !tr._rk || cur.options.crossFilter === false) return;
-        var f = cur.enc.item && cur.dataset.has(cur.enc.item) ? cur.enc.item : (cur.dataset.has('instrument') ? 'instrument' : cur.enc.item);
+        if (!tr || !tr._rk || !cur.options.crossFilter) return;
+        var f = curModel.F.item;
         cur.select(f, tr._rk.it.r[f], { scope: cur.options.crossFilterScope === 'global' ? 'global' : 'dataset' });
       }
       function onClick(e) { pick(e.target.closest('tr.rk-su__row')); }

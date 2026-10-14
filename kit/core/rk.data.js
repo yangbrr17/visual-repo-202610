@@ -262,6 +262,17 @@
 
       params: function () { return params; },
       param: function (name) { return get(params, name); },
+      /** '@wacc' -> current value of param wacc (manifest default, then fallbacks[name]); other values pass through. */
+      resolve: function (v, fallbacks) {
+        var m = typeof v === 'string' ? /^@([A-Za-z_]\w*)$/.exec(v) : null;
+        if (!m) return v;
+        var x = get(params, m[1]);
+        if (x === undefined) {
+          var d = get((RK.data && RK.data.manifest && RK.data.manifest.params) || {}, m[1]);
+          x = d && d.value != null ? d.value : get(fallbacks || {}, m[1]);
+        }
+        return x;
+      },
       setParam: function (name, value) {
         if (has(params, name) && params[name] === value) return;
         params[name] = value;

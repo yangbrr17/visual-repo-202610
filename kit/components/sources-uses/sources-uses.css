@@ -28,6 +28,7 @@
 .rk-su__table th, .rk-su__table td { height: 26px; padding-top: 4px; padding-bottom: 4px; }
 .rk-su__table thead th { white-space: normal; line-height: 1.25; }
 .rk-su__table thead th.is-num { width: 1%; min-width: 74px; padding-left: 14px; }
+.rk-su__table thead th.rk-su__c-multiple { min-width: 106px; }
 .rk-su__table thead th.rk-su__side {
   font-size: 12.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rk-accent);
 }
@@ -50,6 +51,7 @@
 /* capitalisation ladder: cumulative leverage at each tranche boundary */
 .rk-su__ladder { position: relative; height: 18px; margin-top: 2px; }
 .rk-su__tick { position: absolute; top: 0; width: 1px; height: 4px; margin-left: -.5px; background: var(--rk-ink-3); }
+.rk-su__lcap { position: absolute; left: 0; top: 4px; font-size: 10px; color: var(--rk-ink-3); white-space: nowrap; }
 .rk-su__lev { position: absolute; top: 4px; transform: translateX(-50%); font-size: 10.5px; font-weight: 600; color: var(--rk-ink-2); white-space: nowrap; }
 
 /* rows */
@@ -68,11 +70,10 @@
 .rk-su__total.is-off td.rk-su__amt { color: var(--rk-neg); }
 
 /* footnotes */
-.rk-su__notes { list-style: none; margin: 10px 0 0; padding: 0; font-size: var(--rk-fs-xs); line-height: 1.45; color: var(--rk-ink-3); columns: 2; column-gap: 32px; }
-.rk-su.is-cap .rk-su__notes { columns: 1; }
-@container (max-width: 640px) { .rk-su__notes { columns: 1; } }
-.rk-su__notes li { break-inside: avoid; }
-.rk-su__fnum { display: inline-block; min-width: 18px; font-variant-numeric: tabular-nums; }
+.rk-su__notes { list-style: none; margin: 8px 0 0; padding: 0; font-size: var(--rk-fs-xs); line-height: 1.45; color: var(--rk-ink-3); }
+.rk-su__notes li { display: flex; gap: 4px; }
+.rk-su__fnum { flex: none; min-width: 18px; font-variant-numeric: tabular-nums; }
+.rk-su > .rk-su__notes { margin-top: 6px; }
 
 /* motion */
 .rk-su.is-first .rk-su__row, .rk-su.is-first .rk-su__total { animation: rk-su-in 460ms var(--rk-ease) both; animation-delay: calc(var(--rk-i, 8) * 35ms); }

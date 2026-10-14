@@ -1398,6 +1398,392 @@
    "has_css": true
   },
   {
+   "id": "avp-table",
+   "name": "Analysis at Various Prices",
+   "name_zh": "不同报价下的估值分析表（AVP）",
+   "category": "valuation",
+   "engine": "dom",
+   "deps": [],
+   "needs_data": false,
+   "summary": "The M&A pitchbook AVP table: offer price levels as columns; premiums to reference prices, implied equity value, EV and implied multiples as rows — all computed live, offer column highlighted.",
+   "summary_zh": "并购项目书的核心表格：列为不同报价，行为相对参考价的溢价、隐含股权价值、企业价值与隐含估值倍数，全部实时计算，突出当前股价列与建议报价列。",
+   "description_zh": "“不同报价下的估值分析”（Analysis at Various Prices）是并购建议书、董事会材料与公平意见书的标准表格。每一列是一个报价（options.prices 列表、{from, to, step} 区间，或绑定数据集的价格字段，可带“初始报价 / 修订报价”等列标签）；行依次为相对当前股价、30 日成交量加权均价（VWAP）、52 周最高价、未受影响股价的溢价 /（折价），隐含股权价值（报价 × 稀释股数）、净负债与隐含企业价值，以及由 metrics 定义的 EV / EBITDA、P/E 等隐含倍数——所有数字由组件根据 shares、netDebt、metrics 实时计算。当前股价列与建议报价列（accent2）高亮；报价可绑定 @参数（如 offer: \"@offer\"），通过表头上方的步进器、点击价格表头或页面上的参数滑块调整，整张表平滑重算。悬停单元格显示计算过程（如 EV ÷ EBITDA = 倍数）。",
+   "best_for": [
+    "M&A offer price discussions (board / special committee materials)",
+    "Fairness opinion and proposal-history comparisons",
+    "Showing premiums and implied multiples at a proposed offer price"
+   ],
+   "avoid_when": [
+    "More than ~10 price columns",
+    "Trading valuation without an offer context (use comps-table / football-field)"
+   ],
+   "channels": {
+    "price": {
+     "type": "number",
+     "required": false,
+     "desc": "Offer price per share of each column (only when a dataset is bound and options.prices is not set)",
+     "default": "price"
+    },
+    "label": {
+     "type": "string",
+     "required": false,
+     "desc": "Column tag above the price (e.g. 'Initial proposal')",
+     "default": "label"
+    },
+    "kind": {
+     "type": "string",
+     "required": false,
+     "desc": "'current' | 'offer' | 'proposal' | 'level' — the current and offer rows set those columns unless options.current / offer are given",
+     "default": "kind"
+    }
+   },
+   "options": {
+    "prices": {
+     "type": "array|object",
+     "default": null,
+     "desc": "Price levels: [42.5, 45, …] or {from, to, step}; null = the bound dataset's price field (or six $2.50 steps from the current price). The current and offer prices are inserted when they are not levels"
+    },
+    "current": {
+     "type": "number|string",
+     "default": null,
+     "desc": "Current share price or '@param' (default: the dataset row with kind 'current'); its column is highlighted"
+    },
+    "offer": {
+     "type": "number|string",
+     "default": null,
+     "desc": "Proposed offer price or '@param' such as '@offer' (default: the dataset row with kind 'offer'); highlighted in accent-2"
+    },
+    "shares": {
+     "type": "number|string",
+     "default": null,
+     "desc": "Diluted shares (m) or '@param' — needed for equity value, EV and EV multiples"
+    },
+    "netDebt": {
+     "type": "number|string",
+     "default": 0,
+     "desc": "Net debt (USD m) or '@param' added to the equity value; negative = net cash"
+    },
+    "references": {
+     "type": "array",
+     "default": [],
+     "desc": "[{label, value, note}] premium rows (current, 30-day VWAP, 52-week high, unaffected); value may be an '@param'; [] = premium to current only"
+    },
+    "metrics": {
+     "type": "array",
+     "default": [],
+     "desc": "[{label, value, kind, group, name, format, metricFormat, note}] implied multiple rows: kind 'ev' = EV / value (EBITDA, revenue), 'equity' = equity value / value (net income), 'price' = price / value (EPS); consecutive rows with the same group get a section heading; name labels the tooltip divisor"
+    },
+    "sections": {
+     "type": "string[]",
+     "default": [
+      "premiums",
+      "value",
+      "metrics"
+     ],
+     "desc": "Row blocks and their order"
+    },
+    "showBridge": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Show the net debt and implied EV rows under the equity value"
+    },
+    "premiumTitle": {
+     "type": "string",
+     "default": "Premium / (discount) to:",
+     "desc": "Heading of the premium block"
+    },
+    "priceLabel": {
+     "type": "string",
+     "default": "Price per share",
+     "desc": "Label of the price header row"
+    },
+    "equityLabel": {
+     "type": "string",
+     "default": "Implied equity value",
+     "desc": "Equity value row label"
+    },
+    "netDebtLabel": {
+     "type": "string",
+     "default": "Plus: net debt",
+     "desc": "Net debt row label"
+    },
+    "netCashLabel": {
+     "type": "string",
+     "default": "Less: net cash",
+     "desc": "Row label used when net debt is negative"
+    },
+    "evLabel": {
+     "type": "string",
+     "default": "Implied enterprise value",
+     "desc": "EV row label"
+    },
+    "currentLabel": {
+     "type": "string",
+     "default": "Current",
+     "desc": "Tag of the current-price column (and the default premium row)"
+    },
+    "offerLabel": {
+     "type": "string",
+     "default": "Offer",
+     "desc": "Tag of the offer column"
+    },
+    "units": {
+     "type": "string",
+     "default": "USD m, except per-share data",
+     "desc": "Units caption in the header corner"
+    },
+    "priceFormat": {
+     "type": "string",
+     "default": "$#,##0.00",
+     "desc": "Price / reference price format"
+    },
+    "valueFormat": {
+     "type": "string",
+     "default": "$#,##0",
+     "desc": "Equity value / net debt / EV format (USD m)"
+    },
+    "premiumFormat": {
+     "type": "string",
+     "default": "0.0%;(0.0%)",
+     "desc": "Premium format (discounts in parentheses)"
+    },
+    "multipleFormat": {
+     "type": "string",
+     "default": "0.0x",
+     "desc": "Default implied multiple format (zero / negative denominators show n.m.)"
+    },
+    "metricFormat": {
+     "type": "string",
+     "default": null,
+     "desc": "Basis-column format of ev / equity metrics (default: valueFormat; 'price' metrics use priceFormat)"
+    },
+    "signColors": {
+     "type": "boolean|string",
+     "default": true,
+     "desc": "true: premiums in the positive colour, discounts in the negative colour | 'neg': discounts only | false"
+    },
+    "footnotes": {
+     "type": "string[]",
+     "default": [],
+     "desc": "Extra footnote lines under the table"
+    },
+    "autoNotes": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Note on the diluted share count and net debt used"
+    },
+    "stepper": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Offer price stepper (− / +) with the premium to current above the table, when an offer is set"
+    },
+    "offerStep": {
+     "type": "number",
+     "default": 0.25,
+     "desc": "Stepper increment (USD per share)"
+    },
+    "clickToOffer": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Click a price header to make it the offer (sets the bound @param, else a local override)"
+    },
+    "crosshair": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Highlight the hovered price column"
+    },
+    "tooltip": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Hover tooltip with the calculation behind each figure"
+    },
+    "paramDefaults": {
+     "type": "object",
+     "default": {},
+     "desc": "Fallback values for '@param' options the report does not define (e.g. {\"offer\": 52}); they are then defined in the store and shared with sliders"
+    }
+   },
+   "interactions": [
+    "Offer stepper (− / +) and click-a-price-header to move the offer; sets the bound @param so sliders and other blocks follow",
+    "Live recompute with number tweening when bound @params change",
+    "Hovered column highlight + tooltip with the calculation (price ÷ reference − 1, price × shares, EV ÷ EBITDA)",
+    "Rows rise in on first reveal; a moved offer column fades in"
+   ],
+   "samples": [
+    {
+     "title": "Analysis at various prices — offer bound to @offer",
+     "height": 420,
+     "options": {
+      "prices": [
+       45,
+       47.5,
+       50,
+       55,
+       57.5
+      ],
+      "current": 42.5,
+      "offer": "@offer",
+      "paramDefaults": {
+       "offer": 52.0
+      },
+      "offerStep": 0.5,
+      "shares": 158.0,
+      "netDebt": 1490,
+      "references": [
+       {
+        "label": "Current",
+        "value": 42.5
+       },
+       {
+        "label": "30-day VWAP",
+        "value": 41.1
+       },
+       {
+        "label": "52-week high",
+        "value": 47.9,
+        "note": "52-week intraday high."
+       },
+       {
+        "label": "Unaffected",
+        "value": 42.5,
+        "note": "Closing price on 09-Oct-2026, the last trading day before the approach."
+       }
+      ],
+      "metrics": [
+       {
+        "group": "Implied EV / EBITDA",
+        "label": "2025A",
+        "name": "EBITDA 2025A",
+        "value": 897.2,
+        "kind": "ev",
+        "metricFormat": "$#,##0.0"
+       },
+       {
+        "group": "Implied EV / EBITDA",
+        "label": "2026E",
+        "name": "EBITDA 2026E",
+        "value": 996.5,
+        "kind": "ev",
+        "metricFormat": "$#,##0.0"
+       },
+       {
+        "group": "Implied P/E",
+        "label": "2025A",
+        "name": "EPS 2025A",
+        "value": 2.82,
+        "kind": "price"
+       },
+       {
+        "group": "Implied P/E",
+        "label": "2026E",
+        "name": "EPS 2026E",
+        "value": 3.23,
+        "kind": "price"
+       }
+      ],
+      "footnotes": [
+       "Market data as of 09-Oct-2026; estimates per Helios Industrial management plan."
+      ]
+     }
+    },
+    {
+     "title": "Proposals received (columns from the offer_prices dataset)",
+     "data": "offer_prices",
+     "height": 380,
+     "options": {
+      "shares": 158.0,
+      "netDebt": 1490,
+      "stepper": false,
+      "references": [
+       {
+        "label": "Current",
+        "value": 42.5
+       },
+       {
+        "label": "30-day VWAP",
+        "value": 41.1
+       },
+       {
+        "label": "52-week high",
+        "value": 47.9
+       }
+      ],
+      "metrics": [
+       {
+        "group": "Implied EV / EBITDA",
+        "label": "LTM (FY2025A)",
+        "name": "EBITDA 2025A",
+        "value": 897.2,
+        "metricFormat": "$#,##0.0"
+       },
+       {
+        "group": "Implied EV / EBITDA",
+        "label": "NTM (FY2026E)",
+        "name": "EBITDA 2026E",
+        "value": 996.5,
+        "metricFormat": "$#,##0.0"
+       },
+       {
+        "group": "Implied EV / Revenue",
+        "label": "NTM (FY2026E)",
+        "name": "Revenue 2026E",
+        "value": 5190,
+        "format": "0.00x"
+       }
+      ]
+     }
+    },
+    {
+     "title": "Compact: price range, P/E on net income, discounts coloured only",
+     "height": 300,
+     "span": 8,
+     "options": {
+      "prices": {
+       "from": 40,
+       "to": 60,
+       "step": 5
+      },
+      "current": 42.5,
+      "offer": 50,
+      "shares": 158.0,
+      "netDebt": 1490,
+      "showBridge": false,
+      "signColors": "neg",
+      "stepper": false,
+      "references": [
+       {
+        "label": "Current",
+        "value": 42.5
+       },
+       {
+        "label": "52-week high",
+        "value": 47.9
+       }
+      ],
+      "metrics": [
+       {
+        "group": "Implied P/E",
+        "label": "2025A",
+        "name": "Net income 2025A",
+        "value": 444.8,
+        "kind": "equity",
+        "metricFormat": "$#,##0.0"
+       },
+       {
+        "group": "Implied P/E",
+        "label": "2026E",
+        "name": "Net income 2026E",
+        "value": 510.8,
+        "kind": "equity",
+        "metricFormat": "$#,##0.0"
+       }
+      ]
+     }
+    }
+   ],
+   "has_css": true
+  },
+  {
    "id": "football-field",
    "name": "Football Field",
    "name_zh": "估值足球场图",
@@ -10300,6 +10686,232 @@
       "base": {
        "row": 0.09,
        "col": 0.025
+      }
+     }
+    }
+   ],
+   "has_css": true
+  },
+  {
+   "id": "sources-uses",
+   "name": "Sources & Uses",
+   "name_zh": "资金来源与运用表",
+   "category": "table",
+   "engine": "dom",
+   "deps": [],
+   "summary": "LBO / acquisition-financing Sources & Uses: two balancing pitchbook tables with % of total, x EBITDA, mix bars and footnotes; capitalization mode for a pro forma capital structure with cumulative leverage.",
+   "summary_zh": "杠杆收购 / 收购融资的资金来源与运用表：左右两张必须平衡的投行表格，含占比、EBITDA 倍数、构成条和脚注；capitalization 模式展示交割后资本结构与累计杠杆倍数。",
+   "description_zh": "交易融资页的标准表格：每行数据是一项资金来源（定期贷款、债券、现有现金、展期股权、发起人股权）或资金运用（收购股权、再融资、交易费用、融资费用、留存现金），side 字段区分左右两栏。每栏显示金额（货币符号只出现在首行和合计行，符合投行排版）、占本栏合计的百分比和 EBITDA 倍数（取自字段，或由 options.ebitda 计算），表头下方的迷你堆积条用序数色阶展示构成，行前色块即为图例；两栏合计行对齐在同一水平线上，若来源与运用不相等会显示红色“Out of balance”提示。notes 字段自动编号为脚注列在表格下方。mode: 'capitalization' 时读取 capital_structure（instrument / amount / rate / maturity / multiple_cum），显示利率、到期日、累计杠杆倍数与小计行，并以“杠杆阶梯”条标出各档债务的累计倍数。适合 LBO、收购融资和再融资方案页。",
+   "best_for": [
+    "LBO / take-private sources & uses",
+    "Acquisition financing structure",
+    "Pro forma capitalisation with cumulative leverage (mode: capitalization)"
+   ],
+   "avoid_when": [
+    "More than ~10 items per side (summarise into fewer lines)",
+    "Time series of debt (use debt maturity bars or a waterfall)"
+   ],
+   "channels": {
+    "side": {
+     "type": "string",
+     "required": true,
+     "desc": "'Sources' | 'Uses' (panel); not needed in capitalization mode",
+     "default": "side"
+    },
+    "item": {
+     "type": "string",
+     "required": true,
+     "desc": "Line item / instrument (falls back to an 'instrument' field); cross-filter field",
+     "default": "item"
+    },
+    "amount": {
+     "type": "number",
+     "required": true,
+     "desc": "Amount (its format drives the amount column)",
+     "default": "amount"
+    },
+    "multiple": {
+     "type": "number",
+     "required": false,
+     "desc": "x EBITDA per line (total = total amount / implied EBITDA); capitalization falls back to a 'multiple_cum' field, shown as is when its name contains 'cum', otherwise as a running sum. options.ebitda computes the multiples instead",
+     "default": "multiple_of_ebitda"
+    },
+    "pct": {
+     "type": "number",
+     "required": false,
+     "desc": "% of total as stored; when unmapped it is computed from the amounts so each side sums to 100%"
+    },
+    "notes": {
+     "type": "string",
+     "required": false,
+     "desc": "Row footnote text (numbered (1), (2) ... and listed under the tables; identical notes share a number)",
+     "default": "notes"
+    },
+    "rate": {
+     "type": "number",
+     "required": false,
+     "desc": "Capitalization mode: coupon / all-in rate",
+     "default": "rate"
+    },
+    "maturity": {
+     "type": "date",
+     "required": false,
+     "desc": "Capitalization mode: maturity date",
+     "default": "maturity"
+    }
+   },
+   "options": {
+    "mode": {
+     "type": "string",
+     "default": "sources-uses",
+     "desc": "sources-uses (two balancing panels) | capitalization (one pro forma capital-structure table with cumulative leverage)"
+    },
+    "sides": {
+     "type": "string[]",
+     "default": [
+      "Sources",
+      "Uses"
+     ],
+     "desc": "Side values in panel order, left to right (case-insensitive); other values follow"
+    },
+    "sideTitles": {
+     "type": "object",
+     "default": {},
+     "desc": "{'Sources': 'Sources of funds'} display names; capitalization: {'capitalization': '...'}"
+    },
+    "totalLabels": {
+     "type": "object",
+     "default": {},
+     "desc": "{'Sources': 'Total sources'} total-row labels; capitalization: {'total': 'Total capitalisation'}"
+    },
+    "titles": {
+     "type": "object",
+     "default": {},
+     "desc": "{item, amount, pct, multiple, rate, maturity} column header overrides (amount defaults to the field unit, e.g. 'USD m')"
+    },
+    "columns": {
+     "type": "string[]",
+     "default": [
+      "amount",
+      "pct",
+      "multiple"
+     ],
+     "desc": "Numeric columns to show (capitalization adds rate and maturity when the fields exist)"
+    },
+    "format": {
+     "type": "string",
+     "default": null,
+     "desc": "Amount format (defaults to the amount field format)"
+    },
+    "pctFormat": {
+     "type": "string",
+     "default": null,
+     "desc": "% format (defaults to the pct field format, else 0.0%)"
+    },
+    "multipleFormat": {
+     "type": "string",
+     "default": null,
+     "desc": "Multiple format (defaults to the multiple field format, else 0.0x)"
+    },
+    "ebitda": {
+     "type": "number",
+     "default": null,
+     "desc": "EBITDA for x EBITDA = amount / ebitda; overrides the multiple field (e.g. to switch to an LTM basis — retitle with titles.multiple). Without it the EBITDA is implied from the multiple column (sum of amounts / sum of multiples), so balanced sides show the same total multiple; capitalization totals use the cumulative value"
+    },
+    "currency": {
+     "type": "string",
+     "default": "first",
+     "desc": "first: currency symbol on the first row and the totals only (pitchbook style) | all"
+    },
+    "mixBar": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Mini stacked bar of the mix under each header (ordinal ramp; row swatches are its key); capitalization: leverage ladder with cumulative multiples"
+    },
+    "alignTotals": {
+     "type": "boolean",
+     "default": true,
+     "desc": "Pad the shorter side so both total rows sit on the same line (dropped when the panels stack on narrow screens)"
+    },
+    "tolerance": {
+     "type": "number",
+     "default": 0.5,
+     "desc": "Sources and uses differing by more than this (amount units) show the red out-of-balance chip"
+    },
+    "highlight": {
+     "type": "string|string[]",
+     "default": null,
+     "desc": "Item(s) drawn in accent2 (bar segment, swatch, row tint), e.g. 'Sponsor equity'"
+    },
+    "subtotals": {
+     "type": "array",
+     "default": [],
+     "desc": "Capitalization: [{after: '<item>', label: 'Total debt'}] cumulative subtotal rows"
+    },
+    "footnotes": {
+     "type": "string[]",
+     "default": [],
+     "desc": "Extra footnotes appended after the row notes"
+    },
+    "crossFilter": {
+     "type": "boolean",
+     "default": false,
+     "desc": "Click a row to cross-filter on the item field (other rows dim). Off by default: filtering a balancing table rarely makes sense"
+    },
+    "crossFilterScope": {
+     "type": "string",
+     "default": "dataset",
+     "desc": "dataset: the selection only filters blocks bound to the same dataset | global"
+    }
+   },
+   "interactions": [
+    "Hover a row or bar segment to link them (tooltip on segments)",
+    "Optional click-to-cross-filter on rows (crossFilter: true; others dim)",
+    "Bars grow on reveal and glide when filters change",
+    "Out-of-balance warning chip when totals differ",
+    "Leverage-ladder labels re-space on resize"
+   ],
+   "samples": [
+    {
+     "title": "Sources & uses — illustrative LBO at $52.00 per share (USD m)",
+     "data": "sources_uses",
+     "height": 330,
+     "options": {
+      "highlight": "Sponsor equity"
+     }
+    },
+    {
+     "title": "Pro forma capitalisation at close",
+     "data": "capital_structure",
+     "height": 260,
+     "span": 8,
+     "options": {
+      "mode": "capitalization",
+      "subtotals": [
+       {
+        "after": "Senior unsecured notes",
+        "label": "Total debt"
+       }
+      ],
+      "titles": {
+       "item": "Instrument"
+      }
+     }
+    },
+    {
+     "title": "Balance check — existing cash left out of the sources",
+     "data": "sources_uses",
+     "height": 300,
+     "options": {
+      "where": "item != 'Existing cash on balance sheet'",
+      "mixBar": false,
+      "columns": [
+       "amount",
+       "pct"
+      ],
+      "sideTitles": {
+       "Sources": "Sources of funds",
+       "Uses": "Uses of funds"
       }
      }
     }

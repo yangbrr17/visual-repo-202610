@@ -66,6 +66,10 @@ def lint_samples(m: dict, datasets: dict) -> list[str]:
 
 
 def main() -> int:
+    import argparse
+    ap = argparse.ArgumentParser(description="Build kit/catalog.json, gallery/catalog.js, gallery/samples.js and docs/component-catalog.md from component manifests.")
+    ap.add_argument("--strict", action="store_true", help="exit 1 when any manifest / sample problem is found")
+    args = ap.parse_args()
     cats = load(KIT / "categories.json")["categories"]
     cat_ids = [c["id"] for c in cats]
     build = load(KIT / "build.json")
@@ -173,7 +177,7 @@ def main() -> int:
           f"{len(thumbs)} demo thumbnails")
     for p in problems:
         print("  WARN", p)
-    return 1 if ("--strict" in sys.argv and problems) else 0
+    return 1 if (args.strict and problems) else 0
 
 
 if __name__ == "__main__":

@@ -18,7 +18,9 @@
     architecture: '../docs/architecture.md',
     builder: '../py/README.md',
     catalogue: '../docs/component-catalog.md',
-    formula: '../docs/formula-language.md'
+    formula: '../docs/formula-language.md',
+    design: '../docs/design-system.md',
+    roadmap: '../docs/roadmap-step2.md'
   };
   // overview strip: component, sample index, width on a 12-column grid (the Sankey gets the wide slot)
   var FEATURED = [{ id: 'football-field', span: 6 }, { id: 'price-volume', span: 6 }, { id: 'choropleth', span: 4 }, { id: 'sankey', span: 8 }];
@@ -382,7 +384,9 @@
         resCard('#/landscape', 'Library table', '调研明细', 'Filterable table of every library with verdict, licence, version and rationale.', true),
         resCard(LINKS.architecture, 'Architecture & contracts', '架构契约', 'Folder layout, dataset / manifest / HTML contracts and the runtime API. docs/architecture.md'),
         resCard(LINKS.builder, 'Python builder', 'Python 构建器', 'DataFrame / records → report folder; validation, JSON spec, CLI. py/README.md'),
-        resCard(LINKS.formula, 'Formula language', '公式语言', 'Safe expressions and the query language behind computed fields and the console. docs/formula-language.md')));
+        resCard(LINKS.formula, 'Formula language', '公式语言', 'Safe expressions and the query language behind computed fields and the console. docs/formula-language.md'),
+        resCard(LINKS.design, 'Design system', '设计规范', 'Pitchbook conventions, tokens, palettes and typography. docs/design-system.md'),
+        resCard(LINKS.roadmap, 'Step 2 roadmap', '下一步', 'Data API, skills and locally hosted LLM integration. docs/roadmap-step2.md')));
 
     return h('div.g-page', hero, feat, pipeline, strip, catGrid, resources);
   }
@@ -568,7 +572,7 @@
       h('footer.rk-page__foot', h('span.rk-page__source', 'Source: Company filings, FactSet as of 10-Oct-2026. Notes: (1) Pro forma for disposals.'), h('span.rk-page__conf', 'Strictly confidential'), h('span.rk-page__num', '7')));
     return h('div.g-page',
       h('header.g-pagehead', h('p.g-kicker', 'Design system'), h('h1', '设计规范'), h('p.g-lead', '所有颜色、字体、间距都是 CSS 变量（kit/styles/tokens.css + themes/*.css），图表通过 RK.theme 读取同一套 token。换肤 = 换一个主题文件。'),
-        h('p.g-lead-en', 'Pitchbook conventions: serif action titles, sans-serif data, tabular figures, one accent colour, light gridlines, sources & confidentiality on every page, 16:9 pages that print to PDF.')),
+        h('p.g-lead-en', 'Pitchbook conventions: serif action titles, sans-serif data, tabular figures, one accent colour, light gridlines, sources & confidentiality on every page, 16:9 pages that print to PDF. ', ext(LINKS.design, 'docs/design-system.md ↗', 'g-more'))),
       h('section', h('h2.g-h2', '主题 Themes'), h('div.g-themegrid', themeCards)),
       h('section', h('h2.g-h2', '页面结构 Page anatomy'),
         h('p.g-muted.g-annos', callout('1', 'kicker'), callout('2', 'action title'), callout('3', 'subtitle: units / period'), callout('4', '12-column grid of blocks'), callout('5', 'source · confidentiality · page number')),

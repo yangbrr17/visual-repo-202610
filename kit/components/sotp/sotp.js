@@ -46,12 +46,31 @@
   }
 
   /* ---------------- model ---------------- */
-  /** Segment colours: the ordinal ramp minus shades too close to the accent (the totals). */
+  /**
+   * Segment colours from the ordinal ramp: shades too close to the accent (the totals), the paper or the text ink are
+   * dropped; n colours are then picked evenly along what is left (interpolated when fewer shades remain), so the
+   * segments always read as one ordered family and never borrow a categorical hue.
+   */
+  function hueSat(c) {
+    var x = RK.theme.parseColor(c).slice(0, 3).map(function (v) { return v / 255; });
+    var mx = Math.max.apply(null, x), mn = Math.min.apply(null, x), d = mx - mn, l = (mx + mn) / 2, hh = 0;
+    if (d) hh = mx === x[0] ? ((x[1] - x[2]) / d + 6) % 6 : mx === x[1] ? (x[2] - x[0]) / d + 2 : (x[0] - x[1]) / d + 4;
+    return [hh * 60, d ? d / (1 - Math.abs(2 * l - 1)) : 0];
+  }
   function segmentPalette(t, n) {
-    var ok = t.ord.filter(function (c) { return RK.theme.distance(c, t.accent) >= 70 && RK.theme.distance(c, t.paper) >= 90; });
-    if (ok.length < Math.min(n, 3)) ok = RK.theme.palette({ exclude: [t.accent, t.accent2], n: Math.max(n, 1) });
-    var out = ok.slice(), k = 0;
-    while (out.length < n) { out.push(RK.theme.mix(ok[k % ok.length], t.paper, 0.35)); k++; }
+    var D = RK.theme.distance;
+    // a theme that defines fewer ramp shades inherits the default theme's from :root (another hue): drop off-hue shades
+    var ref = hueSat(t.ord[Math.min(1, t.ord.length - 1)] || t.accent);
+    var ord = t.ord.filter(function (c) {
+      var hs = hueSat(c), dh = Math.abs(hs[0] - ref[0]);
+      return hs[1] < 0.12 || ref[1] < 0.12 || Math.min(dh, 360 - dh) <= 50;
+    });
+    var ok = ord.filter(function (c) { return D(c, t.accent) >= 70 && D(c, t.paper) >= 90 && D(c, t.ink) >= 80; });
+    if (ok.length < 2) ok = ord.filter(function (c) { return D(c, t.paper) >= 60; });
+    if (!ok.length) ok = [t.accent3 || t.accent];
+    if (n <= 1 || ok.length === 1) return Array.apply(null, Array(Math.max(n, 1))).map(function () { return ok[0]; });
+    var r = RK.theme.ramp(ok), out = [];
+    for (var i = 0; i < n; i++) out.push(ok.length >= n ? ok[Math.round(i * (ok.length - 1) / (n - 1))] : r(i / (n - 1)));
     return out;
   }
 
@@ -83,6 +102,7 @@
       steps.push(s);
     });
     var ev = { kind: 'total', key: 'ev', label: o.evLabel, lo: evLo, hi: evHi, start: 0, end: evLo, hiEnd: evHi, color: t.accent };
+    var dedColor = RK.theme.mix(t.neutral, t.ink3, 0.45);   // deductions: a darker grey than the range tints
     steps.push(ev);
     var deds = [];
     var nd = val(o.netDebt);
@@ -92,7 +112,7 @@
     deds.forEach(function (d) {
       var v = isNum(d.value) ? d.value : null;
       steps.push({ kind: 'deduct', label: d.label, note: d.note, value: v, lo: v == null ? null : -v, hi: v == null ? null : -v,
-        start: run, end: run - (v || 0), hiEnd: run - (v || 0), color: t.neutral });
+        start: run, end: run - (v || 0), hiEnd: run - (v || 0), color: dedColor });
       if (v != null) { run -= v; eqLo -= v; eqHi -= v; }
     });
     if (deds.length) steps.push({ kind: 'total', key: 'equity', label: o.equityLabel, lo: eqLo, hi: eqHi, start: 0, end: eqLo, hiEnd: eqHi, color: t.accent });
@@ -135,9 +155,12 @@
     var M = model(ctx), steps = M.steps, n = steps.length;
     var fmt = o.format || '#,##0;(#,##0)';
     var psFmt = o.perShareFormat || '$#,##0.00;($#,##0.00)';
-    var mFmt = o.multipleFormat || ctx.fmtOf(enc.low) || '0.0x';
+    // one optional extra decimal so 3.25x is not shown as 3.3x ('0.0x' -> '0.0#x')
+    var mFmtCalc = o.multipleFormat || ctx.fmtOf(enc.low) || '0.0x';
+    var mFmt = o.multipleFormat || String(RK.format.presets[mFmtCalc] || mFmtCalc).replace(/(\.0+)(?![0#])/, '$1#');
     var metFmt = o.metricFormat || ctx.fmtOf(enc.metric) || '#,##0.0;(#,##0.0)';
     var showPS = o.perShare !== false && M.shares != null;
+    var partial = ctx.rows.length < ctx.allRows.length;
 
     function range(lo, hi, f) {
       if (!isNum(lo) && !isNum(hi)) return RK.format(null, f);
@@ -148,7 +171,10 @@
       if (!showPS) return '';
       return range(isNum(s.lo) ? s.lo / M.shares : null, isNum(s.hi) ? s.hi / M.shares : null, psFmt);
     }
+    // totals: the light range part is a tint of accent3 (a tint of the dark accent itself turns grey, like the deductions)
+    var totalLight = RK.theme.mix(t.accent3 || t.accent, t.paper, 0.45);
     function colorOf(s, light) {
+      if (s.kind === 'total') return light ? totalLight : s.color;
       var c = s.kind === 'part' && s.row ? C.dim(ctx, enc.label, s.label, s.color) : s.color;
       return light ? RK.theme.mix(c, t.paper, LIGHT) : c;
     }
@@ -159,8 +185,10 @@
           ? RK.format(r[enc.low], mFmt) + EN + RK.format(r[enc.high], mFmt) : RK.format(isNum(r[enc.low]) ? r[enc.low] : r[enc.high], mFmt);
         return (name ? name + ' ' : '') + RK.format(r[enc.metric], metFmt) + ' × ' + mult;
       }
+      // a cross-filter elsewhere narrowed the segments: the totals are partial, the group multiple does not apply
+      if (s.key === 'ev' && partial) return 'Selected segments only (' + ctx.rows.length + ' of ' + ctx.allRows.length + ')';
       if (s.key === 'ev' && M.evMetric && isNum(M.evMetric.value) && M.evMetric.value > 0) {
-        return 'Implied ' + range(s.lo / M.evMetric.value, s.hi / M.evMetric.value, mFmt) + ' ' + (M.evMetric.label || '');
+        return 'Implied ' + range(s.lo / M.evMetric.value, s.hi / M.evMetric.value, mFmtCalc) + ' ' + (M.evMetric.label || '');
       }
       if (s.key === 'equity') {
         if (o.equityNote != null) return o.equityNote;
@@ -181,11 +209,14 @@
     steps.forEach(function (s) {
       leftW = Math.max(leftW, C.measure(s.label, s.kind === 'total' ? fontB : fontN), o.showBasis !== false ? C.measure(basisOf(s), fontS) : 0);
     });
-    leftW = Math.min(leftW, Math.max(150, W * 0.3));
+    leftW = Math.ceil(Math.min(leftW, Math.max(150, W * 0.3)));
     var rightW = 0;
     if (showPS) steps.forEach(function (s) { rightW = Math.max(rightW, C.measure(perShare(s), s.kind === 'total' ? '600 11px ' + t.fontNum : fontV)); });
     rightW = Math.max(rightW, showPS ? C.measure(o.perShareTitle || '', '600 10px ' + t.fontSans) : 0);
-    var plotW = Math.max(160, W - leftW - (showPS ? rightW + 28 : 0) - 24);
+    rightW = Math.ceil(rightW);
+    // explicit layout (containLabel ignores the right-aligned per-share column): label column | plot | per-share column
+    var gridL = 4 + leftW + 10, gridR = showPS ? rightW + 18 : 16;
+    var plotW = Math.max(160, W - gridL - gridR);
     var xs = [0];
     steps.forEach(function (s) { xs.push(s.pieces.min, s.pieces.max); });
     M.refs.forEach(function (r) { xs.push(r.value); });
@@ -210,7 +241,7 @@
     }
 
     // ---- reference lines (current price x shares) with labels above the plot, spread apart ----
-    var refFont = '600 11px ' + t.fontSans, x0 = W - plotW - (showPS ? rightW + 28 : 0) - 8;
+    var refFont = '600 11px ' + t.fontSans, x0 = gridL;
     var refTexts = M.refs.map(function (r) { return r.label || (o.refLabel || 'Current') + ' ' + RK.format(r.price, psFmt); });
     var gap = Math.max.apply(null, refTexts.map(function (s) { return C.measure(s, refFont); }).concat([0])) + 12;
     var rxs = M.refs.map(function (r) { return x0 + (r.value - axMin) / (axMax - axMin) * plotW; });
@@ -239,7 +270,7 @@
       { id: 'base', type: 'bar', stack: 'sotp', stackStrategy: 'all', silent: true, barWidth: (BAR * 100) + '%', barMaxWidth: BAR_MAX,
         itemStyle: { color: 'transparent' }, emphasis: { disabled: true }, tooltip: { show: false }, animationDelay: delay,
         data: steps.map(function (s) { return s.pieces.left.from; }),
-        markLine: marks.length ? { silent: true, symbol: ['none', 'none'], z: 8, data: marks, animation: false } : undefined },
+        markLine: marks.length ? { silent: true, symbol: ['none', 'none'], data: marks, animation: false } : undefined },
       { id: 'p1', name: 'p1', type: 'bar', stack: 'sotp', stackStrategy: 'all', barWidth: (BAR * 100) + '%', barMaxWidth: BAR_MAX,
         emphasis: { focus: 'none', itemStyle: { opacity: 0.88 } }, animationDelay: delay, data: pieceData('left') },
       { id: 'p2', name: 'p2', type: 'bar', stack: 'sotp', stackStrategy: 'all', barWidth: (BAR * 100) + '%', barMaxWidth: BAR_MAX,
@@ -249,13 +280,15 @@
     // value labels on a ghost series: right of rows that build up, left of deductions / costs
     if (o.labels !== false) {
       series.push({
-        id: 'vals', type: 'scatter', silent: true, symbolSize: 0, z: 6, tooltip: { show: false },
+        id: 'vals', type: 'scatter', silent: true, symbolSize: 0, z: 10, tooltip: { show: false }, itemStyle: { opacity: 1 },
         animationDelay: function (i) { return delay(i) + 260; },
         data: steps.map(function (s, i) {
           var tot = s.kind === 'total';
           return { value: [labs[i].x, i], label: { position: labs[i].dir < 0 ? 'left' : 'right', fontWeight: tot ? 600 : 400, color: tot ? t.ink : t.ink2 } };
         }),
-        label: { show: true, distance: 5, fontSize: 11, fontFamily: t.fontNum, formatter: function (p) { return valueText(steps[p.dataIndex]); } }
+        // paper backing: a reference line crossing a label never runs through the figures
+        label: { show: true, distance: 3, padding: [1, 2], backgroundColor: t.paper, fontSize: 11, fontFamily: t.fontNum,
+          formatter: function (p) { return valueText(steps[p.dataIndex]); } }
       });
     }
 
@@ -287,7 +320,7 @@
     var keyLow = o.lowLabel, keyHigh = o.highLabel;
     if (showLegend) {
       series.push({ id: 'key-lo', name: keyLow, type: 'bar', data: [], itemStyle: { color: t.accent } });
-      series.push({ id: 'key-hi', name: keyHigh, type: 'bar', data: [], itemStyle: { color: RK.theme.mix(t.accent, t.paper, LIGHT) } });
+      series.push({ id: 'key-hi', name: keyHigh, type: 'bar', data: [], itemStyle: { color: totalLight } });
     }
 
     var labels = steps.map(function (s) { return s.label; });
@@ -302,7 +335,7 @@
       type: 'category', data: labels, inverse: true,
       axisLine: { show: true, lineStyle: { color: t.axis } }, axisTick: { show: false },
       axisLabel: {
-        interval: 0, margin: 10, rich: rich,
+        interval: 0, margin: 10, rich: rich, width: leftW, overflow: 'truncate',
         formatter: function (v, i) {
           var s = steps[i];
           if (!s) return v;
@@ -315,10 +348,9 @@
       yAxes.push({
         type: 'category', data: labels, inverse: true, position: 'right',
         axisLine: { show: false }, axisTick: { show: false },
-        name: o.perShareTitle, nameLocation: 'start', nameGap: 8,
-        nameTextStyle: { color: t.ink3, fontSize: 10, fontWeight: 600, align: 'left', padding: [0, 0, 0, 10] },
+        // right-aligned like a table column: the margin spans the widest label
         axisLabel: {
-          interval: 0, margin: 10, rich: rich,
+          interval: 0, margin: rightW + 14, align: 'right', rich: rich,
           formatter: function (v, i) { var s = steps[i]; return s ? '{' + (s.kind === 'total' ? 'V' : 'v') + '|' + perShare(s) + '}' : ''; }
         }
       });
@@ -326,7 +358,10 @@
 
     return {
       legend: C.legend(ctx, { show: showLegend, data: showLegend ? [keyLow, keyHigh] : [], selectedMode: false }),
-      grid: { left: 4, right: 4, top: top, bottom: o.valueAxis ? 4 : 2, containLabel: true },
+      // per-share column heading, right-aligned over the column (level with the reference-line captions)
+      graphic: showPS && o.perShareTitle ? [{ type: 'text', id: 'ps-title', right: 4, top: top - 18, silent: true,
+        style: { text: o.perShareTitle, fill: t.ink3, font: '600 10px ' + t.fontSans, textAlign: 'right' } }] : [],
+      grid: { left: gridL, right: gridR, top: top, bottom: o.valueAxis ? 24 : 4, containLabel: false },
       tooltip: {
         trigger: 'item',
         formatter: function (p) {
@@ -364,10 +399,10 @@
         foot = s.note || null;
       } else {
         rows.push({ color: t.accent, label: 'Low', value: RK.format(s.lo, fmt) });
-        rows.push({ color: RK.theme.mix(t.accent, t.paper, LIGHT), label: 'High', value: RK.format(s.hi, fmt) });
+        rows.push({ color: totalLight, label: 'High', value: RK.format(s.hi, fmt) });
         rows.push({ label: 'Midpoint', value: RK.format((s.lo + s.hi) / 2, fmt) });
-        if (s.key === 'ev' && M.evMetric && isNum(M.evMetric.value) && M.evMetric.value > 0) {
-          rows.push({ label: 'Implied ' + (M.evMetric.label || 'multiple'), value: range(s.lo / M.evMetric.value, s.hi / M.evMetric.value, mFmt) });
+        if (s.key === 'ev' && !partial && M.evMetric && isNum(M.evMetric.value) && M.evMetric.value > 0) {
+          rows.push({ label: 'Implied ' + (M.evMetric.label || 'multiple'), value: range(s.lo / M.evMetric.value, s.hi / M.evMetric.value, mFmtCalc) });
         }
         if (showPS) rows.push({ label: 'Per share', value: perShare(s), bold: true });
         if (s.key === 'equity' && showPS && M.refPrice) {

@@ -1454,7 +1454,7 @@ class _Gen:
         rows = []
         for side, items in (("Sources", sources), ("Uses", uses)):
             tot = sum(a for _, a, _ in items)
-            rows += [dict(side=side, item=i, amount=a, multiple_of_ebitda=round(a / e26, 2), pct=round(a / tot, 4), notes=n)
+            rows += [dict(side=side, item=i, amount=a, multiple_of_ebitda=round(a / e26, 4), pct=round(a / tot, 4), notes=n)
                      for i, a, n in items]
         fields = [S("side", "Side"), S("item", "Item"), N("amount", "Amount", F_USDM1, "USD m"),
                   N("multiple_of_ebitda", "x 2026E EBITDA", F_MULT), N("pct", "% of total", F_PCT), S("notes", "Notes")]

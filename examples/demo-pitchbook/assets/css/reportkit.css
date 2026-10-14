@@ -81,12 +81,12 @@
 
   /* categorical — ordered for maximum separation in the first 4 */
   --rk-cat-1: #0b2d5b;
-  --rk-cat-2: #5f8dc4;
-  --rk-cat-3: #9f3960;
-  --rk-cat-4: #008e88;
-  --rk-cat-5: #57873a;
+  --rk-cat-2: #9f3960;
+  --rk-cat-3: #4b99c9;
+  --rk-cat-4: #cb5f31;
+  --rk-cat-5: #008e88;
   --rk-cat-6: #7555a8;
-  --rk-cat-7: #cb5f31;
+  --rk-cat-7: #57873a;
   --rk-cat-8: #8a95a6;
 
   /* sequential (light -> dark) */
@@ -124,7 +124,7 @@
   --rk-surface-2: #ede5d8;
   --rk-ink: #2b221c;
   --rk-ink-2: #4f443b;
-  --rk-ink-3: #85786b;
+  --rk-ink-3: #76695c;
   --rk-rule: #d8cdbd;
   --rk-grid: #ece5da;
   --rk-axis: #a39684;
@@ -169,7 +169,6 @@
   --rk-ord-2: #6b4a26;
   --rk-ord-3: #9a6b35;
   --rk-ord-4: #c49a60;
-  --rk-ord-5: #dfc7a3;
   --rk-ref: #b3261e;
 }
 
@@ -190,7 +189,7 @@
   --rk-accent-2: #1b8a8f;
   --rk-accent-3: #3d7eaa;
   --rk-highlight: #1b8a8f;
-  --rk-pos: #3a8b5c;
+  --rk-pos: #2f7a4f;
   --rk-neg: #c0504d;
   --rk-neutral: #a8b2bd;
   --rk-tooltip-bg: #ffffff;
@@ -200,12 +199,12 @@
   --rk-map-water: #f5f7f9;
 
   --rk-cat-1: #1f2a44;
-  --rk-cat-2: #3e6dc8;
-  --rk-cat-3: #db6143;
-  --rk-cat-4: #7d5abc;
-  --rk-cat-5: #3e9245;
-  --rk-cat-6: #c38700;
-  --rk-cat-7: #c35f92;
+  --rk-cat-2: #c38700;
+  --rk-cat-3: #c35f92;
+  --rk-cat-4: #3e6dc8;
+  --rk-cat-5: #db6143;
+  --rk-cat-6: #7d5abc;
+  --rk-cat-7: #3e9245;
   --rk-cat-8: #8e9aaf;
 
   --rk-seq-1: #f0f6f7;
@@ -227,7 +226,6 @@
   --rk-ord-2: #33475f;
   --rk-ord-3: #52698a;
   --rk-ord-4: #7c93b3;
-  --rk-ord-5: #a9bad0;
   --rk-ref: #c0392b;
 }
 
@@ -261,12 +259,12 @@
   --rk-shadow-page: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 30px rgba(0, 0, 0, .35);
 
   --rk-cat-1: #7fa7d9;
-  --rk-cat-2: #5fb3a2;
-  --rk-cat-3: #e58f9c;
-  --rk-cat-4: #a3b1c6;
-  --rk-cat-5: #9c7cc0;
-  --rk-cat-6: #3e6fa8;
-  --rk-cat-7: #c9d5e6;
+  --rk-cat-2: #d5683b;
+  --rk-cat-3: #129d97;
+  --rk-cat-4: #8a69be;
+  --rk-cat-5: #639346;
+  --rk-cat-6: #449fc9;
+  --rk-cat-7: #b74e74;
   --rk-cat-8: #8794a8;
 
   --rk-seq-1: #16233a;
@@ -421,6 +419,10 @@ table { border-collapse: collapse; }
 .rk-page__notes { display: block; margin-top: 2px; }
 .rk-page__conf { white-space: nowrap; text-transform: uppercase; letter-spacing: .06em; }
 .rk-page__num { font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; min-width: 18px; text-align: right; color: var(--rk-ink-2); font-weight: 600; }
+
+/* page proportions: 16:9 widescreen (default) | US Letter landscape | A4 landscape (Report(page_size=...)) */
+[data-rk-page-size="letter"] .rk-page { aspect-ratio: 11 / 8.5; }
+[data-rk-page-size="a4"] .rk-page { aspect-ratio: 297 / 210; }
 
 /* ---------- 12-column grid ---------- */
 .rk-grid {
@@ -688,7 +690,7 @@ textarea.rk-input { height: auto; padding: 8px 10px; line-height: 1.45; resize: 
    ReportKit print — each .rk-page becomes one 16:9 landscape sheet
    (13.333in x 7.5in, the PowerPoint widescreen size) for "Save as PDF".
    ========================================================================== */
-@page { size: 13.333in 7.5in; margin: 0; }
+@page { size: 13.333in 7.5in; margin: 0; }   /* the builder appends a Letter / A4 @page rule when page_size is set */
 
 @media print {
   html, body { background: #fff !important; }
@@ -706,6 +708,8 @@ textarea.rk-input { height: auto; padding: 8px 10px; line-height: 1.45; resize: 
     overflow: hidden;
   }
   .rk-page:last-child { break-after: auto; page-break-after: auto; }
+  [data-rk-page-size="letter"] .rk-page { width: 11in; height: 8.5in; }
+  [data-rk-page-size="a4"] .rk-page { width: 297mm; height: 210mm; }
   .rk-js .rk-reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
   .rk-block { break-inside: avoid; }
   a { color: inherit; text-decoration: none; }

@@ -51,5 +51,6 @@
   --rk-ord-2: #33475f;
   --rk-ord-3: #52698a;
   --rk-ord-4: #7c93b3;
+  --rk-ord-5: initial;   /* 4-step ramp: the light 5th step fails 2:1 contrast; unset so navy (:root) does not leak in */
   --rk-ref: #c0392b;
 }
