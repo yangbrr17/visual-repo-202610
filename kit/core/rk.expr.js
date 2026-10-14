@@ -272,9 +272,11 @@
     if (typeof a === 'string' && typeof b === 'string') return a.toLowerCase() === b.toLowerCase();
     return a == b; // eslint-disable-line eqeqeq
   }
+  // case-insensitive text ordering, like eq(), so "a" >= "A" agrees with "a" == "A". One shared collator:
+  // localeCompare(b, locale, options) builds a new one per call (80x slower on a 250k-row filter).
+  var collator = typeof Intl !== 'undefined' && Intl.Collator ? new Intl.Collator(undefined, { sensitivity: 'accent' }) : null;
   function cmp(a, b) {
-    // case-insensitive like eq(), so "a" >= "A" agrees with "a" == "A"
-    if (typeof a === 'string' && typeof b === 'string') return a.localeCompare(b, undefined, { sensitivity: 'accent' });
+    if (typeof a === 'string' && typeof b === 'string') return collator ? collator.compare(a, b) : a.toLowerCase().localeCompare(b.toLowerCase());
     var x = num(a), y = num(b);
     // text that is not a number ("n.a.", "NM", "2021-03-18") is not comparable with a number: NaN makes <, >, <=, >= false
     return x === null || y === null ? NaN : x - y;
@@ -651,7 +653,7 @@
   function compile(src, opts) {
     opts = opts || {};
     var key = opts.fields ? null : String(src);
-    if (key !== null && cache.has(key)) return cache.get(key);
+    if (key !== null && cache.has(key)) { var hit = cache.get(key); cache.delete(key); cache.set(key, hit); return hit; }   // LRU
     var ast, c, aggregate, fn;
     try {
       ast = new Parser(tokenize(String(src))).parse();

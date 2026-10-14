@@ -738,14 +738,14 @@ evaluated and compared.
 ```bash
 node tests/js/formula-doc.test.js            # 核对 / verify
 node tests/js/formula-doc.test.js --write    # 文档修改后重新生成结果表 / regenerate the result tables
-RK_CORE_DIR=/path/to/patched/kit/core node tests/js/formula-doc.test.js   # 对补丁后的引擎核对 / verify a patched engine
+RK_CORE_DIR=/path/to/other/kit/core node tests/js/formula-doc.test.js     # 对另一份引擎核对 / verify another copy of kit/core
 ```
 
-验证输出 / Verification output（2026-10-14，`kit/core` @ `88a4097`；同一文档也在应用审计补丁后的引擎上通过 /
-the same document also verifies on the engine with the audit patches applied）。覆盖范围 / coverage：§11 的 17 个查询实例，
-§3–§9 的 83 个公式，§12 的 20 个格式码，§13 的 18 条错误信息；并检查引擎的 50 个函数名（含别名）都在 §8 中有说明 /
-the 17 worked queries of §11, 83 formulas in §3–§9, 20 format codes (§12) and 18 error messages (§13); it also checks
-that all 50 engine function names (incl. aliases) are documented in §8:
+验证输出 / Verification output（2026-10-14，`kit/core` 已合入 `research/engine-audit.md` 的全部修复 / with all fixes of
+`research/engine-audit.md` merged）。覆盖范围 / coverage：§11 的 17 个查询实例，§3–§9 的 91 个公式，§12 的 33 个格式码，
+§13 的 24 条错误信息；并检查引擎的 50 个函数名（含别名）都在 §8 中有说明 / the 17 worked queries of §11, 91 formulas in
+§3–§9, 33 format codes (§12) and 24 error messages (§13); it also checks that all 50 engine function names (incl.
+aliases) are documented in §8:
 
 ```text
 $ node tests/js/formula-doc.test.js --verbose
@@ -766,10 +766,6 @@ $ node tests/js/formula-doc.test.js --verbose
   query 11.15  4 rows x 4 cols  sum(if(year == "2024A", revenue, 0)) as "2024A" format "$#,##0.0", ...
   query 11.16 12 rows x 3 cols  company, if(net_debt < 0, "Net cash", if(net_debt_ebitda > 2, "Leve...
   query 11.17  5 rows x 4 cols  count() as "Deals", sum(ev) as "Total EV", median(ev_ebitda) as "Me...
-formula-doc: 17 queries, 83 formulas, 20 format codes, 18 error messages, 1 setup blocks — 138/138 verified; 50 engine functions documented
+formula-doc: 17 queries, 91 formulas, 33 format codes, 24 error messages, 1 setup blocks — 165/165 verified; 50 engine functions documented
 core: kit/core, node v22.22.0
-
-$ RK_CORE_DIR=/tmp/patched/kit/core node tests/js/formula-doc.test.js     # kit/core + research/engine-audit.md patches
-formula-doc: 17 queries, 83 formulas, 20 format codes, 18 error messages, 1 setup blocks — 138/138 verified; 50 engine functions documented
-core: /tmp/patched/kit/core, node v22.22.0
 ```

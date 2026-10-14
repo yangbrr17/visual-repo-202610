@@ -4,7 +4,9 @@
   "name_zh": "中国省份方块地图",
   "category": "geo",
   "engine": "echarts",
-  "deps": ["echarts"],
+  "deps": [
+    "echarts"
+  ],
   "summary": "Compliance-safe China cartogram: the 34 provincial-level divisions as equal-size squares or hexagons on a geography-like grid, shaded by a metric — no boundaries, so no map-review (审图号) issue in client decks.",
   "summary_zh": "合规友好的中国省级方块地图：34 个省级行政区各占一个等大的方块（或六边形），按近似地理位置排布并按指标着色；不绘制任何边界线，客户材料中无需审图号。",
   "description_zh": "用于在客户材料中展示按省汇总的指标（收入、增速、门店数、市场份额）。每个省级行政区（含台湾、香港、澳门）是一个同样大小的方块，按地理相对位置排成 7 × 8 网格：黑龙江在右上，新疆、西藏在左侧，长江沿线（西藏—四川—重庆—湖北—安徽—江苏—上海）占一整行，海南在底部，港澳在广东下方，台湾在福建东侧。因为不画边界、不涉及比例尺和领土轮廓，图表不属于需要送审的“地图”，也不会因边界画法引发合规问题；同时每个省面积相等，避免新疆、西藏等大省在视觉上压倒东部经济大省。数据可按 6 位行政区划代码（adcode，市/县级代码自动汇总到省）、中文或英文省名（带不带“省/市/自治区”均可）或 ISO 3166-2:CN 字母代码连接。方块颜色表示数值：顺序色阶或以中点为中心的发散色阶（如增速相对集团平均），默认按分位数分 5 档并取整为好看的分界值，图例显示每档省份数；也可用等距分档或连续色阶。方块上显示中文简称或英文名/代码，空间足够时第二行显示格式化数值；可用强调色描边突出重点省份。悬停显示全部字段和排名，点击方块交叉筛选其他图表，悬停图例高亮该档省份、点击图例按档筛选；筛选变化时颜色平滑过渡。",
@@ -20,32 +22,140 @@
     "Precise comparison of close values — pair with a bar chart or table"
   ],
   "channels": {
-    "id": {"type": "string", "required": true, "desc": "Province key: 6-digit adcode (\"440000\"; city / county codes roll up), Chinese or English name (\"广东省\", \"广东\", \"Guangdong\") or ISO 3166-2:CN letters (\"GD\", \"CN-GD\")", "default": "adcode"},
-    "value": {"type": "number", "required": true, "desc": "Metric that drives the tile colour (several rows per province are combined with options.agg)", "default": "value"}
+    "id": {
+      "type": "string",
+      "required": true,
+      "desc": "Province key: 6-digit adcode (\"440000\"; city / county codes roll up), Chinese or English name (\"广东省\", \"广东\", \"Guangdong\") or ISO 3166-2:CN letters (\"GD\", \"CN-GD\")",
+      "default": "adcode"
+    },
+    "value": {
+      "type": "number",
+      "required": true,
+      "desc": "Metric that drives the tile colour (several rows per province are combined with options.agg)",
+      "default": "value"
+    }
   },
   "options": {
-    "join": {"type": "string", "default": "auto", "desc": "auto | adcode | name — how encode.id values are matched (name also accepts ISO letters); unmatched keys are reported once in the console"},
-    "lang": {"type": "string", "default": "zh", "desc": "Tile labels: 'zh' (北京, or 简称 京 on small tiles) | 'en' (Beijing, or ISO letters BJ on small tiles)"},
-    "labels": {"type": "string|boolean", "default": "auto", "desc": "auto (short name when it fits every tile, else 简称 / ISO code) | name | abbr | false"},
-    "values": {"type": "string|boolean", "default": "auto", "desc": "Second line with the formatted value: auto (when tiles are large enough) | true | false"},
-    "shape": {"type": "string", "default": "square", "desc": "square | hex (pointy-top hexagons, odd rows offset half a tile)"},
-    "scale": {"type": "string", "default": "auto", "desc": "auto (diverging when values straddle mid) | sequential | diverging"},
-    "mid": {"type": "number", "default": 0, "desc": "Diverging midpoint (0 for growth, or e.g. the group average)"},
-    "bins": {"type": "number", "default": 5, "desc": "Number of colour classes; 0 = continuous ramp. Diverging uses symmetric nice steps around mid (classes per side = bins / 2)"},
-    "classify": {"type": "string", "default": "quantile", "desc": "quantile | equal — how sequential class breaks are found (then rounded to nice numbers)"},
-    "breaks": {"type": "number[]", "default": null, "desc": "Explicit class breaks, e.g. [5, 10, 20, 40] (overrides bins / classify)"},
-    "format": {"type": "string", "default": null, "desc": "Value format for tiles, legend and tooltip; defaults to the value field format"},
-    "agg": {"type": "string", "default": "sum", "desc": "Combine several rows per province: sum | avg | max | min | median | first"},
-    "highlight": {"type": "string|string[]", "default": null, "desc": "Province key(s) outlined in the accent colour (adcode, name or ISO letters), e.g. the target's home province"},
-    "highlightLabel": {"type": "string", "default": null, "desc": "Legend entry explaining the highlight outline (e.g. \"Headquarters\")"},
-    "tooltip": {"type": "string|string[]|boolean", "default": "all", "desc": "'all' lists every field of the row (province name / code columns go to the title), or an array of fields, or false"},
-    "legend": {"type": "boolean", "default": true, "desc": "Colour legend with province counts per class; hover a class to focus its tiles, click it to cross-filter them"},
-    "legendTitle": {"type": "string", "default": null, "desc": "Legend title; defaults to the value field title and unit"},
-    "legendPosition": {"type": "string", "default": "auto", "desc": "auto (the empty top-left corner of the grid when it fits, else beside or below) | corner | left | right | bottom"},
-    "filterField": {"type": "string", "default": null, "desc": "Field used for click-to-filter; defaults to encode.id. 'province' (a shared dimension) filters the whole report; other fields such as adcode only this block's dataset — set crossFilterScope to override"},
-    "gap": {"type": "number", "default": null, "desc": "Gap between tiles in px (default about 6% of the cell, 2–5 px)"},
-    "radius": {"type": "number", "default": 2, "desc": "Corner radius of square tiles (px)"},
-    "layout": {"type": "object", "default": null, "desc": "Position overrides {key: [row, col]}, keys as for encode.id (e.g. {\"TW\": [5, 6]})"}
+    "join": {
+      "type": "string",
+      "default": "auto",
+      "desc": "auto | adcode | name — how encode.id values are matched (name also accepts ISO letters); unmatched keys are reported once in the console"
+    },
+    "lang": {
+      "type": "string",
+      "default": "zh",
+      "desc": "Tile labels: 'zh' (北京, or 简称 京 on small tiles) | 'en' (Beijing, or ISO letters BJ on small tiles)"
+    },
+    "labels": {
+      "type": "string|boolean",
+      "default": "auto",
+      "desc": "auto (short name when it fits every tile, else 简称 / ISO code) | name | abbr | false"
+    },
+    "values": {
+      "type": "string|boolean",
+      "default": "auto",
+      "desc": "Second line with the formatted value: auto (when tiles are large enough) | true | false"
+    },
+    "shape": {
+      "type": "string",
+      "default": "square",
+      "desc": "square | hex (pointy-top hexagons, odd rows offset half a tile)"
+    },
+    "scale": {
+      "type": "string",
+      "default": "auto",
+      "desc": "auto (diverging when values straddle mid) | sequential | diverging"
+    },
+    "mid": {
+      "type": "number",
+      "default": 0,
+      "desc": "Diverging midpoint (0 for growth, or e.g. the group average)"
+    },
+    "bins": {
+      "type": "number",
+      "default": 5,
+      "desc": "Number of colour classes; 0 = continuous ramp. Diverging uses symmetric nice steps around mid (classes per side = bins / 2)"
+    },
+    "classify": {
+      "type": "string",
+      "default": "quantile",
+      "desc": "quantile | equal — how sequential class breaks are found (then rounded to nice numbers)"
+    },
+    "breaks": {
+      "type": "number[]",
+      "default": null,
+      "desc": "Explicit class breaks, e.g. [5, 10, 20, 40] (overrides bins / classify)"
+    },
+    "format": {
+      "type": "string",
+      "default": null,
+      "desc": "Value format for tiles, legend and tooltip; defaults to the value field format"
+    },
+    "agg": {
+      "type": "string",
+      "default": "sum",
+      "desc": "Combine several rows per province: sum | avg | max | min | median | first"
+    },
+    "highlight": {
+      "type": "string|string[]",
+      "default": null,
+      "desc": "Province key(s) outlined in the accent colour (adcode, name or ISO letters), e.g. the target's home province"
+    },
+    "highlightLabel": {
+      "type": "string",
+      "default": null,
+      "desc": "Legend entry explaining the highlight outline (e.g. \"Headquarters\")"
+    },
+    "tooltip": {
+      "type": "string|string[]|boolean",
+      "default": "all",
+      "desc": "'all' lists every field of the row (province name / code columns go to the title), or an array of fields, or false"
+    },
+    "legend": {
+      "type": "boolean",
+      "default": true,
+      "desc": "Colour legend with province counts per class; hover a class to focus its tiles, click it to cross-filter them"
+    },
+    "legendTitle": {
+      "type": "string",
+      "default": null,
+      "desc": "Legend title; defaults to the value field title and unit"
+    },
+    "legendPosition": {
+      "type": "string",
+      "default": "auto",
+      "desc": "auto (the empty top-left corner of the grid when it fits, else beside or below) | corner | left | right | bottom"
+    },
+    "filterField": {
+      "type": "string",
+      "default": null,
+      "desc": "Field used for click-to-filter; defaults to encode.id. 'province' (a shared dimension) filters the whole report; other fields such as adcode only this block's dataset — set crossFilterScope to override"
+    },
+    "gap": {
+      "type": "number",
+      "default": null,
+      "desc": "Gap between tiles in px (default about 6% of the cell, 2–5 px)"
+    },
+    "radius": {
+      "type": "number",
+      "default": 2,
+      "desc": "Corner radius of square tiles (px)"
+    },
+    "layout": {
+      "type": "object",
+      "default": null,
+      "desc": "Position overrides {key: [row, col]}, keys as for encode.id (e.g. {\"TW\": [5, 6]})"
+    },
+    "note": {
+      "type": "boolean|string",
+      "default": false,
+      "desc": "Small schematic disclaimer drawn in the free bottom-right corner (true: 'Schematic; no boundaries implied' / '示意图，不代表实际边界'), or your own text"
+    },
+    "uiLang": {
+      "type": "string",
+      "default": null,
+      "desc": "Language of legend / tooltip UI strings ('zh' | 'en'); defaults to the report locale or <html lang>, independent of the tile-label language"
+    }
   },
   "interactions": [
     "Hover a tile: tooltip with names, value, rank and every other field",
@@ -55,14 +165,68 @@
     "PNG / SVG export including the legend; print-safe (no animation, SVG)"
   ],
   "samples": [
-    {"title": "Revenue 2025A by province (USD m) — 广东 / 江苏 lead", "data": "china_provinces", "height": 500, "span": 7,
-     "options": {"encode": {"id": "adcode", "value": "revenue"}, "join": "adcode", "lang": "zh",
-                 "highlight": ["440000", "320000"], "highlightLabel": "Top-2 markets", "filterField": "province"}},
-    {"title": "Revenue growth vs. 7.0% group average", "data": "china_provinces", "height": 440, "span": 6,
-     "options": {"encode": {"id": "province", "value": "growth"}, "join": "name", "lang": "en", "shape": "hex",
-                 "scale": "diverging", "mid": 0.07, "bins": 6, "legendTitle": "Growth vs. 7.0% average", "tooltip": ["revenue", "stores"]}},
-    {"title": "服务网点数量（连续色阶）", "data": "china_provinces", "height": 400, "span": 6,
-     "options": {"encode": {"id": "province_zh", "value": "stores"}, "join": "name", "lang": "zh", "bins": 0,
-                 "values": false, "legendTitle": "服务网点（个）", "filterField": "province"}}
+    {
+      "title": "Revenue 2025A by province (USD m) — 广东 / 江苏 lead",
+      "data": "china_provinces",
+      "height": 500,
+      "span": 7,
+      "options": {
+        "encode": {
+          "id": "adcode",
+          "value": "revenue"
+        },
+        "join": "adcode",
+        "lang": "zh",
+        "highlight": [
+          "440000",
+          "320000"
+        ],
+        "highlightLabel": "Top-2 markets",
+        "filterField": "province"
+      }
+    },
+    {
+      "title": "Revenue growth vs. 7.0% group average",
+      "data": "china_provinces",
+      "height": 440,
+      "span": 6,
+      "options": {
+        "encode": {
+          "id": "province",
+          "value": "growth"
+        },
+        "join": "name",
+        "lang": "en",
+        "shape": "hex",
+        "scale": "diverging",
+        "mid": 0.07,
+        "bins": 6,
+        "legendTitle": "Growth vs. 7.0% average",
+        "tooltip": [
+          "revenue",
+          "stores"
+        ]
+      }
+    },
+    {
+      "title": "服务网点数量（连续色阶）",
+      "data": "china_provinces",
+      "height": 400,
+      "span": 6,
+      "options": {
+        "encode": {
+          "id": "province_zh",
+          "value": "stores"
+        },
+        "join": "name",
+        "lang": "zh",
+        "bins": 0,
+        "values": false,
+        "legendTitle": "服务网点（个）",
+        "filterField": "province",
+        "note": true,
+        "uiLang": "zh"
+      }
+    }
   ]
 }

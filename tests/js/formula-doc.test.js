@@ -67,7 +67,7 @@ function cell(s) { return String(s).replace(/\|/g, '\\|').replace(/\n/g, ' '); }
 
 function renderTable(RK, res) {
   const head = '| ' + res.columns.map(c => cell(c.title)).join(' | ') + ' |';
-  // right-align columns whose values are numbers (query columns built from expressions are typed 'number' even for text)
+  // right-align columns whose values are all numbers (decided from the values, as in a spreadsheet)
   const numeric = res.columns.map(c => res.rows.every(r => r[c.name] == null || typeof r[c.name] === 'number'));
   const sep = '|' + numeric.map(n => (n ? '---:' : '---')).join('|') + '|';
   const body = res.rows.slice(0, MAX_ROWS).map(r => '| ' + res.columns.map(c => cell(RK.format(r[c.name], c.format))).join(' | ') + ' |');

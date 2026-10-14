@@ -237,7 +237,8 @@
     var tk = state.ticks = catTicks(m, windowOf(m, state.zoom), state.plotW);
 
     var upC = t.pos, dnC = t.neg;
-    var pal = RK.theme.palette({ exclude: [upC, dnC, t.accent2], n: m.mas.length });   // MAs clear of up / down and the highlight
+    // MAs sit on dense red / green candles: keep them well clear of up / down and of the accent2 highlight
+    var pal = RK.theme.palette({ exclude: [upC, dnC, t.accent2], minDistance: 110, n: m.mas.length });
     var series = [{
       id: 'ohlc', name: 'OHLC', type: 'candlestick', xAxisIndex: 0, yAxisIndex: 0,
       barMaxWidth: 14, barMinWidth: 1,

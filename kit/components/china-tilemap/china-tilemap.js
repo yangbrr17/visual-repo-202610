@@ -10,14 +10,15 @@
  * classes with a counted legend), label = short Chinese / English name or code, optional second line
  * with the formatted value, highlighted tiles, tooltip with every field, click to cross-filter.
  *
- * Tile layout (rows / cols below). Rationale and source:
- *   Derived from the geofacet "china_prov_grid1" grid (R package geofacet / hafen/grid-designer, MIT),
- *   compacted to a 7 x 8 grid so the cartogram fills a pitchbook block without holes:
- *     - west to east by centroid longitude, north to south by centroid latitude;
- *     - row 4 is the Yangtze corridor (西藏-四川-重庆-湖北-安徽-江苏-上海), row 6 the south coast;
- *     - 黑龙江 top-right with 吉林 / 辽宁 below it, 新疆 / 西藏 on the left edge, 海南 at the bottom
- *       below 广西 / 广东, 澳门 / 香港 under 广东, 台湾 east of 福建 across an empty "strait" cell;
- *     - 31 of 34 tiles touch at least one real neighbour; the empty top-left corner (Mongolia) holds the legend.
+ * Tile layout (rows / cols below) — own layout, built from province centroids (longitude -> column,
+ * latitude -> row), cross-checked against the geofacet "china_prov_grid1" grid (hafen/grid-designer, MIT)
+ * and newsroom China tile maps, then compacted to 7 x 8 so it fills a pitchbook block without holes:
+ *   - 黑龙江 top-right with 吉林 / 辽宁 below, 新疆 / 西藏 on the left edge, 海南 at the bottom under
+ *     广西 / 广东, 澳门 / 香港 under 广东, 台湾 east of 福建 across an empty "strait" cell;
+ *   - row 4 is the Yangtze corridor (西藏-四川-重庆-湖北-安徽-江苏-上海), row 6 the south coast;
+ *   - 63 of the 70 provincial land borders survive as touching tiles (side or corner) and every province
+ *     with a land border touches at least one true neighbour; the empty top-left corner (where Mongolia
+ *     would be) holds the legend.
  *         col:  0    1    2    3    4    5    6
  *         r0                                 黑
  *         r1                  蒙   京   辽   吉
@@ -27,6 +28,8 @@
  *         r5         滇   黔   湘   赣   浙
  *         r6              桂   粤   闽        台
  *         r7              琼   澳   港
+ *   Hexagons (shape: 'hex') use the same rows with per-row offsets of [0, 1, 2, 3, 2, 1, 2, 1] half tiles
+ *   (found by exhaustive search; keeps 55 of 70 borders as shared hexagon sides).
  *   options.layout overrides positions ({"GD": [6, 3], "440000": [6, 3], ...}).
  */
 (function () {
@@ -102,10 +105,21 @@
     return BY_NAME[HAN.test(s) ? zhKey(s) : enKey(s)] || null;
   }
 
+  /** Hexagon rows: offset of each default row in half tiles (a valid hex lattice: neighbouring rows differ by one). */
+  var HEX_SHIFT = [0, 1, 2, 3, 2, 1, 2, 1];
+
+  /** UI strings (legend, tooltip) follow the report language, not the tile-label language. */
   var TXT = {
-    zh: { noData: '无数据', filtered: '不在当前筛选范围内', rank: '排名', highlighted: '重点省份' },
-    en: { noData: 'No data', filtered: 'Not in the current filter', rank: 'Rank', highlighted: 'Highlighted' }
+    zh: { noData: '无数据', filtered: '不在当前筛选范围内', rank: '排名', rows: '行', values: '个值',
+      note: '示意图，不代表实际边界' },
+    en: { noData: 'No data', filtered: 'Not in the current filter', rank: 'Rank', rows: 'rows', values: 'values',
+      note: 'Schematic; no boundaries implied' }
   };
+  function uiLang(o) {
+    if (o.uiLang === 'zh' || o.uiLang === 'en') return o.uiLang;
+    var loc = (RK.data && RK.data.manifest && RK.data.manifest.report && RK.data.manifest.report.locale) || document.documentElement.lang || 'en';
+    return /^zh/i.test(loc) ? 'zh' : 'en';
+  }
 
   /* ---------------- colour scale ---------------- */
 
@@ -279,18 +293,26 @@
    */
   function makeFrame(W, H, o, pos, lm) {
     var hex = o.shape === 'hex', pad = 2;
-    var rows = 1 + Math.max.apply(null, pos.map(function (p) { return p[0]; }));
-    var cols = 1 + Math.max.apply(null, pos.map(function (p) { return p[1]; }));
+    var r0 = Math.min.apply(null, pos.map(function (p) { return p[0]; }));
+    // column units per tile (hex rows are offset by half tiles), normalised so the leftmost tile sits at 0
+    var xu = pos.map(function (p) {
+      var r = p[0], sh = !hex ? 0 : r >= 0 && r < HEX_SHIFT.length ? HEX_SHIFT[r] : HEX_SHIFT[HEX_SHIFT.length - 2 + (r % 2)];
+      return p[1] + sh / 2;
+    });
+    var x0 = Math.min.apply(null, xu);
+    xu = xu.map(function (x) { return x - x0; });
+    var rows = 1 + Math.max.apply(null, pos.map(function (p) { return p[0] - r0; }));
+    var cols = 1 + Math.max.apply(null, xu);
     function fit(aw, ah) {
-      var s = hex ? Math.min(aw / (cols + 0.5), ah / ((rows - 1) * SQRT3 / 2 + 2 / SQRT3)) : Math.min(aw / cols, ah / rows);
+      var s = hex ? Math.min(aw / cols, ah / ((rows - 1) * SQRT3 / 2 + 2 / SQRT3)) : Math.min(aw / cols, ah / rows);
       return Math.max(10, Math.floor(s * 2) / 2);
     }
-    function size(s) { return hex ? { w: (cols + 0.5) * s, h: (rows - 1) * s * SQRT3 / 2 + 2 * s / SQRT3 } : { w: cols * s, h: rows * s }; }
+    function size(s) { return hex ? { w: cols * s, h: (rows - 1) * s * SQRT3 / 2 + 2 * s / SQRT3 } : { w: cols * s, h: rows * s }; }
     function gapOf(s) { return o.gap != null ? +o.gap : U.clamp(Math.round(s * 0.06), 2, 5); }
     function centres(s) {
-      return pos.map(function (rc) {
-        var r = rc[0], c = rc[1];
-        return hex ? [(c + (r % 2 ? 1 : 0.5)) * s, r * s * SQRT3 / 2 + s / SQRT3] : [(c + 0.5) * s, (r + 0.5) * s];
+      return pos.map(function (rc, i) {
+        var r = rc[0] - r0;
+        return hex ? [(xu[i] + 0.5) * s, r * s * SQRT3 / 2 + s / SQRT3] : [(xu[i] + 0.5) * s, (r + 0.5) * s];
       });
     }
     function cornerFits(s) {
@@ -322,8 +344,14 @@
       ox = Math.max(pad, (W - g.w) / 2); oy = Math.max(pad, (H - g.h) / 2);
       lx = ox + 2; ly = oy + 2;
     }
-    var tile = s - gapOf(s);
-    return { W: W, H: H, hex: hex, s: s, tile: tile, ox: ox, oy: oy, gw: g.w, gh: g.h, centres: centres(s), legend: place, lx: lx, ly: ly };
+    var tile = s - gapOf(s), cs = centres(s);
+    var fr = { W: W, H: H, hex: hex, s: s, tile: tile, ox: ox, oy: oy, gw: g.w, gh: g.h, centres: cs, legend: place, lx: lx, ly: ly };
+    /** Is the rectangle (grid coordinates) clear of every tile? */
+    fr.clear = function (x, y, w, h) {
+      var hw = tile / 2 + 3, hh = (hex ? tile / SQRT3 : tile / 2) + 3;
+      return cs.every(function (c) { return c[0] + hw <= x || c[0] - hw >= x + w || c[1] + hh <= y || c[1] - hh >= y + h; });
+    };
+    return fr;
   }
 
   function hexPoints(R) {
@@ -338,7 +366,7 @@
   function labelPlan(o, t, frame, valueTexts) {
     var lang = o.lang === 'en' ? 'en' : 'zh';
     var inner = frame.tile * (frame.hex ? 0.84 : 0.9) - 4;
-    var f = U.clamp(Math.round(frame.tile * 0.2 * 2) / 2, 8, 13);
+    var f = U.clamp(Math.round(frame.tile * (o.values === false ? 0.235 : 0.2) * 2) / 2, 8, o.values === false ? 14 : 13);
     var mode = o.labels === false ? 'none' : o.labels === 'abbr' || o.labels === 'code' ? 'abbr' : o.labels === 'name' ? 'name' : 'auto';
     function names(m) { return PROV.map(function (p) { return lang === 'zh' ? (m === 'abbr' ? p.abbr : p.zh) : (m === 'abbr' ? p.code : p.en); }); }
     function widest(list, size) { return Math.max.apply(null, list.map(function (s) { return C.measure(s, '600 ' + size + 'px ' + t.fontSans); })); }
@@ -388,7 +416,9 @@
       filterField: null,          // click-to-filter field; defaults to encode.id
       gap: null,                  // px between tiles (default ~6% of the cell)
       radius: 2,                  // square corner radius (px)
-      layout: null                // {key: [row, col]} position overrides
+      layout: null,               // {key: [row, col]} position overrides
+      note: false,                // true (localised "schematic, no boundaries implied" note) | string | false
+      uiLang: null                // legend / tooltip strings: zh | en (default: report locale / <html lang>)
     },
     render: C(build, {
       rebuildOnResize: true,      // label plan and legend placement follow the block size
@@ -407,7 +437,7 @@
   function build(ctx, inst) {
     var o = ctx.options, t = ctx.theme, enc = ctx.enc;
     var vf = enc.value, idf = enc.id;
-    var lang = o.lang === 'en' ? 'en' : 'zh', txt = TXT[lang];
+    var lang = o.lang === 'en' ? 'en' : 'zh', txt = TXT[uiLang(o)];
     var fmt = o.format || ctx.fmtOf(vf) || 'auto';
     var join = o.join === 'adcode' || o.join === 'name' ? o.join : 'auto';
     var aggFn = RK.expr.agg[o.agg] || RK.expr.agg.sum;
@@ -505,7 +535,8 @@
       var faint = RK.theme.contrast(fill, paper) < 1.12;
       var ring = x.sel ? t.ink : x.hl ? t.accent2 : null;
       var lw = x.sel ? 2 : 2.5;
-      var ink = !x.has ? t.ink3 : dim ? RK.theme.mix(RK.theme.textOn(x.base), fill, 0.55) : RK.theme.textOn(fill);
+      var on = RK.theme.textOn(fill);
+      var ink = !x.has ? t.ink3 : dim ? RK.theme.mix(on, fill, 0.4) : on;
       var delay = motion ? Math.round((c[0] / fr.gw) * 420 + (c[1] / fr.gh) * 180) : 0;
       var enter = { enterFrom: { style: { opacity: 0 } }, enterAnimation: { delay: delay, duration: 520 } };
       var shape, ringShape;
@@ -560,7 +591,7 @@
       if (!vs.length) return null;
       if (f.type === 'number' && vs.length > 1) return RK.format(aggFn(vs), f.format);
       var u = U.unique(vs);
-      return u.length > 3 ? u.length + ' values' : u.map(function (v) { return RK.format(v, f.format); }).join(', ');
+      return u.length > 3 ? u.length + ' ' + txt.values : u.map(function (v) { return RK.format(v, f.format); }).join(', ');
     }
     function tooltip(p) {
       if (p.seriesId !== 'tiles' || p.dataIndex == null) return '';
@@ -576,7 +607,7 @@
           if (v != null) rows.push({ label: f.title || f.name, value: v });
         });
       }
-      var foot = 'CN-' + pr.code + ' · ' + pr.adcode + (x.rows && x.rows.length > 1 ? ' · ' + x.rows.length + ' rows' : '');
+      var foot = 'CN-' + pr.code + ' · ' + pr.adcode + (x.rows && x.rows.length > 1 ? ' · ' + x.rows.length + ' ' + txt.rows : '');
       if (!x.has) foot = (x.inDomain ? txt.filtered : txt.noData) + ' · ' + foot;
       return C.tip(title, rows, foot);
     }
@@ -591,6 +622,17 @@
     };
     if (lm && F.legend !== 'none') {
       opt.graphic.elements.push(legendGraphic(ctx, lm, F.lx, F.ly, F.legend === 'bottom', legendOn));
+    }
+    var note = o.note === true ? txt.note : typeof o.note === 'string' && o.note ? o.note : null;
+    if (note) {
+      // bottom-right of the grid when that corner is free (the default layout leaves it empty), else below the grid
+      var nf = '9.5px ' + t.fontSans, nw = Math.ceil(C.measure(note, nf)), nx, ny;
+      if (F.clear(F.gw - nw, F.gh - 12, nw, 12)) { nx = F.ox + F.gw; ny = F.oy + F.gh; }
+      else if (F.oy + F.gh + 14 <= F.H && F.legend !== 'bottom') { nx = F.ox + F.gw; ny = F.oy + F.gh + 13; }
+      if (nx != null) {
+        opt.graphic.elements.push({ type: 'text', id: 'rk-tile-note', silent: true, x: Math.round(Math.min(nx, F.W - 2)), y: Math.round(ny),
+          style: { text: note, fill: t.ink3, font: nf, align: 'right', verticalAlign: 'bottom' } });
+      }
     }
     return opt;
   }

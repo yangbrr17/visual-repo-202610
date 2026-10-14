@@ -308,6 +308,7 @@
   }
 
   function compact(v, decimals) {
+    if (!isFinite(v)) return config.nm;
     var abs = Math.abs(v), d = decimals == null ? 1 : decimals, units = config.compactUnits, s = null;
     for (var i = 0; i < units.length && s === null; i++) {
       var u = units[i];
@@ -355,15 +356,17 @@
     if (cache[code]) return cache[code];
     var fn;
     if (code === 'auto') fn = function (v) { return compact(v, 1); };
-    else if (code === 'General') fn = general;
+    else if (code === 'General') fn = finite(general);
     else if (code === '@') fn = function (v) { return String(v); };
-    else if (isNumericCode(code)) fn = compileNumeric(code);
+    else if (isNumericCode(code)) fn = finite(compileNumeric(code));
     else if (looksLikeDate(code)) fn = compileDate(code);
-    else fn = general;   // unknown preset name (typo) or plain text: readable number, not a garbled date
+    else fn = finite(general);   // unknown preset name (typo) or plain text: readable number, not a garbled date
     cache[code] = fn;
     return fn;
   }
 
+  /** Compiled number formats called directly (RK.format.compile(code)(v)) show NaN / Infinity as n.m., like RK.format. */
+  function finite(fn) { return function (v) { return typeof v === 'number' && !isFinite(v) ? config.nm : fn(v); }; }
   function isPreset(name) { return typeof name === 'string' && has(presets, name); }   // not "constructor", "toString" ...
   function looksLikeDate(code) {
     var bare = code.replace(/"[^"]*"/g, '').replace(/\\./g, '').replace(/\[[^\]]*\]/g, '');
@@ -392,7 +395,12 @@
   format.compile = compile;
   format.compact = compact;
   format.round = round;
-  format.fixed = function (v, d) { var s = fixed(v, d); return v < 0 && /[1-9]/.test(s) ? config.minus + s : s; };
+  /** Excel-rounded toFixed() for components: RK.format.fixed(10.35, 1) -> "10.4" (toFixed: "10.3"); never "-0.0". */
+  format.fixed = function (v, d) {
+    if (!isFinite(v)) return String(v);
+    var s = fixed(v, d);
+    return v < 0 && /[1-9]/.test(s) ? config.minus + s : s;
+  };
   format.presets = presets;
   format.config = config;
   format.toDate = toDate;

@@ -272,7 +272,8 @@
     var tk = state.ticks = dateTicks(windowOf(m, state.zoom), state.plotW);
 
     var priceColor = t.accent;
-    var pal = RK.theme.palette({ exclude: [priceColor, t.accent2], n: m.mas.length + 1 });   // overlays clear of price + highlight
+    // MA / VWAP overlays stay clear of the price line, the accent2 highlight, the 52-week (pos / neg) and reference lines
+    var pal = RK.theme.palette({ exclude: [priceColor, t.accent2, t.pos, t.neg, t.ref], minDistance: 110, n: m.mas.length + 1 });
     var series = [];
     var sel = state.legendSel;
 
