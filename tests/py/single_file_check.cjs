@@ -30,6 +30,17 @@ const url = require('url').pathToFileURL(file).href;   // percent-encoded like t
     await page.waitForTimeout(250);
   }
   await page.waitForTimeout(1200);
+  // blocks render lazily when scrolled into view: on a loaded machine a 250 ms stop per page can be too short, so
+  // bring each block that is still idle into view itself (the user's path — no RK.runtime.renderAll shortcut)
+  for (let pass = 0; pass < 3; pass++) {
+    const idle = await page.evaluate(() => RK.blocks().filter(b => b.state === 'idle').map(b => b.id));
+    if (!idle.length) break;
+    for (const id of idle) {
+      await page.evaluate(id => { const el = document.getElementById(id); if (el) el.scrollIntoView({ block: 'center' }); }, id);
+      await page.waitForTimeout(400);
+    }
+    await page.waitForTimeout(800);
+  }
   const res = await page.evaluate(() => {
     const blocks = RK.blocks();
     const fonts = Array.from(document.fonts).filter(f => f.status === 'loaded').map(f => f.family + ' ' + f.weight);

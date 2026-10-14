@@ -194,12 +194,12 @@
    */
   function applyUpdown() {
     var root = document.documentElement;
+    function set(p, v) { root.style.setProperty(p, v); swapped.push(p); }
     swapped.forEach(function (p) { root.style.removeProperty(p); });
     swapped = [];
     var t = readTokens();
     if (theme.updown() === 'cn') {
       var pos = t.pos, neg = t.neg, div = t.div.slice().reverse();
-      function set(p, v) { root.style.setProperty(p, v); swapped.push(p); }
       set('--rk-pos', neg);
       set('--rk-neg', pos);
       // the theme's --rk-div-<i> slots, read again in order (readTokens skips empty ones)
