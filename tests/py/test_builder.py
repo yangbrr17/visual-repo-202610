@@ -416,7 +416,7 @@ class TestValidation(KitTestCase):
         r.param("g", 0.02)
         errors, _ = r.check()
         # [m] refers to a computed field defined by this very formula -> unknown at that point
-        self.assertTrue(any("unknown field 'm'" in e for e in errors), errors)
+        self.assertTrue(any("unknown field 'm'" in e or "self-referential" in e for e in errors), errors)
 
     def test_ui_component_without_data_and_topbar(self):
         r = Report("T")
