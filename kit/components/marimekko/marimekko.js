@@ -9,19 +9,8 @@
   var C = RK.chart;
   var OTHERS = /^(others?|other .+|rest of .+|all other.*)$/i;
 
-  var measurer = null;
-  function textWidth(s, font) {
-    try {
-      measurer = measurer || document.createElement('canvas').getContext('2d');
-      measurer.font = font;
-      return measurer.measureText(String(s)).width;
-    } catch (e) { return String(s).length * 6.2; }
-  }
-  function near(a, b) {
-    var x = RK.theme.parseColor(a), y = RK.theme.parseColor(b);
-    return Math.sqrt(Math.pow(x[0] - y[0], 2) + Math.pow(x[1] - y[1], 2) + Math.pow(x[2] - y[2], 2)) < 64;
-  }
-  function inkOn(fill, t) { return RK.theme.luminance(fill) > 0.3 ? (t.dark ? t.paper : t.ink) : '#ffffff'; }
+  /** Generic fields ('type', 'category' …) cross-filter only this block's dataset; business dimensions stay global. */
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
 
   /** Segments (columns) and players (stacks) with cumulative geometry in [0, 1] x [0, 1]. */
   function model(ctx) {
@@ -99,22 +88,20 @@
       axes: true               // 0–100% axes (left: share of segment, bottom: cumulative share of market)
     },
     render: function (ctx) {
-      var state = { m: null, w: 0, h: 0, ctx: ctx };
-      var base = C(function (c, inst) { state.ctx = c; state.w = inst.getWidth(); state.h = inst.getHeight(); return build(c, inst, state); }, {
-        select: function (p, c) {
-          if (p.seriesId === 'hdr') return { field: c.enc.x, value: p.name };
-          if (!/^p-/.test(p.seriesId || '')) return null;
-          if (c.options.selectBy === 'series') return p.seriesName === state.m.othersName ? null : { field: c.enc.series, value: p.seriesName };
-          return { field: c.enc.x, value: p.name };
+      var state = { m: null };
+      return C(function (c, inst) { return build(c, inst, state); }, {
+        rebuildOnResize: true,   // header placement and cell labels are computed in pixels
+        on: {
+          // click a cell -> cross-filter by its column (selectBy 'x') or player ('series'); a header -> by column
+          click: function (p, c) {
+            var bySeries = p.seriesId !== 'hdr' && c.options.selectBy === 'series';
+            if (c.options.crossFilter === false || (p.seriesId !== 'hdr' && !/^p-/.test(p.seriesId || ''))) return;
+            if (bySeries && p.seriesName === state.m.othersName) return;
+            var f = bySeries ? c.enc.series : c.enc.x;
+            c.select(f, bySeries ? p.seriesName : p.name, GENERIC.test(f) ? { scope: c.options.crossFilterScope || 'dataset' } : null);
+          }
         }
       })(ctx);
-      // header placement is computed in pixels: re-layout when the block is resized
-      var resize = base.resize;
-      base.resize = function () {
-        resize();
-        if (Math.abs(base.chart.getWidth() - state.w) > 1 || Math.abs(base.chart.getHeight() - state.h) > 1) base.update(state.ctx);
-      };
-      return base;
     }
   });
 
@@ -124,8 +111,8 @@
     var fmt = o.format || ctx.fmtOf(enc.value) || 'auto';
     var sfmt = o.shareFormat || '0%';
     var hl = o.highlight == null ? [] : [].concat(o.highlight).map(String);
-    var pal = t.cat.filter(function (c) { return !hl.length || !near(c, t.accent2); });
-    if (!pal.length) pal = t.cat;
+    // players are nominal: categorical colours; with a highlight none may read like the accent2 target
+    var pal = RK.theme.palette(hl.length ? { n: m.players.length } : { exclude: [], n: m.players.length });
     var colorOf = {};
     var k = 0;
     m.players.forEach(function (p) {
@@ -153,7 +140,7 @@
       sg.px0 = plotL + sg.x0 * plotW + (i ? gap / 2 : 0);
       sg.px1 = plotL + sg.x1 * plotW - (i < m.segs.length - 1 ? gap / 2 : 0);
       sg.totLine = RK.format(sg.total, fmt) + '  ·  ' + RK.format(sg.share, sfmt);
-      sg.tw = Math.max(textWidth(sg.name, nameFont), textWidth(sg.totLine, numFont)) + 4;
+      sg.tw = Math.max(C.measure(sg.name, nameFont), C.measure(sg.totLine, numFont)) + 4;
     });
     m.segs.forEach(function (sg, i) {
       var prev = m.segs[i - 1], next = m.segs[i + 1];
@@ -170,7 +157,7 @@
       var name = cell.player;
       var font = '600 11px ' + t.fontSans;
       var lines = null;
-      var nw = textWidth(name, font);
+      var nw = C.measure(name, font);
       // two lines (player + share) only when the name fits, or can be truncated to something readable
       if (o.labels !== 'share' && hpx >= 36 && (nw <= w - 10 || w - 10 >= 64)) {
         if (nw > w - 10) {
@@ -180,7 +167,7 @@
         lines = '{n|' + name + '}\n{v|' + share + '}';
       } else if (w >= 28 && hpx >= 17) lines = '{v|' + share + '}';
       if (!lines) return null;
-      var ink = inkOn(fill, t);
+      var ink = RK.theme.textOn(fill);
       return {
         style: {
           text: lines, fill: ink,
@@ -264,7 +251,7 @@
       });
     }
 
-    var axisLabel = { formatter: function (v) { return RK.format(v, '0%'); }, color: t.ink3, fontSize: 10.5, fontFamily: t.fontNum };
+    var axisLabel = { formatter: function (v) { return RK.format(v, '0%'); }, color: t.ink3, fontSize: 11, fontFamily: t.fontNum };
     return {
       legend: C.legend(ctx, {
         show: showLegend, selectedMode: false,

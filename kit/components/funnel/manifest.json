@@ -26,7 +26,8 @@
     "labels": {"type": "boolean", "default": true, "desc": "Value labels on the bars (inside when they fit)"},
     "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field's format"},
     "secondaryFormat": {"type": "string", "default": null, "desc": "Secondary column format; defaults to its field's format"},
-    "crossFilter": {"type": "boolean", "default": true, "desc": "Click a stage to cross-filter other blocks"}
+    "crossFilter": {"type": "boolean", "default": true, "desc": "Click a stage to cross-filter other blocks"},
+    "crossFilterScope": {"type": "string", "default": "dataset", "desc": "dataset: the stage selection only filters blocks bound to the same dataset ('stage' is a generic field) | global"}
   },
   "interactions": ["Hover a stage: value, secondary value, conversion vs. previous and vs. first stage", "Click a stage to cross-filter (others dim)", "Animated bar / connector transitions when filters change", "PNG / CSV export"],
   "samples": [

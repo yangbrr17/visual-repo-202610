@@ -502,6 +502,12 @@
     if (!ctx.dataset) return ctx.rows;
     try { return RK.data.view(ctx.dataset, { filters: false, where: ctx.options.where || null }); } catch (e) { return ctx.rows; }
   }
+  /** Plural noun for the marks, from the label field title: "Site" -> "sites"; "points" without one. */
+  function noun(ctx, field) {
+    if (!field || !ctx.field(field)) return 'points';
+    var w = String(ctx.title(field)).toLowerCase();
+    return /[^aeiou]y$/.test(w) ? w.slice(0, -1) + 'ies' : /(s|x|ch|sh)$/.test(w) ? w + 'es' : w + 's';
+  }
   /** Is a row inside every active self-selection on the given fields? (false -> draw dimmed) */
   function isOn(ctx, row, fields) {
     return fields.every(function (f) { if (!f) return true; var s = ctx.selected(f); return !s.length || s.indexOf(row[f]) >= 0; });
@@ -573,6 +579,7 @@
   geo.fieldTitle = fieldTitle;
   geo.domainRows = domainRows;
   geo.isOn = isOn;
+  geo.noun = noun;
   geo.scopeOf = scopeOf;
   geo.select = select;
   geo.snapshot = snapshot;

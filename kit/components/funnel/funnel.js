@@ -8,23 +8,8 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
-  /** Canvas text width (margins and wraps are sized from measured labels). */
-  var measure = (function () {
-    var c2d = null;
-    return function (text, font) {
-      c2d = c2d || document.createElement('canvas').getContext('2d');
-      c2d.font = font;
-      // +7%: the canvas may measure with a fallback face before the webfont has loaded
-      return c2d.measureText(String(text)).width * 1.07;
-    };
-  })();
-
-  /** Text colour with the higher WCAG contrast against a fill (RK.theme.onColor uses a fixed threshold). */
-  function bestText(fill, dark, light) {
-    var lf = RK.theme.luminance(fill);
-    function ratio(c) { var l = RK.theme.luminance(c); return (Math.max(l, lf) + 0.05) / (Math.min(l, lf) + 0.05); }
-    return ratio(dark) >= ratio(light) ? dark : light;
-  }
+  /** Label width via the shared canvas measure; +7% because the canvas may still measure a fallback face. */
+  function measure(text, font) { return C.measure(text, font) * 1.07; }
 
   RK.component({
     id: 'funnel',
@@ -41,7 +26,8 @@
       labels: true,             // value labels on the bars
       format: null,             // value format (defaults to the value field's format)
       secondaryFormat: null,    // secondary column format (defaults to its field's format)
-      crossFilter: true
+      crossFilter: true,
+      crossFilterScope: 'dataset'   // 'stage' is a generic field: the selection filters this dataset only
     },
     render: C(function (ctx) {
       var o = ctx.options, t = ctx.theme, enc = ctx.enc;
@@ -58,9 +44,6 @@
       var hi = o.highlight == null ? [] : [].concat(o.highlight);
       var n = stages.length;
 
-      // readable text on a bar fill in light and dark themes (t.ink is light in dark themes)
-      function textOn(fill) { return bestText(fill, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#fff'); }
-
       function conv(i) {
         if (i <= 0) return null;
         var base = o.conversion === 'first' ? first : vals[i - 1];
@@ -68,15 +51,16 @@
       }
 
       // colours: ordinal ramp down the funnel (dark -> light), highlight in accent2
-      var ord = t.ord && t.ord.length ? t.ord : [t.accent, t.accent3, t.cat[2]];
-      var ramp = RK.theme.ramp(ord.slice(0, Math.min(ord.length, 4)));
+      var ramp = RK.theme.ramp(t.ord.slice(0, 4));
       var colors = stages.map(function (s, i) {
         var c = hi.indexOf(s) >= 0 ? t.accent2 : (o.colorBy === 'single' ? t.accent : ramp(n > 1 ? i / (n - 1) : 0));
         return C.dim(ctx, enc.stage, s, c);
       });
+      // label colour against what is actually painted (a dimmed bar is its colour at 25% over the paper)
+      function inkOn(c) { var x = RK.theme.parseColor(c); return RK.theme.textOn(x[3] < 1 ? RK.theme.mix(RK.theme.toHex(x), t.paper, 1 - x[3]) : c); }
 
       // geometry: stage labels left, columns right, header row on top
-      var labFont = '600 11.5px ' + t.fontSans, numFont = '11.5px ' + t.fontNum, headFont = '600 10px ' + t.fontSans;
+      var labFont = '600 11px ' + t.fontSans, numFont = '11px ' + t.fontNum, headFont = '600 10px ' + t.fontSans;
       var labW = Math.min(220, Math.max.apply(null, stages.map(function (s) { return measure(s, labFont); }).concat([40])));
       var cols = [];
       if (o.columns !== false) {
@@ -115,7 +99,7 @@
             x: inside ? mid : b + 6, y: cy,
             style: {
               text: txt, align: inside ? 'center' : 'left', verticalAlign: 'middle', font: '600 ' + numFont,
-              fill: inside ? textOn(colors[i]) : t.ink
+              fill: inside ? inkOn(colors[i]) : t.ink2
             },
             enterFrom: { style: { opacity: 0 } }, transition: ['x', 'y']
           });
@@ -147,7 +131,7 @@
         // stage name (left) and right-hand columns
         kids.push({
           type: 'text', id: 'stage', silent: true, x: 2, y: cy,
-          style: { text: stages[i], align: 'left', verticalAlign: 'middle', font: labFont, fill: hi.indexOf(stages[i]) >= 0 ? t.ink : t.ink, width: labW, overflow: 'truncate' },
+          style: { text: stages[i], align: 'left', verticalAlign: 'middle', font: labFont, fill: hi.indexOf(stages[i]) >= 0 ? t.ink : t.ink2, width: labW, overflow: 'truncate' },
           transition: ['y']
         });
         var xr = api.getWidth() - 2;

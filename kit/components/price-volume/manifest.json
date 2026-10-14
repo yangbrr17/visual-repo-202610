@@ -23,7 +23,7 @@
     "vwap": {"type": "boolean|number", "default": false, "desc": "Rolling VWAP line: true (20-day) or a number of days"},
     "range52w": {"type": "string|boolean", "default": "lines", "desc": "'lines' | 'band' | false — 52-week high / low"},
     "lastPrice": {"type": "boolean", "default": true, "desc": "Current price tag on the right axis with a dotted guide"},
-    "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] horizontal price lines (offer, unaffected price)"},
+    "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] horizontal price lines (offer, unaffected price), dashed in the theme's reference colour"},
     "eventsData": {"type": "string", "default": null, "desc": "Dataset id of events (date, label, kind, detail) drawn as numbered pins"},
     "eventsEncode": {"type": "object", "default": {"date": "date", "label": "label", "kind": "kind", "detail": "detail"}, "desc": "Field mapping of the events dataset"},
     "range": {"type": "string|number", "default": "all", "desc": "Initial window: 'all' | '1m' | '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | number of days"},
@@ -31,10 +31,10 @@
     "volumeShare": {"type": "number", "default": 0.24, "desc": "Share of the plot height used by the volume panel (0.1–0.5)"},
     "format": {"type": "string", "default": null, "desc": "Price format (defaults to the close field format)"},
     "volumeFormat": {"type": "string", "default": null, "desc": "Volume format in the tooltip (defaults to the volume field format)"},
-    "zoom": {"type": "boolean", "default": true, "desc": "Wheel / pinch and slider zoom shared by both panels; value axes re-fit to the window"},
+    "zoom": {"type": "boolean", "default": true, "desc": "Slider, drag, Ctrl/Cmd + wheel or pinch zoom shared by both panels (options.wheelZoom: true for the plain wheel); value axes re-fit to the window"},
     "legend": {"type": "boolean", "default": true, "desc": "Legend top-left"}
   },
-  "interactions": ["Crosshair tooltip: date, close, 1-day and period change, volume, MAs", "Hover near a pin to read the event", "Wheel / pinch / slider zoom shared by price and volume", "1M / 3M / 6M / YTD / 1Y / All range buttons", "Legend toggles MAs / VWAP / volume", "PNG / CSV export"],
+  "interactions": ["Crosshair tooltip: date, close, 1-day and period change, volume, MAs", "Hover near a pin to read the event", "Slider, drag, Ctrl/Cmd + wheel or pinch zoom shared by price and volume (plain wheel scrolls the page)", "1M / 3M / 6M / YTD / 1Y / All range buttons", "Legend toggles MAs / VWAP / volume", "PNG / CSV export"],
   "samples": [
     {"title": "Helios Industrial share price and volume (USD)", "data": "price_ohlc", "height": 420,
      "options": {"eventsData": "price_events", "refLines": [{"value": 52.0, "label": "Indicative offer $52.00"}]}},

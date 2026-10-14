@@ -9,26 +9,18 @@
   var C = RK.chart, util = RK.util;
 
   /* ---------- helpers ---------- */
-  var measure = null;
-  function textWidth(s, font) {
-    if (!measure) measure = document.createElement('canvas').getContext('2d');
-    measure.font = font;
-    return measure.measureText(String(s)).width;
-  }
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
-  /**
-   * Categorical palette for peers: drops colours too close to accent-2 (reserved for the target)
-   * and near-duplicates of a colour already kept, so adjacent series stay distinguishable.
-   */
-  function paletteFor(t) {
-    function dist(x, y) {
-      var a = RK.theme.parseColor(x), b = RK.theme.parseColor(y);
-      return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
-    }
-    var base = t.cat.filter(function (c) { return dist(c, t.accent2) > 64; });
-    var pal = [];
-    base.forEach(function (c) { if (pal.every(function (k) { return dist(c, k) > 48; })) pal.push(c); });
-    return pal.length >= 3 ? pal : (base.length ? base : t.cat);
+  /** Generic column names (deal 'target', link 'source', long-format 'metric' ...) never key other datasets. */
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|category|group|label|name|series)$/i;
+
+  /** Axis tick format: the value format with no more decimals than the tick step needs (10x not 10.0x). */
+  function tickFmt(fmt, step) {
+    var code = RK.format.presets[fmt] || fmt;
+    if (typeof code !== 'string' || !step || !/[0#]/.test(code) || RK.format.isDateCode(code)) return fmt;
+    var sec = code.split(';')[0].replace(/"[^"]*"/g, ''), scale = Math.pow(1000, ((sec.match(/[0#](,+)[^0#]*$/) || [])[1] || '').length);
+    var v = Math.abs(step) * (/%/.test(sec) ? 100 : 1) / scale, dec = 0;
+    while (dec < 4 && Math.abs(Math.round(v * Math.pow(10, dec)) - v * Math.pow(10, dec)) > 1e-6) dec++;
+    return code.replace(/([0#])\.([0#]+)/g, function (m, a, d) { var n = Math.min(dec, d.length); return a + (n ? '.' + d.slice(0, n) : ''); });
   }
 
   /** Summary stats of a numeric array (sorted copy, quartiles by linear interpolation). */
@@ -90,6 +82,7 @@
       sortGroups: null,           // null (data order) | 'desc' | 'asc' (by median) | 'alpha'
       format: null,               // value format; defaults to the value field format
       zoom: false,                // dataZoom along the value axis
+      wheelZoom: null,            // zoom: null = Ctrl/Cmd + wheel or pinch (plain wheel scrolls the report) | true = plain wheel
       legend: true                // legend (only shown when colorBy is a field)
     },
     render: C(function (ctx) {
@@ -123,16 +116,16 @@
       var hl = o.highlight == null ? [] : [].concat(o.highlight);
       var isHL = function (r) { return (enc.target && r[enc.target] === true) || hl.some(function (h) { return same(h, r[lf]); }); };
 
-      // colours (accent-2 is reserved for the target, so it is skipped in categorical palettes)
-      var pal = paletteFor(t);
+      // colours: categorical palettes skip accent-2 (reserved for the target)
       var peerColor = t.accent3 || t.cat[1];
       var colorField = o.colorBy && o.colorBy !== 'single' && o.colorBy !== 'group' && ctx.dataset && ctx.dataset.has(o.colorBy) ? o.colorBy : null;
       // colour order from the unfiltered rows so colours stay put while cross-filters change
       var cats = colorField ? util.unique(ctx.allRows.map(function (r) { return r[colorField]; })) : [];
       var groupOrder = util.unique(ctx.allRows.map(groupOf));
+      var pal = RK.theme.palette({ n: Math.max(cats.length, groupOrder.length) });
       var colorOf = function (r) {
-        if (colorField) return pal[cats.indexOf(r[colorField]) % pal.length];
-        if (o.colorBy === 'group') return pal[groupOrder.indexOf(groupOf(r)) % pal.length];
+        if (colorField) return pal[cats.indexOf(r[colorField])];
+        if (o.colorBy === 'group') return pal[groupOrder.indexOf(groupOf(r))];
         return peerColor;
       };
 
@@ -219,7 +212,7 @@
         cand.forEach(function (c) {
           var p = L.pos[c.i], strong = c.pri === 0;
           var font = (strong ? '600 ' : '') + '11px ' + t.fontSans;
-          var w = textWidth(c.r[lf], font) + 2, h = 13, gap = p.r + 3;
+          var w = C.measure(c.r[lf], font) + 2, h = 13, gap = p.r + 3;
           var opts = horiz
             ? [['top', 0, -gap, 'center', 'bottom'], ['bottom', 0, gap, 'center', 'top'], ['right', gap + 1, 0, 'left', 'middle'], ['left', -gap - 1, 0, 'right', 'middle']]
             : [['right', gap + 1, 0, 'left', 'middle'], ['left', -gap - 1, 0, 'right', 'middle'], ['top', 0, -gap, 'center', 'bottom'], ['bottom', 0, gap, 'center', 'top']];
@@ -300,7 +293,7 @@
 
       // one points series per colour category (so the legend can toggle them); layout is shared
       var present = colorField ? cats.filter(function (c) { return rows.some(function (r) { return r[colorField] === c; }); }) : [];
-      var buckets = colorField ? present.map(function (c) { return { name: String(c), color: pal[cats.indexOf(c) % pal.length], test: function (r) { return r[colorField] === c; } }; })
+      var buckets = colorField ? present.map(function (c) { return { name: String(c), color: pal[cats.indexOf(c)], test: function (r) { return r[colorField] === c; } }; })
         : [{ name: ctx.title(vf), test: function () { return true; } }];
       var pointSeries = buckets.map(function (b, bi) {
         var idx = [];
@@ -352,7 +345,8 @@
       var lines = [];
       if (axMin < 0 && axMax > 0) lines.push({ v: 0, label: '', color: t.axis, type: 'solid', width: 1 });
       if (o.overall && overall) lines.push({ v: overall.median, label: 'Overall median ' + RK.format(overall.median, fmt), color: t.ink3, type: 'dashed', width: 1 });
-      (o.refLines || []).forEach(function (r) { lines.push({ v: r.value, label: r.label || RK.format(r.value, fmt), color: r.color || t.accent2, type: r.type || 'dashed', width: 1.5 }); });
+      // user reference lines (offer premium, ...): dashed --rk-ref, label in the line colour
+      (o.refLines || []).forEach(function (r) { lines.push({ v: r.value, label: r.label || RK.format(r.value, fmt), color: r.color || t.ref, type: r.type || 'dashed', width: 1.5 }); });
       var hasLineLabels = lines.some(function (l) { return l.label; });
       if (lines.length) {
         bandSeries.markLine = {
@@ -391,7 +385,7 @@
         type: 'value', min: axMin, max: axMax, interval: step,
         axisLine: { show: !horiz, lineStyle: { color: t.axis } },
         splitLine: { show: true, lineStyle: { color: t.grid } },
-        axisLabel: { formatter: C.axisFmt(fmt), hideOverlap: true }
+        axisLabel: { formatter: C.axisFmt(tickFmt(fmt, step)), hideOverlap: true }
       };
 
       var showLegend = !!colorField && o.legend !== false;
@@ -400,7 +394,7 @@
       if (medianSeries) series.push(medianSeries);
 
       return {
-        legend: C.legend(ctx, { show: showLegend, data: buckets.map(function (b) { return b.name; }), icon: 'circle', itemWidth: 9, itemHeight: 9 }),
+        legend: C.legend(ctx, { show: showLegend, data: buckets.map(function (b) { return b.name; }) }),
         grid: { left: 4, right: horiz ? 18 : 8, top: top, bottom: o.zoom ? 34 : 6, containLabel: true },
         tooltip: {
           trigger: 'item', confine: true,
@@ -440,8 +434,10 @@
       };
     }, {
       select: function (p, ctx) {
-        if (p.seriesId === 'band') return ctx.enc.group ? { field: ctx.enc.group, value: String(p.name) } : null;
-        if (/^pts-/.test(p.seriesId)) return { field: ctx.enc.label, value: String(p.name).split('\u0001')[0] };
+        var f = p.seriesId === 'band' ? ctx.enc.group : /^pts-/.test(p.seriesId) ? ctx.enc.label : null;
+        if (!f || ctx.options.crossFilter === false) return null;
+        // generic columns (e.g. a deal's 'target') are scoped to this dataset; names / sectors filter globally
+        ctx.select(f, String(p.name).split('\u0001')[0], { scope: ctx.options.crossFilterScope || (GENERIC.test(f) ? 'dataset' : 'global') });
         return null;
       }
     })

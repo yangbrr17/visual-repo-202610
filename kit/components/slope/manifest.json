@@ -22,7 +22,7 @@
   "options": {
     "periods": {"type": "array", "default": null, "desc": "Long data: [fromPeriod, toPeriod]; default = first and last distinct period"},
     "headers": {"type": "array", "default": null, "desc": "[left, right] column headers; default = period values, or field titles minus their common words"},
-    "colorBy": {"type": "string", "default": "direction", "desc": "direction (increase / decrease) | neutral (grey; target in accent) | category"},
+    "colorBy": {"type": "string", "default": "direction", "desc": "direction (increase / decrease) | neutral (grey; target in accent2) | category"},
     "good": {"type": "string", "default": "up", "desc": "Direction mode: which way is favourable — 'up' or 'down' (e.g. ranks)"},
     "highlight": {"type": "string|string[]", "default": null, "desc": "Label value(s) to emphasise in addition to encode.highlight rows"},
     "median": {"type": "boolean", "default": false, "desc": "Dashed median line across both periods"},

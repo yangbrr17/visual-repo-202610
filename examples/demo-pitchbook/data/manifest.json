@@ -11,16 +11,6 @@
     "theme": "navy"
   },
   "datasets": {
-    "kpis": {
-      "path": "datasets/kpis.json",
-      "title": "Key performance indicators",
-      "rows": 6
-    },
-    "peers": {
-      "path": "datasets/peers.json",
-      "title": "Trading comparables",
-      "rows": 18
-    },
     "price_ohlc": {
       "path": "datasets/price_ohlc.json",
       "title": "Helios Industrial (HLX) daily share price",
@@ -76,11 +66,6 @@
       "title": "LBO sensitivity: sponsor IRR",
       "rows": 25
     },
-    "precedents": {
-      "path": "datasets/precedents.json",
-      "title": "Selected precedent transactions",
-      "rows": 21
-    },
     "revenue_by_country": {
       "path": "datasets/revenue_by_country.json",
       "title": "Revenue by country (FY25A)",
@@ -90,11 +75,6 @@
       "path": "datasets/assets_locations.json",
       "title": "Global footprint",
       "rows": 47
-    },
-    "deal_flows": {
-      "path": "datasets/deal_flows.json",
-      "title": "Cross-border industrials M&A flows (2021–2026 YTD)",
-      "rows": 26
     },
     "ownership": {
       "path": "datasets/ownership.json",
@@ -125,6 +105,26 @@
       "path": "datasets/league_table.json",
       "title": "Global industrials M&A league table (LTM Sep-2026)",
       "rows": 12
+    },
+    "kpis": {
+      "path": "datasets/kpis.json",
+      "title": "Key performance indicators",
+      "rows": 6
+    },
+    "peers": {
+      "path": "datasets/peers.json",
+      "title": "Trading comparables",
+      "rows": 18
+    },
+    "precedents": {
+      "path": "datasets/precedents.json",
+      "title": "Selected precedent transactions",
+      "rows": 21
+    },
+    "deal_flows": {
+      "path": "datasets/deal_flows.json",
+      "title": "Cross-border industrials M&A flows (2021–2026 YTD)",
+      "rows": 26
     },
     "dcf_live": {
       "path": "datasets/dcf_live.json",

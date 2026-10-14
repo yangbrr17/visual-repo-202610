@@ -25,7 +25,7 @@
     "format": {"type": "string", "default": null, "desc": "Fallback axis format for fields without one"},
     "legend": {"type": "boolean", "default": true, "desc": "Legend (colour groups, target, peer median); click to toggle"}
   },
-  "interactions": ["Drag on any axis to brush a range (several axes = AND)", "Brushed companies cross-filter every other block on the same dataset", "Click an axis outside the brush to clear it; external filter reset clears brushes", "Hover a line: all metrics formatted", "Legend toggle by colour group", "PNG / CSV export"],
+  "interactions": ["Drag on any axis to brush a range (several axes = AND)", "Brushed companies cross-filter every other block with the label field (crossFilterScope: 'dataset' keeps it to this dataset); a brush that catches no company shows an empty selection", "Click an axis outside the brush to clear it; external filter reset clears brushes", "Hover a line: all metrics formatted", "Legend toggle by colour group", "PNG / CSV export"],
   "samples": [
     {"title": "Peer screening — valuation, profitability, growth, leverage", "data": "peers", "height": 380,
      "options": {"encode": {"label": "company", "color": "sector"}, "dims": ["ev_ebitda_25e", "pe_25e", "ebitda_margin_25e", "rev_growth_25e", {"field": "net_debt_ebitda", "inverse": true}, "tsr_1y"]}},

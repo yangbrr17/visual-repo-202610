@@ -15,7 +15,8 @@
     "lon": {"type": "number", "required": true, "desc": "Longitude", "default": "lon"},
     "size": {"type": "number", "required": true, "desc": "Value driving bubble area (sqrt radius scale)", "default": "value"},
     "color": {"type": "string|number", "required": false, "desc": "Category (categorical colours + clickable legend) or numeric field (ramp)"},
-    "label": {"type": "string", "required": false, "desc": "Name for labels / tooltips; also the default click-to-filter field", "default": "name"}
+    "label": {"type": "string", "required": false, "desc": "Name for labels / tooltips; also the default click-to-filter field", "default": "name"},
+    "target": {"type": "boolean", "required": false, "desc": "Rows where this field is true are highlighted in accent-2 and always labelled (like options.highlight)", "default": "is_target"}
   },
   "options": {
     "basemap": {"type": "string", "default": "world-110m", "desc": "Registered basemap name"},
@@ -25,15 +26,15 @@
     "opacity": {"type": "number", "default": 0.78, "desc": "Bubble fill opacity"},
     "labels": {"type": "number", "default": 5, "desc": "Label the top N bubbles by size (0 = none); crowded labels hide automatically"},
     "labelValue": {"type": "boolean", "default": true, "desc": "Append the size value to labels"},
-    "highlight": {"type": "string|string[]", "default": null, "desc": "Label value(s) drawn in accent-2 and always labelled (e.g. the target company)"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Label value(s) drawn in accent-2 and always labelled (e.g. the target company); rows flagged by the target channel are too. Peer colours never resemble accent-2"},
     "format": {"type": "string", "default": null, "desc": "Size value format; defaults to the size field format"},
     "tooltip": {"type": "string[]", "default": [], "desc": "Extra fields listed in the tooltip"},
     "fit": {"type": "string|array|object", "default": "data", "desc": "Initial view: 'data' | 'world' | [[south, west], [north, east]] | {center: [lat, lon], zoom}"},
     "legend": {"type": "boolean", "default": true, "desc": "Show the legend (colour + size)"},
     "sizeLegend": {"type": "boolean", "default": true, "desc": "Nested reference circles for the size scale"},
     "legendPosition": {"type": "string", "default": "bottomleft", "desc": "Leaflet control corner"},
-    "filterField": {"type": "string", "default": null, "desc": "Field used for click-to-filter; defaults to encode.label"},
-    "scrollZoom": {"type": "boolean|string", "default": "click", "desc": "Mouse-wheel zoom: true | false | 'click' (armed after clicking the map)"}
+    "filterField": {"type": "string", "default": null, "desc": "Field used for click-to-filter; defaults to encode.label. Shared business dimensions (country, company, sector, region, segment, year…) filter the whole report; other fields (site name, type, from / to…) only this block's dataset — set crossFilterScope to override"},
+    "scrollZoom": {"type": "boolean|string", "default": "click", "desc": "Plain mouse-wheel zoom: 'click' (armed after clicking the map, so page scrolling is never hijacked) | true | false. Ctrl/Cmd + wheel or a trackpad pinch always zooms; +/- buttons and drag too"}
   },
   "interactions": ["Hover tooltip", "Click a bubble to cross-filter (others dim)", "Click a legend category to filter by it", "Zoom / pan; labels re-place on zoom", "Grow-in animation, smooth radius transitions on filter", "PNG export"],
   "samples": [

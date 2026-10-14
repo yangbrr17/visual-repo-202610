@@ -22,7 +22,7 @@
     "ma": {"type": "number[]", "default": [20, 50], "desc": "Simple moving averages of the close in trading days; [] for none"},
     "volume": {"type": "boolean", "default": true, "desc": "Volume panel with bars coloured by the day's direction"},
     "lastPrice": {"type": "boolean", "default": true, "desc": "Last close tag on the right axis, coloured by the day's move"},
-    "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] horizontal price lines"},
+    "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] horizontal price lines (offer, unaffected price), dashed in the theme's reference colour"},
     "eventsData": {"type": "string", "default": null, "desc": "Dataset id of events (date, label, kind, detail) drawn as numbered pins above the candles"},
     "eventsEncode": {"type": "object", "default": {"date": "date", "label": "label", "kind": "kind", "detail": "detail"}, "desc": "Field mapping of the events dataset"},
     "range": {"type": "string|number", "default": "6m", "desc": "Initial window: '1m' | '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'all' | number of days"},
@@ -30,10 +30,10 @@
     "volumeShare": {"type": "number", "default": 0.22, "desc": "Share of the plot height used by the volume panel (0.1–0.5)"},
     "format": {"type": "string", "default": null, "desc": "Price format (defaults to the close field format)"},
     "volumeFormat": {"type": "string", "default": null, "desc": "Volume format in the tooltip (defaults to the volume field format)"},
-    "zoom": {"type": "boolean", "default": true, "desc": "Wheel / pinch and slider zoom shared by both panels; the price axis re-fits to the visible candles"},
+    "zoom": {"type": "boolean", "default": true, "desc": "Slider, drag, Ctrl/Cmd + wheel or pinch zoom shared by both panels (options.wheelZoom: true for the plain wheel); the price axis re-fits to the visible candles"},
     "legend": {"type": "boolean", "default": true, "desc": "Legend top-left (moving averages and volume)"}
   },
-  "interactions": ["Crosshair tooltip: OHLC, change vs. prior close, volume, MAs", "Hover near a pin to read the event", "Wheel / pinch / slider zoom shared by candles and volume", "1M / 3M / 6M / YTD / 1Y / All range buttons", "Legend toggles MAs / volume", "PNG / CSV export"],
+  "interactions": ["Crosshair tooltip: OHLC, change vs. prior close, volume, MAs", "Hover near a pin to read the event", "Slider, drag, Ctrl/Cmd + wheel or pinch zoom shared by candles and volume (plain wheel scrolls the page)", "1M / 3M / 6M / YTD / 1Y / All range buttons", "Legend toggles MAs / volume", "PNG / CSV export"],
   "samples": [
     {"title": "Helios Industrial daily OHLC — last 6 months (USD)", "data": "price_ohlc", "height": 420,
      "options": {"eventsData": "price_events"}},

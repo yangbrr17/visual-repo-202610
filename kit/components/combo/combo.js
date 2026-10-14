@@ -7,6 +7,8 @@
 (function () {
   'use strict';
   var C = RK.chart, U = RK.util;
+  // house rule: generic fields cross-filter only this block's dataset; business dimensions filter globally
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|series|category|group|label|name|key|id|status|variable)$/i;
   // legend glyph for line series: a rule with a dot; the two empty sub-paths keep the 14x14 box square
   var LINE_ICON = 'path://M7,0L7,0Z M7,14L7,14Z M0,6.4L14,6.4L14,7.6L0,7.6Z M9.4,6L9.4,8L8,9.4L6,9.4L4.6,8L4.6,6L6,4.6L8,4.6Z';
 
@@ -38,9 +40,10 @@
       var bfmt = o.format || ctx.fmtOf(bars.length ? bars[0].field : null) || 'auto';
       var lfmt = o.lineFormat || ctx.fmtOf(lines.length ? lines[0].field : null) || '0.0%';
       var band = o.layout !== 'overlay';
-      var barColor = function (i) { return bars.length === 1 ? t.accent : RK.theme.color(i); };
-      var lineColors = [t.accent2, t.ink3, t.cat[2], t.cat[6] || t.ink2];
-      var lineColor = function (i) { return lineColors[i % lineColors.length]; };
+      // primary line in accent2; bars and further lines from the palette, kept clear of it
+      var pal = RK.theme.palette({ n: bars.length + lines.length });
+      var barColor = function (i) { return bars.length === 1 ? t.accent : pal[i]; };
+      var lineColor = function (i) { return i === 0 ? t.accent2 : i === 1 ? t.ink3 : pal[bars.length + i - 2]; };
 
       // per-category bar tops (stack totals or tallest bar) — used for scales, labels and CAGR legs
       var pos = [], neg = [], tops = [];
@@ -73,9 +76,8 @@
 
       /* ---------------- value axes ---------------- */
       var hasLegend = o.legend !== false && bars.length + lines.length > 1;
-      var printing = ctx.print || !!(RK.runtime && RK.runtime.printing);   // see multiple-history: no slider in print
       var gridTop = hasLegend ? 40 : (fi >= 0 && o.forecastLabel ? 24 : 12);
-      var plotH = Math.max(120, inst.getHeight() - gridTop - (o.zoom && !printing ? 56 : 26));
+      var plotH = Math.max(120, inst.getHeight() - gridTop - (o.zoom && !ctx.print ? 56 : 26));
       var lineLo = 0.72, lineHi = 0.92;
       var yLeft, yRight = null, lAxisFmt = o.lineAxisFormat || lfmt;
       var lmin = hasLine ? Math.min.apply(null, lineVals) : 0, lmax = hasLine ? Math.max.apply(null, lineVals) : 0;
@@ -92,11 +94,13 @@
           for (var bv = bmin; bv <= Math.ceil(hi / bstep) * bstep + 1e-9 && bv <= bmax; bv += bstep) bticks.push(+bv.toPrecision(12));
           yLeft = {
             type: 'value', min: bmin, max: bmax,
-            axisLabel: { customValues: bticks, formatter: axisFmt(bfmt, bstep) },
+            axisLabel: { customValues: bticks, formatter: tickFmt(bfmt, bstep) },
             axisTick: { show: false, customValues: bticks }
           };
         } else {
-          yLeft = { type: 'value', min: lo < 0 ? null : 0, axisLabel: { formatter: axisFmt(bfmt) } };
+          var astep = U.niceStep(hi - lo || 1, 5);
+          var amin = Math.floor(lo / astep) * astep, amax = Math.ceil(hi / astep) * astep;
+          yLeft = { type: 'value', min: amin, max: amax > amin ? amax : amin + astep, interval: astep, axisLabel: { formatter: tickFmt(bfmt, astep) } };
         }
         if (hasLine) {
           // the line gets its own band [lineLo, lineHi] of the plot; right-axis labels only inside it
@@ -110,7 +114,7 @@
           }
           yRight = {
             type: 'value', position: 'right', min: A, max: B, splitLine: { show: false },
-            axisLabel: { customValues: lticks, formatter: axisFmt(lAxisFmt, o.lineAxisFormat ? null : lstep) },
+            axisLabel: { customValues: lticks, formatter: tickFmt(lAxisFmt, o.lineAxisFormat ? null : lstep) },
             axisTick: { show: false, customValues: lticks }
           };
         }
@@ -121,11 +125,11 @@
         var omin = lo < 0 ? Math.floor(lo / ostep) * ostep : 0;
         var omax = Math.ceil(top / ostep) * ostep;
         var k = Math.max(1, Math.round((omax - omin) / ostep));
-        yLeft = { type: 'value', min: omin, max: omax, interval: ostep, axisLabel: { formatter: axisFmt(bfmt, ostep) } };
+        yLeft = { type: 'value', min: omin, max: omax, interval: ostep, axisLabel: { formatter: tickFmt(bfmt, ostep) } };
         if (hasLine) {
           var al = alignScale(lmin, lmax, k);
           yRight = { type: 'value', position: 'right', min: al.min, max: al.max, interval: al.step, splitLine: { show: false },
-            axisLabel: { formatter: axisFmt(lAxisFmt, o.lineAxisFormat ? null : al.step) } };
+            axisLabel: { formatter: tickFmt(lAxisFmt, o.lineAxisFormat ? null : al.step) } };
         }
       }
       yLeft.splitLine = { show: true };
@@ -148,7 +152,7 @@
           barGap: '14%', barCategoryGap: groups > 1 ? '30%' : '36%',
           z: 2,
           label: showBarLabels ? C.label(ctx, bfmt, o.barStack ? {
-            position: 'inside', fontSize: 10, color: textOn(base, t),
+            position: 'inside', fontSize: 10.5, color: RK.theme.textOn(base),
             formatter: function (p) { return U.isNum(p.value) && Math.abs(p.value) >= (hi - lo) * 0.07 ? RK.format(p.value, bfmt) : ''; }
           } : { position: 'top', distance: 4, fontSize: 10.5, color: t.ink2 }) : { show: false },
           data: b.values.map(function (v, i) {
@@ -159,7 +163,7 @@
               st.decal.color = RK.theme.alpha(base, 0.12);
             }
             if (o.barStack && isEst(i)) st.color = C.dim(ctx, enc.x, cats[i], RK.theme.mix(base, t.paper, 0.45));
-            return { value: v, itemStyle: st, label: o.barStack && isEst(i) ? { color: textOn(RK.theme.mix(base, t.paper, 0.45), t) } : undefined };
+            return { value: v, itemStyle: st, label: o.barStack && isEst(i) ? { color: RK.theme.textOn(RK.theme.mix(base, t.paper, 0.45)) } : undefined };
           })
         });
       });
@@ -276,7 +280,7 @@
           show: hasLegend,
           data: bars.map(function (b) { return b.name; }).concat(lines.map(function (l) { return { name: l.name, icon: LINE_ICON, itemStyle: { color: lineColor(lines.indexOf(l)), borderWidth: 0 } }; }))
         }),
-        grid: C.grid(ctx, { top: gridTop, right: hasLine ? 6 : 12, bottom: o.zoom && !printing ? 30 : 4 }),
+        grid: C.grid(ctx, { top: gridTop, right: hasLine ? 6 : 12, bottom: o.zoom && !ctx.print ? 30 : 4 }),
         tooltip: {
           trigger: 'axis',
           axisPointer: { type: 'shadow' },
@@ -298,12 +302,17 @@
         },
         xAxis: { type: 'category', data: cats, axisLabel: { interval: 0, hideOverlap: true } },
         yAxis: yAxes,
-        dataZoom: o.zoom ? C.zoom({ options: o, print: printing }, 'x') : [],
+        dataZoom: o.zoom ? C.zoom(ctx, 'x') : [],
         series: series
       };
     }, {
       rebuildOnResize: true,     // label density and the band split depend on the plot size
-      select: function (p, ctx) { return /^b-\d+$/.test(p.seriesId) ? { field: ctx.enc.x, value: p.name } : null; }
+      select: function (p, ctx) {
+        if (!/^b-\d+$/.test(p.seriesId) || ctx.options.crossFilter === false) return null;
+        var f = ctx.enc.x;
+        ctx.select(f, p.name, GENERIC.test(f) && !ctx.options.crossFilterScope ? { scope: 'dataset' } : null);
+        return null;
+      }
     })
   });
 
@@ -409,24 +418,19 @@
   function shortX(x) { return String(x).replace(/^(?:FY)?(\d{2})(\d{2})/, '’$2'); }
 
   /**
-   * Axis label formatter from a format code. When the tick step is whole at display precision
-   * the decimals are dropped ("20.0%" -> "20%") so axes read like a hand-built pitchbook chart.
+   * Axis tick formatter (house style: no decimals when the tick step is whole at display precision,
+   * "$6,000" not "$6,000.0", "20%" not "20.0%"). step: number, function returning the live step,
+   * or an array of tick values; null decides per value.
    */
-  function axisFmt(code, step) {
-    code = RK.format.presets[code] || code || 'auto';
-    var trimmed = String(code).replace(/([0#])\.[0#]+/g, '$1');
-    if (trimmed === code) return function (v) { return RK.format(v, code); };
-    function num(s) { return parseFloat(String(s).replace(/[^\d.\-]/g, '')); }
-    if (step != null) {
-      var whole = num(RK.format(step, code)) === num(RK.format(step, trimmed));
-      return function (v) { return RK.format(v, whole ? trimmed : code); };
-    }
+  function tickFmt(code, step) {
+    code = String(RK.format.presets[code] || code || 'auto');
+    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
+    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
+    function whole(v) { return num(v, code) === num(v, trimmed); }
     return function (v) {
-      var a = RK.format(v, code), b = RK.format(v, trimmed);
-      return num(a) === num(b) ? b : a;
+      var s = typeof step === 'function' ? step() : step;
+      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
+      return RK.format(v, ok ? trimmed : code);
     };
   }
-
-  /** Readable text on a fill in any theme (dark themes have a light ink, so "dark text" is the paper colour). */
-  function textOn(fill, t) { return RK.theme.onColor(fill, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#fff'); }
 })();

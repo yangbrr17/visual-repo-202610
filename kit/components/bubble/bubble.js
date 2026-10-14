@@ -389,7 +389,7 @@
         var r = diam(v) / 2, ty = base - 2 * r;
         kids.push({ type: 'circle', shape: { cx: dMax / 2, cy: base - r, r: r }, style: { fill: 'none', stroke: t.ink3, lineWidth: 0.8 } });
         kids.push({ type: 'line', shape: { x1: dMax / 2, y1: ty, x2: dMax + 6, y2: ty }, style: { stroke: t.ink3, lineWidth: 0.6, lineDash: [2, 2] } });
-        kids.push({ type: 'text', x: dMax + 8, y: ty, style: { text: axisFmt(sFmt, true)(v), fill: t.ink2, font: '10px ' + t.fontNum, verticalAlign: 'middle' } });
+        kids.push({ type: 'text', x: dMax + 8, y: ty, style: { text: keyFmt(v), fill: t.ink2, font: keyFont, verticalAlign: 'middle' } });
       });
       graphic.push({ type: 'group', id: 'rk-size', right: 2, top: top0, silent: true, children: kids });
     }
@@ -399,7 +399,7 @@
     var visualMap;
     if (continuous) {
       var cTitle = o.colorTitle || ctx.title(colorF);
-      var tw = textW(cTitle, 10.5) + 10;
+      var tw = C.measure(cTitle, '600 10.5px ' + t.fontSans) + 10;
       graphic.push({ type: 'text', id: 'rk-ctitle', left: 0, top: 16, silent: true, style: { text: cTitle, fill: t.ink2, font: '600 10.5px ' + t.fontSans } });
       visualMap = {
         type: 'continuous', dimension: 3, seriesIndex: bubbleIdx, min: cDom[0], max: cDom[1],
@@ -418,13 +418,13 @@
     inst.__rk = { ctx: ctx, points: points, selField: selField };
     inst.__rkLabels = timeline ? { frames: frameLabels } : frameLabels[0];
     if (!timeline) inst.__rkTimeline = null;
-    inst.__rkCanBrush = !!selField && o.brush !== false && !timeline;
+    inst.__rkCanBrush = !!selField && o.brush !== false && o.crossFilter !== false && !timeline;
 
     var axisBase = function (isX, ext, fmt, scale, title) {
       var a = {
         type: scale === 'log' ? 'log' : 'value', min: ext.min, max: ext.max, name: title, nameLocation: 'middle',
         axisLabel: {
-          formatter: axisFmt(fmt, scale === 'log'),
+          formatter: ticks(fmt, function () { return axisStep(inst, isX ? 'xAxis' : 'yAxis', ext.step); }, scale === 'log'),
           hideOverlap: true, showMinLabel: !zoomed, showMaxLabel: !zoomed
         },
         splitLine: { show: true, lineStyle: { color: t.grid } },
@@ -434,7 +434,8 @@
       else a.splitNumber = Math.round((ext.max - ext.min) / ext.step);
       return a;
     };
-    var yLabW = Math.max(textW(RK.format(ye.min, yFmt)), textW(RK.format(ye.max, yFmt)));
+    var yLab = ticks(yFmt, ye.step, o.yScale === 'log'), labFont = '11px ' + t.fontNum;
+    var yLabW = Math.max(C.measure(yLab(ye.min), labFont), C.measure(yLab(ye.max), labFont));
     var xAxis = util.merge(axisBase(true, xe, xFmt, o.xScale, o.xTitle || ctx.title(enc.x)), { nameGap: 26 });
     var yAxis = util.merge(axisBase(false, ye, yFmt, o.yScale, o.yTitle || ctx.title(enc.y)), { nameGap: Math.round(yLabW + 14) });
 
@@ -456,7 +457,7 @@
     };
     var gridTop = (continuous ? 42 : showLegend || interactive ? 30 : 10) + (hasXRef ? 14 : 0);
     var common = {
-      legend: C.legend(ctx, { show: showLegend, data: legendNames, right: (interactive ? 92 : 0) + gutter, icon: 'circle', itemWidth: 9, itemHeight: 9 }),
+      legend: C.legend(ctx, { show: showLegend, data: legendNames, right: (interactive ? 92 : 0) + gutter }),
       // containLabel:false -> ECharts 6 keeps axis labels + names inside outerBounds (above the timeline)
       grid: C.grid(ctx, { top: gridTop, right: gutter ? gutter + 14 : 8, left: 2, bottom: tlShown ? 50 : 2, containLabel: false,
         outerBounds: { left: 0, right: 0, top: 0, bottom: tlShown ? 48 : 0 } }),
@@ -465,10 +466,9 @@
       yAxis: yAxis,
       visualMap: visualMap ? [visualMap] : [],
       toolbox: { show: false },
-      dataZoom: interactive ? [
-        util.merge({ type: 'inside', xAxisIndex: 0, filterMode: 'none', zoomOnMouseWheel: 'ctrl', moveOnMouseMove: true, moveOnMouseWheel: false }, zs[0]),
-        util.merge({ type: 'inside', yAxisIndex: 0, filterMode: 'none', zoomOnMouseWheel: 'ctrl', moveOnMouseMove: true, moveOnMouseWheel: false }, zs[1])
-      ] : [],
+      // inside zoom on both axes: Ctrl/Cmd + wheel or pinch (plain wheel scrolls the report unless options.wheelZoom);
+      // the window is carried over explicitly because timeline updates rebuild the option with notMerge
+      dataZoom: interactive ? [util.merge(C.zoom(ctx, 'x')[0], zs[0]), util.merge(C.zoom(ctx, 'y')[0], zs[1])] : [],
       brush: interactive ? {
         toolbox: [], xAxisIndex: 0, yAxisIndex: 0, brushMode: 'single', transformable: false, removeOnClick: true, throttleType: 'debounce', throttleDelay: 120,
         brushStyle: { borderWidth: 1, color: RK.theme.alpha(t.accent3 || t.accent, 0.08), borderColor: RK.theme.alpha(t.accent3 || t.accent, 0.7) },
@@ -510,18 +510,19 @@
   }
 
   var base = C(build, {
-    select: function (p, ctx) {
-      if (!p.data || !p.data.row || p.componentType !== 'series') return null;
-      var enc = ctx.enc, ds = ctx.dataset;
-      var f = enc.label && ds.has(enc.label) ? enc.label : (enc.name && ds.has(enc.name) ? enc.name : null);
-      return f ? { field: f, value: p.data.row[f] } : null;
+    on: {
+      // click a bubble -> toggle it in the cross-filter on the label (or name) field
+      click: function (p, ctx, inst) {
+        var f = inst.__rk && inst.__rk.selField;
+        if (p.componentType !== 'series' || !p.data || !p.data.row || !f || ctx.options.crossFilter === false) return;
+        ctx.select(f, p.data.row[f], scoped(ctx, f));
+      }
     },
     init: function (inst) {
       inst.on('brushEnd', function (params) { onBrushEnd(params, inst); });
       inst.on('brush', function (params) {
-        if (inst.__rkMode === 'select' && params.areas && !params.areas.length && inst.__rk && inst.__rk.selField) {
-          RK.store.clearFilter(inst.__rk.ctx.id + ':' + inst.__rk.selField);
-        }
+        var st = inst.__rk;
+        if (inst.__rkMode === 'select' && params.areas && !params.areas.length && st && st.selField) st.ctx.setSelection(st.selField, []);
       });
       inst.on('timelineplaychanged', function (e) {
         // pressing play on the last period replays from the first one
@@ -567,6 +568,7 @@
       tooltipFields: [],
       brush: true,             // box-select tool -> cross-filter on the label field (not in timeline mode)
       zoom: true,              // box zoom, ctrl + wheel zoom, drag to pan and the hover toolbar
+      wheelZoom: null,         // true: a plain mouse wheel zooms (default: Ctrl/Cmd + wheel or pinch, so the page scrolls)
       legend: true
     },
     render: function (ctx) {

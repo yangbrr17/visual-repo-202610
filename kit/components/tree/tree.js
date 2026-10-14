@@ -1,7 +1,7 @@
 /*!
  * RK component: tree — legal-entity / group structure chart from an (id, parent) table: entity
  * boxes (name, country) coloured by entity type, orthogonal connectors with the direct ownership %
- * on each drop, click a box to collapse / expand its subsidiaries, wheel zoom + pan.
+ * on each drop, click a box to collapse / expand its subsidiaries, Ctrl/Cmd + wheel (or pinch) zoom + pan.
  * Layouts: top-down (TB), left-to-right (LR) or radial.
  *
  * Drawn as an ECharts graph with layout 'none': positions come from a tidy-tree layout computed
@@ -12,16 +12,8 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
-  /** Canvas text width (margins and wraps are sized from measured labels). */
-  var measure = (function () {
-    var c2d = null;
-    return function (text, font) {
-      c2d = c2d || document.createElement('canvas').getContext('2d');
-      c2d.font = font;
-      // +7%: the canvas may measure with a fallback face before the webfont has loaded
-      return c2d.measureText(String(text)).width * 1.07;
-    };
-  })();
+  /** Label width via the shared canvas measure; +7% because the canvas may still measure a fallback face. */
+  function measure(text, font) { return C.measure(text, font) * 1.07; }
 
   function tokenColor(t, v) {
     if (!v) return null;
@@ -31,37 +23,6 @@
     return v;
   }
   function safe(s) { return String(s == null ? '' : s).replace(/[{}|]/g, ' '); }
-
-  function hsl(c) {
-    var x = RK.theme.parseColor(c), r = x[0] / 255, g = x[1] / 255, b = x[2] / 255;
-    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn, h = 0, s = 0;
-    if (d) {
-      s = d / (1 - Math.abs(2 * l - 1));
-      h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
-      h = (h * 60 + 360) % 360;
-    }
-    return [h, s, l, x];
-  }
-  function rgbDist(a, b) { return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2)); }
-  /** Theme categorical colours, skipping the highlight's hue family and near-duplicates. */
-  function distinctPalette(cat, reserved) {
-    var res = reserved ? hsl(reserved) : null, picked = [];
-    cat.forEach(function (c) {
-      var x = hsl(c);
-      if (res && (rgbDist(x[3], res[3]) < 50 || (Math.min(Math.abs(x[0] - res[0]), 360 - Math.abs(x[0] - res[0])) < 22 && x[1] > 0.25 && res[1] > 0.25))) return;
-      if (picked.some(function (p) { return rgbDist(hsl(p)[3], x[3]) < 60; })) return;
-      picked.push(c);
-    });
-    // near-duplicates come back at the end (most distinct first), the reserved hue family only if needed
-    var rest = cat.filter(function (c) {
-      if (picked.indexOf(c) >= 0) return false;
-      var x = hsl(c);
-      return !(res && picked.length >= 3 && (rgbDist(x[3], res[3]) < 50 || (Math.min(Math.abs(x[0] - res[0]), 360 - Math.abs(x[0] - res[0])) < 22 && x[1] > 0.25 && res[1] > 0.25)));
-    });
-    function gapTo(c) { var x = hsl(c)[3]; return Math.min.apply(null, picked.map(function (p) { return rgbDist(hsl(p)[3], x); }).concat([999])); }
-    rest.sort(function (a, b) { return gapTo(b) - gapTo(a); });
-    return picked.concat(rest);
-  }
 
   /** Greedy word wrap into at most maxLines lines (last line ellipsised). */
   function wrap(text, font, maxW, maxLines) {
@@ -82,13 +43,6 @@
       lines[last] = s.replace(/[\s,.;-]+$/, '') + '…';
     }
     return lines;
-  }
-
-  /** Text colour with the higher WCAG contrast against a fill (RK.theme.onColor uses a fixed threshold). */
-  function bestText(fill, dark, light) {
-    var lf = RK.theme.luminance(fill);
-    function ratio(c) { var l = RK.theme.luminance(c); return (Math.max(l, lf) + 0.05) / (Math.min(l, lf) + 0.05); }
-    return ratio(dark) >= ratio(light) ? dark : light;
   }
 
   /** (id, parent) rows -> nodes with children, depth and effective ownership; cycles are cut. */
@@ -171,6 +125,42 @@
     })(roots);
   }
 
+  /**
+   * Wheel rule (same as RK.chart.zoom): a plain wheel scrolls the report, Ctrl/Cmd + wheel or a
+   * trackpad pinch zooms the chart. A plain wheel over the chart flashes a hint so zoom stays
+   * discoverable; options.wheelZoom === true restores plain-wheel zoom.
+   */
+  function guardWheel(ctx, api) {
+    var el = ctx.el, hint = null, timer = null;
+    function onWheel(e) {
+      var o = ctx.options;
+      if (e.ctrlKey || e.metaKey || o.wheelZoom === true || o.roam === false || ctx.print) return;
+      e.stopPropagation();          // never reaches the ECharts roam controller: the page scrolls
+      if (!hint) {
+        hint = RK.util.h('div.rk-noprint', { 'aria-hidden': 'true', style: {
+          position: 'absolute', right: '8px', bottom: '8px', padding: '3px 8px', 'pointer-events': 'none', 'z-index': '3',
+          font: '11px ' + ctx.theme.fontSans, color: 'var(--rk-ink-2)', background: 'var(--rk-tooltip-bg)',
+          border: '1px solid var(--rk-rule)', 'border-radius': '4px', opacity: '0', transition: 'opacity 160ms'
+        } }, (/Mac|iP/.test(navigator.platform) ? '\u2318' : 'Ctrl') + ' + scroll to zoom \u00b7 drag to pan');
+        el.appendChild(hint);
+      }
+      hint.style.opacity = '1';
+      clearTimeout(timer);
+      timer = setTimeout(function () { hint.style.opacity = '0'; }, 1400);
+    }
+    el.addEventListener('wheel', onWheel, true);
+    el.addEventListener('mousewheel', onWheel, true);
+    var destroy = api.destroy;
+    api.destroy = function () {
+      el.removeEventListener('wheel', onWheel, true);
+      el.removeEventListener('mousewheel', onWheel, true);
+      clearTimeout(timer);
+      if (hint) hint.remove();
+      destroy();
+    };
+    return api;
+  }
+
   RK.component({
     id: 'tree',
     deps: ['echarts'],
@@ -187,6 +177,7 @@
       rootFilled: true,         // ultimate parent(s) drawn as a solid box
       boxWidth: null,           // px; null = fit to the container (96–176)
       roam: true,
+      wheelZoom: null,          // true: plain wheel zooms (default: Ctrl/Cmd + wheel or pinch; plain wheel scrolls the page)
       legend: true,
       format: null              // ownership format; defaults to the pct field format
     },
@@ -208,7 +199,7 @@
       // collapse / expand re-applies the latest ctx (filters may have changed since mount)
       var up = api.update;
       api.update = function (c) { current = c; up(c); };
-      return api;
+      return guardWheel(ctx, api);
     }
   });
 
@@ -227,8 +218,8 @@
 
     // categories -> colours (legend is a key only: hiding a type would orphan connectors)
     var cats = util.unique(model.list.map(function (n) { return n.cat || 'Entity'; }));
-    var pal = distinctPalette(t.cat, hi.length ? t.accent2 : null), catColor = {};
-    cats.forEach(function (c, i) { catColor[c] = tokenColor(t, (o.categoryColors || {})[c]) || pal[i % pal.length]; });
+    var pal = RK.theme.palette({ n: cats.length }), catColor = {};   // categorical, kept clear of accent2 (the highlight)
+    cats.forEach(function (c, i) { catColor[c] = tokenColor(t, (o.categoryColors || {})[c]) || pal[i]; });
 
     var visible = [];
     (function walk(list) { list.forEach(function (n) { visible.push(n); walk(kids(n)); }); })(model.roots);
@@ -262,8 +253,7 @@
     function boxStyle(n) {
       var c = catColor[n.cat || 'Entity'], filled = o.rootFilled && n.depth === 0;
       var fill = filled ? c : RK.theme.mix(c, t.paper, 0.9);
-      // t.ink is light in dark themes: pick the text colour against the actual fill
-      var on = filled ? bestText(fill, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#fff') : t.ink;
+      var on = filled ? RK.theme.textOn(fill) : t.ink;   // readable on the fill in light and dark themes
       return {
         fill: fill,
         text: on,

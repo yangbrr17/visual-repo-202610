@@ -90,6 +90,8 @@
       todayLabel: 'Today',
       highlight: null,        // label value(s) to emphasise (accent-2 label, larger marker)
       selectBy: 'kind',       // click-to-filter channel: kind | label | null
+      crossFilter: true,
+      crossFilterScope: 'dataset',  // 'kind' / 'label' are generic fields: filter this dataset only
       legend: true
     },
     render: function (ctx) {
@@ -138,12 +140,11 @@
         // kinds: stable order from all rows so colours do not shift when filtering
         var kinds = RK.util.unique(c.allRows.map(function (r) { return enc.kind && r[enc.kind] != null ? String(r[enc.kind]) : null; }).filter(function (k) { return k != null; }));
         var kc = o.kindColors || {}, ks = o.kindShapes || {};
-        // automatic colours skip any colour already claimed by a kindColors override (e.g. accent2 == cat-2 in some themes)
-        var taken = Object.keys(kc).map(function (k) { return String(tokenColor(t, kc[k]) || '').toLowerCase(); });
-        var pal = t.cat.filter(function (col) { return taken.indexOf(col.toLowerCase()) < 0; });
-        if (!pal.length) pal = t.cat;
+        // automatic colours stay clear of accent2 (highlight) and of colours claimed by kindColors overrides
+        var free = kinds.filter(function (k) { return !tokenColor(t, kc[k]); });
+        var pal = RK.theme.palette({ n: free.length, exclude: [t.accent2].concat(Object.keys(kc).map(function (k) { return tokenColor(t, kc[k]); })) });
         var auto = {};
-        kinds.filter(function (k) { return !tokenColor(t, kc[k]); }).forEach(function (k, i) { auto[k] = pal[i % pal.length]; });
+        free.forEach(function (k, i) { auto[k] = pal[i]; });
         var colorOf = function (k) { return k == null ? t.accent : (tokenColor(t, kc[k]) || auto[k] || t.neutral); };
         var shapeOf = function (k) { return o.marker === 'dot' ? 'circle' : (ks[k] || SHAPES[Math.max(0, kinds.indexOf(k)) % SHAPES.length]); };
         var selField = o.selectBy ? enc[o.selectBy] : null;
@@ -217,7 +218,7 @@
           it.marker.classList.toggle('is-hl', ev.hl);
           it.leader.classList.toggle('is-dim', ev.dim);
           it.marker.innerHTML = o.marker === 'number'
-            ? '<span class="rk-tl__num" style="background:' + ev.color + ';color:' + RK.theme.onColor(ev.color, t.ink, '#fff') + '">' + ev.n + '</span>'
+            ? '<span class="rk-tl__num" style="background:' + ev.color + ';color:' + RK.theme.textOn(ev.color) + '">' + ev.n + '</span>'
             : shapeSVG(ev.shape, o.marker === 'dot' ? 4.5 : (ev.hl ? 6.5 : 5.5), ev.color, t.paper);
           it.r = o.marker === 'number' ? 9 : (ev.hl ? 7.5 : 6.5);
         });
@@ -358,7 +359,7 @@
             gridLayer.appendChild(h('div.rk-tl__tick', { style: { left: x0 + 'px', top: (axisY - 4.5) + 'px' } }));
             gridLayer.appendChild(h('div.rk-tl__rtick', { class: p.major ? 'is-major' : null, style: { left: x0 + 'px', top: plotBottom + 'px' } }));
           }
-          var cx = (cx0 + cx1) / 2, tw = p.text.length * 6.2;
+          var cx = (cx0 + cx1) / 2, tw = RK.chart.measure(p.text, '10.5px ' + c.theme.fontNum);
           if (tw + 8 > cx1 - cx0) return;
           if (todayX != null && Math.abs(todayX - cx) < tw / 2 + 34) return;
           gridLayer.appendChild(h('div.rk-tl__period', { style: { left: cx + 'px', top: (plotBottom + 3) + 'px' } }, p.text));

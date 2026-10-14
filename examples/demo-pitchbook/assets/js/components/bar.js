@@ -4,7 +4,9 @@
  */
 (function () {
   'use strict';
-  var C = RK.chart;
+  var C = RK.chart, U = RK.util;
+  // house rule: generic fields cross-filter only this block's dataset; business dimensions filter globally
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|series|category|group|label|name|key|id|status|variable)$/i;
 
   RK.component({
     id: 'bar',
@@ -16,7 +18,7 @@
       labels: 'auto',              // true | false | 'auto' (on when few bars)
       sort: null,                  // null | 'asc' | 'desc' (by total)
       highlight: null,             // x value(s) to emphasise, e.g. the target company
-      refLines: [],                // [{value, label}]
+      refLines: [],                // [{value, label, color}] reference lines (default colour: theme ref)
       avgLine: false,              // dashed average line (single-series only)
       colorBy: 'series',           // series | category
       palette: 'auto',             // auto (ordinal ramp for stacks, categorical otherwise) | cat | ord
@@ -54,9 +56,11 @@
       var single = data.series.length === 1;
       var showLabels = o.labels === 'auto' ? (cats.length * data.series.length <= 24 && (!o.stack || data.series.length <= 4)) : !!o.labels;
 
+      // stacks are parts of a whole -> ordinal ramp; otherwise categorical colours kept clear of the accent2 highlight
       var useOrd = o.palette === 'ord' || (o.palette === 'auto' && o.stack && data.series.length <= t.ord.length);
+      var pal = RK.theme.palette({ n: Math.max(data.series.length, o.colorBy === 'category' ? cats.length : 0) });
       var series = data.series.map(function (se, si) {
-        var base = useOrd ? t.ord[si] : RK.theme.color(si);
+        var base = useOrd ? t.ord[si % t.ord.length] : pal[si];
         return {
           id: 's-' + si,
           name: se.name,
@@ -65,6 +69,7 @@
           barGap: '18%',
           barCategoryGap: single ? '38%' : '28%',
           emphasis: { focus: 'series' },
+          itemStyle: { color: base },          // series colour also drives the legend icon
           label: showLabels ? C.label(ctx, fmt, {
             position: o.stack ? 'inside' : (horiz ? 'right' : 'top'),
             color: o.stack ? RK.theme.textOn(base) : t.ink2,
@@ -75,7 +80,7 @@
             }
           }) : { show: false },
           data: se.values.map(function (v, i) {
-            var c = o.colorBy === 'category' ? RK.theme.color(i) : base;
+            var c = o.colorBy === 'category' ? pal[i] : base;
             if (highlights.length && single) c = highlights.indexOf(cats[i]) >= 0 ? t.accent2 : c;
             c = C.dim(ctx, enc.x, cats[i], c);
             return { value: v, itemStyle: { color: c } };
@@ -96,11 +101,12 @@
       }
 
       var catAxis = { type: 'category', data: cats, axisLabel: { interval: 0, hideOverlap: true, width: horiz ? 140 : 90, overflow: 'truncate' }, inverse: horiz };
-      var valAxis = { type: 'value', axisLabel: { formatter: C.axisFmt(fmt) }, max: o.stack === 'percent' ? 1 : null };
+      var scale = valueScale(o, data, cats);
+      var valAxis = { type: 'value', min: scale.min, max: scale.max, interval: scale.step, axisLabel: { formatter: tickFmt(fmt, scale.step) } };
 
       return {
         legend: C.legend(ctx, { show: o.legend !== false && data.series.length > 1, data: data.series.map(function (s) { return s.name; }) }),
-        grid: C.grid(ctx, { top: o.legend !== false && data.series.length > 1 ? 32 : 14, bottom: o.zoom ? 30 : 4 }),
+        grid: C.grid(ctx, { top: o.legend !== false && data.series.length > 1 ? 32 : 14, bottom: o.zoom && !ctx.print ? 30 : 4 }),
         tooltip: {
           trigger: 'axis',
           axisPointer: { type: 'shadow' },
@@ -123,24 +129,67 @@
         series: series
       };
     }, {
-      select: function (p, ctx) { return p.seriesId === 's-total' ? null : { field: ctx.enc.x, value: p.name }; }
+      select: function (p, ctx) {
+        if (p.seriesId === 's-total' || ctx.options.crossFilter === false) return null;
+        var f = ctx.enc.x;
+        ctx.select(f, p.name, GENERIC.test(f) && !ctx.options.crossFilterScope ? { scope: 'dataset' } : null);
+        return null;
+      }
     })
   });
 
+  /** Nice value-axis scale over the bars (stack sums when stacked), reference lines and zero. */
+  function valueScale(o, data, cats) {
+    var vals = [0];
+    if (o.stack) {
+      cats.forEach(function (_, i) {
+        var p = 0, q = 0;
+        data.series.forEach(function (se) { var v = se.values[i]; if (U.isNum(v)) { if (v > 0) p += v; else q += v; } });
+        vals.push(p, q);
+      });
+    } else data.series.forEach(function (se) { se.values.forEach(function (v) { if (U.isNum(v)) vals.push(v); }); });
+    (o.refLines || []).forEach(function (r) { if (U.isNum(r.value)) vals.push(r.value); });
+    var ext = U.extent(vals);
+    var step = U.niceStep(ext[1] - ext[0] || Math.abs(ext[1]) || 1, 5);
+    var min = Math.floor(ext[0] / step + 1e-9) * step, max = Math.ceil(ext[1] / step - 1e-9) * step;
+    if (o.stack === 'percent') max = Math.min(max, 1);
+    return { min: min, max: max > min ? max : min + step, step: step };
+  }
+
   function markLines(ctx, o, se, horiz) {
+    var t = ctx.theme;
     var lines = (o.refLines || []).map(function (r) {
-      var d = { name: r.label || '', label: { formatter: r.label || '{c}' }, lineStyle: { color: r.color || ctx.theme.accent2 } };
+      var col = r.color || t.ref;
+      var d = { name: r.label || '', label: { formatter: r.label || '{c}', color: col }, lineStyle: { color: col, type: 'dashed', width: 1.25 } };
       d[horiz ? 'xAxis' : 'yAxis'] = r.value;
       return d;
     });
     if (o.avgLine) {
       var vals = se.values.filter(function (v) { return v != null; });
       var avg = vals.reduce(function (s, v) { return s + v; }, 0) / (vals.length || 1);
-      var d = { name: 'Average', label: { formatter: 'Avg ' + RK.format(avg, o.format || ctx.fmtOf(Array.isArray(ctx.enc.y) ? ctx.enc.y[0] : ctx.enc.y) || 'auto') } };
+      var d = { name: 'Average', lineStyle: { color: t.ink3, type: 'dashed', width: 1 },
+        label: { formatter: 'Avg ' + RK.format(avg, o.format || ctx.fmtOf(Array.isArray(ctx.enc.y) ? ctx.enc.y[0] : ctx.enc.y) || 'auto') } };
       d[horiz ? 'xAxis' : 'yAxis'] = avg;
       lines.push(d);
     }
     if (!lines.length) return undefined;
     return { silent: true, symbol: ['none', 'none'], label: { position: horiz ? 'start' : 'insideEndTop', fontSize: 10.5 }, data: lines };
+  }
+
+  /**
+   * Axis tick formatter (house style: no decimals when the tick step is whole at display precision,
+   * "$6,000" not "$6,000.0", "20%" not "20.0%"). step: number, function returning the live step,
+   * or an array of tick values; null decides per value.
+   */
+  function tickFmt(code, step) {
+    code = String(RK.format.presets[code] || code || 'auto');
+    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
+    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
+    function whole(v) { return num(v, code) === num(v, trimmed); }
+    return function (v) {
+      var s = typeof step === 'function' ? step() : step;
+      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
+      return RK.format(v, ok ? trimmed : code);
+    };
   }
 })();

@@ -9,25 +9,7 @@
   var C = RK.chart, util = RK.util;
 
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
-  /**
-   * Categorical palette for peers: drops colours too close to accent-2 (reserved for the target)
-   * and near-duplicates of a colour already kept, so adjacent series stay distinguishable.
-   */
-  function paletteFor(t) {
-    function dist(x, y) {
-      var a = RK.theme.parseColor(x), b = RK.theme.parseColor(y);
-      return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
-    }
-    var base = t.cat.filter(function (c) { return dist(c, t.accent2) > 64; });
-    var pal = [];
-    base.forEach(function (c) { if (pal.every(function (k) { return dist(c, k) > 48; })) pal.push(c); });
-    return pal.length >= 3 ? pal : (base.length ? base : t.cat);
-  }
-  var DASH_ICON = 'path://M0,4h5v2H0z M7.5,4h5v2h-5z M15,4h5v2h-5z';   // dashed legend swatch for the median
-  function median(vals) {
-    var a = vals.filter(util.isNum).sort(function (x, y) { return x - y; });
-    return a.length ? RK.expr.quantile(a, 0.5) : null;
-  }
+  var DASH_ICON = 'path://M0,0h3v1.6H0z M3.5,0h3v1.6h-3z M7,0h3v1.6H7z';   // dashed legend swatch for the median
 
   RK.component({
     id: 'radar',
@@ -45,16 +27,13 @@
       format: null,           // value format (long data); wide data uses each field's format
       legend: true
     },
-    render: function (ctx) {
-      // the radar centre / radius depend on the block size, so a resize re-runs the layout
-      var cur = ctx, handle = chart(ctx), upd = handle.update, rsz = handle.resize;
-      handle.update = function (c) { cur = c; upd(c); };
-      handle.resize = function () { rsz(); upd(cur); };
-      return handle;
-    }
+    render: C(build, {
+      rebuildOnResize: true,  // the radar centre / radius and the legend column depend on the block size
+      select: function (p, ctx) { return p.name && p.name !== 'Peer median' ? { field: ctx.enc.series, value: p.name } : null; }
+    })
   });
 
-  var chart = C(function (ctx) {
+  function build(ctx) {
     var o = ctx.options, t = ctx.theme, enc = ctx.enc, rows = ctx.rows;
     var wide = Array.isArray(enc.axis);
     var sf = enc.series;
@@ -91,7 +70,7 @@
     var targets = names.filter(isHL), peers = names.filter(function (n) { return !isHL(n); });
 
     // peer median per axis (target excluded)
-    var med = axes.map(function (_, j) { return median(peers.map(function (n) { return matrix[n][j]; })); });
+    var med = axes.map(function (_, j) { return RK.expr.agg.median(peers.map(function (n) { return matrix[n][j]; }).filter(util.isNum)); });
 
     /* ---------- axis scale ---------- */
     var indicator = axes.map(function (a, j) {
@@ -109,13 +88,13 @@
     });
 
     /* ---------- colours ---------- */
-    var pal = paletteFor(t);
     var order = util.unique(ctx.allRows.map(function (r) { return r[sf]; })).filter(function (n) { return !isHL(n); });   // stable colours
+    var pal = RK.theme.palette({ n: order.length });   // peer outlines never resemble the accent-2 target
     var sel = ctx.selected(sf);
     var colorOf = function (n) {
       if (isHL(n)) return t.accent2;
       if (o.peers === 'muted') return RK.theme.mix(t.ink3, t.paper, 0.25);
-      return pal[Math.max(0, order.indexOf(n)) % pal.length];
+      return pal[Math.max(0, order.indexOf(n))];
     };
     var dimmed = function (n) { return sel.length && sel.indexOf(n) < 0; };
 
@@ -135,13 +114,13 @@
         lineStyle: { color: dim ? RK.theme.alpha(c, 0.18) : c, width: 1.4, opacity: 1 },
         itemStyle: { color: dim ? RK.theme.alpha(c, 0.18) : c },
         areaStyle: { opacity: 0 },
-        label: o.labels === 'all' && !dim ? vertexLabel(0, false, t.ink3) : { show: false }
+        label: o.labels === 'all' && !dim ? vertexLabel(0, false, t.ink2) : { show: false }
       };
     });
     if (o.median && peers.length > 1) {
       data.push({
         name: 'Peer median', value: med, symbol: 'none',
-        lineStyle: { color: t.ink2, width: 1.5, type: [4, 3] }, itemStyle: { color: t.ink2 }, areaStyle: { opacity: 0 },
+        lineStyle: { color: t.ink3, width: 1.5, type: [4, 3] }, itemStyle: { color: t.ink3 }, areaStyle: { opacity: 0 },
         label: { show: false }
       });
     }
@@ -163,15 +142,14 @@
     var legendData = legendNames.map(function (n) { return n === 'Peer median' && peers.indexOf(n) < 0 ? { name: n, icon: DASH_ICON } : n; });
     var W = ctx.el.clientWidth || 600, H = ctx.el.clientHeight || 320;
     var vertical = W > H * 1.45 && o.legend !== false;
-    var legendW = vertical ? Math.min(200, 26 + Math.max.apply(null, legendNames.map(function (n) { return n.length * 6.3; }))) : 0;
+    var legendW = vertical ? Math.min(200, 26 + Math.max.apply(null, legendNames.map(function (n) { return C.measure(n, '11px ' + t.fontSans); }))) : 0;
     var top = o.legend !== false && !vertical ? 30 : 0;
     var cx = vertical ? legendW + (W - legendW) / 2 : W / 2;
     var radius = Math.max(40, Math.min((W - legendW) / 2 - 90, (H - top) / 2 - 32));
 
     return {
       legend: C.legend(ctx, {
-        data: legendData, orient: vertical ? 'vertical' : 'horizontal', top: vertical ? 4 : 0, left: 0, itemGap: vertical ? 9 : 14,
-        icon: 'roundRect', itemWidth: 14, itemHeight: 3, itemStyle: { borderWidth: 0 }
+        data: legendData, orient: vertical ? 'vertical' : 'horizontal', top: vertical ? 4 : 0, left: 0, itemGap: vertical ? 9 : 14
       }),
       tooltip: {
         trigger: 'item', confine: true,
@@ -209,7 +187,5 @@
         data: data
       }]
     };
-  }, {
-    select: function (p, ctx) { return p.name && p.name !== 'Peer median' ? { field: ctx.enc.series, value: p.name } : null; }
-  });
+  }
 })();

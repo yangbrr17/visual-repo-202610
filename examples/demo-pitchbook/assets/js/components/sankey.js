@@ -7,16 +7,8 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
-  /** Canvas text width (labels are measured so the margins fit the longest one). */
-  var measure = (function () {
-    var c2d = null;
-    return function (text, font) {
-      c2d = c2d || document.createElement('canvas').getContext('2d');
-      c2d.font = font;
-      // +7%: the canvas may measure with a fallback face before the webfont has loaded
-      return c2d.measureText(String(text)).width * 1.07;
-    };
-  })();
+  /** Label width via the shared canvas measure; +7% because the canvas may still measure a fallback face. */
+  function measure(text, font) { return C.measure(text, font) * 1.07; }
 
   /** Theme token name ('accent2', 'neg', 'cat3' ...) or literal CSS colour -> colour. */
   function tokenColor(t, v) {
@@ -65,28 +57,15 @@
     return { list: list, byName: nodes, maxDepth: maxDepth };
   }
 
-  /** Toggle a value in this block's selection, scoped to its own dataset by default. */
   /**
-   * Toggle a node in this block's selection. A node matches links at either end, so the filter is
-   * an expression (`source in [..] or target in [..]`), scoped to this block's dataset unless
-   * filterScope = 'global'. `values` is kept on the spec so ctx.selected(enc.source) still works.
+   * Toggle a node in this block's selection. A node matches links at either end (source OR target);
+   * the selection is scoped by crossFilterScope (default 'dataset': 'source' / 'target' are generic names).
    */
   function selectNode(ctx, value) {
     var enc = ctx.enc;
     if (ctx.options.crossFilter === false || value == null || !enc.source || !enc.target) return;
-    var key = ctx.id + ':' + enc.source, cur = RK.store.filter(key);
-    var vals = cur && cur.values ? cur.values.slice() : [];
-    var i = vals.indexOf(value);
-    if (i >= 0) vals.splice(i, 1); else vals.push(value);
-    if (!vals.length) { RK.store.clearFilter(key); return; }
-    var list = '[' + vals.map(function (v) { return JSON.stringify(String(v)); }).join(', ') + ']';
-    RK.store.setFilter(key, {
-      op: 'expr', field: enc.source, values: vals, source: ctx.id,
-      expr: '`' + enc.source + '` in ' + list + ' or `' + enc.target + '` in ' + list,
-      datasets: ctx.options.filterScope === 'global' || !ctx.dataset ? undefined : [ctx.dataset.id]
-    });
+    ctx.select(enc.source, value, { either: enc.target, scope: ctx.options.filterScope || undefined });
   }
-
 
   RK.component({
     id: 'sankey',
@@ -111,7 +90,8 @@
       draggable: false,
       format: null,
       crossFilter: true,
-      filterScope: 'dataset'    // dataset | global — reach of the click-to-filter selection
+      crossFilterScope: 'dataset',  // dataset | global — reach of the click-to-filter selection
+      filterScope: null         // deprecated alias of crossFilterScope
     },
     render: C(function (ctx) {
       var o = ctx.options, t = ctx.theme, enc = ctx.enc;
@@ -150,13 +130,19 @@
       // colours
       var ord = t.ord && t.ord.length ? t.ord : [t.accent, t.accent3, t.cat[2]];
       var stageRamp = RK.theme.ramp(ord.slice(0, Math.max(2, Math.min(ord.length, 4))));
-      var catOf = RK.theme.categorical(nodes.map(function (n) { return n.name; }));
-      function nodeColor(n) {
+      // colorBy 'node': categorical colours kept clear of the highlight, the cost colour and explicit node colours
+      var custom = {}, free = [];
+      nodes.forEach(function (n) {
         var c = tokenColor(t, (o.nodeColors || {})[n.name]);
-        if (c) return c;
+        if (c) custom[n.name] = c;
+        else if (hi.indexOf(n.name) < 0 && !isCost(n.name)) free.push(n.name);
+      });
+      var pal = RK.theme.palette({ n: free.length, exclude: [t.accent2, costs.length ? t.neg : null].concat(Object.keys(custom).map(function (k) { return custom[k]; })) });
+      function nodeColor(n) {
+        if (custom[n.name]) return custom[n.name];
         if (hi.indexOf(n.name) >= 0) return t.accent2;
         if (isCost(n.name)) return t.neg;
-        if (o.colorBy === 'node') return catOf(n.name);
+        if (o.colorBy === 'node') return pal[free.indexOf(n.name)];
         return stageRamp(g.maxDepth ? n.depth / g.maxDepth : 0);
       }
 

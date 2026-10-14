@@ -29,15 +29,15 @@
     "eventsData": {"type": "string", "default": null, "desc": "Dataset id of events (date, label, kind, detail) drawn as numbered pins"},
     "eventsEncode": {"type": "object", "default": {"date": "date", "label": "label", "kind": "kind", "detail": "detail"}, "desc": "Field mapping of the events dataset"},
     "eventsSeries": {"type": "string", "default": null, "desc": "Series the pins sit on (default: highlight, else the first series)"},
-    "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] horizontal reference lines"},
-    "zoom": {"type": "boolean|string", "default": "auto", "desc": "'auto' (on for time axes with > 12 points) | true | false — wheel / pinch + slider; value axis re-fits to the window"},
+    "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] horizontal reference lines (offer / current price), dashed in the theme's reference colour"},
+    "zoom": {"type": "boolean|string", "default": "auto", "desc": "'auto' (on for time axes with > 12 points) | true | false — slider + drag, Ctrl/Cmd + wheel or pinch (options.wheelZoom: true for the plain wheel); value axis re-fits to the window"},
     "xType": {"type": "string", "default": "auto", "desc": "'auto' | 'time' | 'category' | 'value'"},
     "xFormat": {"type": "string", "default": null, "desc": "X format for tooltip titles (dates default to the field format)"},
     "format": {"type": "string", "default": null, "desc": "Value format; defaults to the y field format ('#,##0.0' when rebased)"},
     "yMin": {"type": "string|number", "default": "auto", "desc": "'auto' (zero for areas, otherwise fit the data) | 'dataMin' | number"},
     "legend": {"type": "boolean", "default": true, "desc": "Legend top-left (shown when there is more than one series)"}
   },
-  "interactions": ["Axis tooltip with all series (and % change when rebased)", "Hover near a pin to read the event", "Wheel / pinch / slider zoom with automatic y re-fit", "Legend toggle re-fits the axis", "Click a line to cross-filter (long data)", "End labels follow zoom and filters", "PNG / CSV export"],
+  "interactions": ["Axis tooltip with all series (and % change when rebased)", "Hover near a pin to read the event", "Slider, drag, Ctrl/Cmd + wheel or pinch zoom with automatic y re-fit (plain wheel scrolls the page)", "Legend toggle re-fits the axis", "Click a line to cross-filter (long data; generic series fields filter this dataset only)", "End labels follow zoom and filters", "PNG / CSV export"],
   "samples": [
     {"title": "Share price performance, rebased to 100", "data": "price_perf", "height": 380,
      "options": {"encode": {"x": "date", "y": "value", "series": "series"}, "rebase": 100, "highlight": "Helios Industrial",

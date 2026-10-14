@@ -25,9 +25,9 @@
     "format": {"type": "string", "default": null, "desc": "Value format; defaults to the y field format (else 0.0x)"},
     "dateFormat": {"type": "string", "default": "mmm yy", "desc": "Time-axis label format"},
     "legend": {"type": "boolean", "default": true, "desc": "Top-left legend (when a comparison series is shown)"},
-    "zoom": {"type": "boolean", "default": true, "desc": "Wheel / pinch zoom plus a compact slider on the time axis"}
+    "zoom": {"type": "boolean", "default": true, "desc": "Compact slider + drag on the time axis; Ctrl/Cmd + wheel or pinch zooms (options.wheelZoom: true for the plain wheel)"}
   },
-  "interactions": ["Crosshair tooltip with value, peer value, premium / (discount) and deviation from the mean in σ", "Zoom and pan the time axis (wheel, pinch, slider)", "Legend toggle", "Animated update when filters change", "PNG / CSV export"],
+  "interactions": ["Crosshair tooltip with value, peer value, premium / (discount) and deviation from the mean in σ", "Zoom and pan the time axis (slider, drag, Ctrl/Cmd + wheel or pinch)", "Legend toggle", "Animated update when filters change", "PNG / CSV export"],
   "samples": [
     {"title": "NTM EV / EBITDA — Helios Industrial vs. peer median", "data": "ntm_multiple", "height": 340,
      "options": {"encode": {"x": "date", "y": "target", "compare": "peer_median"}, "sigma": 1}},

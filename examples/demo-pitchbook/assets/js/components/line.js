@@ -8,6 +8,8 @@
 (function () {
   'use strict';
   var C = RK.chart, util = RK.util;
+  // house rule: generic fields cross-filter only this block's dataset; business dimensions filter globally
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|series|category|group|label|name|key|id|status|variable)$/i;
   var FORECAST_RE = /\d\s*[EFBP]$/i;      // "2026E", "FY27F", "2025B", "2028P"
   var DELTA = '+0.0%;-0.0%;0.0%';
 
@@ -29,7 +31,7 @@
       eventsData: null,        // dataset id with events {date, label, kind, detail} -> numbered pins
       eventsEncode: { date: 'date', label: 'label', kind: 'kind', detail: 'detail' },
       eventsSeries: null,      // series the pins sit on (default: highlight, else the first series)
-      refLines: [],            // [{value, label, color}] horizontal reference lines
+      refLines: [],            // [{value, label, color}] horizontal reference lines (default colour: theme ref)
       zoom: 'auto',            // 'auto' (on for time axes) | true | false
       xType: 'auto',           // 'auto' | 'time' | 'category' | 'value'
       xFormat: null,           // x format for tooltips (dates default to the field format / 'dd mmm yyyy')
@@ -40,10 +42,12 @@
     render: function (ctx) {
       var state = { zoom: null, legendSel: null, labelIds: [], model: null, yAxis: null, raf: 0 };
       var api = C(function (c, inst) { return build(c, inst, state); }, {
+        rebuildOnResize: true,     // date-tick density and the end-label margin depend on the plot size
         select: function (p, c) {
-          if (!c.enc.series || Array.isArray(c.enc.y) || p.componentType !== 'series' || p.seriesType !== 'line') return null;
-          var s = state.model && state.model.byId[p.seriesId];
-          return s ? { field: c.enc.series, value: s.name } : null;
+          var f = c.enc.series, s = state.model && state.model.byId[p.seriesId];
+          if (!f || !s || Array.isArray(c.enc.y) || p.seriesType !== 'line' || c.options.crossFilter === false) return null;
+          c.select(f, s.name, GENERIC.test(f) && !c.options.crossFilterScope ? { scope: 'dataset' } : null);
+          return null;
         }
       })(ctx);
       var inst = api.chart;
@@ -81,8 +85,8 @@
         update: function (c) { current = c; api.update(c); layoutEndLabels(inst, c, state, 'update'); },
         resize: function () { api.resize(); layoutEndLabels(inst, current, state, 'instant'); },
         destroy: function () { api.destroy(); },
-        exportImage: function () { return exportPNG(inst, current.theme); },
-        exportSVG: function () { return cleanSVG(inst, current.theme); }
+        exportImage: api.exportImage,
+        exportSVG: api.exportSVG
       };
     }
   });
@@ -110,7 +114,7 @@
     var fmt = o.format || (o.rebase != null ? '#,##0.0' : data.yFormat) || 'auto';
     var hl = o.highlight;
     var stacked = o.area === 'stacked';
-    var pal = palette(t, hl != null);
+    var pal = RK.theme.palette({ n: data.series.length });     // peers stay clear of the accent2 highlight
     var sel = enc.series && !Array.isArray(enc.y) ? ctx.selected(enc.series) : [];
 
     var pi = 0;
@@ -122,7 +126,7 @@
         vals = raw.map(function (v) { return v == null || base == null ? null : v / base * o.rebase; });
       }
       var isHl = hl != null && s.name === hl;
-      var color = isHl ? t.accent2 : pal[pi++ % pal.length];
+      var color = isHl ? t.accent2 : pal[pi++];
       var muted = hl != null && !isHl;
       if (muted) color = RK.theme.mix(color, t.paper, 0.12);
       var dimmed = sel.length && sel.indexOf(s.name) < 0;
@@ -162,29 +166,6 @@
     series.forEach(function (s) { byId[s.key] = s; byId[s.key + 'f'] = s; });
     return { xType: xType, isTime: isTime, isValue: isValue, isCat: !isTime && !isValue, xs: xs, xv: xv,
       series: series, byId: byId, fmt: fmt, stacked: stacked, fIdx: fIdx };
-  }
-
-  /**
-   * Series colours. accent2 is reserved for the highlighted series (the target), so nothing close to it
-   * is used for other lines; with a highlight, the context series use the calm semantic tokens first
-   * (accent, accent3, ink3).
-   */
-  function palette(t, highlight) {
-    var semantic = highlight ? [t.accent, t.accent3, t.ink3] : [];
-    var out = [];
-    semantic.concat(t.cat).forEach(function (c, i) {
-      if (!c) return;
-      if (colorDist(c, t.accent2) < 72) return;
-      // semantic tokens only drop exact look-alikes; categorical fallbacks must be clearly distinct
-      var sep = i < semantic.length ? 30 : 60;
-      if (out.some(function (x) { return colorDist(x, c) < sep; })) return;
-      out.push(c);
-    });
-    return out.length ? out : t.cat.slice();
-  }
-  function colorDist(a, b) {
-    var x = RK.theme.parseColor(a), y = RK.theme.parseColor(b);
-    return Math.sqrt(Math.pow(x[0] - y[0], 2) + Math.pow(x[1] - y[1], 2) + Math.pow(x[2] - y[2], 2));
   }
 
   /** ISO date / Date -> local-time ms (the same parsing RK.format uses), null when unparseable. */
@@ -383,28 +364,20 @@
       splitLine: { show: false },
       axisLine: { show: true, lineStyle: { color: t.axis } },
       axisTick: model.isTime ? { show: true, length: 3, lineStyle: { color: t.axis }, customValues: tk.values } : { show: true },
-      axisLabel: model.isTime ? tickLabel(tk) : { formatter: axisFmt(o.xFormat || ctx.fmtOf(ctx.enc.x) || 'auto') },
+      axisLabel: model.isTime ? tickLabel(tk) : { formatter: tickFmt(o.xFormat || ctx.fmtOf(ctx.enc.x) || 'auto') },
       axisPointer: { show: true, type: 'line', label: { show: false } }
     };
 
-    var dz = [];
-    if (useZoom) {
-      var z = state.zoom || { start: 0, end: 100 };
-      dz.push({ id: 'dzi', type: 'inside', xAxisIndex: 0, filterMode: 'none', start: z.start, end: z.end });
-      if (slider) {
-        state.slider = state.slider || { left: 56, right: right };
-        dz.push({ id: 'dzs', type: 'slider', xAxisIndex: 0, filterMode: 'none', start: z.start, end: z.end, height: 18, bottom: 6,
-          showDetail: false, brushSelect: false, left: state.slider.left, right: state.slider.right });
-      }
-    } else state.slider = null;
+    // core zoom: Ctrl/Cmd + wheel or pinch (plain wheel scrolls the report), drag to pan, slider unless printing
+    var z = state.zoom || { start: 0, end: 100 };
+    state.slider = slider ? state.slider || { left: 56, right: right } : null;
+    var dz = useZoom ? C.zoom(ctx, 'x', slider ? { id: 'dzs', bottom: 6, left: state.slider.left, right: state.slider.right, start: z.start, end: z.end } : null) : [];
+    if (dz.length) util.merge(dz[0], { id: 'dzi', start: z.start, end: z.end });
 
     var legendNames = model.series.map(function (s) { return s.name; });
     return {
       animationDurationUpdate: 600,
-      legend: C.legend(ctx, {
-        show: hasLegend, data: legendNames.map(function (nm) { return { name: nm, icon: 'rect' }; }),
-        itemWidth: 16, itemHeight: 4, selected: state.legendSel || undefined
-      }),
+      legend: C.legend(ctx, { show: hasLegend, data: legendNames, selected: state.legendSel || undefined }),
       grid: C.grid(ctx, { top: top, bottom: bottom, right: right, left: 4 }),
       tooltip: {
         trigger: 'axis', confine: true,
@@ -414,7 +387,7 @@
       xAxis: xAxis,
       yAxis: {
         id: 'y', type: 'value', min: y ? y.min : null, max: y ? y.max : null, interval: y ? y.interval : null,
-        axisLabel: { formatter: axisFmt(fmt, function () { return state.yAxis && state.yAxis.interval; }) }
+        axisLabel: { formatter: tickFmt(fmt, function () { return state.yAxis && state.yAxis.interval; }) }
       },
       dataZoom: dz,
       series: series
@@ -431,17 +404,19 @@
   }
 
   /**
-   * Axis labels: drop the decimals when every tick is a whole number ("$40" not "$40.00", "100" not "100.0"),
-   * keep them on all ticks otherwise ("9.5x", "10.0x"). getStep returns the live tick interval when known.
+   * Axis tick formatter (house style: no decimals when the tick step is whole at display precision,
+   * "$6,000" not "$6,000.0", "20%" not "20.0%"). step: number, function returning the live step,
+   * or an array of tick values; null decides per value.
    */
-  function axisFmt(fmt, getStep) {
-    var code = String(RK.format.presets[fmt] || fmt);
-    var intFmt = code.replace(/\.[0#]+/g, '');
-    var isInt = function (v) { return Math.abs(v - Math.round(v)) < 1e-9; };
+  function tickFmt(code, step) {
+    code = String(RK.format.presets[code] || code || 'auto');
+    var trimmed = code.replace(/([0#])\.[0#]+/g, '$1');
+    function num(v, c) { return parseFloat(RK.format(v, c).replace(/[^\d.\-]/g, '')); }
+    function whole(v) { return num(v, code) === num(v, trimmed); }
     return function (v) {
-      var step = getStep ? getStep() : null;
-      var whole = /%/.test(code) ? false : util.isNum(step) ? isInt(step) && isInt(v) : isInt(v);
-      return RK.format(v, whole ? intFmt : fmt);
+      var s = typeof step === 'function' ? step() : step;
+      var ok = trimmed !== code && (Array.isArray(s) ? s.every(whole) : whole(s != null ? s : v));
+      return RK.format(v, ok ? trimmed : code);
     };
   }
 
@@ -485,9 +460,9 @@
     var lines = (o.refLines || []).map(function (r) {
       return {
         yAxis: r.value, name: r.label || '',
-        lineStyle: { color: r.color || t.ink3, type: r.type || 'dashed', width: 1.25 },
+        lineStyle: { color: r.color || t.ref, type: r.type || 'dashed', width: 1.25 },
         // label on a paper chip so it stays legible where it crosses the lines
-        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: r.color || t.ink2, fontWeight: 600, fontSize: 10.5,
+        label: { formatter: r.label || RK.format(r.value, fmt), position: 'insideStartTop', color: r.color || t.ref, fontWeight: 600, fontSize: 10.5,
           backgroundColor: RK.theme.alpha(t.paper, 0.85), padding: [1, 4], borderRadius: 2 }
       };
     });
@@ -518,7 +493,7 @@
    * ------------------------------------------------------------------ */
   function pinSeries(ctx, model, pins) {
     var t = ctx.theme;
-    var pinColor = t.ink2, txt = RK.theme.onColor(pinColor, t.ink, '#ffffff');
+    var pinColor = t.ink2, txt = RK.theme.textOn(pinColor);
     var R = 8;
     return {
       id: 'events', type: 'custom', name: '__events', z: 6, clip: true, silent: false, tooltip: { show: false },
@@ -608,16 +583,10 @@
    * End labels: value tag + name in the right margin, de-collided vertically,
    * with a leader line to the last visible point. Drawn as ECharts graphic elements.
    * ------------------------------------------------------------------ */
-  var measureCtx = null;
-  function textWidth(str, font) {
-    if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
-    measureCtx.font = font;
-    return measureCtx.measureText(str).width;
-  }
   function labelWidth(mode, s, vtxt, t) {
     var w = 0;
-    if (mode !== 'name') w += textWidth(vtxt, '600 10.5px ' + t.fontNum) + 10;
-    if (mode !== 'value') w += (w ? 5 : 0) + textWidth(s.name, (s.hl ? '600 ' : '400 ') + '11px ' + t.fontSans);
+    if (mode !== 'name') w += C.measure(vtxt, '600 10.5px ' + t.fontNum) + 10;
+    if (mode !== 'value') w += (w ? 5 : 0) + C.measure(s.name, (s.hl ? '600 ' : '400 ') + '11px ' + t.fontSans);
     return w;
   }
 
@@ -652,14 +621,16 @@
         if (!pt || !util.isNum(pt[0]) || !util.isNum(py)) return;
         items.push({ s: s, i: i, px: pt[0], py: pt[1], y: util.clamp(py, g.y, g.y + g.height) });
       });
-      spread(items, 15, g.y - 4, g.y + g.height + 4);
+      // label centres >= 15px apart, label boxes inside the plot height (+4px)
+      var ly = C.spreadLabels(items.map(function (it) { return it.y; }), 15, g.y + 3.5, g.y + g.height - 3.5);
+      items.forEach(function (it, k) { it.ly = ly[k]; });
       var lx = g.x + g.width + 8;
       items.forEach(function (it) {
         var s = it.s, id = 'el-' + s.key;
         var vtxt = RK.format(s.values[it.i], model.fmt);
         var rich = {
           // graphic elements take zrender style names: fill (not color)
-          v: { backgroundColor: s.color, fill: RK.theme.onColor(s.solid, t.ink, '#ffffff'), padding: [2, 4, 1, 4], borderRadius: 2,
+          v: { backgroundColor: s.color, fill: RK.theme.textOn(s.solid), padding: [2, 4, 1, 4], borderRadius: 2,
                fontSize: 10.5, fontWeight: 600, fontFamily: t.fontNum, lineHeight: 14 },
           n: { fill: s.dimmed ? RK.theme.alpha(t.ink2, 0.4) : (s.hl ? t.ink : t.ink2), fontSize: 11, fontWeight: s.hl ? 600 : 400, fontFamily: t.fontSans, padding: [0, 0, 0, 4], lineHeight: 14 }
         };
@@ -699,66 +670,5 @@
     return { updateAnimation: { duration: 0 } };
   }
 
-  /** Spread label centres so they are >= gap apart, staying close to their anchors (cluster merge). */
-  function spread(items, gap, lo, hi) {
-    items.sort(function (a, b) { return a.y - b.y; });
-    var groups = items.map(function (it) { return { items: [it], sum: it.y }; });
-    function top(gr) {
-      var size = gr.items.length * gap;
-      var c = gr.sum / gr.items.length;
-      return util.clamp(c - size / 2, lo, Math.max(lo, hi - size));
-    }
-    var merged = true;
-    while (merged) {
-      merged = false;
-      for (var k = 1; k < groups.length; k++) {
-        var a = groups[k - 1], b = groups[k];
-        if (top(a) + a.items.length * gap > top(b) + 1e-6) {
-          groups.splice(k - 1, 2, { items: a.items.concat(b.items), sum: a.sum + b.sum });
-          merged = true;
-          break;
-        }
-      }
-    }
-    groups.forEach(function (gr) {
-      var y0 = top(gr);
-      gr.items.forEach(function (it, j) { it.ly = y0 + gap * (j + 0.5); });
-    });
-  }
-
   function esc(s) { return String(s == null ? '' : s).replace(/[{}|]/g, ' '); }
-
-  /* ------------------------------------------------------------------ *
-   * Export. Workaround for a core issue (rk.chart exportPNG): ECharts' SVG string keeps the theme's
-   * double-quoted font names inside style="…" — invalid XML, so the browser refuses to rasterise it.
-   * Swap them to single quotes before exporting.
-   * ------------------------------------------------------------------ */
-  function cleanSVG(inst, t) {
-    var svg = inst.renderToSVGString ? inst.renderToSVGString() : null;
-    if (!svg) return null;
-    [t.fontSans, t.fontNum, t.fontSerif].forEach(function (f) {
-      if (f && f.indexOf('"') >= 0) svg = svg.split(f).join(f.replace(/"/g, "'"));
-    });
-    return svg;
-  }
-  function exportPNG(inst, t) {
-    var bg = t.paper || '#ffffff';
-    var zr = inst.getZr && inst.getZr();
-    var svg = zr && zr.painter && zr.painter.type === 'canvas' ? null : cleanSVG(inst, t);
-    if (!svg) return Promise.resolve(inst.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: bg }));
-    var w = inst.getWidth(), h = inst.getHeight();
-    return new Promise(function (resolve, reject) {
-      var img = new Image();
-      img.onload = function () {
-        var c = document.createElement('canvas');
-        c.width = w * 2; c.height = h * 2;
-        var g = c.getContext('2d');
-        g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
-        g.drawImage(img, 0, 0, c.width, c.height);
-        resolve(c.toDataURL('image/png'));
-      };
-      img.onerror = reject;
-      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-    });
-  }
 })();

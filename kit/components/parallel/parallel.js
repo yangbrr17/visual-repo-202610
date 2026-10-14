@@ -9,22 +9,17 @@
   var C = RK.chart, util = RK.util;
 
   function same(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
-  /**
-   * Categorical palette for peers: drops colours too close to accent-2 (reserved for the target)
-   * and near-duplicates of a colour already kept, so adjacent series stay distinguishable.
-   */
-  function paletteFor(t) {
-    function dist(x, y) {
-      var a = RK.theme.parseColor(x), b = RK.theme.parseColor(y);
-      return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
-    }
-    var base = t.cat.filter(function (c) { return dist(c, t.accent2) > 64; });
-    var pal = [];
-    base.forEach(function (c) { if (pal.every(function (k) { return dist(c, k) > 48; })) pal.push(c); });
-    return pal.length >= 3 ? pal : (base.length ? base : t.cat);
+  var DASH_ICON = 'path://M0,0h3v1.6H0z M3.5,0h3v1.6h-3z M7,0h3v1.6H7z';   // dashed legend swatch for the median line
+
+  /** Axis tick format: the value format with no more decimals than the tick step needs (20x not 20.0x). */
+  function tickFmt(fmt, step) {
+    var code = RK.format.presets[fmt] || fmt;
+    if (typeof code !== 'string' || !step || !/[0#]/.test(code) || RK.format.isDateCode(code)) return fmt;
+    var sec = code.split(';')[0].replace(/"[^"]*"/g, ''), scale = Math.pow(1000, ((sec.match(/[0#](,+)[^0#]*$/) || [])[1] || '').length);
+    var v = Math.abs(step) * (/%/.test(sec) ? 100 : 1) / scale, dec = 0;
+    while (dec < 4 && Math.abs(Math.round(v * Math.pow(10, dec)) - v * Math.pow(10, dec)) > 1e-6) dec++;
+    return code.replace(/([0#])\.([0#]+)/g, function (m, a, d) { var n = Math.min(dec, d.length); return a + (n ? '.' + d.slice(0, n) : ''); });
   }
-  var NONE = '\u0000(no match)';   // filter value that matches nothing (brush selected zero rows)
-  var DASH_ICON = 'path://M0,4h5v2H0z M7.5,4h5v2h-5z M15,4h5v2h-5z';   // dashed legend swatch for median lines
 
   /** dims option -> [{field, title, format, type, cats, inverse, min, max}] */
   function dimsOf(ctx) {
@@ -63,7 +58,7 @@
     },
     render: function (ctx) {
       var o = ctx.options, enc = ctx.enc, lf = enc.label;
-      var key = ctx.id + ':' + lf;                 // same key as ctx.select -> ctx.selected(label) sees it
+      var key = ctx.id + ':' + lf;                 // store key of this block's selection (ctx.setSelection / ctx.selected)
       var intervals = {};                           // parallelAxisId -> [[lo, hi], ...]
       var restoring = false, lastSig = null;
       var handle = chart(ctx);
@@ -74,10 +69,10 @@
       }
       function active() { return Object.keys(intervals).filter(function (k) { return intervals[k] && intervals[k].length; }); }
 
-      /** rows inside every brushed interval -> store filter (or clear it) */
+      /** rows inside every brushed interval -> selection on the label field (cleared when no brush is left) */
       function publish() {
         var axesOn = active();
-        if (!axesOn.length) { RK.store.clearFilter(key); return; }
+        if (!axesOn.length) { cur.setSelection(lf, []); return; }
         var ds = dimsOf(cur);
         var labels = cur.rows.filter(function (r) {
           return axesOn.every(function (id) {
@@ -88,7 +83,7 @@
             return intervals[id].some(function (iv) { var lo = Math.min(iv[0], iv[1]), hi = Math.max(iv[0], iv[1]); return v >= lo - 1e-9 && v <= hi + 1e-9; });
           });
         }).map(function (r) { return r[lf]; });
-        RK.store.setFilter(key, { field: lf, op: 'in', values: labels.length ? labels : [NONE], source: cur.id });
+        cur.setSelection(lf, labels, { allowEmpty: true });   // a brush that catches no row matches nothing
       }
 
       /** re-apply brushes after a rebuild (silently: no event, no filter churn) */
@@ -114,7 +109,7 @@
       handle.update = function (c) {
         cur = c;
         // the filter was cleared from outside (reset / filter chip) -> drop the brushes
-        if (!c.selected(lf).length && active().length) {
+        if (!RK.store.filter(key) && active().length) {
           Object.keys(intervals).forEach(function (id) { intervals[id] = []; });
           restore();
           intervals = {};
@@ -136,7 +131,6 @@
     var o = ctx.options, t = ctx.theme, enc = ctx.enc, lf = enc.label;
     var dims = dimsOf(ctx);
     var rows = ctx.rows;
-    var pal = paletteFor(t);
     var peerColor = t.accent3 || t.cat[1];
 
     var hl = o.highlight == null ? [] : [].concat(o.highlight);
@@ -154,10 +148,11 @@
     // colour groups (one series each so the legend toggles them)
     var cf = enc.color && ctx.dataset && ctx.dataset.has(enc.color) ? enc.color : null;
     var allCats = cf ? util.unique(ctx.allRows.map(function (r) { return r[cf]; })) : [null];   // stable colour order
+    var pal = RK.theme.palette({ n: allCats.length });   // group colours never resemble the accent-2 target
     var cats = cf ? allCats.filter(function (c) { return peers.some(function (r) { return r[cf] === c; }); }) : [null];
     var lineBase = { width: 1.25, opacity: o.opacity, cap: 'round', join: 'round' };
     var series = cats.map(function (c) {
-      var i = allCats.indexOf(c), color = cf ? pal[i % pal.length] : peerColor;
+      var i = allCats.indexOf(c), color = cf ? pal[i] : peerColor;
       return {
         id: 'p-' + i, name: cf ? String(c) : 'Peers', type: 'parallel', smooth: o.smooth ? 0.2 : false,
         lineStyle: util.merge({ color: color }, lineBase),
@@ -181,8 +176,8 @@
       });
       series.push({
         id: 'median', name: 'Peer median', type: 'parallel', smooth: o.smooth ? 0.2 : false, z: 3,
-        lineStyle: { color: t.ink, width: 1.6, type: [5, 4], opacity: 0.9 },
-        itemStyle: { color: t.ink },
+        lineStyle: { color: t.ink3, width: 1.6, type: [5, 4], opacity: 0.9 },
+        itemStyle: { color: t.ink3 },
         emphasis: { lineStyle: { width: 2.2, opacity: 1 } },
         inactiveOpacity: 0.9, activeOpacity: 0.9,
         data: [{ name: 'Peer median', value: med }]
@@ -205,8 +200,7 @@
         id: 'pa-' + i, dim: i, name: d.title, type: d.type, inverse: d.inverse,
         nameLocation: d.inverse ? 'start' : 'end', nameGap: 14,
         nameTextStyle: { color: t.ink, fontSize: 11, fontWeight: 600, fontFamily: t.fontSans, width: 120, overflow: 'break', lineHeight: 13, align: 'center', verticalAlign: 'bottom' },
-        axisLabel: { color: t.ink3, fontSize: 10.5, fontFamily: t.fontNum, formatter: d.type === 'category' ? null : C.axisFmt(d.format), hideOverlap: true,
-          textBorderColor: t.paper, textBorderWidth: 3 },
+        axisLabel: { color: t.ink3, fontSize: 11, fontFamily: t.fontNum, hideOverlap: true, textBorderColor: t.paper, textBorderWidth: 3 },
         axisLine: { show: true, lineStyle: { color: t.axis, width: 1 } },
         axisTick: { show: true, length: 3, lineStyle: { color: t.axis } },
         splitLine: { show: false }
@@ -218,6 +212,7 @@
         ax.min = d.min != null ? d.min : Math.floor(ext[0] / step) * step;
         ax.max = d.max != null ? d.max : Math.ceil(ext[1] / step) * step;
         ax.interval = d.min == null && d.max == null ? step : null;
+        ax.axisLabel.formatter = C.axisFmt(tickFmt(d.format, ax.interval));
       }
       return ax;
     });
@@ -226,7 +221,7 @@
     var fmts = dims.map(function (d) { return d.format; });
     return {
       legend: C.legend(ctx, {
-        show: showLegend, icon: 'roundRect', itemWidth: 14, itemHeight: 3, itemStyle: { borderWidth: 0 },
+        show: showLegend,
         data: series.filter(function (s) { return s.id !== 'median'; }).map(function (s) { return s.name; })
           .concat(o.median && peers.length > 2 ? [{ name: 'Peer median', icon: DASH_ICON }] : [])
       }),

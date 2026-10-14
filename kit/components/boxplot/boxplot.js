@@ -36,39 +36,16 @@
     if (ext[0] >= 0 && lo < 0) lo = 0;
     return { min: +lo.toPrecision(12), max: +hi.toPrecision(12), step: step };
   }
-  /** Perceptual-ish similarity: close hue and lightness (or near-identical greys). */
-  function similar(a, b) {
-    function hsl(c) {
-      var p = RK.theme.parseColor(c), r = p[0] / 255, g = p[1] / 255, bl = p[2] / 255;
-      var mx = Math.max(r, g, bl), mn = Math.min(r, g, bl), l = (mx + mn) / 2, d = mx - mn, h = 0;
-      var s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
-      if (d) h = mx === r ? ((g - bl) / d) % 6 : mx === g ? (bl - r) / d + 2 : (r - g) / d + 4;
-      return [(h * 60 + 360) % 360, s, l, p];
-    }
-    var x = hsl(a), y = hsl(b);
-    if (x[1] < 0.15 || y[1] < 0.15) {
-      return Math.sqrt(Math.pow(x[3][0] - y[3][0], 2) + Math.pow(x[3][1] - y[3][1], 2) + Math.pow(x[3][2] - y[3][2], 2)) < 40;
-    }
-    var dh = Math.abs(x[0] - y[0]); dh = Math.min(dh, 360 - dh);
-    return dh < 22 && Math.abs(x[2] - y[2]) < 0.22;
+  /** Tick labels in the field format, without decimals while the tick step is whole ("18x", not "18.0x"). */
+  function ticks(fmt, step) {
+    return function (v) {
+      var s = RK.format(v, fmt), st = typeof step === 'function' ? step() : step;
+      return st && !/\.\d*[1-9]/.test(RK.format(st, fmt)) ? s.replace(/\.0+(?=\D*$)/, '') : s;
+    };
   }
-  /**
-   * Category palette: theme order, but skipping colours similar to accent2 (reserved for the target)
-   * or to a colour already picked, so neighbouring categories stay distinguishable.
-   */
-  function catPalette(values, t) {
-    var pool = [];
-    t.cat.forEach(function (c) { if (!similar(c, t.accent2) && pool.every(function (p) { return !similar(c, p); })) pool.push(c); });
-    t.cat.forEach(function (c) { if (pool.indexOf(c) < 0 && !similar(c, t.accent2)) pool.push(c); });  // reuse the rest if needed
-    if (!pool.length) pool = t.cat;
-    var map = {};
-    values.forEach(function (v, i) { map[v] = pool[i % pool.length]; });
-    return function (v) { return map[v] || t.neutral; };
-  }
-  function axisFmt(fmt) {
-    return function (v) { var s = RK.format(v, fmt); return Math.round(v) === v && Math.abs(v) >= 100 ? s.replace(/\.0+(?=\D*$)/, '') : s; };
-  }
-  function textW(s, px) { return String(s).length * (px || 11) * 0.58; }
+  /** Generic field names (group, type …) cross-filter only this block's dataset; business dimensions stay global. */
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
+  function scoped(ctx, f) { return GENERIC.test(f) ? { scope: ctx.options.crossFilterScope || 'dataset' } : null; }
 
   RK.component({
     id: 'boxplot',
@@ -109,7 +86,7 @@
       if (o.sort === 'median') groups.sort(function (a, b) { return b.s.median - a.s.median; });
       else if (o.sort === 'asc' || o.sort === 'desc') groups.sort(function (a, b) { var c = String(a.key).localeCompare(String(b.key)); return o.sort === 'asc' ? c : -c; });
       var cats = groups.map(function (g) { return String(g.key); });
-      var palette = catPalette(util.unique(ctx.allRows.map(function (r) { return r[enc.group]; })), t);
+      var palette = RK.theme.categoricalSafe(util.unique(ctx.allRows.map(function (r) { return r[enc.group]; })));   // never like the accent2 target
       var base = t.accent3 || t.cat[1];
       var colorOf = function (g) { return o.groupColors ? palette(g) : base; };
       var selG = ctx.selected(enc.group);
@@ -191,8 +168,8 @@
         // value labels
         function lab(p, txt, strong) {
           kids.push({ type: 'text', silent: true,
-            style: vert ? { x: c + hw + 5, y: v(p), text: txt, fill: strong ? t.ink : t.ink3, font: (strong ? '600 ' : '') + labFont, align: 'left', verticalAlign: 'middle', opacity: op }
-              : { x: v(p), y: c - hw - 3, text: txt, fill: strong ? t.ink : t.ink3, font: (strong ? '600 ' : '') + labFont, align: 'center', verticalAlign: 'bottom', opacity: op } });
+            style: vert ? { x: c + hw + 5, y: v(p), text: txt, fill: strong ? t.ink : t.ink2, font: (strong ? '600 ' : '') + labFont, align: 'left', verticalAlign: 'middle', opacity: op }
+              : { x: v(p), y: c - hw - 3, text: txt, fill: strong ? t.ink : t.ink2, font: (strong ? '600 ' : '') + labFont, align: 'center', verticalAlign: 'bottom', opacity: op } });
         }
         if (showLab) lab(pMed, RK.format(api.value(3), fmt), true);
         if (showLab === 'all') {
@@ -239,7 +216,7 @@
         }, vert ? { yAxis: overall } : { xAxis: overall }));
       }
 
-      var nOf = {};
+      var nOf = {}, catFont = '11px ' + t.fontSans;
       groups.forEach(function (g) { nOf[String(g.key)] = g.s.n; });
       var catAxis = {
         type: 'category', data: cats, inverse: !vert,
@@ -247,25 +224,26 @@
         // ECharts 6 beeswarm jitter: points spread inside the box width without overlapping
         jitter: Math.max(0, Math.round(bw * 0.9)), jitterOverlap: true, jitterMargin: 1,
         axisLabel: {
-          interval: 0, color: t.ink, fontSize: 11, lineHeight: 14, align: vert ? 'center' : 'right',
+          interval: 0, color: t.ink2, fontSize: 11, lineHeight: 14, align: vert ? 'center' : 'right',
           formatter: function (k) {
             // wrap long names manually (rich text + overflow:'break' do not mix), n on its own line
-            var maxCh = Math.max(10, Math.floor((vert ? band - 10 : 150) / 6.2)), words = String(k).split(' '), lines = [''];
+            var maxW = Math.max(62, vert ? band - 10 : 150), words = String(k).split(' '), lines = [''];
             words.forEach(function (wd) {
               var cur = lines[lines.length - 1];
-              if (cur && (cur + ' ' + wd).length > maxCh) lines.push(wd); else lines[lines.length - 1] = cur ? cur + ' ' + wd : wd;
+              if (cur && C.measure(cur + ' ' + wd, catFont) > maxW) lines.push(wd); else lines[lines.length - 1] = cur ? cur + ' ' + wd : wd;
             });
             var out = lines.map(function (l) { return '{g|' + l + '}'; }).join('\n');
             return o.showN ? out + '\n{n|n = ' + (nOf[k] || 0) + '}' : out;
           },
-          rich: { g: { color: t.ink, fontSize: 11, lineHeight: 14 }, n: { color: t.ink3, fontSize: 10, lineHeight: 14, fontFamily: t.fontNum } }
+          rich: { g: { color: t.ink2, fontSize: 11, lineHeight: 14 }, n: { color: t.ink3, fontSize: 10, lineHeight: 14, fontFamily: t.fontNum } }
         }
       };
+      var tickFont = '11px ' + t.fontNum;
       var valAxis = {
         type: 'value', min: ve.min, max: ve.max, splitNumber: Math.round((ve.max - ve.min) / ve.step),
         name: o.title || ctx.title(enc.value), nameLocation: 'middle',
-        nameGap: vert ? Math.round(Math.max(textW(RK.format(ve.min, fmt)), textW(RK.format(ve.max, fmt))) + 14) : 26,
-        axisLabel: { formatter: axisFmt(fmt) },
+        nameGap: vert ? Math.round(Math.max(C.measure(ticks(fmt, ve.step)(ve.min), tickFont), C.measure(ticks(fmt, ve.step)(ve.max), tickFont)) + 14) : 26,
+        axisLabel: { formatter: ticks(fmt, function () { try { return inst.getModel().getComponent(vert ? 'yAxis' : 'xAxis', 0).axis.scale.getInterval(); } catch (e) { return ve.step; } }) },
         splitLine: { show: true, lineStyle: { color: t.grid } }
       };
 
@@ -314,10 +292,14 @@
         ]
       };
     }, {
-      select: function (p, ctx) {
-        if (p.seriesId === 'box') return { field: ctx.enc.group, value: p.data && p.data.key };
-        if (p.data && p.data.row) return { field: ctx.enc.group, value: p.data.group };
-        return null;
+      rebuildOnResize: true,   // box width, beeswarm jitter and label wrapping follow the band width
+      on: {
+        // click a box or an observation -> cross-filter by its group
+        click: function (p, ctx) {
+          var f = ctx.enc.group, g = p.seriesId === 'box' ? p.data && p.data.key : p.data && p.data.row ? p.data.group : null;
+          if (g == null || ctx.options.crossFilter === false) return;
+          ctx.select(f, g, scoped(ctx, f));
+        }
       }
     })
   });

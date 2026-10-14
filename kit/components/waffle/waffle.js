@@ -15,18 +15,8 @@
     if (parent) parent.appendChild(el);
     return el;
   }
-  var measurer = null;
-  function textWidth(s, font) {
-    try {
-      measurer = measurer || document.createElement('canvas').getContext('2d');
-      measurer.font = font;
-      return measurer.measureText(String(s)).width;
-    } catch (e) { return String(s).length * 6.2; }
-  }
-  function near(a, b) {
-    var x = RK.theme.parseColor(a), y = RK.theme.parseColor(b);
-    return Math.sqrt(Math.pow(x[0] - y[0], 2) + Math.pow(x[1] - y[1], 2) + Math.pow(x[2] - y[2], 2)) < 64;
-  }
+  /** Generic label fields ('type', 'category' …) cross-filter only this block's dataset; business dimensions stay global. */
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
 
   /** Largest-remainder rounding: integer cell counts that add up exactly to `cells`. */
   function allocate(values, cells) {
@@ -70,8 +60,8 @@
     function bucket(c) { return keep.has(c) ? c : o.othersLabel; }
 
     var hl = o.highlight == null ? [] : [].concat(o.highlight).map(String);
-    var pal = t.cat.filter(function (c) { return !hl.length || !near(c, t.accent2); });
-    if (!pal.length) pal = t.cat;
+    // nominal categories: categorical colours; with a highlight none may read like the accent2 target
+    var pal = RK.theme.palette(hl.length ? { n: cats.length } : { exclude: [], n: cats.length });
     var color = {}, k = 0;
     cats.forEach(function (c) {
       color[c] = c === o.othersLabel && members.length ? t.neutral : hl.indexOf(c) >= 0 ? t.accent2 : pal[k++ % pal.length];
@@ -212,11 +202,12 @@
       function onClick(e) {
         var cat = catAt(e), c = state.ctx;
         if (!cat || c.options.crossFilter === false) return;
-        var f = c.enc.label;
-        if (cat !== c.options.othersLabel || !state.m.members.length) { c.select(f, cat); return; }
+        var f = c.enc.label, sc = GENERIC.test(f) ? { scope: c.options.crossFilterScope || 'dataset' } : null;
+        if (cat !== c.options.othersLabel || !state.m.members.length) { c.select(f, cat, sc); return; }
+        // "Others": all members selected -> drop them, else add the missing ones (one store write)
         var sel = c.selected(f), mem = state.m.members;
         var all = mem.every(function (x) { return sel.indexOf(x) >= 0; });
-        mem.forEach(function (x) { if (all || sel.indexOf(x) < 0) c.select(f, x); });
+        c.setSelection(f, all ? sel.filter(function (x) { return mem.indexOf(x) < 0; }) : sel.concat(mem.filter(function (x) { return sel.indexOf(x) < 0; })), sc);
       }
       wrap.addEventListener('mousemove', onMove);
       wrap.addEventListener('mouseleave', onLeave);
@@ -271,10 +262,10 @@
     var tableFits = W - (18 + 60 + (m.pctLike ? 0 : 64) + 56) - 40 >= 110;
     if (n === 1 && !facet && o.legend !== false && tableFits) {
       // [waffle] [legend table]
-      var nameW = Math.min(200, Math.max.apply(null, m.cats.map(function (c) { return textWidth(c, fontName); }).concat([40])) + 8);
+      var nameW = Math.min(200, Math.max.apply(null, m.cats.map(function (c) { return RK.chart.measure(c, fontName); }).concat([40])) + 8);
       var valW = m.pctLike ? 0 : 64;
       // a % field has no separate value column: its title heads the % column, so give it room
-      var pctW = m.pctLike ? Math.min(170, Math.max(56, textWidth(ctx.title(ctx.enc.value), '600 10px ' + t.fontSans) + 4)) : 56;
+      var pctW = m.pctLike ? Math.min(170, Math.max(56, RK.chart.measure(ctx.title(ctx.enc.value), '600 10px ' + t.fontSans) + 4)) : 56;
       var tableW = 18 + nameW + valW + pctW;
       var S = Math.max(60, Math.min(H - 8, W - tableW - 40, o.maxSize));
       var gap = Math.min(48, Math.max(24, W * 0.04));
@@ -289,7 +280,7 @@
     var legendH = 0;
     if (!facet && o.legend !== false) {
       var lx = 0, lines = 1;
-      m.cats.forEach(function (c) { var w = textWidth(c, '11px ' + t.fontSans); if (lx + w + 30 > W && lx > 0) { lx = 0; lines++; } lx += w + 34; });
+      m.cats.forEach(function (c) { var w = RK.chart.measure(c, '11px ' + t.fontSans); if (lx + w + 30 > W && lx > 0) { lx = 0; lines++; } lx += w + 34; });
       legendH = 8 + lines * 18;
     }
     var headH = (facet || m.waffles[0].title) ? 20 : 0, footH = facet ? 30 : 0;
@@ -320,7 +311,9 @@
     var svg = svgEl('svg', { width: L.W, height: L.H, viewBox: '0 0 ' + L.W + ' ' + L.H, class: 'rk-waffle__svg' + (animate ? ' is-animated' : ''), role: 'img', 'aria-label': 'Waffle chart' });
     wrap.appendChild(svg);
     var empty = emptyColor(t);
-    var font = function (size, weight, num) { return { 'font-family': num ? t.fontNum : t.fontSans, 'font-size': size, 'font-weight': weight || 400 }; };
+    var font = function (size, weight, num) {
+      return { 'font-family': num ? t.fontNum : t.fontSans, 'font-size': size, 'font-weight': weight || 400, style: num ? 'font-variant-numeric:tabular-nums' : null };
+    };
     state.cells = [];
 
     m.waffles.forEach(function (wf, wi) {
@@ -367,7 +360,7 @@
     var ef = window.echarts && window.echarts.format;
     if (ef && ef.truncateText) return ef.truncateText(String(s), w, f, '…');
     s = String(s);
-    while (s.length > 3 && textWidth(s, f) > w) s = s.slice(0, -2) + '…';
+    while (s.length > 3 && RK.chart.measure(s, f) > w) s = s.slice(0, -2) + '…';
     return s;
   }
 
@@ -431,7 +424,7 @@
     var t = ctx.theme, x = 0, y = 9;
     var g = svgEl('g', { class: 'rk-waffle__legend' }, svg);
     m.cats.forEach(function (cat) {
-      var w = textWidth(cat, '11px ' + t.fontSans);
+      var w = RK.chart.measure(cat, '11px ' + t.fontSans);
       if (x + w + 30 > L.W && x > 0) { x = 0; y += 18; }
       var row = svgEl('g', { 'data-cat': cat, class: 'rk-waffle__row' }, g);
       svgEl('rect', { x: x - 2, y: y - 8, width: w + 22, height: 16, fill: 'transparent' }, row);

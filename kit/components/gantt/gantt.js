@@ -17,14 +17,6 @@
   function addMonths(t, n) { var d = new Date(t); return new Date(d.getFullYear(), d.getMonth() + n, 1).getTime(); }
   function addDays(t, n) { var d = new Date(t); d.setDate(d.getDate() + n); return d.getTime(); }
 
-  /** Text width for label sizing (canvas measure, cached context). */
-  var measureCtx = null;
-  function textWidth(s, font) {
-    if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
-    measureCtx.font = font;
-    return measureCtx.measureText(String(s)).width;
-  }
-
   /**
    * Calendar header periods for a visible window [lo, hi] at pxPerDay.
    * -> [{s, e, tier (0 upper | 1 lower), text, grid (draw gridline at s)}]
@@ -87,8 +79,11 @@
       labelWidth: 'auto',       // px or 'auto' (fits the longest label, max 38% of the width)
       dateFormat: null,         // tooltip date format; default = start field format or 'dd mmm yyyy'
       selectBy: 'group',        // channel used for click-to-filter / highlight: group | phase | label | null
+      crossFilter: true,
+      crossFilterScope: 'dataset',  // workstream / phase / task are timetable-specific: filter this dataset only
       legend: true,
-      zoom: true
+      zoom: true,
+      wheelZoom: null           // true: plain wheel zooms (default: Ctrl/Cmd + wheel or pinch; plain wheel scrolls the page)
     },
     render: C(function build(ctx, inst) {
       var o = ctx.options, t = ctx.theme, enc = ctx.enc;
@@ -150,7 +145,7 @@
         var sq = RK.theme.sequential([0, Math.max(1, allPhases.length - 1)], seqStops);
         phaseColor = function (p) { return sq(allPhases.indexOf(p)); };
       } else {
-        var cat = RK.theme.categorical(allPhases);
+        var cat = RK.theme.categoricalSafe(allPhases);   // extended with tints instead of repeating
         phaseColor = function (p) { return p == null ? t.accent : cat(p); };
       }
       var selField = o.selectBy ? enc[o.selectBy] : null;
@@ -171,7 +166,7 @@
       var W = inst.getWidth() || ctx.el.clientWidth || 800;
       var fontLab = '11px ' + t.fontSans, fontHead = '600 11.5px ' + t.fontSans;
       var labW = o.labelWidth === 'auto' || o.labelWidth == null
-        ? Math.ceil(Math.max(90, Math.min(W * 0.38, Math.max.apply(null, rowsY.map(function (r) { return r.header ? textWidth(r.text, fontHead) : textWidth(r.text, fontLab) + 12; }).concat([0])))))
+        ? Math.ceil(Math.max(90, Math.min(W * 0.38, Math.max.apply(null, rowsY.map(function (r) { return r.header ? C.measure(r.text, fontHead) : C.measure(r.text, fontLab) + 12; }).concat([0])))))
         : +o.labelWidth;
       var hasLegend = o.legend !== false && (phases.length > 0 || tasks.some(function (k) { return k.ms; }));
       var zoomOn = o.zoom !== false;
@@ -179,12 +174,7 @@
       var gridTop = (hasLegend ? 28 : 4) + TIER * 2;
       var gridBottom = (todayTs != null ? 18 : 4) + (slider ? 28 : 0);
       var grid = { left: labW + 14, right: 16, top: gridTop, bottom: gridBottom, containLabel: false };
-      S.lo = lo; S.hi = hi; S.plotW = W - grid.left - grid.right; S.builtW = W;
-      S.rebuild = function (c) { return build(c, inst); };   // used to re-flow on resize (see 'finished' hook)
-
-      // preserve the zoom window across filter updates
-      var prevZoom = null;
-      try { var dz0 = (inst.getOption() || {}).dataZoom; if (dz0 && dz0[0] && dz0[0].start != null) prevZoom = [dz0[0].start, dz0[0].end]; } catch (e) { /* first render */ }
+      S.lo = lo; S.hi = hi; S.plotW = W - grid.left - grid.right;
 
       /* ---------- renderers ---------- */
       var animate = ctx.motion;
@@ -208,7 +198,7 @@
         }];
         var lab = o.barLabel === 'duration' ? durText(k, true) : (o.barLabel && k.row[o.barLabel] != null ? String(k.row[o.barLabel]) : null);
         if (lab) {
-          var tw = textWidth(lab, '10.5px ' + t.fontSans), right = cs.x + cs.width;
+          var tw = C.measure(lab, '10.5px ' + t.fontSans), right = cs.x + cs.width;
           var after = shape.x + shape.width + 5;
           var x = after + tw <= right ? after : shape.x - 5;
           if (x >= cs.x && (x === after || x - tw >= cs.x)) {
@@ -284,7 +274,7 @@
           if (p.grid) kids.push({ type: 'line', silent: true, shape: { x1: x0, y1: cs.y, x2: x0, y2: cs.y + cs.height }, style: { stroke: t.grid, lineWidth: 1 } });
         }
         var font = p.tier ? '10px ' + t.fontNum : '600 10.5px ' + t.fontSans;
-        var tw = p.text ? textWidth(p.text, font) : 0, tx = (cx0 + cx1) / 2;
+        var tw = p.text ? C.measure(p.text, font) : 0, tx = (cx0 + cx1) / 2;
         if (p.tier && todayTs != null) {
           // keep lower-tier text clear of the today marker on the header edge
           var xt = api.coord([todayTs, 0])[0];
@@ -305,17 +295,17 @@
         return { type: 'rect', silent: true, shape: { x: cs.x, y: cs.y, width: w, height: cs.height }, style: { fill: RK.theme.alpha(t.ink3, t.dark ? 0.1 : 0.055) } };
       }
 
-      // today: line + marker on the header edge + label below the plot (drawn over the bars)
+      // today: dashed reference line (t.ref) + marker on the header edge + label below the plot (drawn over the bars)
       function renderToday(params, api) {
         var cs = params.coordSys, x = api.coord([todayTs, 0])[0];
         if (x < cs.x || x > cs.x + cs.width) return null;
         var label = o.todayLabel + ' ' + RK.format(new Date(todayTs), 'd mmm'), font = '600 10.5px ' + t.fontSans;
-        var half = textWidth(label, font) / 2, lx = Math.max(cs.x + half, Math.min(cs.x + cs.width + 12 - half, x));   // keep the label inside the chart
+        var half = C.measure(label, font) / 2, lx = Math.max(cs.x + half, Math.min(cs.x + cs.width + 12 - half, x));   // keep the label inside the chart
         return { type: 'group', children: [
-          { type: 'line', silent: true, shape: { x1: x, y1: cs.y, x2: x, y2: cs.y + cs.height + 3 }, style: { stroke: t.neg, lineWidth: 1.25 } },
-          { type: 'polygon', silent: true, shape: { points: [[x - 3.5, cs.y - 3], [x + 3.5, cs.y - 3], [x, cs.y + 1.5]] }, style: { fill: t.neg } },
+          { type: 'line', silent: true, shape: { x1: x, y1: cs.y, x2: x, y2: cs.y + cs.height + 3 }, style: { stroke: t.ref, lineWidth: 1.25, lineDash: [4, 3] } },
+          { type: 'polygon', silent: true, shape: { points: [[x - 3.5, cs.y - 3], [x + 3.5, cs.y - 3], [x, cs.y + 1.5]] }, style: { fill: t.ref } },
           { type: 'text', silent: true, x: lx, y: cs.y + cs.height + 5,
-            style: { text: label, fill: t.neg, font: font, align: 'center', verticalAlign: 'top' } }
+            style: { text: label, fill: t.ref, font: font, align: 'center', verticalAlign: 'top' } }
         ] };
       }
 
@@ -400,8 +390,8 @@
         }
       };
 
+      // RK.chart keeps the user's zoom window across filter updates and resizes (keepZoom)
       var dataZoom = zoomOn ? C.zoom(ctx, 'x', { bottom: 4, labelFormatter: function (v) { return RK.format(new Date(v), 'd mmm yy'); } }) : [];
-      if (prevZoom) dataZoom.forEach(function (d) { d.start = prevZoom[0]; d.end = prevZoom[1]; });
 
       return {
         animation: !!ctx.motion,
@@ -431,21 +421,8 @@
         var k = G.tasks[p.value[3]];
         return k ? { field: G.selField, value: G.selValue(k) } : null;
       },
+      rebuildOnResize: true,     // label column, calendar tiers and bar geometry depend on the width
       on: {
-        // label column, calendar tiers and bar geometry depend on the width: rebuild after a resize
-        finished: function (params, ctx, inst) {
-          var S = inst.__rkGantt;
-          if (!S || !S.rebuild || S._resizing || Math.abs(inst.getWidth() - S.builtW) < 2) return;
-          S._resizing = true;
-          setTimeout(function () {
-            try {
-              if (inst.isDisposed()) return;
-              var opt = S.rebuild(ctx);
-              opt.animation = false;
-              inst.setOption(opt, { replaceMerge: ['series', 'xAxis', 'yAxis', 'grid', 'legend', 'dataZoom'] });
-            } finally { S._resizing = false; }
-          }, 0);
-        },
         datazoom: function (params, ctx, inst) {
           var S = inst.__rkGantt;
           if (!S) return;

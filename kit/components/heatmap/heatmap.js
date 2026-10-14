@@ -14,7 +14,9 @@
     mean: { label: 'Average', fn: mean },
     compound: { label: 'Year', fn: function (a) { return a.reduce(function (s, v) { return s * (1 + v); }, 1) - 1; } }
   };
-  function textW(s, px) { return String(s).length * (px || 11) * 0.6; }
+  /** Generic field names (x, y, metric …) cross-filter only this block's dataset; business dimensions stay global. */
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
+  function scoped(ctx, f) { return GENERIC.test(f) ? { scope: ctx.options.crossFilterScope || 'dataset' } : null; }
 
   /** Category label mapping: 'months' (1-12 -> Jan..Dec) or a {value: label} object. */
   function labeller(spec, fmt) {
@@ -122,10 +124,10 @@
       /* labels on/off + size from the available cell size */
       var w = ctx.el.clientWidth || 600, hgt = ctx.el.clientHeight || 300;
       var cw = (w - 70) / xCats.length, ch = (hgt - 60) / ys.length;
-      var sample = RK.format(ext[1], fmt), sample2 = RK.format(ext[0], fmt);
-      var need = Math.max(textW(sample, 10.5), textW(sample2, 10.5)) + 6;
+      var numFont = '10.5px ' + t.fontNum;
+      var need = Math.max(C.measure(RK.format(ext[1], fmt), numFont), C.measure(RK.format(ext[0], fmt), numFont)) + 8;
       var showLabels = o.labels === 'auto' ? cw >= need && ch >= 14 : !!o.labels;
-      var fs = cw >= need + 14 && ch >= 22 ? 11 : 10;
+      var fs = cw >= need + 14 && ch >= 22 ? 11 : 10.5;
 
       var selField = o.select === 'x' ? enc.x : o.select === 'y' ? enc.y : null;
       var sel = selField ? ctx.selected(selField).map(String) : [];
@@ -145,7 +147,7 @@
             value: [ix, iy, v],
             raw: [rawX[xk], rawY[yk]],
             itemStyle: dim ? { opacity: 0.22 } : undefined,
-            label: { color: v == null ? t.ink3 : RK.theme.onColor(fill, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#ffffff') }
+            label: { color: v == null ? t.ink3 : RK.theme.textOn(fill) }
           });
         });
       });
@@ -219,10 +221,14 @@
         }]
       };
     }, {
-      select: function (p, ctx) {
-        var o = ctx.options;
-        if (!o.select || p.seriesId !== 'cells' || !p.data || !p.data.raw) return null;
-        return o.select === 'x' ? { field: ctx.enc.x, value: p.data.raw[0] } : { field: ctx.enc.y, value: p.data.raw[1] };
+      rebuildOnResize: true,   // label visibility / size follow the cell size
+      on: {
+        // click a cell -> cross-filter its column (select: 'x') or row (select: 'y')
+        click: function (p, ctx) {
+          var o = ctx.options, f = o.select === 'x' ? ctx.enc.x : o.select === 'y' ? ctx.enc.y : null;
+          if (!f || o.crossFilter === false || p.seriesId !== 'cells' || !p.data || !p.data.raw) return;
+          ctx.select(f, p.data.raw[o.select === 'x' ? 0 : 1], scoped(ctx, f));
+        }
       }
     })
   });

@@ -7,7 +7,7 @@
   "deps": ["echarts"],
   "summary": "Valuation ranges by methodology as floating horizontal bars, with current / offer price reference lines.",
   "summary_zh": "按估值方法展示估值区间的横向浮动条形图，叠加当前股价 / 报价参考线。",
-  "description_zh": "投行估值页的标志性图表。每一行是一种估值方法（DCF、可比公司、先例交易、52 周股价区间、分析师目标价等），横条两端为估值区间下限/上限，竖虚线标出当前股价或报价，阴影带可标出建议报价区间。可按 group 着色区分内在价值 / 市场法 / 交易法。",
+  "description_zh": "投行估值页的标志性图表。每一行是一种估值方法（DCF、可比公司、先例交易、52 周股价区间、分析师目标价等），横条两端为估值区间下限/上限，竖虚线（主题参考线颜色）标出当前股价或报价，阴影带可标出建议报价区间。可按 group 着色区分内在价值 / 市场法 / 交易法，并在左上角给出图例；52 周股价区间、分析师目标价等仅作参考的行（referenceGroups）按投行惯例以灰色显示。",
   "best_for": ["Equity value per share by methodology", "Enterprise value ranges", "Offer price positioning vs. intrinsic value"],
   "avoid_when": ["Point estimates without ranges", "More than ~10 methodologies"],
   "channels": {
@@ -19,13 +19,17 @@
     "order": {"type": "number", "required": false, "desc": "Sort order (uses an 'order' field automatically when present)"}
   },
   "options": {
-    "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] vertical reference lines"},
-    "refBand": {"type": "object", "default": null, "desc": "{from, to, label} shaded band, e.g. proposed offer range"},
-    "format": {"type": "string", "default": null, "desc": "Value format (defaults to the low field's format)"},
+    "refLines": {"type": "array", "default": [], "desc": "[{value, label, color, type}] vertical reference lines (current / offer price) — dashed, in the theme's reference colour unless color is set; labels above the plot, spread apart when values are close"},
+    "refBand": {"type": "object", "default": null, "desc": "{from, to, label} shaded band, e.g. proposed offer range; the label sits above the reference-line labels"},
+    "referenceGroups": {"type": "string[]", "default": ["Reference"], "desc": "Groups drawn greyed with muted labels — market reference points rather than valuation methods (52-week range, analyst targets)"},
+    "format": {"type": "string", "default": null, "desc": "Value format (defaults to the low field's format); axis ticks drop decimals when the step is whole"},
     "showValues": {"type": "boolean", "default": true, "desc": "Low / high labels at the bar ends"},
-    "groupColors": {"type": "boolean", "default": true, "desc": "Colour bars by group"}
+    "groupColors": {"type": "boolean", "default": true, "desc": "Colour bars by group (colours kept clear of the band and the reference-line colour)"},
+    "legend": {"type": "boolean", "default": true, "desc": "Group key, top-left (when bars are coloured by group)"},
+    "crossFilter": {"type": "boolean", "default": true, "desc": "Click a methodology to cross-filter other blocks"},
+    "crossFilterScope": {"type": "string", "default": "dataset", "desc": "dataset: the selection only filters blocks bound to the same dataset | global"}
   },
-  "interactions": ["Hover tooltip with low / high / midpoint and basis", "Click a methodology to cross-filter", "PNG / CSV export"],
+  "interactions": ["Hover tooltip with low / high / midpoint and basis", "Click a methodology to cross-filter (others dim)", "Re-lays out on resize (tick density, reference-label spacing)", "PNG / CSV export"],
   "samples": [
     {"title": "Implied value per share (USD)", "data": "valuation_ranges", "height": 360,
      "options": {"encode": {"label": "method", "low": "low", "high": "high", "group": "group", "note": "basis"},

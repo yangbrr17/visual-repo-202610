@@ -9,16 +9,8 @@
   'use strict';
   var C = RK.chart, util = RK.util;
 
-  /** Canvas text width (margins and wraps are sized from measured labels). */
-  var measure = (function () {
-    var c2d = null;
-    return function (text, font) {
-      c2d = c2d || document.createElement('canvas').getContext('2d');
-      c2d.font = font;
-      // +7%: the canvas may measure with a fallback face before the webfont has loaded
-      return c2d.measureText(String(text)).width * 1.07;
-    };
-  })();
+  /** Label width via the shared canvas measure; +7% because the canvas may still measure a fallback face. */
+  function measure(text, font) { return C.measure(text, font) * 1.07; }
 
   function tokenColor(t, v) {
     if (!v) return null;
@@ -28,62 +20,51 @@
     return v;
   }
 
-  function hsl(c) {
-    var x = RK.theme.parseColor(c), r = x[0] / 255, g = x[1] / 255, b = x[2] / 255;
-    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn, h = 0, s = 0;
-    if (d) {
-      s = d / (1 - Math.abs(2 * l - 1));
-      h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
-      h = (h * 60 + 360) % 360;
-    }
-    return [h, s, l, x];
-  }
-  function rgbDist(a, b) { return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2)); }
-
   /**
-   * Theme categorical colours in order, skipping any that read like the reserved highlight
-   * (same hue family as accent2) or that are too close to a colour already picked.
-   */
-  function distinctPalette(cat, reserved) {
-    var res = reserved ? hsl(reserved) : null, picked = [];
-    cat.forEach(function (c) {
-      var x = hsl(c);
-      if (res && (rgbDist(x[3], res[3]) < 50 || (Math.min(Math.abs(x[0] - res[0]), 360 - Math.abs(x[0] - res[0])) < 22 && x[1] > 0.25 && res[1] > 0.25))) return;
-      if (picked.some(function (p) { return rgbDist(hsl(p)[3], x[3]) < 60; })) return;
-      picked.push(c);
-    });
-    // near-duplicates come back at the end (most distinct first), the reserved hue family only if needed
-    var rest = cat.filter(function (c) {
-      if (picked.indexOf(c) >= 0) return false;
-      var x = hsl(c);
-      return !(res && picked.length >= 3 && (rgbDist(x[3], res[3]) < 50 || (Math.min(Math.abs(x[0] - res[0]), 360 - Math.abs(x[0] - res[0])) < 22 && x[1] > 0.25 && res[1] > 0.25)));
-    });
-    function gapTo(c) { var x = hsl(c)[3]; return Math.min.apply(null, picked.map(function (p) { return rgbDist(hsl(p)[3], x); }).concat([999])); }
-    rest.sort(function (a, b) { return gapTo(b) - gapTo(a); });
-    return picked.concat(rest);
-  }
-
-  /**
-   * Toggle a node in this block's selection. A node matches links at either end, so the filter is
-   * an expression (`source in [..] or target in [..]`), scoped to this block's dataset unless
-   * filterScope = 'global'. `values` is kept on the spec so ctx.selected(enc.source) still works.
+   * Toggle a node in this block's selection. A node matches edges at either end (source OR target);
+   * the selection is scoped by crossFilterScope (default 'dataset': 'source' / 'target' are generic names).
    */
   function selectNode(ctx, value) {
     var enc = ctx.enc;
     if (ctx.options.crossFilter === false || value == null || !enc.source || !enc.target) return;
-    var key = ctx.id + ':' + enc.source, cur = RK.store.filter(key);
-    var vals = cur && cur.values ? cur.values.slice() : [];
-    var i = vals.indexOf(value);
-    if (i >= 0) vals.splice(i, 1); else vals.push(value);
-    if (!vals.length) { RK.store.clearFilter(key); return; }
-    var list = '[' + vals.map(function (v) { return JSON.stringify(String(v)); }).join(', ') + ']';
-    RK.store.setFilter(key, {
-      op: 'expr', field: enc.source, values: vals, source: ctx.id,
-      expr: '`' + enc.source + '` in ' + list + ' or `' + enc.target + '` in ' + list,
-      datasets: ctx.options.filterScope === 'global' || !ctx.dataset ? undefined : [ctx.dataset.id]
-    });
+    ctx.select(enc.source, value, { either: enc.target, scope: ctx.options.filterScope || undefined });
   }
 
+  /**
+   * Wheel rule (same as RK.chart.zoom): a plain wheel scrolls the report, Ctrl/Cmd + wheel or a
+   * trackpad pinch zooms the graph. A plain wheel over the chart flashes a hint so zoom stays
+   * discoverable; options.wheelZoom === true restores plain-wheel zoom.
+   */
+  function guardWheel(ctx, api) {
+    var el = ctx.el, hint = null, timer = null;
+    function onWheel(e) {
+      var o = ctx.options;
+      if (e.ctrlKey || e.metaKey || o.wheelZoom === true || o.roam === false || ctx.print) return;
+      e.stopPropagation();          // never reaches the ECharts roam controller: the page scrolls
+      if (!hint) {
+        hint = RK.util.h('div.rk-noprint', { 'aria-hidden': 'true', style: {
+          position: 'absolute', right: '8px', bottom: '8px', padding: '3px 8px', 'pointer-events': 'none', 'z-index': '3',
+          font: '11px ' + ctx.theme.fontSans, color: 'var(--rk-ink-2)', background: 'var(--rk-tooltip-bg)',
+          border: '1px solid var(--rk-rule)', 'border-radius': '4px', opacity: '0', transition: 'opacity 160ms'
+        } }, (/Mac|iP/.test(navigator.platform) ? '\u2318' : 'Ctrl') + ' + scroll to zoom \u00b7 drag to pan');
+        el.appendChild(hint);
+      }
+      hint.style.opacity = '1';
+      clearTimeout(timer);
+      timer = setTimeout(function () { hint.style.opacity = '0'; }, 1400);
+    }
+    el.addEventListener('wheel', onWheel, true);
+    el.addEventListener('mousewheel', onWheel, true);
+    var destroy = api.destroy;
+    api.destroy = function () {
+      el.removeEventListener('wheel', onWheel, true);
+      el.removeEventListener('mousewheel', onWheel, true);
+      clearTimeout(timer);
+      if (hint) hint.remove();
+      destroy();
+    };
+    return api;
+  }
 
   /** Nodes + edges with degree / weighted degree; nodes missing from nodesData are derived. */
   function model(ctx) {
@@ -224,17 +205,21 @@
       hideIsolated: true,       // with nodesData: drop nodes without edges under the current filters
       legend: true,
       format: null,             // edge value format (defaults to the value field's format)
+      wheelZoom: null,          // true: plain wheel zooms (default: Ctrl/Cmd + wheel or pinch; plain wheel scrolls the page)
       crossFilter: true,
-      filterScope: 'dataset'
+      crossFilterScope: 'dataset',  // dataset | global — reach of the click-to-filter selection
+      filterScope: null         // deprecated alias of crossFilterScope
     },
-    render: C(build, {
-      rebuildOnResize: true,     // positions are solved in px for the container size
-      on: {
-        click: function (p, c) {
-          if (p.dataType === 'node' && p.data && p.data.rkId != null) selectNode(c, p.data.rkId);
+    render: function (ctx) {
+      return guardWheel(ctx, C(build, {
+        rebuildOnResize: true,     // positions are solved in px for the container size
+        on: {
+          click: function (p, c) {
+            if (p.dataType === 'node' && p.data && p.data.rkId != null) selectNode(c, p.data.rkId);
+          }
         }
-      }
-    })
+      })(ctx));
+    }
   });
 
   function build(ctx, inst) {
@@ -248,14 +233,14 @@
 
     // categories (legend) — a category made only of highlighted nodes takes accent2
     var cats = util.unique(m.nodes.map(function (n) { return n.category || 'Other'; }));
-    var pal = distinctPalette(t.cat, hi.length ? t.accent2 : null);
+    var pal = RK.theme.palette({ n: cats.length });   // categorical, kept clear of accent2 (the highlight)
     var pi = 0, catColor = {};
     cats.forEach(function (c) {
       var members = m.nodes.filter(function (n) { return (n.category || 'Other') === c; });
       var custom = tokenColor(t, (o.categoryColors || {})[c]);
       if (custom) catColor[c] = custom;
       else if (hi.length && members.length && members.every(isHi)) catColor[c] = t.accent2;
-      else catColor[c] = pal[pi++ % pal.length];
+      else catColor[c] = pal[pi++];
     });
     function colorOf(n) { return isHi(n) ? t.accent2 : catColor[n.category || 'Other']; }
 

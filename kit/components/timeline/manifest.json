@@ -38,10 +38,12 @@
     "dateFormat": {"type": "string", "default": "d mmm yy", "desc": "Date format on the labels (tooltip uses the field format)"},
     "spacing": {"type": "string", "default": "even", "desc": "Vertical layout: even (rows with year markers) | time (proportional, labels dodged with elbow leaders)"},
     "domain": {"type": "array", "default": null, "desc": "[start, end] fixed time window for the horizontal axis"},
-    "today": {"type": "string", "default": null, "desc": "Dashed 'today' marker ('YYYY-MM-DD' or 'now'); null hides it"},
+    "today": {"type": "string", "default": null, "desc": "Dashed 'today' reference line in the theme's reference colour ('YYYY-MM-DD' or 'now'); null hides it"},
     "todayLabel": {"type": "string", "default": "Today", "desc": "Label under the today marker (date is appended)"},
     "highlight": {"type": "string|string[]", "default": null, "desc": "Event label(s) to emphasise (bold title, accent-2 date, larger marker)"},
     "selectBy": {"type": "string", "default": "kind", "desc": "Click-to-filter channel: kind | label | null"},
+    "crossFilter": {"type": "boolean", "default": true, "desc": "Click an event or a legend entry to cross-filter other blocks"},
+    "crossFilterScope": {"type": "string", "default": "dataset", "desc": "dataset: the selection only filters blocks bound to the same dataset ('kind' / 'label' are generic fields) | global"},
     "legend": {"type": "boolean", "default": true, "desc": "Kind legend top-left (click to filter)"}
   },
   "interactions": [

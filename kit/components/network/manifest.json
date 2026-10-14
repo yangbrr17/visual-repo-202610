@@ -7,7 +7,7 @@
   "deps": ["echarts"],
   "summary": "Relationship map from an edge list plus an optional node table — customers, suppliers, competitors and partners around the target; force or circular layout with zoom, drag and adjacency highlight.",
   "summary_zh": "由边表（可选节点表）生成的关系网络：围绕目标公司的客户、供应商、竞争对手与合作伙伴；力导向或环形布局，支持缩放、拖拽与邻接高亮。",
-  "description_zh": "主数据集是边表（source、target、value、type），节点信息通过 options.nodesData 绑定另一个数据集（id、name、类别、规模）；没有节点表时自动从边推导节点。节点颜色代表类别（图例可开关），节点面积代表规模，连线粗细代表金额，目标公司以强调色突出。力导向布局使用确定性初始位置，每次打开与打印结果一致。悬停节点会高亮其直接关系，点击节点可保持聚焦并交叉筛选；滚轮缩放、拖动画布与节点。适合 10–80 个节点的生态图、客户/供应商依赖、董事交叉任职、投资人关系等。",
+  "description_zh": "主数据集是边表（source、target、value、type），节点信息通过 options.nodesData 绑定另一个数据集（id、name、类别、规模）；没有节点表时自动从边推导节点。节点颜色代表类别（图例可开关），节点面积代表规模，连线粗细代表金额，目标公司以强调色突出。力导向布局使用确定性初始位置，每次打开与打印结果一致。悬停节点会高亮其直接关系，点击节点可保持聚焦并交叉筛选；Ctrl/⌘ + 滚轮或双指捏合缩放（普通滚轮照常滚动页面），拖动画布与节点。适合 10–80 个节点的生态图、客户/供应商依赖、董事交叉任职、投资人关系等。",
   "best_for": ["Ecosystem map: customers / suppliers / competitors / partners around the target", "Counterparty or supply-chain dependency", "Board interlocks and investor networks", "Synergy maps between business units"],
   "avoid_when": ["More than ~150 nodes (aggregate or use a matrix)", "Ordered stage flows (use sankey)", "Precise value comparison (use a bar chart)"],
   "channels": {
@@ -35,15 +35,17 @@
     "dashedTypes": {"type": "string[]", "default": [], "desc": "Edge types drawn dashed (e.g. ['Competition'])"},
     "arrows": {"type": "boolean", "default": false, "desc": "Arrowheads at the target end"},
     "force": {"type": "object", "default": {}, "desc": "layout 'physics' only: ECharts force overrides {repulsion, edgeLength, gravity, friction}; defaults scale with the container and node count"},
-    "roam": {"type": "boolean", "default": true, "desc": "Wheel zoom + pan"},
+    "roam": {"type": "boolean", "default": true, "desc": "Zoom (Ctrl/⌘ + wheel or pinch) and drag to pan"},
+    "wheelZoom": {"type": "boolean", "default": null, "desc": "true: zoom on a plain mouse wheel; default: a plain wheel scrolls the page and a hint shows the Ctrl/⌘ + wheel shortcut"},
     "draggable": {"type": "boolean", "default": true, "desc": "Drag nodes"},
     "hideIsolated": {"type": "boolean", "default": true, "desc": "With nodesData: drop nodes left without edges by the current filters"},
     "legend": {"type": "boolean", "default": true, "desc": "Category legend (top-left, click to toggle)"},
     "format": {"type": "string", "default": null, "desc": "Edge value format; defaults to the value field's format"},
     "crossFilter": {"type": "boolean", "default": true, "desc": "Click a node to keep its neighbourhood in focus and filter other blocks on the source field"},
-    "filterScope": {"type": "string", "default": "dataset", "desc": "dataset: the selection only filters blocks bound to the same edge dataset | global"}
+    "crossFilterScope": {"type": "string", "default": "dataset", "desc": "dataset: the selection only filters blocks bound to the same edge dataset ('source' / 'target' are generic names) | global"},
+    "filterScope": {"type": "string", "default": null, "desc": "Deprecated alias of crossFilterScope (still honoured when set)"}
   },
-  "interactions": ["Hover a node: adjacency highlight + tooltip (category, size, connections)", "Hover an edge: relationship type and value", "Click a node to pin its neighbourhood and cross-filter", "Wheel zoom, pan, drag nodes", "Legend toggles categories", "Positions are kept across filter updates", "PNG / CSV export"],
+  "interactions": ["Hover a node: adjacency highlight + tooltip (category, size, connections)", "Hover an edge: relationship type and value", "Click a node to pin its neighbourhood and cross-filter", "Ctrl/⌘ + wheel or pinch to zoom (a plain wheel scrolls the page), drag to pan, drag nodes", "Legend toggles categories", "Positions are kept across filter updates", "PNG / CSV export"],
   "samples": [
     {"title": "Helios ecosystem — customers, suppliers, competitors and partners (USD m)", "data": "network_edges", "height": 480,
      "options": {"nodesData": "network_nodes", "encode": {"source": "source", "target": "target", "value": "value", "edgeType": "type", "id": "id", "name": "name", "category": "type", "size": "size"},

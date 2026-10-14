@@ -29,8 +29,8 @@
     "fit": {"type": "string|array|object", "default": "data", "desc": "Initial view: 'data' | 'world' | [[south, west], [north, east]] | {center: [lat, lon], zoom}"},
     "legend": {"type": "boolean", "default": true, "desc": "Show the density legend with point count / total"},
     "legendPosition": {"type": "string", "default": "bottomleft", "desc": "Leaflet control corner"},
-    "filterField": {"type": "string", "default": null, "desc": "Field used when clicking a point; defaults to encode.label"},
-    "scrollZoom": {"type": "boolean|string", "default": "click", "desc": "Mouse-wheel zoom: true | false | 'click' (armed after clicking the map)"}
+    "filterField": {"type": "string", "default": null, "desc": "Field used when clicking a point; defaults to encode.label. Shared business dimensions (country, company, sector, region, segment, year…) filter the whole report; other fields (site name, type, from / to…) only this block's dataset — set crossFilterScope to override"},
+    "scrollZoom": {"type": "boolean|string", "default": "click", "desc": "Plain mouse-wheel zoom: 'click' (armed after clicking the map, so page scrolling is never hijacked) | true | false. Ctrl/Cmd + wheel or a trackpad pinch always zooms; +/- buttons and drag too"}
   },
   "interactions": ["Toggle the points overlay", "Hover a point for its fields; click to cross-filter", "Zoom / pan (density re-computed per zoom)", "Updates with filters", "PNG export"],
   "samples": [

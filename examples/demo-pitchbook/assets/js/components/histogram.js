@@ -1,7 +1,8 @@
 /*!
  * RK component: histogram — binned distribution of one metric (bins by count, width or automatic
  * Freedman–Diaconis rounded to a nice width), optional Gaussian KDE curve, median / mean lines,
- * the bin holding the target highlighted with a marker at its exact value, a rug of the raw
+ * the bin holding the target highlighted with a marker at its exact value (or a dashed reference
+ * line for an explicit value such as an offer premium), a rug of the raw
  * observations, and click-a-bin cross-filtering (a "between" filter on the value field).
  */
 (function () {
@@ -40,8 +41,10 @@
     var k = 1 / (n * h * Math.sqrt(2 * Math.PI));
     return function (x) { var sum = 0; for (var i = 0; i < n; i++) { var u = (x - vals[i]) / h; sum += Math.exp(-0.5 * u * u); } return k * sum; };
   }
-  function axisFmt(fmt) {
-    return function (v) { var s = RK.format(v, fmt); return Math.round(v) === v && Math.abs(v) >= 100 ? s.replace(/\.0+(?=\D*$)/, '') : s; };
+  /** Tick labels in the field format, without decimals while the tick step is whole ("12x", "35%" — not "12.0x"). */
+  function ticks(fmt, step) {
+    var whole = !/\.\d*[1-9]/.test(RK.format(step, fmt));
+    return function (v) { var s = RK.format(v, fmt); return whole ? s.replace(/\.0+(?=\D*$)/, '') : s; };
   }
   var STAT = {
     median: { label: 'Median', fn: function (s) { return quantile(s, 0.5); } },
@@ -51,6 +54,8 @@
   };
 
   function filterKey(ctx) { return ctx.id + ':' + ctx.enc.value; }
+  /** Generic value fields ('value', 'x' …) filter only this block's dataset; named metrics stay global. */
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
 
   RK.component({
     id: 'histogram',
@@ -64,7 +69,7 @@
       density: false,          // Gaussian KDE curve scaled to the bars
       bandwidth: null,         // KDE bandwidth (default: Silverman's rule)
       stats: ['median', 'mean'], // dashed reference lines: 'median' | 'mean' | 'p25' | 'p75'
-      targetValue: null,       // explicit value to mark (e.g. offer premium); default: the target row's value
+      targetValue: null,       // explicit reference value (e.g. offer premium): dashed t.ref line; default: the target row's value
       targetLabel: null,       // label for that marker (default: target label + value)
       highlight: null,         // label / name value(s) treated as the target; default: encode.target field
       labels: true,            // count / % above each bar
@@ -110,7 +115,8 @@
       var tRow = rows.filter(isTarget)[0] || null;
       var tVal = o.targetValue != null ? o.targetValue : (tRow ? tRow[enc.value] : null);
       var tText = o.targetLabel || ((tRow && labelF && o.targetValue == null ? tRow[labelF] + ' ' : 'Target ') + RK.format(tVal, fmt));
-      var tBin = util.isNum(tVal) ? Math.min(k - 1, Math.max(0, Math.floor((tVal - start) / w + 1e-9))) : -1;
+      var isRef = o.targetValue != null;   // an explicit value (offer, price) is a reference line, not the subject
+      var tBin = util.isNum(tVal) && !isRef ? Math.min(k - 1, Math.max(0, Math.floor((tVal - start) / w + 1e-9))) : -1;
       if (util.isNum(tVal) && (tVal < start || tVal > start + k * w)) tBin = -1;
 
       /* own cross-filter selection (a between filter on the value field) */
@@ -151,14 +157,14 @@
         var align = statLines.length === 1 ? 'center' : (j === 0 ? 'right' : 'left');
         return {
           xAxis: s.v, lineStyle: { color: t.ink3, type: [4, 3], width: 1 },
-          label: { show: true, position: 'end', distance: 4, color: t.ink2, fontSize: 10, align: align, padding: align === 'right' ? [0, 2, 0, 0] : align === 'left' ? [0, 0, 0, 2] : 0,
+          label: { show: true, position: 'end', distance: 4, color: t.ink3, fontSize: 10, align: align, padding: align === 'right' ? [0, 2, 0, 0] : align === 'left' ? [0, 0, 0, 2] : 0,
             formatter: s.label + ' ' + RK.format(s.v, fmt) }
         };
       });
       if (util.isNum(tVal)) {
         lines.push({
-          xAxis: tVal, lineStyle: { color: t.accent2, type: 'solid', width: 1.5 },
-          label: { show: true, position: 'end', distance: 18, color: t.ink, fontWeight: 700, fontSize: 10.5, formatter: tText }
+          xAxis: tVal, lineStyle: isRef ? { color: t.ref, type: [5, 3], width: 1.5 } : { color: t.accent2, type: 'solid', width: 1.5 },
+          label: { show: true, position: 'end', distance: 18, color: isRef ? t.ref : t.ink, fontWeight: 700, fontSize: 10.5, formatter: tText }
         });
       }
 
@@ -181,7 +187,7 @@
 
       var maxY = Math.max.apply(null, data.map(function (d) { return d.value[2]; }).concat(curve.map(function (c) { return c[1]; })));
       // one tick per bin edge while labels fit (~56px each), else every 2nd / 5th ... edge
-      var maxTicks = Math.max(4, Math.floor(((ctx.el.clientWidth || 600) - 80) / 56));
+      var maxTicks = Math.max(4, Math.floor(((ctx.el.clientWidth || 600) - 80) / 56));   // re-evaluated on resize
       var tickEvery = Math.max(1, Math.ceil(k / maxTicks));
       var graphic = [];
       if (o.showN) {
@@ -215,7 +221,7 @@
           name: o.title || ctx.title(enc.value), nameLocation: 'middle', nameGap: o.rug ? 34 : 26,
           axisLine: { show: true, onZero: false, lineStyle: { color: t.axis } },
           axisTick: { show: !o.rug, length: 3, lineStyle: { color: t.axis } },   // the rug already marks the axis
-          axisLabel: { formatter: axisFmt(fmt), margin: o.rug ? 14 : 8, hideOverlap: true, showMaxLabel: k % tickEvery === 0 },
+          axisLabel: { formatter: ticks(fmt, w * tickEvery), margin: o.rug ? 14 : 8, hideOverlap: true, showMaxLabel: k % tickEvery === 0 },
           splitLine: { show: false }
         },
         yAxis: {
@@ -240,15 +246,20 @@
         ]
       };
     }, {
+      rebuildOnResize: true,   // tick density follows the width
       on: {
+        // click a bin -> range ("between") cross-filter on the value field; click it again to clear
         click: function (p, ctx) {
           if (p.seriesId !== 'bins' || ctx.options.crossFilter === false) return;
-          var b = p.data && p.data.bin, key = filterKey(ctx), cur = RK.store.filter(key);
+          var b = p.data && p.data.bin, key = filterKey(ctx), cur = RK.store.filter(key), f = ctx.enc.value;
           if (!b) return;
           if (cur && cur.op === 'between' && cur.min === b.x0) { RK.store.clearFilter(key); return; }
           // [x0, x1): nudge the inclusive "between" max just below the next edge (last bin stays closed)
           var max = p.data.last ? b.x1 : b.x1 - Math.abs(b.x1 - b.x0) * 1e-9;
-          RK.store.setFilter(key, { field: ctx.enc.value, op: 'between', min: b.x0, max: max, source: ctx.id });
+          var spec = { field: f, op: 'between', min: b.x0, max: max, source: ctx.id };
+          var scope = ctx.options.crossFilterScope || (GENERIC.test(f) ? 'dataset' : 'global');
+          if (scope === 'dataset' && ctx.dataset) spec.datasets = [ctx.dataset.id];
+          RK.store.setFilter(key, spec);   // ctx.select covers 'in' lists only; ranges go to the store directly
         }
       }
     })

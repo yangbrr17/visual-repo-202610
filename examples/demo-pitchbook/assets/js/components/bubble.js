@@ -33,56 +33,32 @@
     var mag = Math.pow(10, Math.floor(Math.log10(v))), n = v / mag;
     return (n >= 5 ? 5 : n >= 2.5 ? 2.5 : n >= 2 ? 2 : 1) * mag;
   }
-  /** Perceptual-ish similarity: close hue and lightness (or near-identical greys). */
-  function similar(a, b) {
-    function hsl(c) {
-      var p = RK.theme.parseColor(c), r = p[0] / 255, g = p[1] / 255, bl = p[2] / 255;
-      var mx = Math.max(r, g, bl), mn = Math.min(r, g, bl), l = (mx + mn) / 2, d = mx - mn, h = 0;
-      var s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
-      if (d) h = mx === r ? ((g - bl) / d) % 6 : mx === g ? (bl - r) / d + 2 : (r - g) / d + 4;
-      return [(h * 60 + 360) % 360, s, l, p];
-    }
-    var x = hsl(a), y = hsl(b);
-    if (x[1] < 0.15 || y[1] < 0.15) {
-      return Math.sqrt(Math.pow(x[3][0] - y[3][0], 2) + Math.pow(x[3][1] - y[3][1], 2) + Math.pow(x[3][2] - y[3][2], 2)) < 40;
-    }
-    var dh = Math.abs(x[0] - y[0]); dh = Math.min(dh, 360 - dh);
-    return dh < 22 && Math.abs(x[2] - y[2]) < 0.22;
-  }
+  /** Strip all-zero decimals: "$1,800.0" -> "$1,800", "18.0x" -> "18x". */
+  function trim0(s) { return s.replace(/\.0+(?=\D*$)/, ''); }
   /**
-   * Category palette: theme order, but skipping colours similar to accent2 (reserved for the target)
-   * or to a colour already picked, so neighbouring categories stay distinguishable.
+   * Tick labels in the field format, without decimals while the tick step is whole ("18x", "5%" — not
+   * "18.0x"); `step` is a number or a function (live interval while zoomed). Log axes: whole ticks only.
    */
-  function catPalette(values, t) {
-    var pool = [];
-    t.cat.forEach(function (c) { if (!similar(c, t.accent2) && pool.every(function (p) { return !similar(c, p); })) pool.push(c); });
-    t.cat.forEach(function (c) { if (pool.indexOf(c) < 0 && !similar(c, t.accent2)) pool.push(c); });  // reuse the rest if needed
-    if (!pool.length) pool = t.cat;
-    var map = {};
-    values.forEach(function (v, i) { map[v] = pool[i % pool.length]; });
-    return function (v) { return map[v] || t.neutral; };
-  }
-  /** Axis tick formatter: the field format, but whole ticks >= 100 (any whole tick on a log axis) drop ".0" — "$1,800" not "$1,800.0". */
-  function axisFmt(fmt, log) {
+  function ticks(fmt, step, log) {
     return function (v) {
-      var s = RK.format(v, fmt);
-      return Math.round(v) === v && (log || Math.abs(v) >= 100) ? s.replace(/\.0+(?=\D*$)/, '') : s;
+      var s = RK.format(v, fmt), st = typeof step === 'function' ? step() : step;
+      if (log) return Math.round(v) === v ? trim0(s) : s;
+      return st && !/\.\d*[1-9]/.test(RK.format(st, fmt)) ? trim0(s) : s;
     };
   }
-  function textW(s, px) { return String(s).length * (px || 11) * 0.58; }
+  /** Live tick interval of a value axis (changes while zoomed); `dflt` before the first layout. */
+  function axisStep(inst, axis, dflt) {
+    try { return inst.getModel().getComponent(axis, 0).axis.scale.getInterval() || dflt; } catch (e) { return dflt; }
+  }
+  /** Generic field names cross-filter only this block's dataset; business dimensions (company, country …) stay global. */
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
+  function scoped(ctx, f) { return GENERIC.test(f) ? { scope: ctx.options.crossFilterScope || 'dataset' } : null; }
   function sortPeriods(list) {
     var nums = list.every(function (v) { return typeof v === 'number'; });
     return list.slice().sort(function (a, b) { return nums ? a - b : String(a).localeCompare(String(b)); });
   }
 
   /* ---------------- label placement (greedy, think-cell style) ---------------- */
-  var measureCtx = null;
-  function measure(text, font) {
-    if (measureCtx === null) { try { measureCtx = document.createElement('canvas').getContext('2d') || false; } catch (e) { measureCtx = false; } }
-    if (!measureCtx) return String(text).length * 6.2;
-    measureCtx.font = font;
-    return measureCtx.measureText(String(text)).width;
-  }
   function gridRect(inst) {
     try { return inst.getModel().getComponent('grid', 0).coordinateSystem.getRect(); }
     catch (e) { return { x: 0, y: 0, width: inst.getWidth(), height: inst.getHeight() }; }
@@ -227,9 +203,7 @@
     if (!st.selField) return;
     var vals = st.points.filter(function (p) { return p.x >= xr[0] && p.x <= xr[1] && p.y >= yr[0] && p.y <= yr[1]; })
       .map(function (p) { return p.key; });
-    var key = st.ctx.id + ':' + st.selField;
-    if (vals.length) RK.store.setFilter(key, { field: st.selField, op: 'in', values: util.unique(vals), source: st.ctx.id });
-    else RK.store.clearFilter(key);
+    st.ctx.setSelection(st.selField, util.unique(vals), scoped(st.ctx, st.selField));   // empty box clears
   }
 
   /* ---------------- option builder ---------------- */
@@ -267,7 +241,7 @@
     var stops = cType === 'diverging' ? t.div : (t.seq.length > 4 ? t.seq.slice(2) : t.seq);
     var cScale = continuous ? RK.theme.sequential(cDom, stops) : null;   // identical ramp to the visualMap -> label contrast
     var groups = cType === 'category' ? util.unique(allRows.map(function (r) { return r[colorF]; }).filter(function (v) { return v != null; })) : [];
-    var palette = catPalette(groups.length ? groups : [0], t);
+    var palette = RK.theme.categoricalSafe(groups.length ? groups : [0]);   // peers never resemble the accent2 target
 
     /* size: area ∝ value (diameter ∝ √value), scaled to the unfiltered maximum so filtering never rescales */
     var sMax = sizeF ? util.extent(allRows.map(function (r) { return Math.abs(r[sizeF]); }))[1] : 0;
@@ -325,7 +299,7 @@
           var oid = L.id + '#' + (data.length - 1);
           obstacles.push({ x: it.value[0], y: it.value[1], r: d / 2 + 0.5, id: oid, name: L.name });
           if (!name || !(L.target || labelled.has(r))) return;
-          var font = (L.target ? '700 ' : '500 ') + '10.5px ' + t.fontSans, tw = measure(name, font);
+          var font = (L.target ? '700 ' : '500 ') + '10.5px ' + t.fontSans, tw = C.measure(name, font);
           var inside = d >= tw + 8;
           var eff = RK.theme.mix(t.paper, fill || t.cat[0], opacity);
           specs.push({ seriesId: L.id + ':lab', index: labs.length, x: it.value[0], y: it.value[1], r: d / 2, w: tw + 2, h: 13,
@@ -334,7 +308,7 @@
             value: it.value, name: name, symbolSize: d,
             label: {
               show: false,   // shown by layoutLabels() once a free position is found
-              color: dim ? RK.theme.alpha(t.ink2, 0.35) : inside ? RK.theme.onColor(eff, t.dark ? t.paper : t.ink, t.dark ? t.ink : '#ffffff') : (L.target ? t.ink : t.ink2),
+              color: dim ? RK.theme.alpha(t.ink2, 0.35) : inside ? RK.theme.textOn(eff) : (L.target ? t.ink : t.ink2),
               textBorderWidth: inside ? 0 : 2.5, fontWeight: L.target ? 700 : 500
             }
           });
@@ -382,13 +356,13 @@
 
     /* reference lines */
     var lines = [];
-    var refStyle = { color: t.ink3, type: [4, 3], width: 1 };
     if (o.xScale !== 'log' && xe.min < 0 && xe.max > 0) lines.push({ xAxis: 0, lineStyle: { color: t.axis, type: 'solid' }, label: { show: false } });
     if (o.yScale !== 'log' && ye.min < 0 && ye.max > 0) lines.push({ yAxis: 0, lineStyle: { color: t.axis, type: 'solid' }, label: { show: false } });
     (o.refLines || []).forEach(function (r) {
-      var isX = r.axis === 'x', d = { lineStyle: util.merge({}, refStyle, r.color ? { color: r.color } : {}) };
+      // house style: reference lines in t.ref, dashed, label in the line colour
+      var isX = r.axis === 'x', col = r.color || t.ref, d = { lineStyle: { color: col, type: [4, 3], width: 1.25 } };
       d[isX ? 'xAxis' : 'yAxis'] = r.value;
-      d.label = { show: true, position: isX ? 'end' : 'insideEndTop', color: r.color || t.ink3, fontSize: 10, distance: 3,
+      d.label = { show: true, position: isX ? 'end' : 'insideEndTop', color: col, fontSize: 10, distance: 3,
         formatter: (r.label ? r.label + ' ' : '') + RK.format(r.value, isX ? xFmt : yFmt) };
       lines.push(d);
     });
@@ -401,20 +375,21 @@
     /* size key (nested circles, bottom-aligned) in the right gutter */
     var showKey = o.sizeLegend !== false && !!sizeF && sMax > 0;
     var keyVals = showKey ? util.unique([niceBelow(sMax), niceBelow(sMax / 4), niceBelow(sMax / 16)]).filter(function (v) { return v > 0; }) : [];
-    var keyLabW = Math.max.apply(null, [24].concat(keyVals.map(function (v) { return textW(axisFmt(sFmt, true)(v), 10); })));
-    var gutter = showKey ? Math.max(Math.round(dMax + 14 + keyLabW), textW(ctx.title(sizeF), 10) * 0.6) : 0;
+    var keyFmt = ticks(sFmt, null, true), keyFont = '10px ' + t.fontNum, titleFont = '600 10px ' + t.fontSans;
+    var keyLabW = Math.max.apply(null, [24].concat(keyVals.map(function (v) { return C.measure(keyFmt(v), keyFont); })));
+    var gutter = showKey ? Math.max(Math.round(dMax + 14 + keyLabW), C.measure(ctx.title(sizeF), titleFont) * 0.6) : 0;
     var graphic = [];
     var top0 = 34;
     if (showKey) {
       var sTitle = o.sizeTitle || ctx.title(sizeF);
-      var lines = Math.max(1, Math.ceil(textW(sTitle, 10) / gutter));
-      var kids = [{ type: 'text', x: 0, y: 0, style: { text: sTitle, fill: t.ink3, font: '600 10px ' + t.fontSans, width: gutter, overflow: 'break', lineHeight: 12 } }];
+      var lines = Math.max(1, Math.ceil(C.measure(sTitle, titleFont) / gutter));
+      var kids = [{ type: 'text', x: 0, y: 0, style: { text: sTitle, fill: t.ink3, font: titleFont, width: gutter, overflow: 'break', lineHeight: 12 } }];
       var base = 6 + 12 * lines + dMax;
       keyVals.forEach(function (v) {
         var r = diam(v) / 2, ty = base - 2 * r;
         kids.push({ type: 'circle', shape: { cx: dMax / 2, cy: base - r, r: r }, style: { fill: 'none', stroke: t.ink3, lineWidth: 0.8 } });
         kids.push({ type: 'line', shape: { x1: dMax / 2, y1: ty, x2: dMax + 6, y2: ty }, style: { stroke: t.ink3, lineWidth: 0.6, lineDash: [2, 2] } });
-        kids.push({ type: 'text', x: dMax + 8, y: ty, style: { text: axisFmt(sFmt, true)(v), fill: t.ink2, font: '10px ' + t.fontNum, verticalAlign: 'middle' } });
+        kids.push({ type: 'text', x: dMax + 8, y: ty, style: { text: keyFmt(v), fill: t.ink2, font: keyFont, verticalAlign: 'middle' } });
       });
       graphic.push({ type: 'group', id: 'rk-size', right: 2, top: top0, silent: true, children: kids });
     }
@@ -424,7 +399,7 @@
     var visualMap;
     if (continuous) {
       var cTitle = o.colorTitle || ctx.title(colorF);
-      var tw = textW(cTitle, 10.5) + 10;
+      var tw = C.measure(cTitle, '600 10.5px ' + t.fontSans) + 10;
       graphic.push({ type: 'text', id: 'rk-ctitle', left: 0, top: 16, silent: true, style: { text: cTitle, fill: t.ink2, font: '600 10.5px ' + t.fontSans } });
       visualMap = {
         type: 'continuous', dimension: 3, seriesIndex: bubbleIdx, min: cDom[0], max: cDom[1],
@@ -443,13 +418,13 @@
     inst.__rk = { ctx: ctx, points: points, selField: selField };
     inst.__rkLabels = timeline ? { frames: frameLabels } : frameLabels[0];
     if (!timeline) inst.__rkTimeline = null;
-    inst.__rkCanBrush = !!selField && o.brush !== false && !timeline;
+    inst.__rkCanBrush = !!selField && o.brush !== false && o.crossFilter !== false && !timeline;
 
     var axisBase = function (isX, ext, fmt, scale, title) {
       var a = {
         type: scale === 'log' ? 'log' : 'value', min: ext.min, max: ext.max, name: title, nameLocation: 'middle',
         axisLabel: {
-          formatter: axisFmt(fmt, scale === 'log'),
+          formatter: ticks(fmt, function () { return axisStep(inst, isX ? 'xAxis' : 'yAxis', ext.step); }, scale === 'log'),
           hideOverlap: true, showMinLabel: !zoomed, showMaxLabel: !zoomed
         },
         splitLine: { show: true, lineStyle: { color: t.grid } },
@@ -459,7 +434,8 @@
       else a.splitNumber = Math.round((ext.max - ext.min) / ext.step);
       return a;
     };
-    var yLabW = Math.max(textW(RK.format(ye.min, yFmt)), textW(RK.format(ye.max, yFmt)));
+    var yLab = ticks(yFmt, ye.step, o.yScale === 'log'), labFont = '11px ' + t.fontNum;
+    var yLabW = Math.max(C.measure(yLab(ye.min), labFont), C.measure(yLab(ye.max), labFont));
     var xAxis = util.merge(axisBase(true, xe, xFmt, o.xScale, o.xTitle || ctx.title(enc.x)), { nameGap: 26 });
     var yAxis = util.merge(axisBase(false, ye, yFmt, o.yScale, o.yTitle || ctx.title(enc.y)), { nameGap: Math.round(yLabW + 14) });
 
@@ -481,7 +457,7 @@
     };
     var gridTop = (continuous ? 42 : showLegend || interactive ? 30 : 10) + (hasXRef ? 14 : 0);
     var common = {
-      legend: C.legend(ctx, { show: showLegend, data: legendNames, right: (interactive ? 92 : 0) + gutter, icon: 'circle', itemWidth: 9, itemHeight: 9 }),
+      legend: C.legend(ctx, { show: showLegend, data: legendNames, right: (interactive ? 92 : 0) + gutter }),
       // containLabel:false -> ECharts 6 keeps axis labels + names inside outerBounds (above the timeline)
       grid: C.grid(ctx, { top: gridTop, right: gutter ? gutter + 14 : 8, left: 2, bottom: tlShown ? 50 : 2, containLabel: false,
         outerBounds: { left: 0, right: 0, top: 0, bottom: tlShown ? 48 : 0 } }),
@@ -490,10 +466,9 @@
       yAxis: yAxis,
       visualMap: visualMap ? [visualMap] : [],
       toolbox: { show: false },
-      dataZoom: interactive ? [
-        util.merge({ type: 'inside', xAxisIndex: 0, filterMode: 'none', zoomOnMouseWheel: 'ctrl', moveOnMouseMove: true, moveOnMouseWheel: false }, zs[0]),
-        util.merge({ type: 'inside', yAxisIndex: 0, filterMode: 'none', zoomOnMouseWheel: 'ctrl', moveOnMouseMove: true, moveOnMouseWheel: false }, zs[1])
-      ] : [],
+      // inside zoom on both axes: Ctrl/Cmd + wheel or pinch (plain wheel scrolls the report unless options.wheelZoom);
+      // the window is carried over explicitly because timeline updates rebuild the option with notMerge
+      dataZoom: interactive ? [util.merge(C.zoom(ctx, 'x')[0], zs[0]), util.merge(C.zoom(ctx, 'y')[0], zs[1])] : [],
       brush: interactive ? {
         toolbox: [], xAxisIndex: 0, yAxisIndex: 0, brushMode: 'single', transformable: false, removeOnClick: true, throttleType: 'debounce', throttleDelay: 120,
         brushStyle: { borderWidth: 1, color: RK.theme.alpha(t.accent3 || t.accent, 0.08), borderColor: RK.theme.alpha(t.accent3 || t.accent, 0.7) },
@@ -535,18 +510,19 @@
   }
 
   var base = C(build, {
-    select: function (p, ctx) {
-      if (!p.data || !p.data.row || p.componentType !== 'series') return null;
-      var enc = ctx.enc, ds = ctx.dataset;
-      var f = enc.label && ds.has(enc.label) ? enc.label : (enc.name && ds.has(enc.name) ? enc.name : null);
-      return f ? { field: f, value: p.data.row[f] } : null;
+    on: {
+      // click a bubble -> toggle it in the cross-filter on the label (or name) field
+      click: function (p, ctx, inst) {
+        var f = inst.__rk && inst.__rk.selField;
+        if (p.componentType !== 'series' || !p.data || !p.data.row || !f || ctx.options.crossFilter === false) return;
+        ctx.select(f, p.data.row[f], scoped(ctx, f));
+      }
     },
     init: function (inst) {
       inst.on('brushEnd', function (params) { onBrushEnd(params, inst); });
       inst.on('brush', function (params) {
-        if (inst.__rkMode === 'select' && params.areas && !params.areas.length && inst.__rk && inst.__rk.selField) {
-          RK.store.clearFilter(inst.__rk.ctx.id + ':' + inst.__rk.selField);
-        }
+        var st = inst.__rk;
+        if (inst.__rkMode === 'select' && params.areas && !params.areas.length && st && st.selField) st.ctx.setSelection(st.selField, []);
       });
       inst.on('timelineplaychanged', function (e) {
         // pressing play on the last period replays from the first one
@@ -592,6 +568,7 @@
       tooltipFields: [],
       brush: true,             // box-select tool -> cross-filter on the label field (not in timeline mode)
       zoom: true,              // box zoom, ctrl + wheel zoom, drag to pan and the hover toolbar
+      wheelZoom: null,         // true: a plain mouse wheel zooms (default: Ctrl/Cmd + wheel or pinch, so the page scrolls)
       legend: true
     },
     render: function (ctx) {

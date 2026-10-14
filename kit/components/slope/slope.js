@@ -6,6 +6,8 @@
 (function () {
   'use strict';
   var C = RK.chart, U = RK.util;
+  // house rule: generic fields cross-filter only this block's dataset; business dimensions filter globally
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|series|category|group|label|name|key|id|status|variable)$/i;
   var MAX_SLOPE_W = 460;   // the slope area is capped and centred: steep angles read better than flat ones
 
   RK.component({
@@ -15,10 +17,10 @@
       encode: { label: 'company', from: 'ev_ebitda_25e', to: 'ev_ebitda_26e', period: null, value: null, highlight: 'is_target', group: null },
       periods: null,          // long data: [fromPeriod, toPeriod] (default: first and last distinct period)
       headers: null,          // [left, right] column headers (default: period values / field titles minus common words)
-      colorBy: 'direction',   // direction (up / down) | neutral (grey, target in accent) | category (by group or label)
+      colorBy: 'direction',   // direction (up / down) | neutral (grey, target in accent2) | category (by group or label)
       good: 'up',             // direction mode: 'up' | 'down' — which direction is coloured positive
       highlight: null,        // label value(s) to emphasise, in addition to rows flagged by encode.highlight
-      median: false,          // dashed median line across both periods
+      median: false,          // dashed median line across both periods (ink-3)
       change: false,          // append the % change to the right-hand labels
       labels: 'both',         // both (names both sides) | right (names on the right only) | values (no names)
       inverse: false,         // reverse the value axis (ranks: 1 at the top)
@@ -32,7 +34,8 @@
       var fmt = o.format || ctx.fmtOf(d.long ? enc.value : enc.from) || 'auto';
       var heads = o.headers || d.headers;
       var sel = ctx.selected(enc.label);
-      var catColor = RK.theme.categorical(U.unique(items.map(function (it) { return it.group != null ? it.group : it.label; })));
+      // category colours stay clear of the accent2 target highlight
+      var catColor = RK.theme.categoricalSafe(U.unique(items.map(function (it) { return it.group != null ? it.group : it.label; })));
 
       if (o.median) {
         items = items.concat([{ label: 'Median', a: median(items.map(function (it) { return it.a; })), b: median(items.map(function (it) { return it.b; })), median: true }]);
@@ -76,7 +79,7 @@
         function side(key, x) {
           var idx = [], ys = [];
           items.forEach(function (it, i) { if (U.isNum(it[key])) { idx.push(i); ys.push(api.coord([x, it[key]])[1]); } });
-          var out = spread(ys, 14, top, bottom), res = {};
+          var out = C.spreadLabels(ys, 14, top, bottom), res = {};
           idx.forEach(function (i, n) { res[i] = out[n]; });
           return res;
         }
@@ -84,10 +87,10 @@
       }
 
       function colorOf(it) {
-        if (it.median) return t.ink;
+        if (it.median) return t.ink3;
         if (it.hl) return t.accent2;
         if (o.colorBy === 'category') return catColor(it.group != null ? it.group : it.label);
-        if (o.colorBy === 'neutral') return it.sel ? t.accent : t.dark ? t.ink3 : RK.theme.mix(t.ink3, t.paper, 0.15);
+        if (o.colorBy === 'neutral') return it.sel ? t.accent : RK.theme.mix(t.ink3, t.paper, 0.3);
         if (!U.isNum(it.a) || !U.isNum(it.b) || it.a === it.b) return t.neutral;
         var up = it.b > it.a;
         return (o.good === 'down' ? !up : up) ? t.pos : t.neg;
@@ -125,7 +128,7 @@
           // dimming is carried by colour alpha, not style.opacity, so it never fights an enter fade
           var a = it.dim ? 0.2 : 1, col = RK.theme.alpha(it.color, a * (it.hl || it.median || it.sel ? 1 : 0.85));
           var dotCol = RK.theme.alpha(it.color, a);
-          var lw = it.hl ? 2.6 : it.sel ? 2.2 : it.median ? 1.6 : 1.4;
+          var lw = it.hl ? 2.6 : it.sel ? 2.2 : it.median ? 1.5 : 1.4;
           var kids = [];
           var hasA = U.isNum(it.a), hasB = U.isNum(it.b);
           var pa = hasA ? api.coord([0, it.a]) : null, pb = hasB ? api.coord([1, it.b]) : null;
@@ -193,7 +196,10 @@
     }, {
       rebuildOnResize: true,     // label columns and truncation depend on the width
       select: function (p, ctx) {
-        return p.seriesId === 'slope' && p.name && p.name !== 'Median' ? { field: ctx.enc.label, value: p.name } : null;
+        if (p.seriesId !== 'slope' || !p.name || p.name === 'Median' || ctx.options.crossFilter === false) return null;
+        var f = ctx.enc.label;
+        ctx.select(f, p.name, GENERIC.test(f) && !ctx.options.crossFilterScope ? { scope: 'dataset' } : null);
+        return null;
       }
     })
   });
@@ -247,44 +253,7 @@
     return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
   }
 
-  /** Overlapping labels merge into clusters centred on their original mean, kept inside [lo, hi]. */
-  function spread(ys, gap, lo, hi) {
-    var items = ys.map(function (y, i) { return { i: i, y: y }; }).sort(function (p, q) { return p.y - q.y; });
-    var cl = items.map(function (it) { return { items: [it] }; });
-    function place(c) {
-      var n = c.items.length, size = (n - 1) * gap;
-      var mean = c.items.reduce(function (s, it) { return s + it.y; }, 0) / n;
-      c.top = Math.max(lo, Math.min(hi - size, mean - size / 2));
-      c.size = size;
-    }
-    cl.forEach(place);
-    for (var guard = 0; guard < 400; guard++) {
-      var merged = false;
-      for (var j = 1; j < cl.length; j++) {
-        if (cl[j].top < cl[j - 1].top + cl[j - 1].size + gap - 0.01) {
-          cl[j - 1].items = cl[j - 1].items.concat(cl[j].items);
-          cl.splice(j, 1);
-          place(cl[j - 1]);
-          merged = true;
-          break;
-        }
-      }
-      if (!merged) break;
-    }
-    var out = ys.slice();
-    cl.forEach(function (c) { c.items.forEach(function (it, k) { out[it.i] = c.top + k * gap; }); });
-    return out;
-  }
-
-  var canvas = null;
-  function measure(text, font) {
-    try {
-      canvas = canvas || document.createElement('canvas');
-      var g = canvas.getContext('2d');
-      g.font = font;
-      return Math.ceil(g.measureText(String(text)).width);
-    } catch (e) { return String(text).length * 6.2; }
-  }
+  function measure(text, font) { return Math.ceil(C.measure(text, font)); }
 
   function truncate(text, font, max) {
     if (measure(text, font) <= max) return text;

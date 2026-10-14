@@ -10,7 +10,6 @@
 }
 .rk-cs-range button:hover { color: var(--rk-accent); }
 .rk-cs-range button:focus-visible { outline: 2px solid var(--rk-accent-3); outline-offset: -2px; }
-@media print { .rk-cs-range { display: none; } }
 
 .rk-tip .rk-cs-tip-event {
   max-width: 290px; white-space: normal; line-height: 1.4;

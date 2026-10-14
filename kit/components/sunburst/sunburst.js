@@ -85,16 +85,11 @@
     return { roots: roots, total: total, rootName: rootName };
   }
 
-  var measurer = null;
   function longestWord(s, font) {
-    try {
-      measurer = measurer || document.createElement('canvas').getContext('2d');
-      measurer.font = font;
-      return Math.max.apply(null, String(s).split(/\s+/).map(function (w) { return measurer.measureText(w).width; }));
-    } catch (e) { return 0; }
+    return Math.max.apply(null, String(s).split(/\s+/).map(function (w) { return C.measure(w, font); }));
   }
-  /** Text colour on a fill: ink on mid/light fills, white on dark ones (slightly stricter than RK.theme.onColor). */
-  function inkOn(fill, t) { return RK.theme.luminance(fill) > 0.3 ? (t.dark ? t.paper : t.ink) : '#ffffff'; }
+  /** Generic node fields ('name', 'category' …) cross-filter only this block's dataset; business dimensions stay global. */
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
 
   function chainOf(list, id) {
     var out = [];
@@ -146,7 +141,13 @@
         cVal.textContent = RK.format(value, L.fmt);
         cSub.textContent = node ? RK.format(total ? value / total : null, '0.0%') + ' of total' + (!hover && chain.length ? ' · click to go up' : '') : (state.tree.roots.some(function (n) { return n.children.length; }) && o.drill !== false ? 'Click to drill in' : '');
       };
-      var base = C(function (c, inst) { state.ctx = c; state.inst = inst; return build(c, inst, state); }, {
+      var base = C(function (c, inst) {
+        state.ctx = c; state.inst = inst;
+        var opt = build(c, inst, state);
+        state.paintCentre(null);
+        return opt;
+      }, {
+        rebuildOnResize: true,   // rings and the centre readout are laid out in pixels
         on: {
           click: function (p) { click(p, state); },
           mouseover: function (p) { if (p.seriesId === 'sb' && p.data && p.data.id) { var ch = chainOf(state.tree.roots, p.data.id); state.paintCentre(ch[ch.length - 1]); } },
@@ -159,15 +160,8 @@
       ctx.el.appendChild(centre);
       // the centre is a button when drilled: back up one level
       centre.addEventListener('click', function () { if (state.view.length) zoom(state, state.view[state.view.length - 2] || null); });
-      state.paintCentre(null);
 
-      var update = base.update, resize = base.resize, destroy = base.destroy;
-      base.update = function (c) { update(c); state.paintCentre(null); };
-      base.resize = function () {
-        resize();
-        var w = base.chart.getWidth(), ht = base.chart.getHeight();
-        if (state.L && (Math.abs(w - state.L.W) > 1 || Math.abs(ht - state.L.H) > 1)) base.update(state.ctx);
-      };
+      var destroy = base.destroy;
       base.destroy = function () { centre.remove(); destroy(); };
       return base;
     }
@@ -184,7 +178,9 @@
     if (p.seriesId !== 'sb' || !p.data || p.data.id == null) return;
     var node = p.data;
     if (ctx.options.drill !== false && node.children && node.children.length) { zoom(state, node.id); return; }
-    if (ctx.options.crossFilter !== false && node.field) ctx.select(node.field, node.name);
+    if (ctx.options.crossFilter !== false && node.field) {
+      ctx.select(node.field, node.name, GENERIC.test(node.field) ? { scope: ctx.options.crossFilterScope || 'dataset' } : null);
+    }
   }
 
   function build(ctx, inst, state) {
@@ -284,14 +280,16 @@
       return box;
     }
 
-    // colours are assigned on the full tree, so a slice keeps its colour when drilled into
+    // colours are assigned on the full tree, so a slice keeps its colour when drilled into; with a highlight
+    // no group may read like the accent2 target (tints extend the palette instead of repeating it)
+    var pal = RK.theme.palette(hl.length ? { n: tree.roots.length } : { exclude: [], n: tree.roots.length });
     var colors = new Map();
     (function paint(ls, parentColor, depth) {
       sorted(ls).forEach(function (n, i) {
         var c;
         if (byMetric) c = scale(n.metric);
         else if (hl.indexOf(n.name) >= 0) c = t.accent2;
-        else if (depth === 1) c = t.cat[tree.roots.indexOf(n) % t.cat.length];
+        else if (depth === 1) c = pal[tree.roots.indexOf(n) % pal.length];
         else if (OTHERS.test(n.name)) c = RK.theme.mix(t.neutral, t.paper, 0.2);
         else c = RK.theme.mix(parentColor, t.paper, 0.18 + 0.14 * (i % 4));
         colors.set(n.id, c);
@@ -306,7 +304,7 @@
         var item = {
           id: n.id, name: n.name, value: n.value, metric: n.metric, field: n.field,
           itemStyle: { color: fill },
-          label: RK.util.merge({ color: inkOn(fill, t) }, labelBox(n, depth))
+          label: RK.util.merge({ color: RK.theme.textOn(fill) }, labelBox(n, depth))
         };
         if (kids) item.children = toData(n.children, depth + 1);
         return item;

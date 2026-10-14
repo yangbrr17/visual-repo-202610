@@ -24,7 +24,7 @@
     "density": {"type": "boolean", "default": false, "desc": "Gaussian kernel density curve scaled to the bars"},
     "bandwidth": {"type": "number", "default": null, "desc": "KDE bandwidth (default: Silverman's rule of thumb)"},
     "stats": {"type": "string[]", "default": ["median", "mean"], "desc": "Dashed reference lines: 'median' | 'mean' | 'p25' | 'p75'"},
-    "targetValue": {"type": "number", "default": null, "desc": "Explicit value to mark (e.g. proposed offer premium); default: the target row's value"},
+    "targetValue": {"type": "number", "default": null, "desc": "Explicit reference value to mark (e.g. proposed offer premium), drawn as a dashed reference line in the theme reference colour; default: the target row's value (its bin highlighted in the accent colour)"},
     "targetLabel": {"type": "string", "default": null, "desc": "Label of the target marker (default: target label + value)"},
     "highlight": {"type": "string|string[]", "default": null, "desc": "Label / name value(s) treated as the target; default uses the target channel"},
     "labels": {"type": "boolean", "default": true, "desc": "Count / share above each bar"},

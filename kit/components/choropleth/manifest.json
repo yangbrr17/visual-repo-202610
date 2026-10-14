@@ -29,10 +29,10 @@
     "legend": {"type": "boolean", "default": true, "desc": "Show the colour legend (with country counts per class)"},
     "legendTitle": {"type": "string", "default": null, "desc": "Legend title; defaults to the value field title"},
     "legendPosition": {"type": "string", "default": "bottomleft", "desc": "Leaflet control corner: bottomleft | bottomright | topleft | topright"},
-    "filterField": {"type": "string", "default": null, "desc": "Field used for click-to-filter; defaults to encode.id. Use 'country' to link with assets_locations"},
-    "scrollZoom": {"type": "boolean|string", "default": "click", "desc": "Mouse-wheel zoom: true | false | 'click' (armed after clicking the map, so page scrolling is not hijacked)"}
+    "filterField": {"type": "string", "default": null, "desc": "Field used for click-to-filter; defaults to encode.id. Use 'country' to link with assets_locations. Shared business dimensions (country, company, sector, region, segment, year…) filter the whole report; other fields (site name, type, from / to…) only this block's dataset — set crossFilterScope to override"},
+    "scrollZoom": {"type": "boolean|string", "default": "click", "desc": "Plain mouse-wheel zoom: 'click' (armed after clicking the map, so page scrolling is never hijacked) | true | false. Ctrl/Cmd + wheel or a trackpad pinch always zooms; +/- buttons and drag too"}
   },
-  "interactions": ["Hover highlight + tooltip (value, rank, extra fields)", "Click a country to cross-filter (dims the others)", "Zoom / pan (wheel zoom after a click)", "Smooth colour transitions when filters change", "PNG export"],
+  "interactions": ["Hover highlight + tooltip (value, rank, extra fields)", "Click a country to cross-filter (dims the others)", "Zoom / pan (+/- buttons, Ctrl/Cmd + wheel or pinch; plain wheel after a click)", "Smooth colour transitions when filters change", "PNG export"],
   "samples": [
     {"title": "Revenue 2025A by country (USD m)", "data": "revenue_by_country", "height": 460,
      "options": {"encode": {"id": "iso_num", "value": "revenue", "label": "country"}, "tooltip": ["growth", "employees"], "filterField": "country"}},

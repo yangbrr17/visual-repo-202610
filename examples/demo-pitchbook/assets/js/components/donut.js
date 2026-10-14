@@ -7,16 +7,9 @@
   'use strict';
   var C = RK.chart;
 
-  var measurer = null;
-  /** Pixel width of a string in a CSS font (canvas measureText; rough fallback without canvas). */
-  function textWidth(s, font) {
-    s = String(s == null ? '' : s);
-    try {
-      measurer = measurer || document.createElement('canvas').getContext('2d');
-      measurer.font = font;
-      return measurer.measureText(s).width;
-    } catch (e) { return s.length * 6.2; }
-  }
+  /** Generic label fields ('type', 'category' …) cross-filter only this block's dataset; business dimensions stay global. */
+  var GENERIC = /^(type|kind|source|target|step|stage|metric|measure|category|group|series|label|name|id|parent|key|value|x|y)$/i;
+  function scoped(ctx, f) { return GENERIC.test(f) ? { scope: ctx.options.crossFilterScope || 'dataset' } : null; }
   function truncate(s, w, font) {
     var ef = window.echarts && window.echarts.format;
     return ef && ef.truncateText ? ef.truncateText(String(s), w, font, '…') : String(s);
@@ -55,10 +48,9 @@
     // colours: stable rank in the unfiltered data, so slices keep their colour while filtering
     var t = ctx.theme;
     var hl = o.highlight == null ? [] : [].concat(o.highlight).map(String);
-    // with a highlight, drop palette colours that read like the accent so the target stands alone
-    var pal = t.cat.filter(function (c) { return !hl.length || !near(c, t.accent2); });
-    if (!pal.length) pal = t.cat;
     var rank = collect(ctx.allRows).sort(bySize).map(function (d) { return d.name; });
+    // with a highlight, no other slice may read like the accent; tints extend the palette instead of repeating it
+    var pal = RK.theme.palette(hl.length ? { n: rank.length } : { exclude: [], n: rank.length });
     items.forEach(function (d, i) {
       var r = rank.indexOf(d.name);
       var base = d.others ? t.neutral : hl.indexOf(d.name) >= 0 ? t.accent2 : pal[(r < 0 ? i : r) % pal.length];
@@ -70,11 +62,6 @@
     var fmt = o.format || ctx.fmtOf(enc.value) || 'auto';
     var display = o.display === 'auto' ? (/%/.test(RK.format.presets[fmt] || fmt) ? 'value' : 'both') : o.display;
     return { items: items, total: total, fmt: fmt, pctFmt: o.pctFormat || '0.0%', display: display };
-  }
-
-  function near(a, b) {
-    var x = RK.theme.parseColor(a), y = RK.theme.parseColor(b);
-    return Math.sqrt(Math.pow(x[0] - y[0], 2) + Math.pow(x[1] - y[1], 2) + Math.pow(x[2] - y[2], 2)) < 64;
   }
 
   function dimmed(ctx, d) {
@@ -91,8 +78,8 @@
     var fontName = '11.5px ' + t.fontSans, fontNum = '11.5px ' + t.fontNum;
     if (L.side) {
       var showV = m.display !== 'pct', showP = m.display !== 'value';
-      var nameW = Math.max.apply(null, m.items.map(function (d) { return textWidth(d.name, fontName); }).concat([textWidth(ctx.title(ctx.enc.label), '600 10px ' + t.fontSans), 40]));
-      var valW = showV ? Math.max(56, textWidth(RK.format(m.total, m.fmt), '600 ' + fontNum) + 18) : 0;
+      var nameW = Math.max.apply(null, m.items.map(function (d) { return C.measure(d.name, fontName); }).concat([C.measure(ctx.title(ctx.enc.label), '600 10px ' + t.fontSans), 40]));
+      var valW = showV ? Math.max(56, C.measure(RK.format(m.total, m.fmt), '600 ' + fontNum) + 18) : 0;
       var pctW = showP ? 58 : 0;
       nameW = Math.min(Math.ceil(nameW) + 8, 200);
       var tableW = 18 + nameW + valW + pctW;
@@ -254,11 +241,13 @@
   /** Toggle the cross-filter for a slice ("Others" toggles all of its members). */
   function pick(ctx, d) {
     if (!d || ctx.options.crossFilter === false) return;
-    var f = ctx.enc.label;
-    if (!d.others) { ctx.select(f, d.name); return; }
+    var f = ctx.enc.label, sc = scoped(ctx, f);
+    if (!d.others) { ctx.select(f, d.name, sc); return; }
     var sel = ctx.selected(f);
     var all = d.members.every(function (x) { return sel.indexOf(x.name) >= 0; });
-    d.members.forEach(function (x) { if (all || sel.indexOf(x.name) < 0) ctx.select(f, x.name); });
+    // all members selected -> drop them, else add the missing ones (one store write)
+    ctx.setSelection(f, all ? sel.filter(function (n) { return !d.members.some(function (x) { return x.name === n; }); })
+      : sel.concat(d.members.map(function (x) { return x.name; }).filter(function (n) { return sel.indexOf(n) < 0; })), sc);
   }
 
   RK.component({
@@ -280,32 +269,11 @@
       pctFormat: '0.0%'
     },
     render: function (ctx) {
-      var state = { m: null, L: null, first: true, w: 0, h: 0, ctx: ctx, prevTotal: 0 };
-      var base = C(function (c, inst) {
-        state.ctx = c;
-        state.m = model(c);
-        state.w = inst.getWidth(); state.h = inst.getHeight();
-        state.L = layout(c, state.m, state.w, state.h);
-        return {
-          legend: { show: false },
-          tooltip: tooltip(c, state.m, state.L),
-          series: [seriesOption(c, state.m, state.L)]
-        };
-      }, {
-        on: {
-          click: function (p) { if (p.seriesId === 'donut') pick(state.ctx, state.m.items[p.dataIndex]); },
-          mouseover: function (p) { if (p.seriesId === 'donut') hover(state.m.items[p.dataIndex]); },
-          mouseout: function (p) { if (p.seriesId === 'donut') hover(null); },
-          globalout: function () { hover(null); }
-        }
-      })(ctx);
-      var inst = base.chart;
-
+      var state = { m: null, L: null, first: true, ctx: ctx, prevTotal: 0 };
       // hover readout in the hole (HTML: transient, so it does not need to be part of exports)
       var h = RK.util.h;
       var rName = h('div.rk-donut__name'), rVal = h('div.rk-donut__value.rk-num'), rPct = h('div.rk-donut__pct');
       var readout = h('div.rk-donut__readout', { 'aria-hidden': 'true' }, rName, rVal, rPct);
-      ctx.el.appendChild(readout);
       function hover(d) {
         var L = state.L, m = state.m;
         if (!d || !L || !L.readout) { readout.classList.remove('is-on'); return; }
@@ -315,29 +283,41 @@
         readout.classList.add('is-on');
       }
 
-      function paint() {
-        var L = state.L;
+      var base = C(function (c, inst) {
+        if (!state.first) hover(null);
+        state.ctx = c;
+        var m = state.m = model(c);
+        var L = state.L = layout(c, m, inst.getWidth(), inst.getHeight());
         L.inst = inst;
         L.onPick = function (d) { pick(state.ctx, d); };
         L.onHover = hover;
         var d = Math.floor(L.r0 * 1.8);
         readout.style.cssText = 'left:' + L.cx + 'px;top:' + L.cy + 'px;width:' + d + 'px;height:' + d + 'px;--rk-donut-v:' + Math.round(Math.max(13, Math.min(24, L.r0 * 0.3))) + 'px';
-        // RK.chart's update replaceMerges 'graphic', which drops these elements every time; so they are
-        // always re-added fresh, and the total counts from the previous value via enterFrom
+        // the legend table / centre total are replaced on every build (RK.chart replace-merges 'graphic'),
+        // so the total counts up from the previous value via enterFrom
         L.from = state.first ? 0 : state.prevTotal;
-        inst.setOption({ graphic: { elements: graphics(state.ctx, state.m, L, state.first) } });
-        state.prevTotal = state.m.total;
+        var els = graphics(c, m, L, state.first);
+        state.prevTotal = m.total;
         state.first = false;
-      }
-      paint();
+        return {
+          legend: { show: false },
+          tooltip: tooltip(c, m, L),
+          graphic: { elements: els },
+          series: [seriesOption(c, m, L)]
+        };
+      }, {
+        rebuildOnResize: true,   // radius + legend table are laid out in pixels
+        on: {
+          click: function (p) { if (p.seriesId === 'donut') pick(state.ctx, state.m.items[p.dataIndex]); },
+          mouseover: function (p) { if (p.seriesId === 'donut') hover(state.m.items[p.dataIndex]); },
+          mouseout: function (p) { if (p.seriesId === 'donut') hover(null); },
+          globalout: function () { hover(null); }
+        }
+      })(ctx);
+      ctx.el.appendChild(readout);
 
-      var update = base.update, resize = base.resize, destroy = base.destroy;
-      base.update = function (c) { hover(null); update(c); paint(); };
+      var destroy = base.destroy;
       base.destroy = function () { readout.remove(); destroy(); };
-      base.resize = function () {
-        resize();
-        if (Math.abs(inst.getWidth() - state.w) > 1 || Math.abs(inst.getHeight() - state.h) > 1) base.update(state.ctx);
-      };
       return base;
     }
   });
