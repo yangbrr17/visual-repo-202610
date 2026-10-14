@@ -1,0 +1,12 @@
+/* donut — hover readout shown in the hole (masks the total underneath) */
+.rk-donut__readout {
+  position: absolute; z-index: 2; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border-radius: 50%; background: var(--rk-paper); text-align: center; pointer-events: none;
+  opacity: 0; transition: opacity var(--rk-dur-fast) var(--rk-ease);
+}
+.rk-donut__readout.is-on { opacity: 1; }
+.rk-donut__name { max-width: 88%; font-size: 11px; font-weight: 600; color: var(--rk-ink-2); line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rk-donut__value { font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; font-size: var(--rk-donut-v, 22px); font-weight: 600; color: var(--rk-ink); line-height: 1.15; }
+.rk-donut__pct { font-size: 10.5px; color: var(--rk-ink-3); font-family: var(--rk-font-num); font-variant-numeric: tabular-nums; }
+@media print { .rk-donut__readout { display: none; } }

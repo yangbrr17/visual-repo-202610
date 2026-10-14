@@ -1,0 +1,52 @@
+{
+  "id": "scatter",
+  "name": "Scatter Plot",
+  "name_zh": "散点图（回归 / 象限）",
+  "category": "distribution",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Labelled two-metric scatter with regression line and R², median quadrants, target highlight and box-select cross-filter.",
+  "summary_zh": "带标签的双指标散点图：回归线与 R²、中位数象限、目标公司高亮、框选交叉筛选。",
+  "description_zh": "展示两个指标之间的关系，例如 EV/EBITDA 与收入增速、EV/Revenue 与 EBITDA 利润率，用于论证“估值由增长/盈利能力驱动”。每行数据是一个点（通常是一家可比公司），点旁直接标注股票代码，重叠标签自动错开或隐藏；目标公司用强调色（accent2）突出。可叠加最小二乘回归线与 R²（只用可比公司计算，排除目标公司），或以中位数/均值/指定值画象限线并在四角写象限含义。点击点或框选一组点会交叉筛选同一页的其他图表；框选缩放、Ctrl+滚轮缩放、拖动平移用于密集数据。",
+  "best_for": ["Valuation vs. growth / margin regression (comps)", "Positioning the target within its peer set", "Quadrant analysis (high growth / low multiple)", "Any two-metric relationship with < ~60 labelled points"],
+  "avoid_when": ["A third metric matters (use bubble)", "Hundreds of points that all need labels (use a heatmap or table)", "Time series (use line)"],
+  "channels": {
+    "x": {"type": "number", "required": true, "desc": "Horizontal metric (e.g. revenue growth)", "default": "x"},
+    "y": {"type": "number", "required": true, "desc": "Vertical metric (e.g. EV/EBITDA)", "default": "y"},
+    "label": {"type": "string", "required": false, "desc": "Short point label (ticker); also the cross-filter field", "default": "label"},
+    "name": {"type": "string", "required": false, "desc": "Full name for the tooltip title (company); defaults to label"},
+    "color": {"type": "string", "required": false, "desc": "Category used for colour and legend (sector, region)"},
+    "target": {"type": "boolean", "required": false, "desc": "Rows where this field is true are highlighted as the target", "default": "is_target"}
+  },
+  "options": {
+    "labels": {"type": "boolean|string", "default": "auto", "desc": "Point labels: true | false | 'auto' (on up to 40 points); overlapping labels are shifted, then hidden"},
+    "regression": {"type": "boolean", "default": false, "desc": "Ordinary least-squares fit across peers (target excluded) with R² label"},
+    "equation": {"type": "boolean", "default": false, "desc": "Also print the fitted equation y = bx + a"},
+    "quadrants": {"type": "string|object", "default": null, "desc": "null | 'median' | 'mean' | {x, y, label} — dashed quadrant lines (peer statistics exclude the target)"},
+    "quadrantLabels": {"type": "string[]", "default": null, "desc": "Corner captions [top-left, top-right, bottom-left, bottom-right]"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Label / name value(s) drawn as the target; default uses the target channel"},
+    "peerLabel": {"type": "string", "default": "Peers", "desc": "Legend name of the single series when no colour field is set"},
+    "symbolSize": {"type": "number", "default": 9, "desc": "Point diameter in px (target +5)"},
+    "xFormat": {"type": "string", "default": null, "desc": "X format code (defaults to the x field format)"},
+    "yFormat": {"type": "string", "default": null, "desc": "Y format code (defaults to the y field format)"},
+    "xTitle": {"type": "string", "default": null, "desc": "X axis title (defaults to the field title)"},
+    "yTitle": {"type": "string", "default": null, "desc": "Y axis title (defaults to the field title)"},
+    "tooltipFields": {"type": "string[]", "default": [], "desc": "Extra fields listed in the tooltip"},
+    "brush": {"type": "boolean", "default": true, "desc": "Box-select tool that cross-filters the label field"},
+    "zoom": {"type": "boolean", "default": true, "desc": "Box zoom, Ctrl + wheel zoom, drag to pan and the hover toolbar; false = static chart"},
+    "legend": {"type": "boolean", "default": true, "desc": "Category legend (top-left)"}
+  },
+  "interactions": ["Hover tooltip with both metrics (+ extra fields)", "Click a point to cross-filter (toggle)", "Box-select points to cross-filter", "Box zoom, Ctrl + wheel zoom, drag to pan, reset", "Legend toggles categories", "Animated transitions when filters change", "PNG / CSV export"],
+  "samples": [
+    {"title": "EV / EBITDA 2025E vs. revenue growth 2025E", "data": "peers", "height": 400,
+     "options": {"encode": {"x": "rev_growth_25e", "y": "ev_ebitda_25e", "label": "ticker", "name": "company", "color": "sector"},
+                 "regression": true, "tooltipFields": ["ebitda_margin_25e", "mkt_cap"]}},
+    {"title": "EV / Revenue 2025E vs. EBITDA margin 2025E", "data": "peers", "height": 400,
+     "options": {"encode": {"x": "ebitda_margin_25e", "y": "ev_revenue_25e", "label": "ticker", "name": "company"},
+                 "quadrants": "median",
+                 "quadrantLabels": ["Low margin, premium multiple", "High margin, premium multiple", "Low margin, discount multiple", "High margin, discount multiple"]}},
+    {"title": "Regression with equation", "data": "peers", "height": 340, "span": 6,
+     "options": {"encode": {"x": "ebitda_margin_25e", "y": "ev_ebitda_25e", "label": "ticker", "name": "company"},
+                 "regression": true, "equation": true, "legend": false}}
+  ]
+}

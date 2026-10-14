@@ -19,6 +19,7 @@
       refLines: [],                // [{value, label}]
       avgLine: false,              // dashed average line (single-series only)
       colorBy: 'series',           // series | category
+      palette: 'auto',             // auto (ordinal ramp for stacks, categorical otherwise) | cat | ord
       showTotal: true,             // total label on top of stacks
       format: null,
       legend: true,
@@ -53,8 +54,9 @@
       var single = data.series.length === 1;
       var showLabels = o.labels === 'auto' ? (cats.length * data.series.length <= 24 && (!o.stack || data.series.length <= 4)) : !!o.labels;
 
+      var useOrd = o.palette === 'ord' || (o.palette === 'auto' && o.stack && data.series.length <= t.ord.length);
       var series = data.series.map(function (se, si) {
-        var base = RK.theme.color(si);
+        var base = useOrd ? t.ord[si] : RK.theme.color(si);
         return {
           id: 's-' + si,
           name: se.name,

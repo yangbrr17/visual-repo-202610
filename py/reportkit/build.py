@@ -105,7 +105,14 @@ def bundle_js_text(manifest: dict, datasets: dict[str, dict]) -> str:
     """data/bundle.js: ``RK.data.preload({"manifest": ..., "datasets": {...}});``"""
     entries = ",\n".join(f"{dumps(did)}: {dataset_json_text(ds)}" for did, ds in datasets.items())
     body = '{"manifest": ' + dumps(manifest) + ',\n"datasets": {' + ("\n" + entries + "\n" if entries else "") + "}}"
+    if len(body) > BUNDLE_PARSE_THRESHOLD:
+        # large bundles: JSON.parse of a string literal loads ~2-3x faster than an object literal
+        compact = json.dumps(json.loads(body), ensure_ascii=False, separators=(",", ":"))
+        return "RK.data.preload(JSON.parse(" + json.dumps(compact, ensure_ascii=True) + "));\n"
     return "RK.data.preload(" + body + ");\n"
+
+
+BUNDLE_PARSE_THRESHOLD = 1_000_000  # characters; below this keep the readable, diff-friendly form
 
 
 # ---------------------------------------------------------------------------------------------

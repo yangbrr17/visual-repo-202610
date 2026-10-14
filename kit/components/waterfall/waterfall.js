@@ -1,0 +1,294 @@
+/*!
+ * RK component: waterfall — bridge chart (EBITDA bridge, EV-to-equity bridge, variance walk).
+ * Rows are the steps in walk order. kind 'total' / 'subtotal' bars start at zero; 'delta' bars float
+ * from the running total. Positive deltas in --rk-pos, negative in --rk-neg, totals in the accent.
+ * Floating bars = transparent base + visible bar on one stack with stackStrategy 'all', so a walk may
+ * cross zero. Connectors are a light custom series drawn between bar edges (think-cell style).
+ */
+(function () {
+  'use strict';
+  var C = RK.chart, util = RK.util;
+  var MINUS = '−';
+  var BAR = 0.62;          // bar width as share of the category band (connectors use the same value)
+
+  function isNum(v) { return typeof v === 'number' && isFinite(v); }
+
+  /** Greedy word wrap that may also break after hyphens / slashes (ECharts 'break' splits words mid-way). */
+  var measureCtx = null;
+  function wrap(text, width, font) {
+    text = String(text == null ? '' : text);
+    if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
+    measureCtx.font = font;
+    var words = (text.match(/[^\s\-\/]*[\s\-\/]*/g) || [text]), lines = [], cur = '';
+    words.forEach(function (w) {
+      var next = cur + w;
+      if (cur && measureCtx.measureText(next.trim()).width > width) { lines.push(cur.trim()); cur = w; } else cur = next;
+    });
+    if (cur.trim()) lines.push(cur.trim());
+    return lines.join('\n');
+  }
+
+  /** Normalise free-text kinds: start/end/total -> total, sub* -> subtotal, anything else -> delta. */
+  function normKind(k) {
+    if (k == null || k === '') return null;
+    k = String(k).toLowerCase();
+    if (/^sub/.test(k)) return 'subtotal';
+    if (k === 'total' || k === 'start' || k === 'end' || k === 'absolute') return 'total';
+    return 'delta';
+  }
+
+  /** Steps with start / end levels of the running total. Missing total values are computed. */
+  function walk(ctx) {
+    var o = ctx.options, enc = ctx.enc, rows = ctx.rows, n = rows.length;
+    var hasKind = !!(enc.kind && ctx.dataset && ctx.dataset.has(enc.kind));
+    var infer = o.inferTotals === 'auto' ? (hasKind ? false : 'both') : o.inferTotals;
+    var run = 0, steps = [];
+    rows.forEach(function (r, i) {
+      var kind = hasKind ? normKind(r[enc.kind]) : null;
+      if (!kind) {
+        var first = i === 0 && (infer === 'first' || infer === 'both');
+        var last = i === n - 1 && n > 1 && (infer === 'last' || infer === 'both');
+        kind = first || last ? 'total' : 'delta';
+      }
+      var v = r[enc.value];
+      var s = { i: steps.length, label: r[enc.label], kind: kind, row: r, category: enc.category ? r[enc.category] : null };
+      if (kind === 'delta') {
+        s.value = isNum(v) ? v : null;
+        s.start = run; s.end = run + (s.value || 0);
+      } else {
+        s.computed = !isNum(v);
+        s.value = isNum(v) ? v : run;
+        s.diff = isNum(v) && i > 0 ? v - run : 0;     // unreconciled difference vs. the walk
+        s.start = 0; s.end = s.value;
+      }
+      run = s.end;
+      steps.push(s);
+    });
+    if (o.endTotal && steps.length) steps.push({ i: steps.length, label: o.endTotal, kind: 'total', value: run, start: 0, end: run, computed: true, diff: 0 });
+    return steps;
+  }
+
+  /** Break the value axis between zero and the walk when deltas are small relative to the totals. */
+  function autoBreak(steps, hi) {
+    var floats = [];
+    steps.forEach(function (s) { if (s.kind === 'delta') floats.push(s.start, s.end); });
+    if (!floats.length || steps.some(function (s) { return Math.min(s.start, s.end) < 0; })) return null;
+    var lo = Math.min.apply(null, floats), span = hi - lo;
+    if (lo <= 0 || span / hi > 0.45) return null;
+    var step = util.niceStep(span, 4);
+    var end = Math.floor((lo - span * 0.35) / step) * step;
+    var start = util.niceStep((hi - end) * 0.16, 1);
+    return start < end * 0.8 ? { start: start, end: end } : null;
+  }
+
+  function build(ctx, inst) {
+    var o = ctx.options, t = ctx.theme, enc = ctx.enc;
+    var horiz = o.orientation === 'horizontal';
+    var steps = walk(ctx);
+    var fmt = o.format || ctx.fmtOf(enc.value) || '#,##0.0';
+    var pos = o.invert ? t.neg : t.pos, neg = o.invert ? t.pos : t.neg;
+    var sub = t.accent3 || RK.theme.mix(t.accent, t.paper, 0.4);
+    var cats = util.unique(steps.filter(function (s) { return s.kind === 'delta' && s.category != null; }).map(function (s) { return s.category; }));
+    var byCat = o.colorBy === 'category' && cats.length > 0;
+    var catPal = t.cat.slice(1);       // cat[0] is (usually) the total accent
+    function catColor(c) { var k = cats.indexOf(c); return k < 0 ? t.neutral : catPal[k % catPal.length]; }
+
+    function colorOf(s) {
+      if (s.kind === 'total') return t.accent;
+      if (s.kind === 'subtotal') return sub;
+      if (byCat) return catColor(s.category);
+      if (!s.value) return t.neutral;
+      return s.value > 0 ? pos : neg;
+    }
+    function signed(v) {
+      if (o.deltaFormat) return RK.format(v, o.deltaFormat);
+      if (!isNum(v)) return RK.format(v, fmt);
+      var s = RK.format(Math.abs(v), fmt);
+      return v > 0 ? '+' + s : v < 0 && /[1-9]/.test(s) ? MINUS + s : s;
+    }
+    function labelOf(s) { return s.kind === 'delta' ? signed(s.value) : RK.format(s.value, fmt); }
+
+    // ---- value axis bounds (labels sit inside the plot, so pad both ends) ----
+    var levels = [0];
+    steps.forEach(function (s) { levels.push(s.start, s.end); });
+    var ext = util.extent(levels), span = (ext[1] - ext[0]) || 1;
+    var brk = o.axisBreak === 'auto' ? autoBreak(steps, ext[1]) : (o.axisBreak && isNum(o.axisBreak.start) ? o.axisBreak : null);
+    var visSpan = brk ? ext[1] - brk.end + brk.start : span;
+    var pad = visSpan * (horiz ? 0.1 : 0.09);
+    var axMax = ext[1] > 0 ? ext[1] + pad : 0;
+    var axMin = ext[0] < 0 ? ext[0] - pad : 0;
+    var interval;
+    if (o.valueAxis) {
+      interval = util.niceStep(visSpan, 5);
+      axMax = Math.ceil(axMax / interval) * interval;
+      axMin = Math.floor(axMin / interval) * interval;
+    }
+
+    // ---- category labels: wrap to the band width (re-laid out on resize) ----
+    var W = inst.getWidth() || ctx.el.clientWidth || 800;
+    inst.__rkW = W;
+    var bandPx = Math.max(40, (W - 24) / Math.max(1, steps.length));
+    var labelW = horiz ? Math.min(200, Math.max(110, W * 0.22)) : bandPx - 6;
+    var bold = { fontWeight: 600, color: t.ink, lineHeight: 13 };
+    var catAxis = {
+      type: 'category',
+      data: steps.map(function (s) { return s.label; }),
+      inverse: horiz,
+      axisLine: { show: true, onZero: ext[0] >= 0, lineStyle: { color: t.axis } },
+      axisTick: { show: false },
+      axisLabel: {
+        interval: 0, color: t.ink2, fontSize: 11, lineHeight: 13,
+        formatter: function (v, i) {
+          var s = steps[i], tot = s && s.kind !== 'delta';
+          var lines = wrap(v, labelW, (tot ? '600 ' : '') + '11px ' + t.fontSans).split('\n');
+          return tot ? lines.map(function (l) { return '{b|' + l + '}'; }).join('\n') : lines.join('\n');
+        },
+        rich: { b: bold }
+      }
+    };
+    var valAxis = {
+      type: 'value', min: axMin, max: axMax, interval: interval,
+      // kept "shown" with invisible parts: the axis must exist for the break zigzag to be drawn
+      axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: { show: !!o.valueAxis, formatter: C.axisFmt(fmt) },
+      splitLine: { show: !!o.valueAxis }
+    };
+    if (brk) {
+      valAxis.breaks = [{ start: brk.start, end: brk.end, gap: brk.gap || (horiz ? '3%' : '4%') }];
+      valAxis.breakArea = {
+        show: true, expandOnClick: false, zigzagAmplitude: 3, zigzagMinSpan: 3, zigzagMaxSpan: 9,
+        itemStyle: { color: t.paper, borderColor: t.paper, borderWidth: 0, opacity: 1 }   // a clean zigzag cut through the bars
+      };
+      valAxis.breakLabelLayout = { moveOverlap: 'auto' };
+    }
+
+    // ---- series ----
+    var stagger = Math.min(90, 900 / Math.max(1, steps.length));
+    var delay = function (i) { return i * stagger; };
+    var series = [
+      {
+        id: 'base', type: 'bar', stack: 'wf', stackStrategy: 'all', silent: true, barWidth: (BAR * 100) + '%',
+        itemStyle: { color: 'transparent' }, emphasis: { disabled: true }, tooltip: { show: false },
+        animationDelay: delay,
+        data: steps.map(function (s) { return s.kind === 'delta' ? Math.min(s.start, s.end) : 0; })
+      },
+      {
+        id: 'bars', name: ctx.title(enc.value), type: 'bar', stack: 'wf', stackStrategy: 'all', barWidth: (BAR * 100) + '%',
+        animationDelay: delay,
+        emphasis: { focus: 'none', itemStyle: { opacity: 0.85 } },
+        label: {
+          show: o.labels !== false, distance: 5, fontSize: 11, fontFamily: t.fontNum, color: t.ink2,
+          formatter: function (p) { var s = steps[p.dataIndex]; return s ? labelOf(s) : ''; }
+        },
+        data: steps.map(function (s) {
+          var up = s.kind === 'delta' ? (s.value || 0) >= 0 : s.value >= 0;
+          var c = C.dim(ctx, enc.label, s.label, colorOf(s));
+          return {
+            name: s.label,
+            value: s.kind === 'delta' ? Math.abs(s.end - s.start) : s.value,
+            itemStyle: { color: c },
+            label: s.kind === 'delta'
+              ? { position: horiz ? (up ? 'right' : 'left') : (up ? 'top' : 'bottom') }
+              : { position: horiz ? (up ? 'right' : 'left') : (up ? 'top' : 'bottom'), color: t.ink, fontWeight: 600 }
+          };
+        }),
+        markLine: ext[0] < 0 ? {
+          silent: true, symbol: ['none', 'none'], label: { show: false },
+          lineStyle: { color: t.axis, type: 'solid', width: 1 },
+          data: [horiz ? { xAxis: 0 } : { yAxis: 0 }]
+        } : undefined
+      }
+    ];
+
+    if (o.connectors !== false && steps.length > 1) {
+      series.push({
+        id: 'conn', type: 'custom', silent: true, z: 1, tooltip: { show: false },
+        animationDelay: function (i) { return (i + 1) * stagger + 260; },
+        renderItem: function (params, api) {
+          var i = api.value(0), lvl = api.value(1);
+          var a = api.coord(horiz ? [lvl, i] : [i, lvl]), b = api.coord(horiz ? [lvl, i + 1] : [i + 1, lvl]);
+          var half = (horiz ? api.size([0, 1])[1] : api.size([1, 0])[0]) * BAR / 2;
+          var shape = horiz
+            ? { x1: a[0], y1: a[1] + half, x2: b[0], y2: b[1] - half }
+            : { x1: a[0] + half, y1: a[1], x2: b[0] - half, y2: b[1] };
+          return {
+            type: 'line', shape: shape,
+            style: { stroke: t.axis, lineWidth: 1, lineDash: o.connectors === 'dashed' ? [3, 2] : null },
+            enterFrom: { style: { opacity: 0 } }
+          };
+        },
+        data: steps.slice(0, -1).map(function (s, i) { return [i, s.end]; })
+      });
+    }
+
+    // legend entries for category colouring (empty series carry the swatch)
+    if (byCat) {
+      cats.forEach(function (c) {
+        series.push({ id: 'lg-' + c, name: c, type: 'bar', stack: 'lg', data: [], itemStyle: { color: catColor(c) } });
+      });
+    }
+
+    var first = steps.filter(function (s) { return s.kind === 'total'; })[0];
+    var showLegend = byCat && o.legend !== false;
+
+    return {
+      legend: C.legend(ctx, { show: showLegend, data: showLegend ? cats : [], selectedMode: false }),
+      grid: C.grid(ctx, { top: showLegend ? 32 : 8, left: 4, right: horiz ? 16 : 4, bottom: 4 }),
+      tooltip: {
+        trigger: 'item',
+        formatter: function (p) {
+          var s = steps[p.dataIndex];
+          if (!s || p.seriesId !== 'bars') return '';
+          var rows = [];
+          if (s.kind === 'delta') {
+            rows.push({ color: colorOf(s), label: 'Change', value: signed(s.value) });
+            if (o.pctOfStart && first && first.value && s.i > first.i) rows.push({ label: '% of ' + first.label, value: RK.format(s.value == null ? null : s.value / Math.abs(first.value), '+0.0%;' + MINUS + '0.0%;0.0%') });
+            rows.push({ label: 'Running total', value: RK.format(s.end, fmt), bold: true });
+          } else {
+            rows.push({ color: colorOf(s), label: s.kind === 'subtotal' ? 'Subtotal' : 'Total', value: RK.format(s.value, fmt), bold: true });
+            if (s.diff && Math.abs(s.diff) > Math.abs(s.value) * 1e-6) rows.push({ label: 'Unreconciled vs. walk', value: signed(s.diff) });
+          }
+          if (s.category != null && s.kind === 'delta') rows.unshift({ label: ctx.title(enc.category), value: s.category });
+          return C.tip(s.label, rows, s.computed ? 'Computed from the walk' : null);
+        }
+      },
+      xAxis: horiz ? valAxis : catAxis,
+      yAxis: horiz ? catAxis : valAxis,
+      series: series
+    };
+  }
+
+  RK.component({
+    id: 'waterfall',
+    deps: ['echarts'],
+    defaults: {
+      encode: { label: 'step', value: 'value', kind: 'kind', category: null },
+      orientation: 'vertical',   // vertical | horizontal
+      inferTotals: 'auto',       // 'auto' (first + last are totals when there is no kind field) | 'first' | 'last' | 'both' | false
+      endTotal: null,            // label of a computed closing total appended after the last row
+      colorBy: 'sign',           // sign | category (deltas coloured by encode.category, with legend)
+      invert: false,             // true = increases are unfavourable (cost walks): swap pos / neg colours
+      connectors: true,          // true | 'dashed' | false
+      labels: true,
+      deltaFormat: null,         // delta label format; default = value format with explicit +/− sign
+      format: null,              // value format; defaults to the value field's format
+      valueAxis: false,          // pitchbook default: no value axis, labels carry the numbers
+      axisBreak: false,          // false | 'auto' | {start, end, gap} — break the axis between zero and the walk
+      pctOfStart: true,          // tooltip: delta as % of the opening total
+      legend: true
+    },
+    render: function (ctx) {
+      var api = C(build, {
+        select: function (p, c) { return p.seriesId === 'bars' ? { field: c.enc.label, value: p.name } : null; }
+      })(ctx);
+      // category labels wrap to the band width, so re-run the layout (without animation) on resize
+      var last = ctx, update = api.update;
+      api.update = function (c) { last = c; update(c); };
+      api.resize = function () {
+        api.chart.resize();
+        if (Math.abs(api.chart.getWidth() - (api.chart.__rkW || 0)) > 4) update(Object.assign({}, last, { motion: false }));
+      };
+      return api;
+    }
+  });
+})();

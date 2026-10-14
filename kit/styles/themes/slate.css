@@ -23,14 +23,14 @@
   --rk-map-border: #ffffff;
   --rk-map-water: #f5f7f9;
 
-  --rk-cat-1: #1f2a44;
-  --rk-cat-2: #3d7eaa;
-  --rk-cat-3: #1b8a8f;
-  --rk-cat-4: #d0a85c;
-  --rk-cat-5: #8e9aaf;
-  --rk-cat-6: #a9d3d6;
-  --rk-cat-7: #4c956c;
-  --rk-cat-8: #b5525c;
+  --rk-cat-1: #3e6dc8;
+  --rk-cat-2: #db6143;
+  --rk-cat-3: #009783;
+  --rk-cat-4: #7d5abc;
+  --rk-cat-5: #3e9245;
+  --rk-cat-6: #379fc7;
+  --rk-cat-7: #c38700;
+  --rk-cat-8: #c35f92;
 
   --rk-seq-1: #f0f6f7;
   --rk-seq-2: #cfe6e8;
@@ -47,4 +47,10 @@
   --rk-div-5: #cfe6e8;
   --rk-div-6: #67b0b5;
   --rk-div-7: #1e6a76;
+  --rk-ord-1: #1b2533;
+  --rk-ord-2: #33475f;
+  --rk-ord-3: #52698a;
+  --rk-ord-4: #7c93b3;
+  --rk-ord-5: #a9bad0;
+  --rk-ref: #c0392b;
 }

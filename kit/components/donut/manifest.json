@@ -1,0 +1,40 @@
+{
+  "id": "donut",
+  "name": "Donut / Pie",
+  "name_zh": "环形图 / 饼图",
+  "category": "composition",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Part-to-whole ring with a count-up total in the centre, a side legend table (value · % of total) or callout labels, and automatic \"Others\" grouping.",
+  "summary_zh": "部分与整体关系的环形图：中心总数滚动动画，侧边图例表（数值 · 占比）或引线标签，超出数量自动归入“其他”。",
+  "description_zh": "展示一个整体由哪几部分构成，例如股东结构（按投资者类型汇总持股）、收入按业务板块或地区的构成。数据为长表：label 字段为类别、value 字段为数值，同一类别的多行会自动汇总；扇区按大小排序（顺时针，从 12 点钟方向开始），超过 maxSlices 的小类别合并为灰色“Others”。侧边图例表逐行列出数值与占比，并在底部给出合计；悬停扇区时中心显示该部分的数值与占比，点击扇区可交叉筛选其他图表。适合 2–7 个组成部分；部分之间需要精确比较大小时请改用条形图。",
+  "best_for": ["Shareholder structure by investor type", "Revenue mix by segment or region for one year", "Use of proceeds / sources of funds", "Customer or product concentration"],
+  "avoid_when": ["More than ~7 meaningful parts (use a bar or treemap)", "Comparing composition across many periods (use 100% stacked bars)", "Values can be negative", "Parts are very similar in size and must be ranked precisely"],
+  "channels": {
+    "label": {"type": "string", "required": true, "desc": "Category of each part (rows sharing a label are aggregated)", "default": "label"},
+    "value": {"type": "number", "required": true, "desc": "Size of each part (non-positive values are skipped)", "default": "value"}
+  },
+  "options": {
+    "layout": {"type": "string", "default": "legend", "desc": "legend (side table: name · value · % of total) | labels (callout lines) | none"},
+    "display": {"type": "string", "default": "auto", "desc": "What labels / legend show: auto | value | pct | both (auto = value only when the value is already a %)"},
+    "maxSlices": {"type": "number", "default": 7, "desc": "Maximum slices; the smallest parts beyond this are grouped into 'Others'"},
+    "othersLabel": {"type": "string", "default": "Others", "desc": "Name of the grouped tail slice"},
+    "sort": {"type": "string", "default": "desc", "desc": "desc | asc | null (data order); 'Others' is always last"},
+    "agg": {"type": "string", "default": "sum", "desc": "Aggregation for rows sharing a label (sum | avg | max ...)"},
+    "innerRadius": {"type": "number", "default": 0.62, "desc": "Hole radius as a share of the outer radius (0 = pie)"},
+    "center": {"type": "boolean", "default": true, "desc": "Show the total in the hole (counts up on reveal and on filter changes)"},
+    "centerLabel": {"type": "string", "default": "Total", "desc": "Caption under the centre total (null to hide)"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Label(s) drawn in the accent colour, e.g. the client"},
+    "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field format"},
+    "pctFormat": {"type": "string", "default": "0.0%", "desc": "Format of the share of total"}
+  },
+  "interactions": ["Hover a slice or legend row: slice pops out, centre shows its value and share", "Click a slice or legend row to cross-filter ('Others' toggles all of its members)", "Non-selected slices dim", "Count-up total and animated angle transitions when filters change", "PNG / CSV export"],
+  "samples": [
+    {"title": "Shareholder structure by investor type (m shares)", "data": "ownership", "height": 300,
+     "options": {"encode": {"label": "type", "value": "shares_m"}, "centerLabel": "Shares (m)"}},
+    {"title": "Revenue mix by segment — FY2025A (USD m)", "data": "segment_revenue", "height": 320,
+     "options": {"encode": {"label": "segment", "value": "revenue"}, "where": "year == \"2025A\"", "layout": "labels", "display": "both", "centerLabel": "FY2025A revenue"}},
+    {"title": "Top holders (% of shares outstanding)", "data": "ownership", "height": 300, "span": 7,
+     "options": {"encode": {"label": "holder", "value": "pct"}, "maxSlices": 7, "othersLabel": "Other holders", "highlight": "Ardent Family Holdings", "centerLabel": "Disclosed"}}
+  ]
+}

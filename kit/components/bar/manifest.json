@@ -4,36 +4,145 @@
   "name_zh": "柱状图 / 条形图",
   "category": "comparison",
   "engine": "echarts",
-  "deps": ["echarts"],
+  "deps": [
+    "echarts"
+  ],
   "summary": "Compare magnitudes across categories — grouped, stacked, 100% stacked or horizontal ranking bars.",
   "summary_zh": "比较不同类别的数值大小：分组、堆叠、百分比堆叠、横向排名。",
   "description_zh": "最常用的比较图。纵向柱状图适合时间序列（年度收入、利润），横向条形图适合排名（同业市值、估值倍数）。支持宽表（多个 y 字段，每个字段一个系列）和长表（y + series 字段）。可高亮目标公司、加平均线/参考线、点击柱子交叉筛选其他图表，数据较多时可开启缩放。",
-  "best_for": ["Peer ranking by multiple / market cap", "Revenue or EBITDA by year", "Segment mix over time (stacked)", "Share of total (100% stacked)"],
-  "avoid_when": ["More than ~25 categories (use a table or lollipop)", "Continuous time series with many points (use line)"],
+  "best_for": [
+    "Peer ranking by multiple / market cap",
+    "Revenue or EBITDA by year",
+    "Segment mix over time (stacked)",
+    "Share of total (100% stacked)"
+  ],
+  "avoid_when": [
+    "More than ~25 categories (use a table or lollipop)",
+    "Continuous time series with many points (use line)"
+  ],
   "channels": {
-    "x": {"type": "string", "required": true, "desc": "Category axis field (company, year, segment)"},
-    "y": {"type": "number|number[]", "required": true, "desc": "Value field, or an array of fields for wide data (one series per field)"},
-    "series": {"type": "string", "required": false, "desc": "Long-format series field (one series per distinct value)"}
+    "x": {
+      "type": "string",
+      "required": true,
+      "desc": "Category axis field (company, year, segment)"
+    },
+    "y": {
+      "type": "number|number[]",
+      "required": true,
+      "desc": "Value field, or an array of fields for wide data (one series per field)"
+    },
+    "series": {
+      "type": "string",
+      "required": false,
+      "desc": "Long-format series field (one series per distinct value)"
+    }
   },
   "options": {
-    "orientation": {"type": "string", "default": "vertical", "desc": "vertical | horizontal"},
-    "stack": {"type": "boolean|string", "default": false, "desc": "false | true | 'percent'"},
-    "labels": {"type": "boolean|string", "default": "auto", "desc": "Value labels: true | false | 'auto'"},
-    "sort": {"type": "string", "default": null, "desc": "Sort categories by total: 'asc' | 'desc'"},
-    "highlight": {"type": "string|string[]", "default": null, "desc": "Category value(s) drawn in the accent colour (e.g. the target)"},
-    "refLines": {"type": "array", "default": [], "desc": "[{value, label}] reference lines"},
-    "avgLine": {"type": "boolean", "default": false, "desc": "Dashed average line"},
-    "colorBy": {"type": "string", "default": "series", "desc": "series | category"},
-    "format": {"type": "string", "default": null, "desc": "Value format code; defaults to the y field format"},
-    "zoom": {"type": "boolean", "default": false, "desc": "Enable dataZoom (wheel + slider)"}
+    "orientation": {
+      "type": "string",
+      "default": "vertical",
+      "desc": "vertical | horizontal"
+    },
+    "stack": {
+      "type": "boolean|string",
+      "default": false,
+      "desc": "false | true | 'percent'"
+    },
+    "labels": {
+      "type": "boolean|string",
+      "default": "auto",
+      "desc": "Value labels: true | false | 'auto'"
+    },
+    "sort": {
+      "type": "string",
+      "default": null,
+      "desc": "Sort categories by total: 'asc' | 'desc'"
+    },
+    "highlight": {
+      "type": "string|string[]",
+      "default": null,
+      "desc": "Category value(s) drawn in the accent colour (e.g. the target)"
+    },
+    "refLines": {
+      "type": "array",
+      "default": [],
+      "desc": "[{value, label}] reference lines"
+    },
+    "avgLine": {
+      "type": "boolean",
+      "default": false,
+      "desc": "Dashed average line"
+    },
+    "colorBy": {
+      "type": "string",
+      "default": "series",
+      "desc": "series | category"
+    },
+    "palette": {
+      "type": "string",
+      "default": "auto",
+      "desc": "auto (ordinal navy ramp for stacks, categorical otherwise) | cat | ord"
+    },
+    "format": {
+      "type": "string",
+      "default": null,
+      "desc": "Value format code; defaults to the y field format"
+    },
+    "zoom": {
+      "type": "boolean",
+      "default": false,
+      "desc": "Enable dataZoom (wheel + slider)"
+    }
   },
-  "interactions": ["Axis tooltip with totals", "Click a bar to cross-filter", "Legend toggle", "Optional zoom", "PNG / CSV export"],
+  "interactions": [
+    "Axis tooltip with totals",
+    "Click a bar to cross-filter",
+    "Legend toggle",
+    "Optional zoom",
+    "PNG / CSV export"
+  ],
   "samples": [
-    {"title": "EV / EBITDA 2025E — peer ranking", "data": "peers", "height": 380,
-     "options": {"encode": {"x": "company", "y": "ev_ebitda_25e"}, "orientation": "horizontal", "sort": "desc", "highlight": "Helios Industrial", "avgLine": true}},
-    {"title": "Revenue by segment (stacked)", "data": "segment_revenue", "height": 320,
-     "options": {"encode": {"x": "year", "y": "revenue", "series": "segment"}, "stack": true}},
-    {"title": "Revenue vs EBITDA", "data": "financials", "height": 300,
-     "options": {"encode": {"x": "year", "y": ["revenue", "ebitda"]}}}
+    {
+      "title": "EV / EBITDA 2025E — peer ranking",
+      "data": "peers",
+      "height": 380,
+      "options": {
+        "encode": {
+          "x": "company",
+          "y": "ev_ebitda_25e"
+        },
+        "orientation": "horizontal",
+        "sort": "desc",
+        "highlight": "Helios Industrial",
+        "avgLine": true
+      }
+    },
+    {
+      "title": "Revenue by segment (stacked)",
+      "data": "segment_revenue",
+      "height": 320,
+      "options": {
+        "encode": {
+          "x": "year",
+          "y": "revenue",
+          "series": "segment"
+        },
+        "stack": true
+      }
+    },
+    {
+      "title": "Revenue vs EBITDA",
+      "data": "financials",
+      "height": 300,
+      "options": {
+        "encode": {
+          "x": "year",
+          "y": [
+            "revenue",
+            "ebitda"
+          ]
+        }
+      }
+    }
   ]
 }

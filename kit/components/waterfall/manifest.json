@@ -1,0 +1,43 @@
+{
+  "id": "waterfall",
+  "name": "Waterfall / Bridge",
+  "name_zh": "瀑布图 / 桥接图",
+  "category": "bridge",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Bridge from an opening to a closing total through signed steps — EBITDA bridge, EV-to-equity bridge, budget variance walk.",
+  "summary_zh": "从期初总额经过各项正负变动走到期末总额的桥接图：EBITDA 桥、企业价值到股权价值桥、预算差异分析。",
+  "description_zh": "每一行是一步：kind 为 total / subtotal 的柱子从 0 起画，delta 柱子从累计值处浮动，正向变动用 pos 色、负向用 neg 色、合计用主色，柱间以细连接线衔接，标签带 +/− 号。适用于解释两个数之间的差异由哪些驱动因素构成（如 FY25A→FY26E EBITDA 的量、价、成本、并购、汇率贡献，或 EV 扣减净债务、少数股东权益得到股权价值）。没有 kind 字段时自动把首尾两行当作合计；合计值缺失时按累计值计算；变动相对合计很小时可开启 axisBreak 断轴放大变动。",
+  "best_for": ["EBITDA / revenue / net income bridges between two periods", "Enterprise value to equity value bridge", "Budget vs. actual variance walk", "Sources of value creation (LBO returns attribution)"],
+  "avoid_when": ["More than ~15 steps (aggregate small drivers into 'Other')", "Steps that are not additive (use a bar chart)", "Time series of levels (use line / bar)"],
+  "channels": {
+    "label": {"type": "string", "required": true, "desc": "Step name (category axis)", "default": "step"},
+    "value": {"type": "number", "required": true, "desc": "Signed change for delta steps; absolute level for total / subtotal steps (null = computed from the walk)", "default": "value"},
+    "kind": {"type": "string", "required": false, "desc": "total | subtotal | delta (also accepts start / end). Without it, totals are inferred via inferTotals", "default": "kind"},
+    "category": {"type": "string", "required": false, "desc": "Driver group (Organic / Cost / M&A / FX) used by colorBy: 'category' and shown in the tooltip"}
+  },
+  "options": {
+    "orientation": {"type": "string", "default": "vertical", "desc": "vertical | horizontal (horizontal suits long step names)"},
+    "inferTotals": {"type": "string|boolean", "default": "auto", "desc": "Which rows are totals when a row has no kind: 'auto' (first and last when the kind field is absent) | 'first' | 'last' | 'both' | false"},
+    "endTotal": {"type": "string", "default": null, "desc": "Label of a computed closing total appended after the last row (e.g. 'FY26E EBITDA')"},
+    "colorBy": {"type": "string", "default": "sign", "desc": "sign (pos / neg colours) | category (deltas coloured by the category channel, with legend)"},
+    "invert": {"type": "boolean", "default": false, "desc": "Increases are unfavourable (cost walks): swap the pos / neg colours"},
+    "connectors": {"type": "boolean|string", "default": true, "desc": "Connector lines between bars: true | 'dashed' | false"},
+    "labels": {"type": "boolean", "default": true, "desc": "Value labels (deltas with +/− sign, totals in bold)"},
+    "deltaFormat": {"type": "string", "default": null, "desc": "Format code for delta labels; default = value format with an explicit +/− sign"},
+    "format": {"type": "string", "default": null, "desc": "Value format; defaults to the value field's format"},
+    "valueAxis": {"type": "boolean", "default": false, "desc": "Show the value axis and gridlines (off by default: labels carry the numbers)"},
+    "axisBreak": {"type": "boolean|string|object", "default": false, "desc": "false | 'auto' | {start, end, gap}: break the value axis between zero and the walk so small deltas stay readable"},
+    "pctOfStart": {"type": "boolean", "default": true, "desc": "Tooltip shows each delta as % of the opening total"},
+    "legend": {"type": "boolean", "default": true, "desc": "Legend (only shown for colorBy: 'category')"}
+  },
+  "interactions": ["Hover tooltip with change, % of opening total and running total", "Click a step to cross-filter / highlight", "Animated build-up of the walk; smooth transitions on filter change", "PNG / CSV export"],
+  "samples": [
+    {"title": "EBITDA bridge FY25A to FY26E (USD m)", "data": "ebitda_bridge", "height": 360,
+     "options": {"encode": {"label": "step", "value": "value", "kind": "kind", "category": "category"}, "axisBreak": "auto"}},
+    {"title": "Enterprise value to equity value (USD m)", "data": "ev_equity_bridge", "height": 340, "span": 7,
+     "options": {"encode": {"label": "step", "value": "value", "kind": "kind"}}},
+    {"title": "EBITDA bridge by driver (USD m)", "data": "ebitda_bridge", "height": 380, "span": 5,
+     "options": {"encode": {"label": "step", "value": "value", "kind": "kind", "category": "category"}, "orientation": "horizontal", "colorBy": "category", "connectors": "dashed", "axisBreak": "auto"}}
+  ]
+}

@@ -1,0 +1,131 @@
+{
+  "id": "text-block",
+  "name": "Text Block",
+  "name_zh": "叙事文本块",
+  "category": "layout",
+  "engine": "dom",
+  "deps": [],
+  "needs_data": false,
+  "summary": "Narrative block for pitchbook pages: prose with a safe markdown subset, numbered key takeaways, callout box, serif pull quote or big-number stats with count-up — optionally filled live from a dataset via {{field|format}} placeholders.",
+  "summary_zh": "页面叙事模块：安全 Markdown 子集正文、编号要点卡片、强调框、衬线体引言、大数字统计（数字滚动），可用 {{字段|格式}} 占位符从数据集实时取数。",
+  "description_zh": "用于执行摘要、章节要点、关键结论和引言等纯文字内容，通过 variant 切换五种版式：prose（正文，支持 **粗体**、*斜体*、“- ” 列表、“1. ” 编号列表与换行，其余内容一律转义）、takeaways（大号衬线编号的要点卡片）、callout（左侧色条强调框）、quote（衬线体引言 + 署名）、stats（大数字 + 说明，进入视口时数字滚动）。不需要数据即可使用；绑定数据集后，文本中的 {{字段}}、{{字段|0.0x}}、{{median(字段)|0.0x}}（对全部筛选后行聚合）、{{@参数|0.0%}} 会用 options.row 指定的行（行号或表达式，如 \"is_target\"）实时填充，并随全局筛选和参数联动更新。适合把数字结论直接写进叙述，保证正文与图表口径一致。",
+  "best_for": [
+    "Executive summary and section key takeaways",
+    "Callouts next to a chart (key consideration, risk, next step)",
+    "Headline stats strip with live numbers from the model",
+    "Management / investor pull quotes",
+    "Narrative sentences that must stay in sync with the data (placeholders)"
+  ],
+  "avoid_when": [
+    "Tabular comparisons (use a table component)",
+    "More than ~6 takeaways or stats on one page (split the page)",
+    "Untrusted HTML — options.html is meant for report authors only"
+  ],
+  "channels": {
+    "title": {"type": "string", "required": false, "desc": "Takeaway title per row — used only when options.items is empty and a dataset is bound", "default": "title"},
+    "text": {"type": "string", "required": false, "desc": "Takeaway body (markdown subset) per row", "default": "text"},
+    "value": {"type": "number", "required": false, "desc": "Stats value per row", "default": "value"},
+    "label": {"type": "string", "required": false, "desc": "Stats caption per row", "default": "label"},
+    "format": {"type": "string", "required": false, "desc": "Per-row format code for the stats value (falls back to the value field format)", "default": "format"},
+    "note": {"type": "string", "required": false, "desc": "Small secondary line under a stat (e.g. comparison period)", "default": "note"}
+  },
+  "options": {
+    "variant": {"type": "string", "default": "prose", "desc": "prose | takeaways | callout | quote | stats"},
+    "text": {"type": "string", "default": null, "desc": "Body text in the safe markdown subset (**bold**, *italic*, '- ' bullets, '1. ' numbered, line breaks, blank line = paragraph); used by prose, callout and quote. Supports {{placeholders}}"},
+    "html": {"type": "string", "default": null, "desc": "Trusted author HTML instead of text (scripts, event handlers and javascript: URLs are stripped); placeholders are filled"},
+    "items": {"type": "array", "default": null, "desc": "takeaways: [{title, text}]; stats: [{value | field | expr, format, label, note, tone}] — value may also be a '{{...}}' placeholder or literal text. When empty and a dataset is bound, one item per row via encode"},
+    "row": {"type": "number|string", "default": 0, "desc": "Row used for {{field}} placeholders: index into the (filtered) rows, or an RK.expr predicate such as \"is_target\" (first match)"},
+    "title": {"type": "string", "default": null, "desc": "Callout heading (inline markdown, placeholders)"},
+    "kicker": {"type": "string", "default": null, "desc": "Callout small-caps label above the heading, e.g. 'Key consideration'"},
+    "tone": {"type": "string", "default": "accent", "desc": "Callout rule colour token: accent | accent2 | accent3 | pos | neg | neutral (also per stats item)"},
+    "attribution": {"type": "string", "default": null, "desc": "Quote: speaker name"},
+    "role": {"type": "string", "default": null, "desc": "Quote: speaker title / organisation / occasion"},
+    "columns": {"type": "number", "default": null, "desc": "prose: number of text columns (> 1); takeaways / stats: fixed grid columns (auto-fit when null)"},
+    "layout": {"type": "string", "default": "grid", "desc": "takeaways: grid (cards side by side) | list (stacked rows, numeral on the left — for narrow blocks)"},
+    "numbered": {"type": "boolean", "default": true, "desc": "takeaways: show large serif numerals 01, 02 …"},
+    "lead": {"type": "boolean", "default": false, "desc": "prose: set the first paragraph as a larger serif lead-in"},
+    "size": {"type": "string", "default": "base", "desc": "prose: sm | base | lg"},
+    "countUp": {"type": "boolean", "default": true, "desc": "stats: count numbers up on reveal and animate from old to new values on filter changes"},
+    "tools": {"type": "boolean", "default": false, "desc": "Show the block toolbar (off by default for narrative blocks)"}
+  },
+  "interactions": [
+    "Count-up of stats on reveal; animated old-to-new values when filters or parameters change",
+    "Placeholders update live with global filters, cross-filters and what-if parameters",
+    "Staggered entry of takeaway cards and stats (disabled for print / reduced motion)"
+  ],
+  "samples": [
+    {
+      "title": "Executive summary — prose filled from the comps dataset",
+      "data": "peers",
+      "height": 220,
+      "span": 8,
+      "options": {
+        "variant": "prose",
+        "lead": true,
+        "row": "is_target",
+        "text": "{{company}} offers a scaled, cash-generative platform at an undemanding valuation of **{{ev_ebitda_25e}} 2025E EBITDA**, versus a peer median of {{median(ev_ebitda_25e)|0.0x}}.\n\n- Revenue of **{{revenue_25e|$#,##0\"m\"}}** in 2025E, growing {{rev_growth_25e}} (peer median {{median(rev_growth_25e)|0.0%}})\n- EBITDA margin of {{ebitda_margin_25e}} and net leverage of only {{net_debt_ebitda}} EBITDA\n- Shares trade {{1 - share_price / price_52w_high|0.0%}} below the 52-week high of {{price_52w_high}} — *a window before the Q4 results*\n\n1. Launch a dual-track process in Q4 2026\n2. Target signing by the end of Q1 2027"
+      }
+    },
+    {
+      "title": "Key takeaways",
+      "data": null,
+      "height": 160,
+      "options": {
+        "variant": "takeaways",
+        "items": [
+          {"title": "Attractive entry point", "text": "Trades at **9.2x** 2025E EBITDA, a c.1.5x discount to listed peers despite in-line growth."},
+          {"title": "Resilient, cash-generative model", "text": "Recurring service revenue of 38% and FCF conversion above 60% through the cycle."},
+          {"title": "Multiple value-creation levers", "text": "- Pricing and mix: +150 bps margin\n- Bolt-on M&A in motion control"},
+          {"title": "Deep buyer universe", "text": "12 strategic and 9 financial sponsors identified; *three unsolicited approaches* in the last 18 months."}
+        ]
+      }
+    },
+    {
+      "title": "Headline statistics — live from the comps dataset",
+      "data": "peers",
+      "height": 110,
+      "options": {
+        "variant": "stats",
+        "row": "is_target",
+        "items": [
+          {"field": "mkt_cap", "format": "$#,##0.0,\"bn\"", "label": "Market capitalisation", "note": "Share price {{share_price}}"},
+          {"field": "ev", "format": "$#,##0.0,\"bn\"", "label": "Enterprise value", "note": "Net debt {{net_debt|$#,##0\"m\"}}"},
+          {"field": "ev_ebitda_25e", "label": "EV / EBITDA 2025E", "note": "Peer median {{median(ev_ebitda_25e)|0.0x}}"},
+          {"field": "ebitda_margin_25e", "label": "EBITDA margin 2025E", "note": "Peer median {{median(ebitda_margin_25e)|0.0%}}"},
+          {"value": "#2", "label": "Market position", "note": "In industrial automation, North America", "tone": "accent2"}
+        ]
+      }
+    },
+    {
+      "title": "Callout — key consideration",
+      "data": null,
+      "height": 120,
+      "span": 6,
+      "options": {
+        "variant": "callout",
+        "kicker": "Key consideration",
+        "title": "Regulatory approvals set the critical path to closing",
+        "text": "Antitrust filings in **four jurisdictions** and an FDI review in Germany are expected to take *12–14 weeks* from signing.\n- Pre-notification talks to start in parallel with due diligence\n- Hell-or-high-water covenant to be tested with bidders",
+        "tone": "accent"
+      }
+    },
+    {
+      "title": "Pull quote",
+      "data": null,
+      "height": 120,
+      "span": 6,
+      "options": {
+        "variant": "quote",
+        "text": "We have built a business that compounds through the cycle. The next chapter needs a partner with the balance sheet to accelerate it.",
+        "attribution": "Chief Executive Officer",
+        "role": "Helios Industrial, Q2-26 earnings call"
+      }
+    },
+    {
+      "title": "Stats from dataset rows (kpis)",
+      "data": "kpis",
+      "height": 110,
+      "options": {"variant": "stats", "encode": {"note": "period"}}
+    }
+  ]
+}

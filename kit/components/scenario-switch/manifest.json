@@ -1,0 +1,141 @@
+{
+  "id": "scenario-switch",
+  "name": "Scenario Switch",
+  "name_zh": "情景切换器",
+  "category": "controls",
+  "engine": "dom",
+  "deps": [],
+  "needs_data": false,
+  "summary": "Segmented control (Base / Upside / Downside) with a sliding indicator that sets a scenario filter or a shared state key for the whole report.",
+  "summary_zh": "带滑动指示条的分段切换控件（基准 / 乐观 / 悲观），为整份报告设置情景筛选或共享状态。",
+  "description_zh": "用于管理层计划、DCF、LBO 等多情景页面：点击或用方向键切换情景，所有绑定了含情景字段数据集的图表会同步刷新。filter 模式在 RK.store 中设置 {field, op:'in', values:[情景]} 筛选；state 模式只写入一个状态键（RK.store.set），供声明了 listens 的组件自行读取。挂载时若尚未设置则自动应用默认情景，被外部清除时会恢复默认值，保证页面始终只展示一个情景。可在每个选项下显示该情景的关键数字（如 2028E EBITDA），并用说明文字解释情景假设。",
+  "best_for": [
+    "Management plan Base / Upside / Downside toggles",
+    "DCF or LBO case selection",
+    "Sticky top-bar scenario picker",
+    "Bull / bear sensitivity narratives"
+  ],
+  "avoid_when": [
+    "More than ~5 options (use a filter-bar select)",
+    "Several values must be compared side by side (chart them instead)"
+  ],
+  "channels": {
+    "field": {
+      "type": "string",
+      "required": false,
+      "desc": "Scenario field in the bound dataset (option 'field')",
+      "default": "scenario"
+    }
+  },
+  "options": {
+    "field": {
+      "type": "string",
+      "default": "scenario",
+      "desc": "Dataset field holding the scenario names; also the default store key"
+    },
+    "values": {
+      "type": "array",
+      "default": null,
+      "desc": "Explicit option order; null = distinct values of the bound dataset in data order (fallback Base / Upside / Downside)"
+    },
+    "labels": {
+      "type": "object",
+      "default": {},
+      "desc": "{value: display label} overrides"
+    },
+    "descriptions": {
+      "type": "object",
+      "default": {},
+      "desc": "{value: caption} shown under the control for the active case"
+    },
+    "default": {
+      "type": "string",
+      "default": null,
+      "desc": "Case applied on mount when the store has none (null = first value)"
+    },
+    "mode": {
+      "type": "string",
+      "default": "filter",
+      "desc": "filter: RK.store.setFilter(key, {field, op:'in', values:[v]}) | state: RK.store.set(key, v)"
+    },
+    "key": {
+      "type": "string",
+      "default": null,
+      "desc": "Store key (filter key or state key); defaults to the field name"
+    },
+    "label": {
+      "type": "string",
+      "default": null,
+      "desc": "Small-caps label; defaults to the field title"
+    },
+    "tones": {
+      "type": "string|object|boolean",
+      "default": "auto",
+      "desc": "Status dot colour: 'auto' (Upside = positive, Downside = negative), false, or {value: 'pos'|'neg'|'base'}"
+    },
+    "metric": {
+      "type": "object",
+      "default": null,
+      "desc": "{field, agg, where, format, label, compare} headline value per case; agg defaults to sum, compare (default true) adds the % change vs. the default case, e.g. {field:'ebitda', where:'year == \"2028E\"', format:'$#,##0\"m\"', label:'EBITDA 2028E'}"
+    },
+    "layout": {
+      "type": "string",
+      "default": "auto",
+      "desc": "auto | stacked | inline (auto = inline inside .rk-topbar__controls)"
+    },
+    "tools": {
+      "type": "boolean",
+      "default": false,
+      "desc": "Block toolbar (off for controls)"
+    }
+  },
+  "interactions": [
+    "Click or arrow keys to switch case (radio group, roving focus)",
+    "Sliding indicator with tone underline",
+    "Drives every block bound to a dataset with the scenario field",
+    "Re-applies the default case if the filter is cleared elsewhere",
+    "Metric values respect the other global filters"
+  ],
+  "samples": [
+    {
+      "title": "Management plan scenario",
+      "data": "scenarios",
+      "height": 120,
+      "span": 7,
+      "options": {
+        "field": "scenario",
+        "label": "Scenario",
+        "default": "Base",
+        "metric": {
+          "field": "ebitda",
+          "where": "year == \"2028E\"",
+          "format": "$#,##0\"m\"",
+          "label": "EBITDA 2028E"
+        },
+        "descriptions": {
+          "Base": "Management plan: 6.6% revenue CAGR 2025A–30E, EBITDA margin expanding to 20.5%.",
+          "Upside": "Accelerated automation demand: 8.8% revenue CAGR, 22.0% EBITDA margin by 2030E.",
+          "Downside": "Industrial slowdown: 3.2% revenue CAGR, margins flat at c.18.5%."
+        }
+      }
+    },
+    {
+      "title": "Compact state switch (top-bar style)",
+      "data": "scenarios",
+      "height": 60,
+      "span": 5,
+      "options": {
+        "mode": "state",
+        "key": "case",
+        "label": "Case",
+        "values": [
+          "Downside",
+          "Base",
+          "Upside"
+        ],
+        "default": "Upside",
+        "layout": "inline"
+      }
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "id": "beeswarm",
+  "name": "Beeswarm",
+  "name_zh": "蜂群分布图",
+  "category": "distribution",
+  "engine": "echarts",
+  "deps": ["echarts"],
+  "summary": "Every observation as a non-overlapping dot along a value axis, one row per group, with interquartile band and median tick — shows dispersion and where the target sits.",
+  "summary_zh": "把每个观测值画成互不重叠的点，按分组逐行排列，叠加四分位区间和中位数刻度，直观展示离散程度以及目标公司所处位置。",
+  "description_zh": "适合展示同业估值倍数（按行业）或交易溢价（按对价方式）等一维分布：每个点是一家公司 / 一笔交易，点沿数值轴排列、在组内自动错开不重叠，浅色带为 25–75 分位区间，深色短线为中位数，组名下方注明样本数与中位数。目标公司以 accent-2 高亮并直接标注名称，可选 extremes 模式标注组内最高 / 最低值。数据为长表：label（名称）+ value（数值）+ group（分组），可选 size 映射气泡大小、colorBy 按字段着色。比箱线图更诚实（小样本也能看清每个点），比柱状图更能体现分布。",
+  "best_for": ["Peer trading multiples by sector / region", "Precedent transaction premia by consideration type", "Showing where the target sits within a peer distribution", "Small-n distributions (5–200 points per chart)"],
+  "avoid_when": ["Thousands of observations (use a histogram or box plot)", "A single number per group is all that matters (use a bar)", "Groups have only one or two observations each"],
+  "channels": {
+    "label": {"type": "string", "required": true, "desc": "Observation name (company, deal) — used for labels, tooltip and cross-filter", "default": "label"},
+    "value": {"type": "number", "required": true, "desc": "Value plotted along the axis (multiple, premium, margin)", "default": "value"},
+    "group": {"type": "string", "required": false, "desc": "Row / column grouping (sector, consideration); omit for a single swarm", "default": "group"},
+    "size": {"type": "number", "required": false, "desc": "Optional bubble size (sqrt / area scale), e.g. market cap"},
+    "target": {"type": "boolean", "required": false, "desc": "Flag field marking the target (accent-2 + label)", "default": "is_target"}
+  },
+  "options": {
+    "orientation": {"type": "string", "default": "horizontal", "desc": "horizontal (one row per group) | vertical (one column per group)"},
+    "highlight": {"type": "string|string[]", "default": null, "desc": "Label value(s) drawn in accent-2 and labelled, in addition to rows flagged by encode.target"},
+    "labels": {"type": "string", "default": "highlight", "desc": "Direct labels: 'highlight' | 'extremes' (also min / max per group) | 'all' (collisions hidden) | 'none'"},
+    "median": {"type": "boolean", "default": true, "desc": "Median tick per group and 'n · Med.' line under the group name"},
+    "band": {"type": "string|boolean", "default": "iqr", "desc": "Shaded band per group: 'iqr' (25th–75th percentile) | 'range' (min–max) | false"},
+    "overall": {"type": "boolean", "default": false, "desc": "Dashed line at the median of all observations"},
+    "refLines": {"type": "array", "default": [], "desc": "[{value, label, color}] reference lines, e.g. proposed premium"},
+    "colorBy": {"type": "string", "default": "single", "desc": "'single' | 'group' | a field name (categorical colours + legend toggle)"},
+    "symbolSize": {"type": "number", "default": 10, "desc": "Dot diameter in px"},
+    "sizeRange": {"type": "number[]", "default": [6, 24], "desc": "[min, max] diameter in px when encode.size is set"},
+    "sortGroups": {"type": "string", "default": null, "desc": "null (data order) | 'desc' | 'asc' (by group median) | 'alpha'"},
+    "format": {"type": "string", "default": null, "desc": "Value format code; defaults to the value field's format"},
+    "zoom": {"type": "boolean", "default": false, "desc": "dataZoom along the value axis (wheel + slider); the swarm re-flows on zoom"},
+    "legend": {"type": "boolean", "default": true, "desc": "Show the legend when colorBy is a field"}
+  },
+  "interactions": ["Hover a dot: value, delta to group median, rank in group", "Hover a row: n, quartiles, mean", "Click a dot to cross-filter by label; click a row to cross-filter by group", "Non-selected dots dimmed", "Legend toggle (colorBy field)", "Optional zoom with live re-layout", "Dots fan out from the group median on entry", "PNG / CSV export"],
+  "samples": [
+    {"title": "EV / EBITDA 2025E by sector", "data": "peers", "height": 300,
+     "options": {"encode": {"label": "company", "value": "ev_ebitda_25e", "group": "sector"}, "overall": true, "labels": "extremes", "sortGroups": "desc"}},
+    {"title": "Premium to 30-day VWAP by consideration", "data": "precedents", "height": 230,
+     "options": {"encode": {"label": "target", "value": "premium_30d", "group": "consideration"}, "symbolSize": 12, "refLines": [{"value": 0.35, "label": "Proposed offer 35%"}]}},
+    {"title": "EV / EBITDA 2025E by region — sized by market cap", "data": "peers", "height": 360,
+     "options": {"encode": {"label": "company", "value": "ev_ebitda_25e", "group": "region", "size": "mkt_cap"}, "orientation": "vertical", "colorBy": "sector", "band": "range"}}
+  ]
+}

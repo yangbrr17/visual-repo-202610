@@ -1,0 +1,78 @@
+/* comps-table — extends the shared .rk-table pitchbook styles */
+.rk-comps { position: relative; height: 100%; }
+.rk-comps.is-auto { height: auto; }
+.rk-comps__scroll { height: 100%; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--rk-rule) transparent; }
+.rk-comps.is-auto .rk-comps__scroll { height: auto; overflow-x: auto; overflow-y: visible; }
+
+/* separate borders so sticky cells keep their rules while scrolling */
+.rk-comps .rk-table { border-collapse: separate; border-spacing: 0; line-height: 1.3; }
+.rk-comps thead { position: sticky; top: 0; z-index: 3; }
+.rk-comps thead th { background: var(--rk-paper); white-space: normal; line-height: 1.25; padding-top: 4px; }
+.rk-comps thead th.is-sorted { color: var(--rk-ink); }
+.rk-comps thead th .rk-sort { width: 9px; margin: 0 0 0 3px; font-size: 8px; color: var(--rk-accent-3); vertical-align: 1px; }
+.rk-comps thead th.is-num .rk-sort { margin: 0 3px 0 0; }
+.rk-comps thead tr.rk-table__group th { border-bottom: 0; padding-bottom: 0; vertical-align: bottom; }
+.rk-comps thead tr.rk-table__group th[rowspan] { border-bottom: 1.5px solid var(--rk-accent); text-transform: none; letter-spacing: 0; font-size: var(--rk-fs-sm); color: var(--rk-ink-2); text-align: left; padding-bottom: 5px; }
+.rk-comps thead tr.rk-table__group th[rowspan].is-num { text-align: right; }
+.rk-comps thead tr.rk-table__group th[rowspan].is-sorted { color: var(--rk-ink); }
+.rk-comps th.rk-comps__grp > span { display: block; padding-bottom: 3px; border-bottom: 1px solid var(--rk-rule); white-space: nowrap; }
+
+/* sticky first column (wide tables scroll horizontally under it) */
+.rk-comps .is-sticky { position: sticky; left: 0; z-index: 1; background-color: var(--rk-paper); }
+.rk-comps thead .is-sticky { z-index: 4; }
+.rk-comps td.rk-comps__label { color: var(--rk-ink); }
+.rk-comps__fn { margin-left: 2px; font-size: 8.5px; line-height: 0; color: var(--rk-ink-3); font-weight: 500; font-style: normal; }
+
+/* rows */
+.rk-comps tbody tr { transition: transform 460ms var(--rk-ease), opacity var(--rk-dur-fast); }
+.rk-comps tbody td { transition: opacity var(--rk-dur-fast), background-color var(--rk-dur-fast); }
+.rk-comps tbody tr.is-data { cursor: pointer; }
+.rk-comps tbody tr.is-data:focus-visible { outline: 2px solid var(--rk-accent-3); outline-offset: -2px; }
+.rk-comps tbody tr.is-data:hover td:not(.is-heat) { background-color: var(--rk-surface); }
+.rk-comps tbody tr.is-data td.is-heat { font-weight: 500; }
+.rk-comps .rk-table td.is-neg { color: var(--rk-neg); }
+.rk-comps .rk-table td.is-pos { color: var(--rk-pos); }
+
+/* target: opaque gold tint (sticky cells must not be see-through) + accent edge */
+.rk-comps .rk-table tr.is-target td { background-color: color-mix(in srgb, var(--rk-accent-2) 15%, var(--rk-paper)); font-weight: 600; border-bottom-color: color-mix(in srgb, var(--rk-accent-2) 40%, var(--rk-paper)); }
+.rk-comps .rk-table tr.is-target td.is-sticky, .rk-comps .rk-table tr.is-target td:first-child { box-shadow: inset 3px 0 0 var(--rk-accent-2); }
+.rk-comps .rk-table tr.is-target:hover td:not(.is-heat) { background-color: color-mix(in srgb, var(--rk-accent-2) 22%, var(--rk-paper)); }
+.rk-comps .rk-table tr.is-pinned-bottom td { border-top: 1px solid var(--rk-rule); border-bottom: 0; }
+
+/* sections */
+.rk-comps .rk-table tr.is-section td { padding: 12px 8px 4px; border-bottom: 1px solid var(--rk-rule); background: var(--rk-paper); }
+.rk-comps .rk-table tbody tr.is-section:first-child td { padding-top: 7px; }
+.rk-comps__sec { position: sticky; left: 8px; font-size: var(--rk-fs-sm); font-weight: 600; letter-spacing: .02em; color: var(--rk-accent); }
+[data-rk-theme="ink"] .rk-comps__sec { color: var(--rk-accent); }
+
+/* statistics (overall rows sit in a sticky <tfoot>) */
+.rk-comps tfoot { position: sticky; bottom: 0; z-index: 2; }
+.rk-comps.is-auto tfoot { position: static; }
+.rk-comps .rk-table tfoot td { border-bottom: 0; }
+.rk-comps .rk-table tr.is-stat td { background: var(--rk-surface); font-weight: 600; border-bottom: 0; color: var(--rk-ink); }
+.rk-comps .rk-table tfoot tr.is-stat:last-child td { padding-bottom: 6px; }
+.rk-comps .rk-table tr.is-stat.is-stat-first td { border-top: 1.5px solid var(--rk-accent); }
+.rk-comps .rk-table tr.is-substat td { background: var(--rk-paper); font-weight: 500; color: var(--rk-ink-2); padding-top: 3px; padding-bottom: 3px; }
+.rk-comps .rk-table tr.is-substat.is-stat-first td { border-top: 1px dotted var(--rk-rule); }
+.rk-comps .rk-table tr.is-substat td.rk-comps__label { font-style: italic; padding-left: 16px; color: var(--rk-ink-3); }
+.rk-comps .rk-table tbody tr.is-stat:hover td, .rk-comps .rk-table tbody tr.is-section:hover td { background-color: inherit; }
+.rk-comps .rk-table tbody tr.is-stat:not(.is-substat):hover td { background: var(--rk-surface); }
+.rk-comps .rk-table tbody tr.is-substat:hover td, .rk-comps .rk-table tbody tr.is-section:hover td { background: var(--rk-paper); }
+
+/* cross-filter selection */
+.rk-comps.has-sel tr.is-data:not(.is-selected) td { opacity: .38; }
+.rk-comps tr.is-selected td:first-child { box-shadow: inset 3px 0 0 var(--rk-accent); font-weight: 600; }
+
+/* density */
+.rk-comps--dense .rk-table th, .rk-comps--dense .rk-table td { padding-top: 3px; padding-bottom: 3px; }
+
+/* motion: staggered reveal on first paint, fade for rows entering after a filter change */
+.rk-comps tr.is-in { animation: rk-comps-in 440ms var(--rk-ease) both; animation-delay: calc(var(--rk-i, 0) * 22ms + 60ms); }
+.rk-comps tr.is-enter { animation: rk-comps-in 360ms var(--rk-ease) both; }
+@keyframes rk-comps-in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .rk-comps tr.is-in, .rk-comps tr.is-enter { animation: none; } .rk-comps tbody tr { transition: none; } }
+@media print {
+  .rk-comps tr.is-in, .rk-comps tr.is-enter { animation: none; }
+  .rk-comps__scroll { height: auto; overflow: visible; }
+  .rk-comps thead, .rk-comps tfoot { position: static; }
+}

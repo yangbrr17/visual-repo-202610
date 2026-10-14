@@ -27,13 +27,13 @@
 
   /* categorical — ordered for maximum separation in the first 4 */
   --rk-cat-1: #0b2d5b;
-  --rk-cat-2: #4a78b0;
-  --rk-cat-3: #9dbcdd;
-  --rk-cat-4: #b08d57;
-  --rk-cat-5: #5e6b7a;
-  --rk-cat-6: #c8d2de;
-  --rk-cat-7: #2e7d6f;
-  --rk-cat-8: #8c3b4a;
+  --rk-cat-2: #5f8dc4;
+  --rk-cat-3: #b68028;
+  --rk-cat-4: #9f3960;
+  --rk-cat-5: #3f7fb0;
+  --rk-cat-6: #57873a;
+  --rk-cat-7: #7555a8;
+  --rk-cat-8: #8a95a6;
 
   /* sequential (light -> dark) */
   --rk-seq-1: #f1f5fa;
@@ -52,4 +52,10 @@
   --rk-div-5: #c9d8ea;
   --rk-div-6: #6f98c8;
   --rk-div-7: #0b2d5b;
+  --rk-ord-1: #0e2a47;
+  --rk-ord-2: #1f4e79;
+  --rk-ord-3: #3a6fa6;
+  --rk-ord-4: #6b93c4;
+  --rk-ord-5: #98b4d8;
+  --rk-ref: #b3261e;
 }

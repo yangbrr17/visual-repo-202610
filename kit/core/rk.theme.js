@@ -71,6 +71,7 @@
     t.cat = series('cat', 12);
     t.seq = series('seq', 9);
     t.div = series('div', 9);
+    t.ord = series('ord', 9);           // ordinal ramp: stacked parts of a whole (dark -> light)
     if (!t.cat.length) t.cat = ['#0b2d5b', '#3b6ea8', '#8fb3d9', '#b08d57', '#6b7785', '#c9d3df', '#2f7d6d', '#a3485a'];
     if (!t.seq.length) t.seq = ['#eef3f9', '#c9d8ea', '#93b1d4', '#5b86ba', '#2f5f99', '#163f73', '#0b2d5b'];
     if (!t.div.length) t.div = ['#a3485a', '#d79aa4', '#f1dfe2', '#f4f4f2', '#d8e4f0', '#8fb3d9', '#1f4e89'];
@@ -86,6 +87,8 @@
     t.neg = t.neg || '#a3485a';
     t.neutral = t.neutral || '#9ca3af';
     t.highlight = t.highlight || t.accent2;
+    if (!t.ord.length) t.ord = t.seq.slice().reverse().slice(0, 5);
+    t.ref = v('ref') || t.neg;            // reference lines: current / offer price
     t.paper = t.paper || '#ffffff';
     t.surface = t.surface || t.paper;
     t.tooltipBg = t.tooltipBg || '#ffffff';
